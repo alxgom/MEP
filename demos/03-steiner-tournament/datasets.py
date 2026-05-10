@@ -58,3 +58,13 @@ def get_benchmark_suites() -> Dict[str, List[Dict[str, Any]]]:
         })
         
     return suites
+
+def get_heavy_benchmark_suite(num_maps: int = 20, n_terminals: int = 70) -> List[Dict[str, Any]]:
+    """Generate 20 unique seeded maps with 70 terminals each."""
+    return [
+        {
+            "name": f"Heavy_{i+1}",
+            "terminals": generate_random_cluster(n_terminals, seed=i*1000)
+        }
+        for i in range(num_maps)
+    ]
