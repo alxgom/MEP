@@ -1,0 +1,4 @@
+pygame>=2.5
+networkx>=3.0
+imageio>=2.30
+matplotlib>=3.7

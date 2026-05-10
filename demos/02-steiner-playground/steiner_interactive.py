@@ -1,0 +1,611 @@
+"""
+Steiner Tree Demo — Browser-only interactive version (HTML/JS)
+==============================================================
+Generates steiner_interactive.html.
+Run: python steiner_interactive.py
+Then: python -m http.server 8080
+Open: http://localhost:8080/steiner_interactive.html
+
+Uses vanilla JavaScript with HTML5 Canvas. No Python needed in the browser.
+"""
+
+import os
+
+HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Steiner Point Playground — Browser Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #12121c; color: #d0d0e0; font-family: 'Consolas', monospace; display: flex; flex-direction: row; height: 100vh; overflow: hidden; }
+  canvas { border-left: 2px solid #3a3a50; cursor: crosshair; }
+  #panel { width: 320px; padding: 16px; background: #1c1c2e; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+  #panel h1 { color: #5eb8ff; font-size: 18px; margin-bottom: 4px; }
+  #panel h2 { color: #ffa500; font-size: 14px; margin-bottom: 8px; }
+  .legend { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #fff; }
+  .legend-line { width: 20px; height: 3px; }
+  .stat { font-size: 13px; color: #c0c0d0; }
+  .stat b { color: #ffe080; }
+  #status { font-size: 13px; color: #ffc832; margin-top: 8px; min-height: 20px; }
+  .controls { font-size: 11px; color: #606080; margin-top: 12px; line-height: 1.8; }
+  #presetSelect { width: 100%; padding: 4px; background: #2a2a3e; color: #d0d0e0; border: 1px solid #404060; border-radius: 4px; font-family: inherit; font-size: 12px; margin: 4px 0; }
+  button { padding: 6px 12px; background: #3a3a5e; color: #d0d0e0; border: 1px solid #505080; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; }
+  button:hover { background: #50507a; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>STEINER TREE</h1>
+  <h2>Point Playground</h2>
+  <select id="presetSelect"></select>
+  <div class="stat">Terminals: <b id="sTerm">0</b></div>
+  <div class="stat">Steiner: <b id="sStein">0</b></div>
+  <div class="stat">MST Weight: <b id="sWeight">0</b></div>
+  <div class="stat">Iteration: <b id="sIter">0</b></div>
+  <div class="stat">Max Force: <b id="sForce">0</b></div>
+  <div class="stat">120° Dev: <b id="sAngle">0</b></div>
+  <div id="status">Click canvas to add terminals. Press N or Auto.</div>
+  <div class="legend">
+    <div class="legend-dot" style="background:#46b4ff"></div> Terminal
+  </div>
+  <div class="legend">
+    <div class="legend-dot" style="background:#ffb450"></div> Steiner
+  </div>
+  <div class="legend">
+    <div class="legend-line" style="background:#3cff70"></div> MST edge
+  </div>
+  <div class="legend">
+    <div class="legend-line" style="background:#ff6464"></div> Force
+  </div>
+  <div class="controls">
+    <b>Controls:</b><br>
+    <b>N</b> — Next step<br>
+    <b>A</b> / <b>Space</b> — Auto-run<br>
+    <b>R</b> — Reset algorithm<br>
+    <b>C</b> — Clear all<br>
+    <b>+</b> / <b>−</b> — Add/remove Steiner pts<br>
+    <b>G</b> — Random terminals<br>
+    <b>Click</b> — Add terminal<br>
+    <b>Drag</b> — Move vertex<br>
+    <b>Scroll</b> — Zoom<br>
+    <b>Esc</b> — Quit (close tab)
+  </div>
+</div>
+<canvas id="canvas"></canvas>
+<script>
+// --- Config ---
+const N_TERMINALS = 3;
+const CANVAS_PAD = 20;
+const VERTEX_R = 14;
+const VERTEX_R_STEINER = 11;
+const ANIM_SPEED = 600; // ms per step
+const FAST_SPEED = 20;
+
+// --- State ---
+let terminals = [];
+let steinerPts = [];
+let mstEdges = [];
+let mstWeight = 0;
+let forces = [];
+let angles = [];
+let iteration = 0;
+let autoRunning = false;
+let fastMode = false;
+let dragging = -1;
+let dragType = ''; // 'T' or 'S'
+let hoverIdx = -1;
+let zoom = 1.0;
+let panX = 0, panY = 0;
+let waiting = true;
+let complete = false;
+
+// --- Presets ---
+const PRESETS = [
+  { name: "Equilateral Triangle", terminals: [[0.2,0.3],[0.8,0.3],[0.5,0.7]], steiner: 1 },
+  { name: "Square", terminals: [[0.15,0.15],[0.85,0.15],[0.85,0.85],[0.15,0.85]], steiner: 2 },
+  { name: "Hexagon", terminals: [[.5,.15],[.85,.35],[.85,.65],[.5,.85],[.15,.65],[.15,.35]], steiner: 4 },
+  { name: "Pentagon", terminals: [[.5,.1],[.85,.35],[.72,.8],[.28,.8],[.15,.35]], steiner: 3 },
+  { name: "Diamond", terminals: [[.5,.1],[.9,.5],[.5,.9],[.1,.5]], steiner: 2 },
+  { name: "Collinear", terminals: [[.1,.5],[.3,.5],[.5,.5],[.7,.5],[.9,.5]], steiner: 0 },
+  { name: "Random 6 (s:7)", seed: 7, count: 6 },
+  { name: "Random 8 (s:13)", seed: 13, count: 8 },
+  { name: "Random 12 (s:42)", seed: 42, count: 12 },
+  { name: "Random 15 (s:99)", seed: 99, count: 15 },
+];
+
+// --- Seeded RNG ---
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+function genRandom(n, seed) {
+  const rng = mulberry32(seed);
+  const pts = [];
+  const margin = 0.1;
+  for (let i = 0; i < n; i++) {
+    pts.push([margin + rng()*(1-2*margin), margin + rng()*(1-2*margin)]);
+  }
+  return pts;
+}
+
+// --- Canvas ---
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth - 320;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Color ---
+const COL_TERM = '#46b4ff';
+const COL_STEINER = '#ffb450';
+const COL_MST = '#3cff70';
+const COL_FORCE = '#ff6464';
+const COL_GRID = '#1e1e32';
+const COL_DIM = '#3a3a50';
+const COL_BG = '#16162a';
+const COL_TEXT = '#c8c8e0';
+
+// --- World <-> Pixel ---
+function wx(x) { return (x - 0.5 - panX) * zoom * (canvas.width - CANVAS_PAD*2) * 0.85 + canvas.width/2; }
+function wy(y) { return (y - 0.5 - panY) * zoom * (canvas.height - CANVAS_PAD*2) * 0.85 + canvas.height/2; }
+function pw(px) { return (px - canvas.width/2) / (zoom * (canvas.width - CANVAS_PAD*2) * 0.85) + 0.5 + panX; }
+function ph(py) { return (py - canvas.height/2) / (zoom * (canvas.height - CANVAS_PAD*2) * 0.85) + 0.5 + panY; }
+function r() { return Math.max(8, VERTEX_R / zoom * 0.85); }
+
+// --- Geometry ---
+function dist2(a,b) { return (a[0]-b[0])**2 + (a[1]-b[1])**2; }
+function dist(a,b) { return Math.sqrt(dist2(a,b)); }
+
+// --- MST (Kruskal) ---
+class DSU {
+  constructor(n) { this.p = Array.from({length:n},(_,i)=>i); this.rk = new Array(n).fill(0); }
+  find(x) { while(this.p[x]!==x){this.p[x]=this.p[this.p[x]];x=this.p[x];} return x; }
+  union(a,b) { let ra=this.find(a),rb=this.find(b); if(ra===rb)return false; if(this.rk[ra]<this.rk[rb])[ra,rb]=[rb,ra]; this.p[rb]=ra; if(this.rk[ra]===this.rk[rb])this.rk[ra]++; return true; }
+}
+
+function computeMST(pts) {
+  const n = pts.length;
+  const edges = [];
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) edges.push([dist(pts[i],pts[j]), i, j]);
+  edges.sort((a,b)=>a[0]-b[0]);
+  const dsu = new DSU(n);
+  const mst = []; let w = 0;
+  for(const [d,u,v] of edges) {
+    if(dsu.union(u,v)) { mst.push([u,v]); w += d; if(mst.length===n-1)break; }
+  }
+  const adj = {};
+  for(let i=0;i<n;i++) adj[i]=[];
+  for(const [u,v] of mst) { adj[u].push(v); adj[v].push(u); }
+  return { mst, weight: w, adj };
+}
+
+function gradientAt(i, pts, adj) {
+  let fx=0, fy=0;
+  for(const j of (adj[i]||[])) {
+    const dx = pts[j][0]-pts[i][0], dy = pts[j][1]-pts[i][1];
+    const d = Math.hypot(dx,dy);
+    if(d>1e-10) { fx += dx/d; fy += dy/d; }
+  }
+  return [fx,fy];
+}
+
+function angleAt(i, pts, adj) {
+  const nbIndices = adj[i]||[];
+  if(nbIndices.length<2) return [];
+  const px=pts[i][0], py=pts[i][1];
+  
+  // Sort neighbors by polar angle
+  const sortedNb = [...nbIndices].sort((a,b) => {
+    return Math.atan2(pts[a][1]-py, pts[a][0]-px) - Math.atan2(pts[b][1]-py, pts[b][0]-px);
+  });
+  
+  const angles = [];
+  for(let k=0;k<sortedNb.length;k++) {
+    const a = sortedNb[k], b = sortedNb[(k+1)%sortedNb.length];
+    const ax = pts[a][0]-px, ay = pts[a][1]-py;
+    const bx = pts[b][0]-px, by = pts[b][1]-py;
+    const angA = Math.atan2(ay, ax), angB = Math.atan2(by, bx);
+    let diff = angB - angA;
+    while(diff < 0) diff += 2 * Math.PI;
+    while(diff >= 2 * Math.PI) diff -= 2 * Math.PI;
+    angles.push(diff * 180 / Math.PI);
+  }
+  return angles;
+}
+
+// --- Main update step ---
+function step() {
+  if(complete || terminals.length + steinerPts.length < 2) return;
+  const allPts = [...terminals, ...steinerPts];
+  const {mst, weight, adj} = computeMST(allPts);
+  mstEdges = mst; mstWeight = weight;
+
+  // Gradient on Steiner
+  const maxF = steinerPts.length > 0 ? Math.max(...steinerPts.map((_,i)=>{
+    const [fx,fy] = gradientAt(terminals.length+i, allPts, adj);
+    const g = 0.08;
+    steinerPts[i][0] += g*fx; steinerPts[i][1] += g*fy;
+    steinerPts[i][0] = Math.max(0.02, Math.min(0.98, steinerPts[i][0]));
+    steinerPts[i][1] = Math.max(0.02, Math.min(0.98, steinerPts[i][1]));
+    return Math.hypot(fx,fy);
+  })) : 0;
+
+  // SA perturbation
+  const T = 0.1 * Math.pow(0.995, iteration);
+  if(T > 1e-10) {
+    steinerPts.forEach(p => {
+      p[0] += (Math.random()-0.5)*T*2;
+      p[1] += (Math.random()-0.5)*T*2;
+      p[0] = Math.max(0.02, Math.min(0.98, p[0]));
+      p[1] = Math.max(0.02, Math.min(0.98, p[1]));
+    });
+  }
+
+  // Merge Steiner pts
+  const mergeThresh = 0.005 * Math.hypot(1,1);
+  for(let i=0;i<steinerPts.length;i++) {
+    // With other Steiner pts
+    for(let j=i+1;j<steinerPts.length;j++) {
+      if(dist(steinerPts[i],steinerPts[j]) < mergeThresh) {
+        steinerPts[i][0] = (steinerPts[i][0]+steinerPts[j][0])/2;
+        steinerPts[i][1] = (steinerPts[i][1]+steinerPts[j][1])/2;
+        steinerPts.splice(j,1); j--;
+      }
+    }
+    // With Terminals
+    for(let t=0; t<terminals.length; t++) {
+      if(dist(steinerPts[i], terminals[t]) < mergeThresh) {
+        steinerPts.splice(i,1); i--; break;
+      }
+    }
+  }
+
+  iteration++;
+  const allPts2 = [...terminals, ...steinerPts];
+  const {mst: mst2, weight: newW, adj: newAdj} = computeMST(allPts2);
+  mstEdges = mst2; mstWeight = newW;
+  forces = steinerPts.map((_,i)=>gradientAt(terminals.length+i, allPts2, newAdj));
+  angles = steinerPts.map((_,i)=>angleAt(terminals.length+i, allPts2, newAdj));
+  complete = maxF < 0.001 && T < 0.001 && iteration > 20;
+
+  if(complete) autoRunning = false;
+  updateStats();
+}
+
+// --- Draw ---
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = COL_BG; ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = COL_GRID; ctx.lineWidth = 0.5;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  const allPts = [...terminals.map(p=>({p,type:'T'})), ...steinerPts.map(p=>({p,type:'S'}))];
+
+  // Candidate edges dimly
+  ctx.strokeStyle = COL_DIM; ctx.lineWidth = 0.5;
+  for(let i=0;i<allPts.length;i++) for(let j=i+1;j<allPts.length;j++) {
+    ctx.beginPath(); ctx.moveTo(wx(allPts[i].p[0]),wy(allPts[i].p[1]));
+    ctx.lineTo(wx(allPts[j].p[0]),wy(allPts[j].p[1])); ctx.stroke();
+  }
+
+  // MST edges
+  ctx.strokeStyle = COL_MST; ctx.lineWidth = 2.5;
+  for(const [u,v] of mstEdges) {
+    if(u < allPts.length && v < allPts.length) {
+      ctx.beginPath(); ctx.moveTo(wx(allPts[u].p[0]),wy(allPts[u].p[1]));
+      ctx.lineTo(wx(allPts[v].p[0]),wy(allPts[v].p[1])); ctx.stroke();
+    }
+  }
+
+  // Force arrows
+  for(let k=0;k<steinerPts.length;k++) {
+    const [fx,fy] = forces[k]||[0,0];
+    const mag = Math.hypot(fx,fy); if(mag<1e-8) continue;
+    const px=wx(steinerPts[k][0]), py=wy(steinerPts[k][1]);
+    const scale = 30;
+    ctx.strokeStyle = COL_FORCE; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+fx*scale,py+fy*scale); ctx.stroke();
+    // Arrowhead
+    const a = Math.atan2(fy,fx);
+    ctx.beginPath();
+    ctx.moveTo(px+fx*scale, py+fy*scale);
+    ctx.lineTo(px+fx*scale-8*Math.cos(a-0.4), py+fy*scale-8*Math.sin(a-0.4));
+    ctx.moveTo(px+fx*scale, py+fy*scale);
+    ctx.lineTo(px+fx*scale-8*Math.cos(a+0.4), py+fy*scale-8*Math.sin(a+0.4));
+    ctx.stroke();
+  }
+
+  // 120° angle arcs
+  const sa = terminals.length;
+  for(let k=0;k<steinerPts.length;k++) {
+    const i = sa + k;
+    const nbIndices = (function(){ const r={}; for(const [u,v] of mstEdges){if(u===i)r[v]=1;if(v===i)r[u]=1;} return Object.keys(r).map(Number); })();
+    if(nbIndices.length<2) continue;
+    const px=steinerPts[k][0], py=steinerPts[k][1];
+    
+    // Sort neighbors by polar angle
+    const sortedNb = nbIndices.sort((a,b) => {
+        return Math.atan2(allPts[a].p[1]-py, allPts[a].p[0]-px) - Math.atan2(allPts[b].p[1]-py, allPts[b].p[0]-px);
+    });
+    
+    for(let j=0;j<sortedNb.length;j++) {
+      const a=sortedNb[j], b=sortedNb[(j+1)%sortedNb.length];
+      const ax=allPts[a].p[0]-px, ay=allPts[a].p[1]-py;
+      const bx=allPts[b].p[0]-px, by=allPts[b].p[1]-py;
+      
+      const angA = Math.atan2(ay, ax), angB = Math.atan2(by, bx);
+      let diff = angB - angA;
+      while(diff < 0) diff += 2 * Math.PI;
+      while(diff >= 2 * Math.PI) diff -= 2 * Math.PI;
+      const angDeg = diff * 180 / Math.PI;
+      
+      const dev = Math.abs(angDeg-120);
+      const col = dev<5?'#3cff70':(dev<15?'#ffa500':'#ff4040');
+      
+      const arcR = 0.035;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(wx(px), wy(py), r()*arcR/0.035, angA, angB, false);
+      ctx.stroke();
+      
+      // Label
+      const mid = angA + diff/2;
+      ctx.fillStyle = col; ctx.font = '10px Consolas'; ctx.textAlign = 'center';
+      ctx.fillText(angDeg.toFixed(1)+'°', wx(px)+Math.cos(mid)*r()*1.6, wy(py)+Math.sin(mid)*r()*1.6);
+    }
+  }
+
+  // Vertices
+  for(let i=0;i<allPts.length;i++) {
+    const {p, type} = allPts[i];
+    const px=wx(p[0]), py=wy(p[1]), rad = type==='T'?r():r()*0.8;
+    const col = type==='T'?COL_TERM:COL_STEINER;
+    // Glow
+    const g = ctx.createRadialGradient(px,py,0,px,py,rad*2.5);
+    g.addColorStop(0, col+'44'); g.addColorStop(1, 'transparent');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,rad*2.5,0,2*Math.PI); ctx.fill();
+    // Circle
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px,py,rad,0,2*Math.PI); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    // Label
+    ctx.fillStyle='#12121c'; ctx.font='bold 10px Consolas'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(type+(type==='T'?i:i-sa), px, py);
+  }
+
+  // Hover
+  if(hoverIdx>=0 && hoverIdx<allPts.length) {
+    const {p} = allPts[hoverIdx];
+    ctx.strokeStyle='#ffe080'; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(wx(p[0]),wy(p[1]),r()+5,0,2*Math.PI); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Info text
+  ctx.fillStyle=COL_TEXT; ctx.font='12px Consolas'; ctx.textAlign='left'; ctx.textBaseline='top';
+  const mx = 8, my = 8;
+  ctx.fillText(`Terminals: ${terminals.length}`, mx, my);
+  ctx.fillText(`Steiner: ${steinerPts.length}`, mx, my+16);
+  ctx.fillText(`Weight: ${mstWeight.toFixed(4)}`, mx, my+32);
+  ctx.fillText(`Iter: ${iteration}`, mx, my+48);
+  const spd = fastMode?'FAST':'NORMAL';
+  ctx.fillText(`Speed: ${spd}`, mx, my+64);
+
+  if(statusMsg) {
+    ctx.fillStyle = complete?'#3cff70':'#ffc832'; ctx.font='bold 13px Consolas'; ctx.textAlign='center';
+    ctx.fillText(statusMsg, W/2, H-20);
+  }
+}
+
+let statusMsg = 'Click canvas to add terminals. Press N or Auto.';
+function updateStats() {
+  document.getElementById('sTerm').textContent = terminals.length;
+  document.getElementById('sStein').textContent = steinerPts.length;
+  document.getElementById('sWeight').textContent = mstWeight.toFixed(4);
+  document.getElementById('sIter').textContent = iteration;
+  if(forces.length) {
+    const maxF = Math.max(...forces.map(([x,y])=>Math.hypot(x,y)));
+    document.getElementById('sForce').textContent = maxF.toFixed(6);
+  }
+  if(angles.length) {
+    const maxDev = Math.max(...angles.flat().map(a=>Math.abs(a-120)));
+    document.getElementById('sAngle').textContent = isFinite(maxDev) ? maxDev.toFixed(2)+'°' : '0°';
+  }
+  document.getElementById('status').textContent = statusMsg;
+}
+
+// --- Preset dropdown ---
+const sel = document.getElementById('presetSelect');
+PRESETS.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.name; sel.appendChild(o); });
+sel.addEventListener('change', ()=>loadPreset(+sel.value));
+
+function loadPreset(idx) {
+  const p = PRESETS[idx];
+  if(p.seed && p.count) {
+    terminals = genRandom(p.count, p.seed);
+  } else {
+    terminals = p.terminals.map(([x,y])=>[x,y]);
+  }
+  steinerPts = [];
+  const ns = p.steiner !== undefined ? p.steiner : Math.max(0, terminals.length-2);
+  for(let i=0;i<ns;i++) steinerPts.push([0.3+Math.random()*0.4, 0.3+Math.random()*0.4]);
+  reset();
+}
+
+// --- Reset ---
+function reset() {
+  const all = [...terminals, ...steinerPts];
+  const r = computeMST(all);
+  mstEdges=r.mst; mstWeight=r.weight; forces=[]; angles=[];
+  iteration=0; complete=false; autoRunning=false; waiting=true;
+  statusMsg = 'Ready. [N]ext / [A]uto';
+  updateStats(); draw();
+}
+
+// --- Interaction ---
+canvas.addEventListener('mousedown', (e)=>{
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  // Check hit
+  const allPts = [...terminals.map(p=>({p,type:'T'})), ...steinerPts.map(p=>({p,type:'S'}))];
+  let hit = -1;
+  for(let i=0;i<allPts.length;i++) {
+    const d = Math.hypot(wx(allPts[i].p[0])-mx, wy(allPts[i].p[1])-my);
+    if(d < r()+8) { hit=i; break; }
+  }
+  if(hit>=0) {
+    dragging=hit;
+    dragType = hit<terminals.length?'T':'S';
+  } else if(mx>=0 && mx<=canvas.width && my>=0 && my<=canvas.height) {
+    terminals.push([pw(mx), ph(my)]);
+    reset();
+  }
+});
+canvas.addEventListener('mousemove', (e)=>{
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  // Hover
+  const allPts = [...terminals.map(p=>({p})), ...steinerPts.map(p=>({p}))];
+  hoverIdx=-1;
+  for(let i=0;i<allPts.length;i++) {
+    if(Math.hypot(wx(allPts[i].p[0])-mx, wy(allPts[i].p[1])-my) < r()+8) { hoverIdx=i; break; }
+  }
+  // Drag
+  if(dragging>=0) {
+    const wx_=pw(mx), wy_=ph(my);
+    if(dragType==='T') { terminals[dragging]=[wx_,wy_]; }
+    else { steinerPts[dragging-terminals.length]=[wx_,wy_]; }
+    reset();
+  }
+  draw();
+});
+canvas.addEventListener('mouseup', ()=>{ dragging=-1; });
+canvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  const oldZ=zoom;
+  zoom *= e.deltaY<0?1.15:1/1.15;
+  zoom = Math.max(0.2, Math.min(5, zoom));
+  // Adjust pan
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  const wx0=pw(mx), wy0=ph(my);
+  const ratio=zoom/oldZ;
+  panX = wx0 - (wx0-panX)*ratio;
+  panY = wy0 - (wy0-panY)*ratio;
+  draw();
+});
+
+// --- Keyboard ---
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='n' || e.key==='N') { waiting=false; autoRunning=false; doStep(); }
+  if(e.key==='a' || e.key==='A' || e.key===' ') { if(!complete)autoRunning=true; waiting=false; }
+  if(e.key==='r' || e.key==='R') { terminals=[]; steinerPts=[]; reset(); }
+  if(e.key==='c' || e.key==='C') { terminals=[]; steinerPts=[]; reset(); }
+  if(e.key==='f' || e.key==='F') { fastMode=!fastMode; }
+  if(e.key==='g' || e.key==='G') {
+    const n = [3,4,5,6,8][Math.floor(Math.random()*5)];
+    terminals = genRandom(n, Math.floor(Math.random()*9999));
+    steinerPts=[]; reset();
+  }
+  if(e.key==='+' || e.key==='=') { steinerPts.push([.3+Math.random()*.4,.3+Math.random()*.4]); reset(); }
+  if(e.key==='-') { if(steinerPts.length>0){steinerPts.pop();reset();} }
+  if(e.key==='Escape') { /* close handled by browser */ }
+});
+
+function doStep() {
+  const allPts = [...terminals, ...steinerPts];
+  if(allPts.length<2) { statusMsg='Need at least 2 terminals.'; updateStats(); return; }
+
+  const {mst, weight, adj} = computeMST(allPts);
+  mstEdges=mst; mstWeight=weight;
+
+  // Gradient on Steiner
+  let maxF=0;
+  for(let i=0;i<steinerPts.length;i++) {
+    const [fx,fy] = gradientAt(terminals.length+i, allPts, adj);
+    const g=0.08;
+    steinerPts[i][0]+=g*fx; steinerPts[i][1]+=g*fy;
+    steinerPts[i][0]=Math.max(0.02,Math.min(0.98,steinerPts[i][0]));
+    steinerPts[i][1]=Math.max(0.02,Math.min(0.98,steinerPts[i][1]));
+    maxF=Math.max(maxF, Math.hypot(fx,fy));
+  }
+
+  // SA
+  const T = 0.1*Math.pow(0.995,iteration);
+  if(T>1e-10) {
+    steinerPts.forEach(p=>{p[0]+=(Math.random()-0.5)*T*2; p[1]+=(Math.random()-0.5)*T*2;
+      p[0]=Math.max(0.02,Math.min(0.98,p[0])); p[1]=Math.max(0.02,Math.min(0.98,p[1]));});
+  }
+
+  // Merge
+  const thresh = 0.005*Math.hypot(1,1);
+  for(let i=0;i<steinerPts.length;i++) {
+    // With other Steiner pts
+    for(let j=i+1;j<steinerPts.length;j++) {
+      if(dist(steinerPts[i],steinerPts[j])<thresh) {
+        steinerPts[i][0]=(steinerPts[i][0]+steinerPts[j][0])/2;
+        steinerPts[i][1]=(steinerPts[i][1]+steinerPts[j][1])/2;
+        steinerPts.splice(j,1); j--;
+      }
+    }
+    // With Terminals
+    for(let t=0; t<terminals.length; t++) {
+      if(dist(steinerPts[i], terminals[t]) < thresh) {
+        steinerPts.splice(i,1); i--; break;
+      }
+    }
+  }
+
+  iteration++;
+  const all2=[...terminals,...steinerPts];
+  const r2=computeMST(all2); mstEdges=r2.mst; mstWeight=r2.weight;
+  forces=steinerPts.map((_,i)=>gradientAt(terminals.length+i,all2,r2.adj));
+  angles=steinerPts.map((_,i)=>angleAt(terminals.length+i,all2,r2.adj));
+  complete = maxF<0.001 && T < 0.001 && iteration > 20;
+  if(complete) { statusMsg='✓ CONVERGED!'; autoRunning=false; }
+  updateStats(); draw();
+}
+
+// --- Auto-loop ---
+setInterval(()=>{
+  if(autoRunning && !complete) {
+    const delay = fastMode ? FAST_SPEED : ANIM_SPEED;
+    if(Date.now() - (autoRunning._last||0) >= delay) {
+      autoRunning._last = Date.now();
+      doStep();
+    }
+  }
+}, 50);
+autoRunning._last = 0;
+
+// Init
+loadPreset(0);
+</script>
+</body>
+</html>
+"""
+
+
+def main():
+    out_path = os.path.join(os.path.dirname(__file__), "steiner_interactive.html")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(HTML)
+    print(f"HTML saved: {os.path.abspath(out_path)}")
+    print("Serve with: python -m http.server 8080")
+
+
+if __name__ == "__main__":
+    main()

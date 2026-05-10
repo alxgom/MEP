@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kruskal's MST Visualizer — Interactive</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f0f18;
+    color: #c8c8e0;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    border: 1px solid #2a2a44;
+    cursor: crosshair;
+  }
+  #panel {
+    width: 300px;
+    background: #18182a;
+    border-left: 1px solid #2a2a44;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  h1 {
+    font-size: 18px;
+    color: #5eb8ff;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .section {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2a2a44;
+  }
+  .section:last-child { border-bottom: none; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+    font-size: 12px;
+  }
+  .legend-swatch {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .stat {
+    font-size: 13px;
+    margin: 3px 0;
+  }
+  .stat .label { color: #888; }
+  .stat .value { color: #e0e0f0; float: right; }
+  .status-msg {
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background: #1a1a2e;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  .btn {
+    background: #2a2a4a;
+    color: #c8c8e0;
+    border: 1px solid #3a3a5a;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 2px 0;
+  }
+  .btn:hover { background: #38385a; }
+  .btn.active { background: #1a3a2a; border-color: #3cff70; color: #3cff70; }
+  .controls { font-size: 11px; color: #666; margin-top: 8px; line-height: 1.8; }
+  #dsu-info {
+    font-size: 11px;
+    color: #8899bb;
+    line-height: 1.6;
+    max-height: 150px;
+    overflow-y: auto;
+    background: #111122;
+    padding: 6px 8px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="panel">
+  <h1>KRUSKAL'S MST</h1>
+
+  <div class="section">
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#5eb8ff;"></div>
+      Vertex
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#3cff70;"></div>
+      MST edge (accepted)
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#ffc832;"></div>
+      Current edge
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#ff4040;"></div>
+      Rejected (cycle)
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stat"><span class="label">Vertices</span><span class="value" id="s-verts">0</span></div>
+    <div class="stat"><span class="label">Candidate edges</span><span class="value" id="s-edges">0</span></div>
+    <div class="stat"><span class="label">Step</span><span class="value" id="s-step">0/0</span></div>
+    <div class="stat"><span class="label">In MST</span><span class="value" id="s-mst">0</span></div>
+    <div class="stat"><span class="label">Rejected</span><span class="value" id="s-rej">0</span></div>
+    <div class="stat"><span class="label">MST weight</span><span class="value" id="s-wt">0.0</span></div>
+  </div>
+
+  <div class="section">
+    <button class="btn" id="btnStep" onclick="step()">Step [N]</button>
+    <button class="btn" id="btnAuto" onclick="toggleAuto()">Auto [A]</button>
+    <button class="btn" onclick="resetAlgo()">Reset [R]</button>
+    <button class="btn" onclick="clearAll()">Clear All [C]</button>
+    <div class="controls">
+      Click canvas to add vertices.<br>
+      Drag vertices to reposition.<br>
+      [N]ext step &nbsp; [A]uto &nbsp; [R]eset &nbsp; [C]lear<br>
+      [-] / [+] to adjust speed
+    </div>
+  </div>
+
+  <div class="section">
+    <div style="font-size:11px; color:#888; margin-bottom:4px;">Status:</div>
+    <div class="status-msg" id="status">Click on the canvas to add vertices</div>
+  </div>
+
+  <div class="section">
+    <div style="font-size:11px; color:#888; margin-bottom:4px;">DSU Components:</div>
+    <div id="dsu-info">—</div>
+  </div>
+</div>
+
+<script>
+// ─── Configuration ──────────────────────────────────────────────────────────
+const VERTEX_R = 16;
+const CANVAS_W = 660;
+const CANVAS_H = 600;
+const MARGIN = 30;
+
+// ─── DSU ────────────────────────────────────────────────────────────────────
+class DSU {
+  constructor(n) {
+    this.par = Array.from({length: n}, (_, i) => i);
+    this.rnk = new Array(n).fill(0);
+  }
+  find(x) {
+    while (this.par[x] !== x) {
+      this.par[x] = this.par[this.par[x]];
+      x = this.par[x];
+    }
+    return x;
+  }
+  union(a, b) {
+    let ra = this.find(a), rb = this.find(b);
+    if (ra === rb) return false;
+    if (this.rnk[ra] < this.rnk[rb]) [ra, rb] = [rb, ra];
+    this.par[rb] = ra;
+    if (this.rnk[ra] === this.rnk[rb]) this.rnk[ra]++;
+    return true;
+  }
+  roots() {
+    const m = {};
+    for (let i = 0; i < this.par.length; i++) {
+      const r = this.find(i);
+      (m[r] = m[r] || []).push(i);
+    }
+    return m;
+  }
+}
+
+// ─── State ──────────────────────────────────────────────────────────────────
+let verts = [];          // [{x, y}]
+let edges = [];          // [{u, v, w}]
+let sorted = [];         // sorted edge indices
+let dsu = null;
+let mstEdges = [];       // [{u, v, w}]
+let rejected = [];       // [{u, v}]
+let step = 0;
+let totalW = 0;
+let dragging = -1;
+
+let autoRunning = false;
+let autoInterval = null;
+let speed = 500;     // ms per auto-step
+
+// ─── Canvas ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = CANVAS_W;
+canvas.height = CANVAS_H;
+
+function dist(i, j) {
+  const dx = verts[i].x - verts[j].x;
+  const dy = verts[i].y - verts[j].y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+function buildEdges() {
+  edges = [];
+  for (let i = 0; i < verts.length; i++) {
+    for (let j = i+1; j < verts.length; j++) {
+      edges.push({ u: i, v: j, w: dist(i, j) });
+    }
+  }
+  edges.sort((a, b) => a.w - b.w);
+  sorted = edges;
+}
+
+function resetAlgo() {
+  if (verts.length < 2) return;
+  dsu = new DSU(verts.length);
+  mstEdges = [];
+  rejected = [];
+  step = 0;
+  totalW = 0;
+  buildEdges();
+  updateUI();
+  setStatus('Ready — ' + sorted.length + ' edges to process');
+}
+
+function clearAll() {
+  stopAuto();
+  verts = [];
+  edges = [];
+  sorted = [];
+  dsu = null;
+  mstEdges = [];
+  rejected = [];
+  step = 0;
+  totalW = 0;
+  updateUI();
+  setStatus('Cleared. Click to add vertices.');
+  draw();
+}
+
+// ─── Algorithm Step ─────────────────────────────────────────────────────────
+function step() {
+  if (!dsu || sorted.length === 0) {
+    setStatus('Add at least 2 vertices first');
+    return;
+  }
+  if (step >= sorted.length) {
+    setStatus('All edges processed.', true);
+    stopAuto();
+    updateUI();
+    draw();
+    return;
+  }
+
+  const e = sorted[step];
+  step++;
+
+  if (dsu.union(e.u, e.v)) {
+    mstEdges.push(e);
+    totalW += e.w;
+    setStatus('✓ Edge ' + e.u + '—' + e.v + ' accepted (w=' + e.w.toFixed(1) + ')');
+  } else {
+    rejected.push({ u: e.u, v: e.v });
+    setStatus('✗ Edge ' + e.u + '—' + e.v + ' rejected (would create cycle)');
+  }
+
+  if (step >= sorted.length) {
+    const expected = verts.length - 1;
+    const complete = mstEdges.length === expected && verts.length > 0;
+    if (complete) {
+      setStatus('✓ DONE — MST complete! Total weight = ' + totalW.toFixed(1), true);
+    } else {
+      setStatus('Graph disconnected — MST incomplete.', true);
+    }
+    stopAuto();
+  }
+
+  updateUI();
+  draw();
+}
+
+// ─── Auto Run ───────────────────────────────────────────────────────────────
+function toggleAuto() {
+  if (autoRunning) {
+    stopAuto();
+  } else {
+    startAuto();
+  }
+}
+
+function startAuto() {
+  if (!dsu) { resetAlgo(); }
+  autoRunning = true;
+  document.getElementById('btnAuto').classList.add('active');
+  autoInterval = setInterval(() => {
+    if (step >= sorted.length) {
+      stopAuto();
+      return;
+    }
+    step();
+  }, speed);
+}
+
+function stopAuto() {
+  autoRunning = false;
+  document.getElementById('btnAuto').classList.remove('active');
+  if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+}
+
+// ─── Drawing ────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.fillStyle = '#0f0f18';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Grid
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < CANVAS_W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); ctx.stroke();
+  }
+  for (let y = 0; y < CANVAS_H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke();
+  }
+
+  if (verts.length === 0) {
+    ctx.fillStyle = '#444';
+    ctx.font = '16px Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Click to add vertices', CANVAS_W/2, CANVAS_H/2);
+    return;
+  }
+
+  // Candidate edges (dim gray)
+  ctx.strokeStyle = '#2a2a44';
+  ctx.lineWidth = 1;
+  for (let i = step; i < sorted.length; i++) {
+    const e = sorted[i];
+    drawEdge(e.u, e.v);
+  }
+
+  // Rejected edges (red, dashed)
+  ctx.strokeStyle = '#ff4040';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  for (const e of rejected) {
+    drawEdge(e.u, e.v);
+    // X mark
+    const mx = (verts[e.u].x + verts[e.v].x) / 2;
+    const my = (verts[e.u].y + verts[e.v].y) / 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(mx-6, my-6); ctx.lineTo(mx+6, my+6);
+    ctx.moveTo(mx+6, my-6); ctx.lineTo(mx-6, my+6);
+    ctx.stroke();
+    ctx.setLineDash([6, 4]);
+  }
+  ctx.setLineDash([]);
+
+  // MST edges (green, thick)
+  ctx.strokeStyle = '#3cff70';
+  ctx.lineWidth = 3;
+  for (const e of mstEdges) {
+    drawEdge(e.u, e.v);
+  }
+
+  // Current edge (yellow, highlighted)
+  if (step < sorted.length) {
+    const e = sorted[step];
+    const pulse = 3 + Math.round(2 * Math.sin(Date.now() * 0.005));
+    ctx.strokeStyle = '#ffc832';
+    ctx.lineWidth = 3;
+    drawEdge(e.u, e.v);
+    // Glow on endpoints
+    ctx.strokeStyle = 'rgba(255,200,50,0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(verts[e.u].x, verts[e.u].y, VERTEX_R + pulse, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(verts[e.v].x, verts[e.v].y, VERTEX_R + pulse, 0, Math.PI*2); ctx.stroke();
+    // Weight label
+    const mx = (verts[e.u].x + verts[e.v].x) / 2;
+    const my = (verts[e.u].y + verts[e.v].y) / 2;
+    ctx.fillStyle = '#ffc832';
+    ctx.font = 'bold 12px Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(e.w.toFixed(1), mx, my - 10);
+  }
+
+  // Vertices
+  for (let i = 0; i < verts.length; i++) {
+    const v = verts[i];
+    const isHighlighted = step < sorted.length && (sorted[step].u === i || sorted[step].v === i);
+    const fill = isHighlighted ? '#ffe080' : '#5eb8ff';
+    const stroke = isHighlighted ? '#ffc832' : '#ffffff';
+
+    ctx.beginPath();
+    ctx.arc(v.x, v.y, VERTEX_R, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = '#0f0f18';
+    ctx.font = 'bold 13px Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i, v.x, v.y);
+  }
+
+  // MST weight display at bottom of canvas
+  ctx.fillStyle = '#888';
+  ctx.font = '12px Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('MST weight: ' + totalW.toFixed(1) + '  |  Edges in MST: ' + mstEdges.length + '/' + (verts.length - 1), 10, CANVAS_H - 10);
+}
+
+function drawEdge(i, j) {
+  ctx.beginPath();
+  ctx.moveTo(verts[i].x, verts[i].y);
+  ctx.lineTo(verts[j].x, verts[j].y);
+  ctx.stroke();
+}
+
+// ─── UI Updates ─────────────────────────────────────────────────────────────
+function updateUI() {
+  document.getElementById('s-verts').textContent = verts.length;
+  document.getElementById('s-edges').textContent = sorted.length;
+  document.getElementById('s-step').textContent = step + '/' + sorted.length;
+  document.getElementById('s-mst').textContent = mstEdges.length;
+  document.getElementById('s-rej').textContent = rejected.length;
+  document.getElementById('s-wt').textContent = totalW.toFixed(1);
+
+  // DSU info
+  const dsuEl = document.getElementById('dsu-info');
+  if (dsu) {
+    const roots = dsu.roots();
+    let html = '';
+    for (const [r, members] of Object.entries(roots)) {
+      html += '<span style="color:#5eb8ff">root ' + r + '</span> ← <span style="color:#c8c8e0">[' + members.join(', ') + ']</span><br>';
+    }
+    dsuEl.innerHTML = html || '—';
+  } else {
+    dsuEl.textContent = '—';
+  }
+}
+
+function setStatus(msg, done) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.color = done ? '#3cff70' : '#ffc832';
+}
+
+// ─── Mouse Interaction ──────────────────────────────────────────────────────
+function getMouse(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+function hitTest(mx, my) {
+  for (let i = 0; i < verts.length; i++) {
+    const dx = verts[i].x - mx;
+    const dy = verts[i].y - my;
+    if (dx*dx + dy*dy < (VERTEX_R + 4) * (VERTEX_R + 4)) return i;
+  }
+  return -1;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const p = getMouse(e);
+  const idx = hitTest(p.x, p.y);
+
+  if (idx >= 0) {
+    dragging = idx;
+  } else {
+    // Add new vertex
+    verts.push({ x: p.x, y: p.y });
+    buildEdges();
+    if (dsu) resetAlgo();
+    draw();
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (dragging >= 0) {
+    const p = getMouse(e);
+    verts[dragging].x = Math.max(VERTEX_R, Math.min(CANVAS_W - VERTEX_R, p.x));
+    verts[dragging].y = Math.max(VERTEX_R, Math.min(CANVAS_H - VERTEX_R, p.y));
+    if (dsu) resetAlgo();
+    draw();
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  dragging = -1;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  dragging = -1;
+});
+
+// ─── Keyboard Shortcuts ─────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+
+  switch(e.key) {
+    case 'n': case 'N': step(); break;
+    case 'a': case 'A': toggleAuto(); break;
+    case ' ': e.preventDefault(); toggleAuto(); break;
+    case 'r': case 'R': resetAlgo(); break;
+    case 'c': case 'C': clearAll(); break;
+    case '-': speed = Math.min(2000, speed + 100); if (autoRunning) { stopAuto(); startAuto(); } break;
+    case '+': speed = Math.max(100, speed - 100); if (autoRunning) { stopAuto(); startAuto(); } break;
+  }
+});
+
+// ── Welcome animation ───────────────────────────────────────────────────────
+// Add 6 demo vertices after a short delay so user sees the empty canvas first
+setTimeout(() => {
+  const demoVerts = [
+    { x: 150, y: 480 },
+    { x: 550, y: 480 },
+    { x: 350, y: 80 },
+    { x: 220, y: 240 },
+    { x: 500, y: 240 },
+    { x: 350, y: 380 },
+  ];
+  verts = demoVerts;
+  buildEdges();
+  resetAlgo();
+  draw();
+  setStatus('6 demo vertices added. Press [N] to step or [A] to auto-run!');
+}, 300);
+
+// Initial draw
+draw();
+</script>
+</body>
+</html>
