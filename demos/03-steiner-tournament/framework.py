@@ -12,6 +12,7 @@ from solvers.variational_solver import VariationalSolver
 from solvers.iterated_steiner_solver import Iterated1SteinerSolver
 from solvers.grid_prune_solver import GridPruneSolver
 from solvers.adaptive_grid_solver import AdaptiveGridPruneSolver
+from solvers.reactive_solver import ReactiveQuenchingSolver
 from solvers.monte_carlo_solver import MonteCarloSolver
 from solvers.delaunay_kick_solver import DelaunayKickSolver
 from datasets import get_benchmark_suites
@@ -26,6 +27,7 @@ class Tournament:
             "Iterated 1-Steiner": Iterated1SteinerSolver,
             "Grid-to-Prune (Fixed 10x10)": GridPruneSolver,
             "Adaptive Grid-to-Prune": AdaptiveGridPruneSolver,
+            "Reactive Quenching Grid": ReactiveQuenchingSolver,
             "Monte Carlo Population": MonteCarloSolver,
             "Delaunay Centroid Kick": DelaunayKickSolver
         }
