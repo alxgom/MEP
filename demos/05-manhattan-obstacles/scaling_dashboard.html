@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manhattan Steiner Scaling Analysis</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Manhattan Steiner Scaling Dashboard</h1>
+        <p class="text-gray-600 mb-8 border-b pb-4">Analyzing Stochastic 'Kick' heuristic vs. Deterministic Greedy ($N=40$ to $100$)</p>
+
+        <div class="grid grid-cols-1 gap-8">
+            <!-- Improvement Chart -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border">
+                <h2 class="text-xl font-semibold mb-4 text-blue-600">Mean Efficiency Gain vs. Complexity</h2>
+                <p class="text-sm text-gray-500 mb-4">How much shorter is the 'Best of 50' result compared to a single Greedy run?</p>
+                <div id="impChart" style="height: 500px;"></div>
+            </div>
+
+            <!-- Probability Scatter -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border">
+                <h2 class="text-xl font-semibold mb-4 text-green-600">Trial Success Probability</h2>
+                <p class="text-sm text-gray-500 mb-4">What is the % chance that a random trial will beat the greedy result? (Each point is a unique map)</p>
+                <div id="probChart" style="height: 500px;"></div>
+            </div>
+        </div>
+        
+        <footer class="mt-8 text-center text-gray-400 text-xs italic">
+            Generated from benchmark_results.db
+        </footer>
+    </div>
+
+    <script>
+        const impData = [];
+        const probData = [];
+
+        // 1. Improvement Line Chart
+        Plotly.newPlot('impChart', [{
+            x: impData.map(d => d.n_terminals),
+            y: impData.map(d => d.avg_improvement),
+            mode: 'lines+markers',
+            name: 'Avg Gain',
+            line: { shape: 'spline', color: '#3b82f6', width: 4 },
+            marker: { size: 10, color: '#1d4ed8' },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(59, 130, 246, 0.1)'
+        }], {
+            xaxis: { title: 'Number of Terminals (N)', gridcolor: '#f1f5f9' },
+            yaxis: { title: 'Length Savings over Greedy (%)', gridcolor: '#f1f5f9' },
+            margin: { t: 20 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)'
+        });
+
+        // 2. Probability Scatter Plot
+        Plotly.newPlot('probChart', [{
+            x: probData.map(d => d.n_terminals),
+            y: probData.map(d => d.win_prob),
+            mode: 'markers',
+            marker: {
+                size: 12,
+                color: '#22c55e',
+                opacity: 0.6,
+                line: { color: 'white', width: 1 }
+            },
+            name: 'Maps'
+        }], {
+            xaxis: { title: 'Number of Terminals (N)', gridcolor: '#f1f5f9' },
+            yaxis: { title: 'Win Probability (%)', gridcolor: '#f1f5f9', range: [0, 105] },
+            margin: { t: 20 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)'
+        });
+    </script>
+</body>
+</html>
+    
