@@ -25,32 +25,37 @@ def run_auto_benchmark():
     env = MultiNetEnvironment(nets)
     solver = MultiNetSolver(env)
     
-    # 3. Solve using the 3 Contenders
+    # 3. Solve using the 4 Contenders
     print("\n--- Solver Metrics ---")
     print("Solving Negotiated...")
     res_neg, len_neg, iss_neg = solver.solve_negotiated()
-    print(f"  [NEGOTIATED] Total Length: {len_neg:.2f} | Collisions/Fails: {iss_neg}")
+    print(f"  [NEGOTIATED]  Total Length: {len_neg:.2f} | Collisions/Fails: {iss_neg}")
     
-    print("Solving Hybrid Rip-Up...")
+    print("Solving Surgical Hybrid (Ideal)...")
     res_hyb, len_hyb, iss_hyb = solver.solve_hybrid_ripup()
-    print(f"  [HYBRID]     Total Length: {len_hyb:.2f} | Collisions/Fails: {iss_hyb}")
+    print(f"  [SURGICAL]    Total Length: {len_hyb:.2f} | Collisions/Fails: {iss_hyb}")
+
+    print("Solving Negotiated Hybrid (Soft)...")
+    res_nhb, len_nhb, iss_nhb = solver.solve_negotiated_hybrid()
+    print(f"  [NEG-HYBRID]  Total Length: {len_nhb:.2f} | Collisions/Fails: {iss_nhb}")
     
     print("Solving Global Permutation...")
     res_per, len_per, iss_per = solver.solve_best_permutation()
     print(f"  [GLOBAL PERM] Total Length: {len_per:.2f} | Collisions/Fails: {iss_per}")
     
     # 4. Plotting
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig, axes = plt.subplots(1, 4, figsize=(24, 6))
     plt.subplots_adjust(top=0.85)
     
     titles = [
-        f"1. Negotiated (Soft)\nLen: {len_neg:.1f} | Issues: {iss_neg}",
-        f"2. Hybrid Rip-Up (New)\nLen: {len_hyb:.1f} | Issues: {iss_hyb}",
-        f"3. Global Permutation\nLen: {len_per:.1f} | Issues: {iss_per}"
+        f"1. Negotiated (Hard)\nLen: {len_neg:.1f} | Issues: {iss_neg}",
+        f"2. Surgical (Ideal)\nLen: {len_hyb:.1f} | Issues: {iss_hyb}",
+        f"3. Neg-Hybrid (Soft)\nLen: {len_nhb:.1f} | Issues: {iss_nhb}",
+        f"4. Global Permutation\nLen: {len_per:.1f} | Issues: {iss_per}"
     ]
     
-    results = [res_neg, res_hyb, res_per]
-    colors = ["#2ecc71", "#3498db", "#9b59b6"] # Green, Blue, Purple
+    results = [res_neg, res_hyb, res_nhb, res_per]
+    colors = ["#2ecc71", "#3498db", "#e67e22", "#9b59b6"] # Green, Blue, Orange, Purple
     
     for idx, ax in enumerate(axes):
         ax.set_title(titles[idx], fontweight='bold')

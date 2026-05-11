@@ -1,9 +1,9 @@
 """
-Sequential Multi-Net Steiner Solver (v4.4)
+Sequential Multi-Net Steiner Solver (v4.7)
 =========================================
 Supports:
-- Hyper-Aggressive Negotiated Congestion (Node + Edge)
-- Forest-Based Hybrid Rip-up (Component-to-Component Shortest Path)
+- Hyper-Aggressive Stochastic Negotiated Congestion (Node + Edge)
+- Forest-Based Surgical Rip-up (Dual Node-Edge Separation + Ownership)
 - Global Permutation Search
 """
 
@@ -88,7 +88,7 @@ class MultiNetSolver:
                 segments.append(tuple(sorted((path[i], path[i+1]))))
         return current_w, segments
 
-    def solve_negotiated(self, max_iters=25):
+    def solve_negotiated(self, max_iters=25, congestion_base=500.0):
         """Pathfinder-style Negotiated Congestion."""
         net_names = list(self.env.nets.keys())
         all_results = {}
@@ -97,27 +97,24 @@ class MultiNetSolver:
         
         for i in range(max_iters):
             all_results = {}
-            for e in self.env.edge_congestion: self.env.edge_congestion[e] = 0
-            for n in self.env.node_congestion: self.env.node_congestion[n] = 0
+            self.env.edge_owners.clear()
+            self.env.node_owners.clear()
             
             for name in net_names:
-                self.env.rebuild(mode="Negotiated")
+                self.env.rebuild(mode="Negotiated", active_net=name, congestion_base=congestion_base)
                 w, segs = self._solve_single_net_stochastic(name)
                 all_results[name] = {"weight": w, "segments": segs, "failed": w >= 1e8}
-                for u, v in segs:
-                    self.env.edge_congestion[tuple(sorted((u, v)))] += 1
-                    self.env.node_congestion[u] += 1
-                    self.env.node_congestion[v] += 1
+                self.env.add_usage(name, segs)
             
-            total_collisions = sum(1 for e, c in self.env.edge_congestion.items() if c > 1)
-            total_collisions += sum(1 for n, c in self.env.node_congestion.items() if c > 1)
+            total_collisions = sum(1 for e, owners in self.env.edge_owners.items() if len(owners) > 1)
+            total_collisions += sum(1 for n, owners in self.env.node_owners.items() if len(owners) > 1)
             if total_collisions == 0: break
             
-            for e, c in self.env.edge_congestion.items():
-                if c > 1: self.env.history_penalties[e] += 15.0
+            for e, owners in self.env.edge_owners.items():
+                if len(owners) > 1: self.env.history_penalties[e] += 15.0
                 
-        fails = sum(1 for r in all_results.values() if r["failed"])
-        return all_results, sum(r["weight"] for r in all_results.values() if not r["failed"]), total_collisions + fails
+        issues = self._count_geometric_issues(all_results)
+        return all_results, sum(r["weight"] for r in all_results.values() if not r["failed"]), issues
 
     def _find_connected_components(self, nodes: List[int], segments: List[Tuple[int, int]]) -> List[List[int]]:
         adj = {n: [] for n in nodes}
@@ -142,96 +139,152 @@ class MultiNetSolver:
                 components.append(comp)
         return components
 
+    def _count_geometric_issues(self, results):
+        """Rigorous post-solve check for any shared nodes or edges between nets."""
+        edge_usage = {} 
+        node_usage = {} 
+        for name, data in results.items():
+            if data.get("failed"): continue
+            for u, v in data["segments"]:
+                e = tuple(sorted((u, v)))
+                edge_usage.setdefault(e, []).append(name)
+                node_usage.setdefault(u, []).append(name)
+                node_usage.setdefault(v, []).append(name)
+        collisions = sum(1 for nets in edge_usage.values() if len(set(nets)) > 1)
+        collisions += sum(1 for nets in node_usage.values() if len(set(nets)) > 1)
+        fails = sum(1 for r in results.values() if r.get("failed"))
+        return collisions + fails
+
     def solve_hybrid_ripup(self):
         """
-        1. Run Negotiated pass for global coordination.
-        2. Identify and DELETE shared segments (collisions).
-        3. Keep surviving islands (components).
-        4. Re-route each net (Smallest BB first) to heal the breaks.
+        Forest-Based Surgical Rip-Up v4.7:
+        1. Run Ideal Draft (respecting other terminals).
+        2. Detect all shared nodes/edges.
+        3. Resolve ownership surgically.
+        4. Re-route sequentially to heal the breaks.
         """
-        # Phase 1: Negotiated draft (High precision, low iters)
-        init_res, _, _ = self.solve_negotiated(max_iters=12)
-        
-        # Phase 2: Detect Global Collisions
-        all_segs = []
-        for r in init_res.values(): all_segs.extend(r["segments"])
-        from collections import Counter
-        edge_counts = Counter(all_segs)
-        bad_segs = {s for s, c in edge_counts.items() if c > 1}
-        
-        # Phase 3: Identify Components for every net
         net_names = list(self.env.nets.keys())
-        net_islands = {}
-        for name in net_names:
-            # Keep only segments that are 100% clean
-            clean_segs = [s for s in init_res[name]["segments"] if s not in bad_segs]
-            # Nodes are terminals + nodes in clean segments
-            nodes = list(set(self.env.terminal_indices[name]) | {pt for s in clean_segs for pt in s})
-            islands = self._find_connected_components(nodes, clean_segs)
-            net_islands[name] = {"islands": islands, "area": self._get_net_bounding_box_area(name), "clean_segs": clean_segs}
-
-        # Phase 4: Sequential Reconnection (Smallest BB First)
-        sorted_nets = sorted(net_names, key=lambda n: net_islands[n]["area"])
         self.env.reset_locks()
-        self.env.rebuild(mode="Hard_Lock")
         
+        # 1. Draft (Ideal / Greedy)
+        draft_res = {}
+        for name in net_names:
+            self.env.rebuild(mode="Hard_Lock", active_net=name)
+            _, segs = self._solve_single_net_stochastic(name, top_k=3)
+            draft_res[name] = segs
+            
+        return self._surgical_ripup_and_reconnect(draft_res)
+
+    def solve_negotiated_hybrid(self):
+        """
+        Negotiated Hybrid v4.8:
+        1. Run 'Soft' Negotiated Congestion (base=2.0) to get a coordinated draft.
+        2. Perform Surgical Rip-Up on remaining collisions.
+        3. Heal breaks using Hard Locks.
+        """
+        # 1. Coordinated Soft Draft
+        draft_res_full, _, _ = self.solve_negotiated(max_iters=10, congestion_base=2.0)
+        draft_res = {name: data["segments"] for name, data in draft_res_full.items()}
+        
+        return self._surgical_ripup_and_reconnect(draft_res)
+
+    def _surgical_ripup_and_reconnect(self, draft_res: Dict[str, List[Tuple[int, int]]]):
+        """Helper to perform ownership-based rip-up and reconnection."""
+        net_names = list(self.env.nets.keys())
+        net_areas = {name: self._get_net_bounding_box_area(name) for name in net_names}
+        
+        # Collision Detection
+        edge_owners, node_owners = {}, {}
+        for name, segs in draft_res.items():
+            for u, v in segs:
+                e = tuple(sorted((u, v)))
+                edge_owners.setdefault(e, set()).add(name)
+                node_owners.setdefault(u, set()).add(name)
+                node_owners.setdefault(v, set()).add(name)
+        
+        # Surgical Resolution
+        net_to_ripped_edges = {name: set() for name in net_names}
+        net_to_ripped_nodes = {name: set() for name in net_names}
+
+        for e, owners in edge_owners.items():
+            if len(owners) > 1:
+                sorted_owners = sorted(list(owners), key=lambda o: net_areas[o])
+                winner = sorted_owners[0]
+                for loser in sorted_owners[1:]: net_to_ripped_edges[loser].add(e)
+
+        for n, owners in node_owners.items():
+            if len(owners) > 1:
+                terminal_owners = [o for o in owners if n in self.env.terminal_indices[o]]
+                winner = sorted(terminal_owners, key=lambda o: net_areas[o])[0] if terminal_owners else sorted(list(owners), key=lambda o: net_areas[o])[0]
+                for loser in owners:
+                    if loser != winner: net_to_ripped_nodes[loser].add(n)
+
+        # Component Extraction & Pruning
+        net_data = {}
+        for name in net_names:
+            clean_segs = set()
+            for s in draft_res[name]:
+                if s not in net_to_ripped_edges[name] and s[0] not in net_to_ripped_nodes[name] and s[1] not in net_to_ripped_nodes[name]:
+                    clean_segs.add(s)
+            
+            terminals = set(self.env.terminal_indices[name])
+            changed = True
+            while changed:
+                changed = False
+                adj = {}
+                for u, v in clean_segs:
+                    adj.setdefault(u, set()).add(v); adj.setdefault(v, set()).add(u)
+                for n, neighbors in adj.items():
+                    if len(neighbors) == 1 and n not in terminals:
+                        neighbor = neighbors.pop()
+                        clean_segs.discard(tuple(sorted((n, neighbor))))
+                        changed = True
+            
+            final_clean = list(clean_segs)
+            nodes = list(set(self.env.terminal_indices[name]) | {pt for s in final_clean for pt in s})
+            net_data[name] = {"islands": self._find_connected_components(nodes, final_clean), 
+                              "clean_segs": final_clean, "area": net_areas[name]}
+
+        # Reconnection
+        sorted_nets = sorted(net_names, key=lambda n: net_data[n]["area"])
+        self.env.reset_locks()
         final_results = {}
         for name in sorted_nets:
-            islands = net_islands[name]["islands"]
-            current_segs = set(net_islands[name]["clean_segs"])
-            
-            # Forest Stitching: connect islands until they form 1 component
+            self.env.rebuild(mode="Hard_Lock", active_net=name)
+            islands = net_data[name]["islands"]
+            current_segs = set(net_data[name]["clean_segs"])
             while len(islands) > 1:
-                best_d, best_u, best_v, best_idx_i, best_idx_j = float('inf'), -1, -1, -1, -1
-                
-                # Search all island-to-island bridges
+                best_d, best_u, best_v, b_i, b_j = float('inf'), -1, -1, -1, -1
                 for i in range(len(islands)):
                     for j in range(i+1, len(islands)):
-                        sub_dist = self.env.dist_matrix[np.ix_(islands[i], islands[j])]
-                        if np.any(sub_dist < best_d):
-                            r, c = np.unravel_index(np.argmin(sub_dist), sub_dist.shape)
-                            if sub_dist[r, c] < best_d:
-                                best_d = sub_dist[r, c]
-                                best_u, best_v = islands[i][r], islands[j][c]
-                                best_idx_i, best_idx_j = i, j
-                
-                if best_d >= 1e8: break # Blocked
-                
-                # Build bridge
+                        sub = self.env.dist_matrix[np.ix_(islands[i], islands[j])]
+                        if np.any(sub < best_d):
+                            r, c = np.unravel_index(np.argmin(sub), sub.shape)
+                            if sub[r, c] < best_d:
+                                best_d, best_u, best_v, b_i, b_j = sub[r, c], islands[i][r], islands[j][c], i, j
+                if best_d >= 1e8: break
                 path = self.env.get_path_nodes(best_u, best_v)
-                for k in range(len(path)-1):
-                    current_segs.add(tuple(sorted((path[k], path[k+1]))))
-                
-                # Merge islands
-                new_island = list(set(islands[best_idx_i]) | set(islands[best_idx_j]) | set(path))
-                islands = [islands[k] for k in range(len(islands)) if k not in [best_idx_i, best_idx_j]]
-                islands.append(new_island)
+                for k in range(len(path)-1): current_segs.add(tuple(sorted((path[k], path[k+1]))))
+                new_island = list(set(islands[b_i]) | set(islands[b_j]) | set(path))
+                islands = [islands[k] for k in range(len(islands)) if k not in [b_i, b_j]]; islands.append(new_island)
 
-            # Verification
             final_nodes = list(set(self.env.terminal_indices[name]) | {pt for s in current_segs for pt in s})
-            final_comps = self._find_connected_components(final_nodes, list(current_segs))
-            
-            if len(final_comps) > 1:
-                final_results[name] = {"weight": 0, "segments": [], "failed": True}
-            else:
-                final_results[name] = {"weight": sum(self.env.base_weights[s] for s in current_segs),
-                                      "segments": list(current_segs), "failed": False}
-                self.env.lock_path(list(current_segs))
+            final_results[name] = {"weight": sum(self.env.base_weights[s] for s in current_segs),
+                                  "segments": list(current_segs), "failed": len(self._find_connected_components(final_nodes, list(current_segs))) > 1}
+            if not final_results[name]["failed"]: self.env.lock_path(list(current_segs))
                 
-        return final_results, sum(r["weight"] for r in final_results.values() if not r["failed"]), sum(1 for r in final_results.values() if r["failed"])
+        return final_results, sum(r["weight"] for r in final_results.values() if not r["failed"]), self._count_geometric_issues(final_results)
 
     def solve_best_permutation(self):
         net_names = list(self.env.nets.keys())
         perms = list(itertools.permutations(net_names))
         if len(perms) > 24: perms = perms[:24]
-        
         best_results, min_fails, min_total = None, float('inf'), float('inf')
-        
         for p in perms:
             self.env.reset_locks()
-            self.env.rebuild(mode="Hard_Lock")
             res, tot, fails = {}, 0, 0
             for name in p:
+                self.env.rebuild(mode="Hard_Lock", active_net=name)
                 w, segs = self._solve_single_net_stochastic(name)
                 if w >= 1e8:
                     res[name] = {"weight": 0, "segments": [], "failed": True}; fails += 1
@@ -240,4 +293,5 @@ class MultiNetSolver:
                     self.env.lock_path(segs)
             if fails < min_fails or (fails == min_fails and tot < min_total):
                 min_fails, min_total, best_results = fails, tot, res
-        return best_results, min_total, min_fails
+        issues = self._count_geometric_issues(best_results) if best_results else 0
+        return best_results, min_total, issues

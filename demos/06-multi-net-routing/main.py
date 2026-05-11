@@ -14,8 +14,8 @@ from environment import MultiNetEnvironment
 from solver import MultiNetSolver
 
 # Window Config
-PANEL_W, PANEL_H = 500, 550
-WIDTH, HEIGHT = PANEL_W * 3, PANEL_H + 50
+PANEL_W, PANEL_H = 450, 550
+WIDTH, HEIGHT = PANEL_W * 4, PANEL_H + 50
 
 # Colors
 COLOR_BG = (20, 20, 30)
@@ -34,9 +34,9 @@ class HeuristicTournamentVisualizer:
         pygame.init()
         # Rigid window size to prevent scrolling issues
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("Multi-Net Heuristic Tournament v4.1")
-        self.font = pygame.font.SysFont("Arial", 16)
-        self.font_bold = pygame.font.SysFont("Arial", 18, bold=True)
+        pygame.display.set_caption("Multi-Net Heuristic Tournament v4.8")
+        self.font = pygame.font.SysFont("Arial", 14)
+        self.font_bold = pygame.font.SysFont("Arial", 16, bold=True)
         self.clock = pygame.time.Clock()
         
         self.nets: Dict[str, List[List[float]]] = {"Net_1":[], "Net_2":[], "Net_3":[], "Net_4":[]}
@@ -47,19 +47,23 @@ class HeuristicTournamentVisualizer:
         active_nets = {k: np.array(v) for k, v in self.nets.items() if len(v) >= 2}
         if not active_nets: return
 
-        print("\n--- Dispatching Tournament v4.2 ---")
+        print("\n--- Dispatching Tournament v4.8 ---")
         env = MultiNetEnvironment(active_nets)
         solver = MultiNetSolver(env)
         
         # 1. Negotiated Congestion
-        print("Running Negotiated Congestion...")
-        self.results["Negotiated"] = solver.solve_negotiated(max_iters=30)
+        print("Running Negotiated Congestion (Aggressive)...")
+        self.results["Negotiated"] = solver.solve_negotiated(max_iters=30, congestion_base=500.0)
         
-        # 2. Hybrid Rip-up (The New Contender)
-        print("Running Hybrid Rip-up & Component Repair...")
+        # 2. Surgical Hybrid (Ideal Draft)
+        print("Running Surgical Hybrid (Ideal Draft)...")
         self.results["Hybrid"] = solver.solve_hybrid_ripup()
         
-        # 3. Global Permutation (The previous winner)
+        # 3. Negotiated Hybrid (Soft Draft)
+        print("Running Negotiated Hybrid (Soft Draft)...")
+        self.results["NegHybrid"] = solver.solve_negotiated_hybrid()
+        
+        # 4. Global Permutation (Standard)
         print("Running Global Permutation Search...")
         self.results["GlobalPerm"] = solver.solve_best_permutation()
 
@@ -73,9 +77,9 @@ class HeuristicTournamentVisualizer:
         
         if h_key in self.results:
             sol, total_l, issues = self.results[h_key]
-            stat_text = f"Total Len: {total_l:.1f} | Issues: {issues}"
+            stat_text = f"Len: {total_l:.1f} | Issues: {issues}"
             c = COLOR_FAILED if issues > 0 else (100, 255, 100)
-            self.screen.blit(self.font.render(stat_text, True, c), (x_offset + 250, 18))
+            self.screen.blit(self.font.render(stat_text, True, c), (x_offset + PANEL_W - 160, 18))
             
             # Rendering using a cached environment setup
             active_nets = {k: np.array(v) for k, v in self.nets.items() if len(v) >= 2}
@@ -86,7 +90,7 @@ class HeuristicTournamentVisualizer:
                 for u, v in res["segments"]:
                     p1 = (env.nodes[u][0] + x_offset, env.nodes[u][1] + 50)
                     p2 = (env.nodes[v][0] + x_offset, env.nodes[v][1] + 50)
-                    pygame.draw.line(self.screen, color, p1, p2, 4)
+                    pygame.draw.line(self.screen, color, p1, p2, 3)
         
         for net_name, pts in self.nets.items():
             color = COLOR_NETS[net_name]
@@ -117,9 +121,10 @@ class HeuristicTournamentVisualizer:
                     elif event.key == pygame.K_s: self._solve()
                     elif event.key == pygame.K_c: self.nets={k:[] for k in self.nets}; self.results={}
 
-            self.draw_panel(0, "1. Negotiated (Soft)", "Negotiated")
-            self.draw_panel(PANEL_W, "2. Hybrid Rip-Up (New!)", "Hybrid")
-            self.draw_panel(PANEL_W * 2, "3. Global Permutation (Standard)", "GlobalPerm")
+            self.draw_panel(0, "1. Negotiated (Aggressive)", "Negotiated")
+            self.draw_panel(PANEL_W, "2. Surgical Hybrid (Ideal)", "Hybrid")
+            self.draw_panel(PANEL_W * 2, "3. Negotiated Hybrid (Soft)", "NegHybrid")
+            self.draw_panel(PANEL_W * 3, "4. Global Permutation", "GlobalPerm")
 
             help_t = f"Brush: {self.current_net} | Keys 1-4: Switch | S: Solve | C: Clear"
             self.screen.blit(self.font.render(help_t, True, COLOR_TEXT), (10, HEIGHT - 30))

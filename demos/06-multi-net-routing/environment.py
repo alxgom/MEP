@@ -10,6 +10,7 @@ Supports:
 
 import numpy as np
 from typing import List, Tuple, Dict, Optional, Set
+from collections import defaultdict
 from scipy.sparse import csr_matrix, lil_matrix
 from scipy.sparse.csgraph import shortest_path
 
@@ -42,8 +43,8 @@ class MultiNetEnvironment:
         
         # 3. Base Adjacency (Distances)
         self.base_weights = {} 
-        self.edge_congestion = {} # (u,v) -> int
-        self.node_congestion = {} # node_idx -> int
+        self.edge_owners = defaultdict(set) # (u,v) -> {net_names}
+        self.node_owners = defaultdict(set) # node_idx -> {net_names}
         self.history_penalties = {} 
         
         # 4. Indices
@@ -59,16 +60,12 @@ class MultiNetEnvironment:
 
     def _init_topology(self):
         """Initialize the map with physical distances."""
-        for i in range(self.n_nodes):
-            self.node_congestion[i] = 0
-            
         for y in self.uy:
             for i in range(len(self.ux) - 1):
                 u, v = self.node_map[(float(self.ux[i]), float(y))], self.node_map[(float(self.ux[i+1]), float(y))]
                 d = self.ux[i+1] - self.ux[i]
                 edge = tuple(sorted((u, v)))
                 self.base_weights[edge] = d
-                self.edge_congestion[edge] = 0
                 self.history_penalties[edge] = 0.0
         
         for x in self.ux:
@@ -77,24 +74,52 @@ class MultiNetEnvironment:
                 d = self.uy[i+1] - self.uy[i]
                 edge = tuple(sorted((u, v)))
                 self.base_weights[edge] = d
-                self.edge_congestion[edge] = 0
                 self.history_penalties[edge] = 0.0
 
-    def rebuild(self, mode="Hard_Lock"):
+    def add_usage(self, net_name: str, segments: List[Tuple[int, int]]):
+        for u, v in segments:
+            e = tuple(sorted((u, v)))
+            self.edge_owners[e].add(net_name)
+            self.node_owners[u].add(net_name)
+            self.node_owners[v].add(net_name)
+
+    def rebuild(self, mode="Hard_Lock", active_net: Optional[str] = None, congestion_base: float = 500.0):
         adj = lil_matrix((self.n_nodes, self.n_nodes))
         
+        # Identify nodes that are terminals for OTHER nets
+        other_terminals = set()
+        if active_net:
+            for name, indices in self.terminal_indices.items():
+                if name != active_net:
+                    other_terminals.update(indices)
+
         for edge, d in self.base_weights.items():
             u, v = edge
+            # A node is "blocked" if it's hard-locked OR if it's a terminal of another net
+            is_blocked = u in self.locked_nodes or v in self.locked_nodes or u in other_terminals or v in other_terminals
+            
             if mode == "Hard_Lock":
-                if edge not in self.locked_edges and u not in self.locked_nodes and v not in self.locked_nodes:
+                if edge not in self.locked_edges and not is_blocked:
                     adj[u, v] = d; adj[v, u] = d
             else:
-                # Negotiated Logic
-                pres_e = self.edge_congestion[edge]
-                pres_n = self.node_congestion[u] + self.node_congestion[v]
+                # Negotiated Logic (Net-Aware)
+                # Count how many OTHER nets are using this resource
+                pres_e = len([n for n in self.edge_owners[edge] if n != active_net])
+                # Node congestion from OTHER nets (sum of endpoints)
+                pres_n_u = len([n for n in self.node_owners[u] if n != active_net])
+                pres_n_v = len([n for n in self.node_owners[v] if n != active_net])
+                pres_n = pres_n_u + pres_n_v
+
                 hist = self.history_penalties[edge]
-                term_penalty = 10.0 if (u in self.all_terminal_nodes or v in self.all_terminal_nodes) else 1.0
-                penalty = (1.0 + hist) * (500.0 ** (pres_e + pres_n)) * term_penalty
+                
+                # We still want to avoid other terminals VERY strongly in Negotiated mode
+                blocking_penalty = 1e9 if is_blocked else 1.0
+                
+                # term_penalty only applies if u or v is a terminal for OTHER nets
+                is_other_term = u in other_terminals or v in other_terminals
+                term_penalty = 10.0 if is_other_term else 1.0
+
+                penalty = (1.0 + hist) * (congestion_base ** (pres_e + pres_n)) * term_penalty * blocking_penalty
                 cost = d * penalty
                 adj[u, v] = cost; adj[v, u] = cost
                 
@@ -106,8 +131,8 @@ class MultiNetEnvironment:
     def reset_locks(self):
         self.locked_edges.clear()
         self.locked_nodes.clear()
-        for k in self.edge_congestion: self.edge_congestion[k] = 0
-        for k in self.node_congestion: self.node_congestion[k] = 0
+        self.edge_owners.clear()
+        self.node_owners.clear()
 
     def lock_path(self, segments: List[Tuple[int, int]]):
         for edge in segments:
