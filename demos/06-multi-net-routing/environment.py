@@ -98,9 +98,12 @@ class MultiNetEnvironment:
             # A node is "blocked" if it's hard-locked OR if it's a terminal of another net
             is_blocked = u in self.locked_nodes or v in self.locked_nodes or u in other_terminals or v in other_terminals
             
+            # Skip if edge is specifically locked or any endpoint is blocked (other terminals/obstacles)
+            if edge in self.locked_edges or is_blocked:
+                continue
+
             if mode == "Hard_Lock":
-                if edge not in self.locked_edges and not is_blocked:
-                    adj[u, v] = d; adj[v, u] = d
+                adj[u, v] = d; adj[v, u] = d
             else:
                 # Negotiated Logic (Net-Aware)
                 # Count how many OTHER nets are using this resource
@@ -112,14 +115,12 @@ class MultiNetEnvironment:
 
                 hist = self.history_penalties[edge]
                 
-                # We still want to avoid other terminals VERY strongly in Negotiated mode
-                blocking_penalty = 1e9 if is_blocked else 1.0
-                
                 # term_penalty only applies if u or v is a terminal for OTHER nets
+                # (Redundant with is_blocked but kept for logic clarity if we ever relax blocking)
                 is_other_term = u in other_terminals or v in other_terminals
                 term_penalty = 10.0 if is_other_term else 1.0
 
-                penalty = (1.0 + hist) * (congestion_base ** (pres_e + pres_n)) * term_penalty * blocking_penalty
+                penalty = (1.0 + hist) * (congestion_base ** (pres_e + pres_n)) * term_penalty
                 cost = d * penalty
                 adj[u, v] = cost; adj[v, u] = cost
                 
