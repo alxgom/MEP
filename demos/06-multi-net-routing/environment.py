@@ -83,7 +83,7 @@ class MultiNetEnvironment:
             self.node_owners[u].add(net_name)
             self.node_owners[v].add(net_name)
 
-    def rebuild(self, mode="Hard_Lock", active_net: Optional[str] = None, congestion_base: float = 500.0):
+    def rebuild(self, mode="Hard_Lock", active_net: Optional[str] = None, congestion_base: float = 500.0, free_segments: Optional[List[Tuple[int, int]]] = None):
         adj = lil_matrix((self.n_nodes, self.n_nodes))
         
         # Identify nodes that are terminals for OTHER nets
@@ -93,17 +93,27 @@ class MultiNetEnvironment:
                 if name != active_net:
                     other_terminals.update(indices)
 
+        free_segs_set = set()
+        if free_segments:
+            for u, v in free_segments:
+                free_segs_set.add(tuple(sorted((u, v))))
+
         for edge, d in self.base_weights.items():
             u, v = edge
             # A node is "blocked" if it's hard-locked OR if it's a terminal of another net
             is_blocked = u in self.locked_nodes or v in self.locked_nodes or u in other_terminals or v in other_terminals
             
             # Skip if edge is specifically locked or any endpoint is blocked (other terminals/obstacles)
-            if edge in self.locked_edges or is_blocked:
+            # UNLESS it is a free segment (which means we are healing it)
+            if (edge in self.locked_edges or is_blocked) and edge not in free_segs_set:
                 continue
 
             if mode == "Hard_Lock":
                 adj[u, v] = d; adj[v, u] = d
+            elif mode == "Heal":
+                # Free segments cost 0, others cost base distance
+                weight = 0.0 if edge in free_segs_set else d
+                adj[u, v] = weight; adj[v, u] = weight
             else:
                 # Negotiated Logic (Net-Aware)
                 # Count how many OTHER nets are using this resource
@@ -116,7 +126,6 @@ class MultiNetEnvironment:
                 hist = self.history_penalties[edge]
                 
                 # term_penalty only applies if u or v is a terminal for OTHER nets
-                # (Redundant with is_blocked but kept for logic clarity if we ever relax blocking)
                 is_other_term = u in other_terminals or v in other_terminals
                 term_penalty = 10.0 if is_other_term else 1.0
 
