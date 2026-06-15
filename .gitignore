@@ -24,3 +24,6 @@ ENV/
 frames/
 *.gif
 *.png
+
+# SQLite databases (benchmark data — too large for GitHub, use DVC or local storage)
+*.db
