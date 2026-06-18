@@ -360,6 +360,7 @@ The "needle in a haystack" problem: with N pipe segments and M structural obstac
 | **6: 3D Piping** | 6–8 | Hanan Grid, Sequential A*, Darcy-Weisbach | ⏳ Pending |
 | **7: Benchmarking** | 8–9 | Tournament script, unit tests, parallelized Heavy Benchmark (N=70) | ✅ Done |
 | **8: Production** | 9–10 | Clean API, optimized NumPy/SciPy engine, documentation | ✅ Done |
+| **9: Bend-Aware Routing** | 10+ | State-Expanded A*, Shapely geometries, turn-cleanup post-processor | ⏳ In Progress |
 
 ---
 
