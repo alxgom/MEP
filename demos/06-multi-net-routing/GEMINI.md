@@ -23,6 +23,16 @@ Implement a solver that calculates the **Interference Degree** (blocking score) 
 ### 4. Mandatory KPI: Execution Time
 The visual dashboard must now display **Time (ms)** alongside **Length** and **Issues** for every panel.
 
+### 5. New Solver: Dynamic Escape Graph Sequential Solver
+Implement a routing option `solve_dynamic_escape_sequential()` that routes nets sequentially, but constructs a custom, augmented escape graph for each net:
+*   Route nets sequentially sorted by bounding box area.
+*   For each net:
+    *   Construct a local `MultiNetEnvironment` where coordinates of the current net's terminals and all segments/nodes of previously routed nets' paths are added as interest points (forcing grid lines).
+    *   Lock the edges and nodes of the previously routed paths in the local environment to prevent collisions.
+    *   Solve the current net on this dynamic local grid.
+    *   Store the path in physical coordinates and project it back to the global environment's node indices.
+*   Wire this solver into `main.py` as a 5th comparison panel to evaluate length, turns, collisions, and runtime against the static grid solvers.
+
 *Goal:* Establish whether the Staged Pipeline achieves near-permutation quality in a fraction of the time.
 
 ---

@@ -62,6 +62,10 @@ Once Phase 0 is validated and approved, we will build **Demo 07** in `demos/07-m
 *   Supports **Multi-Net Dynamic Locking** (locked edges/nodes representing routed paths).
 *   **Bundling Discount:** Computes a potential well attraction factor $\eta_{\text{bundle}} \in [0.70, 0.85]$ for edges that run parallel and adjacent to already-routed paths.
 *   **Bounded Search Area (BSA):** Limits routing queries to localized detour bounding boxes.
+*   **Dynamic Escape Graph Augmentation**: For sequential multi-net routing:
+    *   When routing Net $k$, treat previously routed paths (Nets $1 \dots k-1$) as dynamic obstacles.
+    *   Augment the escape graph by dynamically projecting orthogonal rays from the elbows/vertices of the already-routed paths.
+    *   This guarantees that the routing grid dynamically adapts to introduce parallel grid lines wrapping tightly around existing pipes, allowing for close packaging and preventing local grid-alignment failures.
 
 ### 2. Solver Specifications (`solver.py`)
 *   **Interference-Degree Priority Queue:** Ranks nets using:
