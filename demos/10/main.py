@@ -870,8 +870,26 @@ def solve_ventilation_routing():
 
         kitchen_pin_node_idx = pin_node_map[best_pin_name]
 
+        # ── Block the exhaust node & shaft route path to prevent overlapping ──
+        kitchen_weights = {}
+        for nbr, dist, direction in current_env.adj.get(exhaust_node_idx, []):
+            edge = (min(exhaust_node_idx, nbr), max(exhaust_node_idx, nbr))
+            kitchen_weights[edge] = 1e9
+
+        if shaft_path:
+            for i in range(len(shaft_path) - 1):
+                u, v = shaft_path[i], shaft_path[i+1]
+                edge = (min(u, v), max(u, v))
+                kitchen_weights[edge] = 1e9
+
         try:
-            kitchen_path, kitchen_len = state_expanded_astar(current_env, kitchen_pin_node_idx, kitchen_node_idx, C_bend=C_BEND)
+            kitchen_path, kitchen_len = state_expanded_astar(
+                current_env,
+                kitchen_pin_node_idx,
+                kitchen_node_idx,
+                C_bend=C_BEND,
+                edge_weights=kitchen_weights
+            )
         except Exception as e:
             print(f"Kitchen routing search error: {e}")
             kitchen_path = None
