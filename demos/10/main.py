@@ -24,7 +24,7 @@ SCALE_TO_MM    = 1000.0
 WALL_THICKNESS = 150.0
 GRID_SPACING   = 200    # mm — regular routing grid resolution
 FPS            = 20
-C_BEND         = 5000.0  # Turn penalty in mm
+C_BEND         = 4000.0  # Turn penalty in mm
 
 # Graph types that can be cycled via Tab key
 GRAPH_TYPES = [
@@ -1050,8 +1050,8 @@ def get_solution_score(routes, crossings):
     for name, segs in routes:
         total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
         total_turns += calculate_tree_turns(segs)
-    # C_bend is 5000.0, crossings are heavily penalized (100,000.0 each)
-    score = total_len + 5000.0 * total_turns + 100000.0 * crossings
+    # C_bend is 4000.0, crossings are heavily penalized (100,000.0 each)
+    score = total_len + 4000.0 * total_turns + 100000.0 * crossings
     return score
 
 def solve_ventilation_routing():
