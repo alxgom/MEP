@@ -1050,8 +1050,8 @@ def get_solution_score(routes, crossings):
     for name, segs in routes:
         total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
         total_turns += calculate_tree_turns(segs)
-    # C_bend is 4000.0, crossings are heavily penalized (100,000.0 each)
-    score = total_len + 4000.0 * total_turns + 100000.0 * crossings
+    # C_bend is 4000.0, crossings are penalized as 5 bends (20,000.0)
+    score = int(total_len) + int(C_BEND) * total_turns + int(5 * C_BEND) * crossings
     return score
 
 def solve_ventilation_routing():
