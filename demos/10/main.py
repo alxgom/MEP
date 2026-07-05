@@ -985,8 +985,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
     routes.append(("Shaft", shaft_segs))
     
     total_nodes = len(shaft_path)
-    available_small_pins = ["tl", "tr", "bl", "br"]
-
+    
     # Pre-calculate terminal node indices
     terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
 
@@ -1002,75 +1001,72 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
                     w[edge] = 1e9
         return w
 
+    # 1. Route Kitchen (Fixed position right after Shaft)
+    kitchen_pt = terminals.get("Kitchen")
+    if kitchen_pt:
+        _, kitchen_node_idx = grid_kd.query(kitchen_pt)
+        kitchen_node_idx = int(kitchen_node_idx)
+        
+        current_weights = get_weights_blocking_other_terminals("Kitchen", accumulated_weights)
+        kitchen_path, _, _ = run_super_sink_astar(
+            current_env,
+            kitchen_node_idx,
+            [kitchen_pin_name],
+            pin_node_map,
+            global_pins,
+            machine_angle,
+            C_BEND,
+            edge_weights=current_weights
+        )
+        if kitchen_path is None:
+            return False, None, "No path to Kitchen", 0
+            
+        kitchen_segs = []
+        for i in range(len(kitchen_path) - 1):
+            p1 = current_env.nodes[kitchen_path[i]]
+            p2 = current_env.nodes[kitchen_path[i+1]]
+            kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+        routes.append(("Kitchen", kitchen_segs))
+        total_nodes += len(kitchen_path)
+        
+        kitchen_pin_node_idx = pin_node_map[kitchen_pin_name]
+        block_path_and_node(kitchen_path, kitchen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
+
+    # 2. Route small duct rooms in perm order
+    available_small_pins = ["tl", "tr", "bl", "br"]
     for room_name in perm:
-        if room_name == "Kitchen":
-            kitchen_pt = terminals.get("Kitchen")
-            if not kitchen_pt:
-                continue
-            _, kitchen_node_idx = grid_kd.query(kitchen_pt)
-            kitchen_node_idx = int(kitchen_node_idx)
+        if not available_small_pins:
+            return False, None, f"No port for {room_name}", 0
+        room_pt = terminals[room_name]
+        _, room_node_idx = grid_kd.query(room_pt)
+        room_node_idx = int(room_node_idx)
+        
+        current_weights = get_weights_blocking_other_terminals(room_name, accumulated_weights)
+        room_path, _, chosen_small_pin = run_super_sink_astar(
+            current_env,
+            room_node_idx,
+            available_small_pins,
+            pin_node_map,
+            global_pins,
+            machine_angle,
+            C_BEND,
+            edge_weights=current_weights
+        )
+        if room_path is None:
+            return False, None, f"No path to {room_name}", 0
             
-            # Temporary weights blocking other terminals
-            current_weights = get_weights_blocking_other_terminals("Kitchen", accumulated_weights)
-            
-            kitchen_path, _, _ = run_super_sink_astar(
-                current_env,
-                kitchen_node_idx,
-                [kitchen_pin_name],
-                pin_node_map,
-                global_pins,
-                machine_angle,
-                C_BEND,
-                edge_weights=current_weights
-            )
-            if kitchen_path is None:
-                return False, None, "No path to Kitchen", 0
-                
-            kitchen_segs = []
-            for i in range(len(kitchen_path) - 1):
-                p1 = current_env.nodes[kitchen_path[i]]
-                p2 = current_env.nodes[kitchen_path[i+1]]
-                kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-            routes.append(("Kitchen", kitchen_segs))
-            total_nodes += len(kitchen_path)
-            
-            kitchen_pin_node_idx = pin_node_map[kitchen_pin_name]
-            block_path_and_node(kitchen_path, kitchen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
-        else:
-            if not available_small_pins:
-                return False, None, f"No port for {room_name}", 0
-            room_pt = terminals[room_name]
-            _, room_node_idx = grid_kd.query(room_pt)
-            room_node_idx = int(room_node_idx)
-            
-            # Temporary weights blocking other terminals
-            current_weights = get_weights_blocking_other_terminals(room_name, accumulated_weights)
-            
-            room_path, _, chosen_small_pin = run_super_sink_astar(
-                current_env,
-                room_node_idx,
-                available_small_pins,
-                pin_node_map,
-                global_pins,
-                machine_angle,
-                C_BEND,
-                edge_weights=current_weights
-            )
-            if room_path is None:
-                return False, None, f"No path to {room_name}", 0
-                
-            room_segs = []
-            for i in range(len(room_path) - 1):
-                p1 = current_env.nodes[room_path[i]]
-                p2 = current_env.nodes[room_path[i+1]]
-                room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-            routes.append((room_name, room_segs))
-            total_nodes += len(room_path)
-            
-            chosen_pin_node_idx = pin_node_map[chosen_small_pin]
-            block_path_and_node(room_path, chosen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
-            available_small_pins.remove(chosen_small_pin)
-            
+        room_segs = []
+        for i in range(len(room_path) - 1):
+            p1 = current_env.nodes[room_path[i]]
+            p2 = current_env.nodes[room_path[i+1]]
+            room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+        routes.append((room_name, room_segs))
+        total_nodes += len(room_path)
+        
+        chosen_pin_node_idx = pin_node_map[chosen_small_pin]
+        block_path_and_node(room_path, chosen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
+        available_small_pins.remove(chosen_small_pin)
+        
     return True, routes, "Success", total_nodes
 
 def get_solution_score(routes, crossings):
@@ -1147,19 +1143,18 @@ def solve_ventilation_routing():
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
         return None, "Blocked: No path to shaft", elapsed_ms, 0
 
-    # 2. Backtracking search over permutations of the rooms
+    # 2. Backtracking search over permutations of the small duct rooms
     from itertools import permutations
     other_rooms = sorted(
         [name for name in terminals.keys() if name != "Kitchen" and any(w in name for w in ["Bathroom", "Toilet", "Washroom"])],
         key=lambda name: math.hypot(terminals[name][0] - machine_cx, terminals[name][1] - machine_cy)
     )
-    all_rooms_to_permute = ["Kitchen"] + other_rooms
     
     if routing_strategy_idx == 0:
         # Greedy Sequential: only the default proximity order
-        all_perms = [tuple(all_rooms_to_permute)]
+        all_perms = [tuple(other_rooms)]
     else:
-        all_perms = list(permutations(all_rooms_to_permute))
+        all_perms = list(permutations(other_rooms))
 
     best_routes = None
     best_crossings = 1e9
@@ -1179,7 +1174,7 @@ def solve_ventilation_routing():
             if crossings == 0:
                 if routing_strategy_idx == 1: # First Fit
                     elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-                    status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings)"
+                    status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings) in {elapsed_ms:.1f}ms"
                     return routes_cand, status_text, elapsed_ms, total_nodes_cand
                 else: # Best Fit or Greedy
                     if score < best_score:
@@ -1215,11 +1210,11 @@ def solve_ventilation_routing():
     # Return the best route found
     if best_routes is not None:
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        status_text = f"Success: Routed all (tried {perm_attempts} perms, {best_crossings} crossings)"
+        status_text = f"Success: Routed all (tried {perm_attempts} perms, {best_crossings} crossings) in {elapsed_ms:.1f}ms"
         return best_routes, status_text, elapsed_ms, best_total_nodes
     else:
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        return None, f"Routing Blocked (tried {perm_attempts} perms)", elapsed_ms, 0
+        return None, f"Routing Blocked (tried {perm_attempts} perms) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
