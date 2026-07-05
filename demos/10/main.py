@@ -288,6 +288,54 @@ def _commit_grid(nodes_arr, valid_edges):
             w = float(np.hypot(dx, dy))
             valid_edges.append((min_idx, shaft_idx, w, d))
 
+    # ── Map pin coordinates to node indices to filter machine face-edges ──
+    pin_indices = {}
+    global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+    for name, pt in global_pins.items():
+        diffs = np.hypot(nodes_arr[:, 0] - pt[0], nodes_arr[:, 1] - pt[1])
+        min_idx = np.argmin(diffs)
+        if diffs[min_idx] < 1.0:  # exact match within 1mm
+            pin_indices[int(min_idx)] = name
+
+    # Allowed direction based on machine_angle
+    left_dir = 'W'
+    right_dir = 'E'
+    if machine_angle == 90:
+        left_dir = 'S'
+        right_dir = 'N'
+    elif machine_angle == 180:
+        left_dir = 'E'
+        right_dir = 'W'
+    elif machine_angle == 270:
+        left_dir = 'N'
+        right_dir = 'S'
+
+    # Filter edges so that machine pins only connect outward normal to their face
+    filtered_edges = []
+    for u, v, w, d in valid_edges:
+        keep = True
+        
+        # Check u as pin
+        if u in pin_indices:
+            pin_name = pin_indices[u]
+            is_left = pin_name in ('left_mid', 'tl', 'bl')
+            allowed = left_dir if is_left else right_dir
+            if d != allowed:
+                keep = False
+                
+        # Check v as pin
+        if v in pin_indices:
+            pin_name = pin_indices[v]
+            is_left = pin_name in ('left_mid', 'tl', 'bl')
+            allowed = left_dir if is_left else right_dir
+            if DIR_REV[d] != allowed:
+                keep = False
+                
+        if keep:
+            filtered_edges.append((u, v, w, d))
+            
+    valid_edges = filtered_edges
+
     adj = {i: [] for i in range(len(nodes_arr))}
     for u, v, w, d in valid_edges:
         adj[u].append((v, w, d))
@@ -857,19 +905,6 @@ def solve_ventilation_routing():
         _, kitchen_node_idx = grid_kd.query(kitchen_pt)
         kitchen_node_idx = int(kitchen_node_idx)
 
-        # Find closest small orange pin to Kitchen terminal
-        small_pins = ["tl", "tr", "bl", "br"]
-        best_pin_name = None
-        best_dist = 1e9
-        for name in small_pins:
-            pt = global_pins[name]
-            dist = math.hypot(pt[0] - kitchen_pt[0], pt[1] - kitchen_pt[1])
-            if dist < best_dist:
-                best_dist = dist
-                best_pin_name = name
-
-        kitchen_pin_node_idx = pin_node_map[best_pin_name]
-
         # ── Block the exhaust node & shaft route path to prevent overlapping ──
         kitchen_weights = {}
         for nbr, dist, direction in current_env.adj.get(exhaust_node_idx, []):
@@ -882,17 +917,28 @@ def solve_ventilation_routing():
                 edge = (min(u, v), max(u, v))
                 kitchen_weights[edge] = 1e9
 
-        try:
-            kitchen_path, kitchen_len = state_expanded_astar(
-                current_env,
-                kitchen_pin_node_idx,
-                kitchen_node_idx,
-                C_bend=C_BEND,
-                edge_weights=kitchen_weights
-            )
-        except Exception as e:
-            print(f"Kitchen routing search error: {e}")
-            kitchen_path = None
+        # Try small pins in order of proximity to Kitchen terminal
+        small_pins = ["tl", "tr", "bl", "br"]
+        sorted_pins = sorted(
+            small_pins,
+            key=lambda name: math.hypot(global_pins[name][0] - kitchen_pt[0], global_pins[name][1] - kitchen_pt[1])
+        )
+
+        for pin_name in sorted_pins:
+            pin_node_idx = pin_node_map[pin_name]
+            try:
+                path, length = state_expanded_astar(
+                    current_env,
+                    pin_node_idx,
+                    kitchen_node_idx,
+                    C_bend=C_BEND,
+                    edge_weights=kitchen_weights
+                )
+                if path is not None:
+                    kitchen_path = path
+                    break
+            except Exception as e:
+                print(f"Kitchen routing search error on pin {pin_name}: {e}")
 
     if kitchen_pt and kitchen_path is None:
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
