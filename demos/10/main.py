@@ -1191,6 +1191,8 @@ def main():
     font_large = pygame.font.SysFont("Consolas", 18, bold=True)
     font_medium = pygame.font.SysFont("Consolas", 14, bold=True)
     font_small = pygame.font.SysFont("Consolas", 11)
+    font_kpi = pygame.font.SysFont("Consolas", 20, bold=True)
+    font_tiny = pygame.font.SysFont("Consolas", 8, bold=True)
     
     # Initial setup
     generate_new_dwelling()
@@ -1409,8 +1411,32 @@ def main():
         explanation_lbl = font_small.render(status, True, COLOR_TEXT)
         screen.blit(explanation_lbl, (30, 137))
         
+        # KPI Cards (Length & Turns)
+        total_length_m = 0.0
+        total_turns = 0
+        if routes:
+            for name, segs in routes:
+                total_length_m += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs) / 1000.0
+                total_turns += calculate_tree_turns(segs)
+                
+        # Card backgrounds
+        pygame.draw.rect(screen, (20, 20, 25), (20, 180, 115, 55), 0, 4)
+        pygame.draw.rect(screen, (20, 20, 25), (145, 180, 115, 55), 0, 4)
+        
+        # Card 1 (Total Length)
+        lbl_card1 = font_tiny.render("TOTAL DUCT LENGTH", True, COLOR_MUTED)
+        screen.blit(lbl_card1, (26, 187))
+        val_card1 = font_kpi.render(f"{total_length_m:.1f} m", True, (46, 204, 113) if routes else COLOR_TEXT)
+        screen.blit(val_card1, (26, 204))
+        
+        # Card 2 (Total Turns)
+        lbl_card2 = font_tiny.render("TOTAL BENDS", True, COLOR_MUTED)
+        screen.blit(lbl_card2, (151, 187))
+        val_card2 = font_kpi.render(f"{total_turns}", True, (230, 126, 34) if routes else COLOR_TEXT)
+        screen.blit(val_card2, (151, 204))
+        
         # Execution Specs
-        specs_y = 175
+        specs_y = 250
         n_nodes = len(grid_nodes) if grid_nodes is not None else 0
         n_edges = len(grid_edge_list) if grid_edge_list else 0
         specs = [
