@@ -940,7 +940,7 @@ def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
     return terminal_nodes
 
 def count_segment_crossings(routes):
-    """Counts the number of perpendicular crossings between different routed paths."""
+    """Counts the number of perpendicular crossings and collinear overlaps between different routed paths."""
     crossings = 0
     all_segs = []
     for name, segs in routes:
@@ -961,11 +961,20 @@ def count_segment_crossings(routes):
             
             if is_horiz1 != is_horiz2:
                 if is_horiz1:
-                    if ax1 < bx1 < ax2 and by1 < ay1 < by2:
+                    if ax1 <= bx1 <= ax2 and by1 <= ay1 <= by2:
                         crossings += 1
                 else:
-                    if bx1 < ax1 < bx2 and ay1 < by1 < ay2:
+                    if bx1 <= ax1 <= bx2 and ay1 <= by1 <= ay2:
                         crossings += 1
+            else:
+                if is_horiz1:
+                    if abs(ay1 - by1) < 1e-7:
+                        if max(ax1, bx1) <= min(ax2, bx2):
+                            crossings += 1
+                else:
+                    if abs(ax1 - bx1) < 1e-7:
+                        if max(ay1, by1) <= min(ay2, by2):
+                            crossings += 1
     return crossings
 
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes):
