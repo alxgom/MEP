@@ -701,7 +701,7 @@ def generate_new_dwelling():
     build_grid(machine_pins=pins)
 
 def get_machine_pins(cx, cy, angle_deg):
-    w, h = 300.0, 200.0 # 30cm x 20cm
+    w, h = 700.0, 600.0 # 70cm x 60cm
     local_pins = {
         "left_mid": (-w/2, 0.0),
         "right_mid": (w/2, 0.0),
