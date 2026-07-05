@@ -840,7 +840,7 @@ def update_dynamic_env(machine_poly):
     print(f"Grid update: {ms:.1f} ms  "
           f"(blocked nodes={len(blocked_nodes)}, edges={len(blocked_edges)})")
 
-def block_path_and_node(path, chosen_pin_node_idx, accumulated_weights, env):
+def block_path_and_node(path, chosen_pin_node_idx, accumulated_weights, env, block_nodes=False):
     # Block all incident edges to the chosen pin node
     if chosen_pin_node_idx in env.adj:
         for nbr, dist, direction in env.adj[chosen_pin_node_idx]:
@@ -851,6 +851,13 @@ def block_path_and_node(path, chosen_pin_node_idx, accumulated_weights, env):
         u, v = path[i], path[i+1]
         edge = (min(u, v), max(u, v))
         accumulated_weights[edge] = 1e9
+    # Block intermediate nodes along the path (preventing crossings)
+    if block_nodes and len(path) > 2:
+        for u in path[1:-1]:
+            if u in env.adj:
+                for nbr, dist, direction in env.adj[u]:
+                    edge = (min(u, nbr), max(u, nbr))
+                    accumulated_weights[edge] = 1e9
 
 def run_super_sink_astar(env, start_node_idx, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
@@ -910,6 +917,119 @@ def run_super_sink_astar(env, start_node_idx, target_pin_names, pin_node_map, gl
     
     return path_without_sink, path_len, chosen_pin_name
 
+def count_segment_crossings(routes):
+    """Counts the number of perpendicular crossings between different routed paths."""
+    crossings = 0
+    all_segs = []
+    for name, segs in routes:
+        for p1, p2 in segs:
+            x1, y1 = min(p1[0], p2[0]), min(p1[1], p2[1])
+            x2, y2 = max(p1[0], p2[0]), max(p1[1], p2[1])
+            all_segs.append((name, (x1, y1, x2, y2)))
+            
+    for i in range(len(all_segs)):
+        name1, (ax1, ay1, ax2, ay2) = all_segs[i]
+        is_horiz1 = abs(ay1 - ay2) < 1e-7
+        
+        for j in range(i + 1, len(all_segs)):
+            name2, (bx1, by1, bx2, by2) = all_segs[j]
+            if name1 == name2:
+                continue
+            is_horiz2 = abs(by1 - by2) < 1e-7
+            
+            if is_horiz1 != is_horiz2:
+                if is_horiz1:
+                    if ax1 < bx1 < ax2 and by1 < ay1 < by2:
+                        crossings += 1
+                else:
+                    if bx1 < ax1 < bx2 and ay1 < by1 < ay2:
+                        crossings += 1
+    return crossings
+
+def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes):
+    accumulated_weights = {}
+    exhaust_node_idx = pin_node_map[chosen_exhaust_pin]
+    block_path_and_node(shaft_path, exhaust_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
+
+    kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
+    routes = []
+    
+    # Shaft segments
+    shaft_segs = []
+    for i in range(len(shaft_path) - 1):
+        p1 = current_env.nodes[shaft_path[i]]
+        p2 = current_env.nodes[shaft_path[i+1]]
+        shaft_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    routes.append(("Shaft", shaft_segs))
+    
+    total_nodes = len(shaft_path)
+    available_small_pins = ["tl", "tr", "bl", "br"]
+
+    for room_name in perm:
+        if room_name == "Kitchen":
+            kitchen_pt = terminals.get("Kitchen")
+            if not kitchen_pt:
+                continue
+            _, kitchen_node_idx = grid_kd.query(kitchen_pt)
+            kitchen_node_idx = int(kitchen_node_idx)
+            
+            kitchen_path, _, _ = run_super_sink_astar(
+                current_env,
+                kitchen_node_idx,
+                [kitchen_pin_name],
+                pin_node_map,
+                global_pins,
+                machine_angle,
+                C_BEND,
+                edge_weights=accumulated_weights
+            )
+            if kitchen_path is None:
+                return False, None, "No path to Kitchen", 0
+                
+            kitchen_segs = []
+            for i in range(len(kitchen_path) - 1):
+                p1 = current_env.nodes[kitchen_path[i]]
+                p2 = current_env.nodes[kitchen_path[i+1]]
+                kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+            routes.append(("Kitchen", kitchen_segs))
+            total_nodes += len(kitchen_path)
+            
+            kitchen_pin_node_idx = pin_node_map[kitchen_pin_name]
+            block_path_and_node(kitchen_path, kitchen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
+        else:
+            if not available_small_pins:
+                return False, None, f"No port for {room_name}", 0
+            room_pt = terminals[room_name]
+            _, room_node_idx = grid_kd.query(room_pt)
+            room_node_idx = int(room_node_idx)
+            
+            room_path, _, chosen_small_pin = run_super_sink_astar(
+                current_env,
+                room_node_idx,
+                available_small_pins,
+                pin_node_map,
+                global_pins,
+                machine_angle,
+                C_BEND,
+                edge_weights=accumulated_weights
+            )
+            if room_path is None:
+                return False, None, f"No path to {room_name}", 0
+                
+            room_segs = []
+            for i in range(len(room_path) - 1):
+                p1 = current_env.nodes[room_path[i]]
+                p2 = current_env.nodes[room_path[i+1]]
+                room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+            routes.append((room_name, room_segs))
+            total_nodes += len(room_path)
+            
+            chosen_pin_node_idx = pin_node_map[chosen_small_pin]
+            block_path_and_node(room_path, chosen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
+            available_small_pins.remove(chosen_small_pin)
+            
+    return True, routes, "Success", total_nodes
+
 def solve_ventilation_routing():
     t_start = time.perf_counter()
     global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
@@ -921,7 +1041,7 @@ def solve_ventilation_routing():
     m_center = Point(machine_cx, machine_cy)
     if not routing_region_base or not routing_region_base.contains(m_center):
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        return None, "Blocked: Machine outside false-ceiling region", elapsed_ms, 0
+        return None, "Blocked: Machine outside region", elapsed_ms, 0
 
     if any(machine_poly.intersects(col) for col in columns):
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
@@ -931,25 +1051,21 @@ def solve_ventilation_routing():
         return None, "Building grid… press Space to retry", 0.0, 0
 
     if graph_type_idx == 0:
-        # Regular grid: fast dynamic filter (machine excluded from adj, not from nodes)
         update_dynamic_env(machine_poly)
     else:
-        # Hannan grids: full rebuild with machine pins as nodes (~15-30 ms)
         build_hannan_grid(machine_pins=global_pins, shift_walls=(graph_type_idx == 2))
 
-    # Snap machine pins to nodes
     pin_node_map = snap_pins_to_graph(global_pins)
     if not pin_node_map or not shaft_extraction:
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
         return None, "Blocked: Missing pins or shaft", elapsed_ms, 0
 
-    # Query nearest node to shaft representative point
     rep_pt = shaft_extraction.representative_point()
     shaft_center = (round(rep_pt.x), round(rep_pt.y))
     _, shaft_node_idx = grid_kd.query(shaft_center)
     shaft_node_idx = int(shaft_node_idx)
 
-    # 1. Route Shaft via Super Sink (targets both large pins left_mid / right_mid)
+    # 1. Route Shaft via Super Sink
     shaft_path, _, chosen_exhaust_pin = run_super_sink_astar(
         current_env,
         shaft_node_idx,
@@ -962,110 +1078,62 @@ def solve_ventilation_routing():
 
     if shaft_path is None:
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        return None, "Routing Blocked: No path to shaft", elapsed_ms, 0
+        return None, "Blocked: No path to shaft", elapsed_ms, 0
 
-    # Setup sequential path blocking
-    accumulated_weights = {}
-    exhaust_node_idx = pin_node_map[chosen_exhaust_pin]
-    block_path_and_node(shaft_path, exhaust_node_idx, accumulated_weights, current_env)
-
-    # 2. Route Kitchen to the remaining large pin
-    kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
-    kitchen_pt = terminals.get("Kitchen")
-    kitchen_path = None
-    
-    if kitchen_pt:
-        _, kitchen_node_idx = grid_kd.query(kitchen_pt)
-        kitchen_node_idx = int(kitchen_node_idx)
-        
-        kitchen_path, _, _ = run_super_sink_astar(
-            current_env,
-            kitchen_node_idx,
-            [kitchen_pin_name],
-            pin_node_map,
-            global_pins,
-            machine_angle,
-            C_BEND,
-            edge_weights=accumulated_weights
-        )
-        
-        if kitchen_path is None:
-            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-            return None, "Routing Blocked: No path to Kitchen", elapsed_ms, len(shaft_path)
-
-        kitchen_pin_node_idx = pin_node_map[kitchen_pin_name]
-        block_path_and_node(kitchen_path, kitchen_pin_node_idx, accumulated_weights, current_env)
-
-    # 3. Route other wet rooms to the small ports via Super Sink
-    routes = []
-    
-    # Render Shaft duct segments
-    shaft_segs = []
-    for i in range(len(shaft_path) - 1):
-        p1 = current_env.nodes[shaft_path[i]]
-        p2 = current_env.nodes[shaft_path[i+1]]
-        shaft_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-    routes.append(("Shaft", shaft_segs))
-
-    # Render Kitchen duct segments
-    total_nodes = len(shaft_path)
-    if kitchen_path:
-        kitchen_segs = []
-        for i in range(len(kitchen_path) - 1):
-            p1 = current_env.nodes[kitchen_path[i]]
-            p2 = current_env.nodes[kitchen_path[i+1]]
-            kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-        routes.append(("Kitchen", kitchen_segs))
-        total_nodes += len(kitchen_path)
-
-    # Solve all other rooms in sequence
+    # 2. Backtracking search over permutations of the rooms
+    from itertools import permutations
     other_rooms = sorted(
         [name for name in terminals.keys() if name != "Kitchen" and any(w in name for w in ["Bathroom", "Toilet", "Washroom"])],
         key=lambda name: math.hypot(terminals[name][0] - machine_cx, terminals[name][1] - machine_cy)
     )
+    all_rooms_to_permute = ["Kitchen"] + other_rooms
+    all_perms = list(permutations(all_rooms_to_permute))
 
-    available_small_pins = ["tl", "tr", "bl", "br"]
-    for room_name in other_rooms:
-        if not available_small_pins:
-            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-            return None, f"Routing Blocked: No available port for {room_name}", elapsed_ms, total_nodes
-            
-        room_pt = terminals[room_name]
-        _, room_node_idx = grid_kd.query(room_pt)
-        room_node_idx = int(room_node_idx)
-        
-        room_path, _, chosen_small_pin = run_super_sink_astar(
-            current_env,
-            room_node_idx,
-            available_small_pins,
-            pin_node_map,
-            global_pins,
-            machine_angle,
-            C_BEND,
-            edge_weights=accumulated_weights
+    best_routes = None
+    best_crossings = 1e9
+    best_total_nodes = 0
+    perm_attempts = 0
+
+    # Pass 1: Try collision-free solutions (block_nodes=True)
+    for perm in all_perms:
+        perm_attempts += 1
+        success, routes_cand, status_cand, total_nodes_cand = run_sequential_routing(
+            perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes=True
         )
-        
-        if room_path is None:
-            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-            return None, f"Routing Blocked: No path to {room_name}", elapsed_ms, total_nodes
-            
-        # Build segments for this room
-        room_segs = []
-        for i in range(len(room_path) - 1):
-            p1 = current_env.nodes[room_path[i]]
-            p2 = current_env.nodes[room_path[i+1]]
-            room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-        routes.append((room_name, room_segs))
-        total_nodes += len(room_path)
-        
-        # Block the chosen port and the path
-        chosen_pin_node_idx = pin_node_map[chosen_small_pin]
-        block_path_and_node(room_path, chosen_pin_node_idx, accumulated_weights, current_env)
-        available_small_pins.remove(chosen_small_pin)
+        if success:
+            crossings = count_segment_crossings(routes_cand)
+            if crossings == 0:
+                elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+                status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings)"
+                return routes_cand, status_text, elapsed_ms, total_nodes_cand
+            if crossings < best_crossings:
+                best_crossings = crossings
+                best_routes = routes_cand
+                best_total_nodes = total_nodes_cand
 
-    elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-    status_text = "Success: Routed all wet rooms"
-    return routes, status_text, elapsed_ms, total_nodes
+    # Pass 2: Fall back to allowing crossings (block_nodes=False)
+    for perm in all_perms:
+        perm_attempts += 1
+        success, routes_cand, status_cand, total_nodes_cand = run_sequential_routing(
+            perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes=False
+        )
+        if success:
+            crossings = count_segment_crossings(routes_cand)
+            if crossings < best_crossings:
+                best_crossings = crossings
+                best_routes = routes_cand
+                best_total_nodes = total_nodes_cand
+                if crossings == 0:
+                    break
+
+    # Return the best route found
+    if best_routes is not None:
+        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+        status_text = f"Success: Routed all (tried {perm_attempts} perms, {best_crossings} crossings)"
+        return best_routes, status_text, elapsed_ms, best_total_nodes
+    else:
+        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+        return None, f"Routing Blocked (tried {perm_attempts} perms)", elapsed_ms, 0
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx
@@ -1282,14 +1350,17 @@ def main():
         screen.blit(subtitle, (20, 52))
         
         # Status Box
-        pygame.draw.rect(screen, (20, 20, 25), (20, 90, CANVAS_LEFT - 40, 60), 0, 4)
+        pygame.draw.rect(screen, (20, 20, 25), (20, 90, CANVAS_LEFT - 40, 75), 0, 4)
         status_lbl = font_medium.render("ROUTING STATUS:", True, COLOR_MUTED)
-        screen.blit(status_lbl, (30, 95))
+        screen.blit(status_lbl, (30, 93))
         
         color_status = (46, 204, 113) if routes else (231, 76, 60)
         status_txt = "SOLVED" if routes else "BLOCKED"
         status_txt_render = font_large.render(status_txt, True, color_status)
-        screen.blit(status_txt_render, (30, 115))
+        screen.blit(status_txt_render, (30, 110))
+        
+        explanation_lbl = font_small.render(status, True, COLOR_TEXT)
+        screen.blit(explanation_lbl, (30, 137))
         
         # Execution Specs
         specs_y = 175
