@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, '..', '08-bend-aware-n
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..', '..')))
 
 import generative_layout
-from solver import state_expanded_astar
+from solver import state_expanded_astar, calculate_tree_turns
 
 # Constants
 SCALE_TO_MM    = 1000.0
@@ -32,6 +32,13 @@ GRAPH_TYPES = [
     "Hannan Grid (numpy)",
     "Hannan + Shifted Nodes",
 ]
+
+ROUTING_STRATEGIES = [
+    "Greedy Sequential",
+    "First Fit",
+    "Best Fit"
+]
+routing_strategy_idx = 1
 
 # Pygame Window Config
 WINDOW_WIDTH, WINDOW_HEIGHT = 1250, 850
@@ -1030,6 +1037,16 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             
     return True, routes, "Success", total_nodes
 
+def get_solution_score(routes, crossings):
+    total_len = 0.0
+    total_turns = 0
+    for name, segs in routes:
+        total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
+        total_turns += calculate_tree_turns(segs)
+    # C_bend is 5000.0, crossings are heavily penalized (100,000.0 each)
+    score = total_len + 5000.0 * total_turns + 100000.0 * crossings
+    return score
+
 def solve_ventilation_routing():
     t_start = time.perf_counter()
     global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
@@ -1087,10 +1104,16 @@ def solve_ventilation_routing():
         key=lambda name: math.hypot(terminals[name][0] - machine_cx, terminals[name][1] - machine_cy)
     )
     all_rooms_to_permute = ["Kitchen"] + other_rooms
-    all_perms = list(permutations(all_rooms_to_permute))
+    
+    if routing_strategy_idx == 0:
+        # Greedy Sequential: only the default proximity order
+        all_perms = [tuple(all_rooms_to_permute)]
+    else:
+        all_perms = list(permutations(all_rooms_to_permute))
 
     best_routes = None
     best_crossings = 1e9
+    best_score = 1e18
     best_total_nodes = 0
     perm_attempts = 0
 
@@ -1102,29 +1125,42 @@ def solve_ventilation_routing():
         )
         if success:
             crossings = count_segment_crossings(routes_cand)
+            score = get_solution_score(routes_cand, crossings)
             if crossings == 0:
-                elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-                status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings)"
-                return routes_cand, status_text, elapsed_ms, total_nodes_cand
-            if crossings < best_crossings:
-                best_crossings = crossings
-                best_routes = routes_cand
-                best_total_nodes = total_nodes_cand
+                if routing_strategy_idx == 1: # First Fit
+                    elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+                    status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings)"
+                    return routes_cand, status_text, elapsed_ms, total_nodes_cand
+                else: # Best Fit or Greedy
+                    if score < best_score:
+                        best_score = score
+                        best_crossings = crossings
+                        best_routes = routes_cand
+                        best_total_nodes = total_nodes_cand
+            else:
+                if score < best_score:
+                    best_score = score
+                    best_crossings = crossings
+                    best_routes = routes_cand
+                    best_total_nodes = total_nodes_cand
 
-    # Pass 2: Fall back to allowing crossings (block_nodes=False)
-    for perm in all_perms:
-        perm_attempts += 1
-        success, routes_cand, status_cand, total_nodes_cand = run_sequential_routing(
-            perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes=False
-        )
-        if success:
-            crossings = count_segment_crossings(routes_cand)
-            if crossings < best_crossings:
-                best_crossings = crossings
-                best_routes = routes_cand
-                best_total_nodes = total_nodes_cand
-                if crossings == 0:
-                    break
+    # Pass 2: Fall back to allowing crossings (block_nodes=False) if no collision-free solution was found
+    if best_routes is None or best_crossings > 0:
+        for perm in all_perms:
+            perm_attempts += 1
+            success, routes_cand, status_cand, total_nodes_cand = run_sequential_routing(
+                perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes=False
+            )
+            if success:
+                crossings = count_segment_crossings(routes_cand)
+                score = get_solution_score(routes_cand, crossings)
+                if score < best_score:
+                    best_score = score
+                    best_crossings = crossings
+                    best_routes = routes_cand
+                    best_total_nodes = total_nodes_cand
+                    if crossings == 0 and routing_strategy_idx == 1:
+                        break
 
     # Return the best route found
     if best_routes is not None:
@@ -1136,7 +1172,7 @@ def solve_ventilation_routing():
         return None, f"Routing Blocked (tried {perm_attempts} perms)", elapsed_ms, 0
 
 def main():
-    global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx
+    global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
     pygame.init()
     pygame.font.init()
     
@@ -1191,6 +1227,10 @@ def main():
                     build_grid(machine_pins=pins)
                     routes, status, elapsed_ms, eval_count = solve_ventilation_routing()
                     print(f"Switched to: {GRAPH_TYPES[graph_type_idx]}")
+                elif event.key == pygame.K_c:
+                    routing_strategy_idx = (routing_strategy_idx + 1) % len(ROUTING_STRATEGIES)
+                    need_solve = True
+                    print(f"Switched Strategy to: {ROUTING_STRATEGIES[routing_strategy_idx]}")
                 elif event.key == pygame.K_SPACE:
                     generate_new_dwelling()
                     need_solve = True
@@ -1368,6 +1408,7 @@ def main():
         n_edges = len(grid_edge_list) if grid_edge_list else 0
         specs = [
             ("Graph:",          GRAPH_TYPES[graph_type_idx]),
+            ("Strategy:",       ROUTING_STRATEGIES[routing_strategy_idx]),
             ("Nodes / Edges:",  f"{n_nodes} / {n_edges}"),
             ("Update time:",    f"{elapsed_ms:.1f} ms"),
             ("Machine Angle:",  f"{machine_angle}°"),
@@ -1417,6 +1458,7 @@ def main():
             ("Click + Drag",        "Move Machine"),
             ("Scroll Wheel / A D",  "Rotate 90°"),
             ("Tab",                 "Cycle Graph Type"),
+            ("C",                   "Cycle Routing Strategy"),
             ("G",                   "Toggle Grid Overlay"),
             ("Spacebar",            "New Random Layout"),
             ("Escape",              "Exit")
