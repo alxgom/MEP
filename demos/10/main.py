@@ -931,6 +931,14 @@ def run_super_sink_astar(env, start_node_idx, target_pin_names, pin_node_map, gl
     
     return path_without_sink, path_len, chosen_pin_name
 
+def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
+    terminal_nodes = {}
+    terminal_nodes["Shaft"] = shaft_node_idx
+    for name, pt in terminals.items():
+        _, node_idx = grid_kd.query(pt)
+        terminal_nodes[name] = int(node_idx)
+    return terminal_nodes
+
 def count_segment_crossings(routes):
     """Counts the number of perpendicular crossings between different routed paths."""
     crossings = 0
@@ -979,6 +987,21 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
     total_nodes = len(shaft_path)
     available_small_pins = ["tl", "tr", "bl", "br"]
 
+    # Pre-calculate terminal node indices
+    terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
+
+    # Helper to block other terminals temporarily
+    def get_weights_blocking_other_terminals(curr_room, base_weights):
+        w = base_weights.copy()
+        for r_name, t_node_idx in terminal_nodes.items():
+            if r_name == curr_room:
+                continue
+            if t_node_idx in current_env.adj:
+                for nbr, dist, direction in current_env.adj[t_node_idx]:
+                    edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
+                    w[edge] = 1e9
+        return w
+
     for room_name in perm:
         if room_name == "Kitchen":
             kitchen_pt = terminals.get("Kitchen")
@@ -986,6 +1009,9 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
                 continue
             _, kitchen_node_idx = grid_kd.query(kitchen_pt)
             kitchen_node_idx = int(kitchen_node_idx)
+            
+            # Temporary weights blocking other terminals
+            current_weights = get_weights_blocking_other_terminals("Kitchen", accumulated_weights)
             
             kitchen_path, _, _ = run_super_sink_astar(
                 current_env,
@@ -995,7 +1021,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
                 global_pins,
                 machine_angle,
                 C_BEND,
-                edge_weights=accumulated_weights
+                edge_weights=current_weights
             )
             if kitchen_path is None:
                 return False, None, "No path to Kitchen", 0
@@ -1017,6 +1043,9 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             _, room_node_idx = grid_kd.query(room_pt)
             room_node_idx = int(room_node_idx)
             
+            # Temporary weights blocking other terminals
+            current_weights = get_weights_blocking_other_terminals(room_name, accumulated_weights)
+            
             room_path, _, chosen_small_pin = run_super_sink_astar(
                 current_env,
                 room_node_idx,
@@ -1025,7 +1054,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
                 global_pins,
                 machine_angle,
                 C_BEND,
-                edge_weights=accumulated_weights
+                edge_weights=current_weights
             )
             if room_path is None:
                 return False, None, f"No path to {room_name}", 0
@@ -1089,6 +1118,19 @@ def solve_ventilation_routing():
     _, shaft_node_idx = grid_kd.query(shaft_center)
     shaft_node_idx = int(shaft_node_idx)
 
+    # Pre-calculate terminal node indices
+    terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
+    
+    # Block other terminals for Shaft search
+    shaft_weights = {}
+    for r_name, t_node_idx in terminal_nodes.items():
+        if r_name == "Shaft":
+            continue
+        if t_node_idx in current_env.adj:
+            for nbr, dist, direction in current_env.adj[t_node_idx]:
+                edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
+                shaft_weights[edge] = 1e9
+
     # 1. Route Shaft via Super Sink
     shaft_path, _, chosen_exhaust_pin = run_super_sink_astar(
         current_env,
@@ -1097,7 +1139,8 @@ def solve_ventilation_routing():
         pin_node_map,
         global_pins,
         machine_angle,
-        C_BEND
+        C_BEND,
+        edge_weights=shaft_weights
     )
 
     if shaft_path is None:
