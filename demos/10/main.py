@@ -34,9 +34,10 @@ GRAPH_TYPES = [
 ]
 
 ROUTING_STRATEGIES = [
-    "Greedy Sequential",
+    "Greedy (Dual-Sort)",
     "First Fit",
-    "Best Fit"
+    "Best Fit",
+    "Negotiated Congestion"
 ]
 routing_strategy_idx = 1
 
@@ -1160,8 +1161,10 @@ def solve_ventilation_routing():
     )
     
     if routing_strategy_idx == 0:
-        # Greedy Sequential: only the default proximity order
-        all_perms = [tuple(other_rooms)]
+        # Greedy (Dual-Sort): try both close_to_far and far_to_close orderings
+        close_to_far = tuple(other_rooms)
+        far_to_close = tuple(reversed(other_rooms))
+        all_perms = [close_to_far, far_to_close]
     else:
         all_perms = list(permutations(other_rooms))
 
@@ -1170,6 +1173,161 @@ def solve_ventilation_routing():
     best_score = 1e18
     best_total_nodes = 0
     perm_attempts = 0
+
+    if routing_strategy_idx == 3:
+        # ── Strategy 3: Negotiated Congestion (Pathfinder-style) ──
+        nets_list = ["Shaft", "Kitchen"] + other_rooms
+        current_paths = {}
+        current_pins = {}
+        
+        P_present = 20000.0  # present sharing is heavily penalized
+        P_history = 4000.0   # history penalty is equivalent to 1 bend (4000)
+        history_congestion = {}
+        node_history_congestion = {}
+        
+        for iteration in range(20):
+            perm_attempts += 1
+            
+            for net_name in nets_list:
+                # 1. Start node and targets setup
+                if net_name == "Shaft":
+                    start_node_idx = shaft_node_idx
+                    targets = ["left_mid", "right_mid"]
+                elif net_name == "Kitchen":
+                    kitchen_pt = terminals.get("Kitchen")
+                    if not kitchen_pt:
+                        continue
+                    _, kitchen_node_idx = grid_kd.query(kitchen_pt)
+                    start_node_idx = int(kitchen_node_idx)
+                    shaft_pin = current_pins.get("Shaft", "left_mid")
+                    kitchen_pin_name = "right_mid" if shaft_pin == "left_mid" else "left_mid"
+                    targets = [kitchen_pin_name]
+                else:
+                    room_pt = terminals[net_name]
+                    _, room_node_idx = grid_kd.query(room_pt)
+                    start_node_idx = int(room_node_idx)
+                    used_small_pins = [current_pins[n] for n in other_rooms if n != net_name and n in current_pins]
+                    targets = [p for p in ["tl", "tr", "bl", "br"] if p not in used_small_pins]
+                    if not targets:
+                        targets = ["tl"]
+                
+                # 2. Rip-up
+                current_paths[net_name] = None
+                
+                # 3. Calculate sharing
+                edge_usage = {}
+                node_usage = {}
+                for other_name, path in current_paths.items():
+                    if path is None:
+                        continue
+                    for u in path:
+                        node_usage[u] = node_usage.get(u, 0) + 1
+                    for k in range(len(path) - 1):
+                        e = (min(path[k], path[k+1]), max(path[k], path[k+1]))
+                        edge_usage[e] = edge_usage.get(e, 0) + 1
+                        
+                # 4. Build dynamic weights
+                current_weights = {}
+                terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
+                for r_name, t_node_idx in terminal_nodes.items():
+                    if r_name == net_name:
+                        continue
+                    if t_node_idx in current_env.adj:
+                        for nbr, dist, direction in current_env.adj[t_node_idx]:
+                            edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
+                            current_weights[edge] = 1e9
+                            
+                for u in current_env.adj:
+                    for v, dist, direction in current_env.adj[u]:
+                        edge = (min(u, v), max(u, v))
+                        if edge in current_weights and current_weights[edge] >= 1e9:
+                            continue
+                        
+                        pres = edge_usage.get(edge, 0)
+                        hist = history_congestion.get(edge, 0.0)
+                        
+                        node_pres = max(node_usage.get(u, 0), node_usage.get(v, 0))
+                        node_hist = max(node_history_congestion.get(u, 0.0), node_history_congestion.get(v, 0.0))
+                        
+                        # Node sharing is penalized equivalent to 5 bends
+                        congestion_weight = (pres * P_present) + hist + (node_pres * 20000.0) + node_hist
+                        current_weights[edge] = dist + congestion_weight
+                        
+                # 5. Run A* search
+                path, _, chosen_pin = run_super_sink_astar(
+                    current_env,
+                    start_node_idx,
+                    targets,
+                    pin_node_map,
+                    global_pins,
+                    machine_angle,
+                    C_BEND,
+                    edge_weights=current_weights
+                )
+                
+                if path is not None:
+                    current_paths[net_name] = path
+                    current_pins[net_name] = chosen_pin
+                    
+            # 6. Evaluate candidate routes at end of iteration
+            routes_cand = []
+            success = True
+            total_nodes_cand = 0
+            for name in nets_list:
+                path = current_paths.get(name)
+                if path is None:
+                    success = False
+                    break
+                segs = []
+                for k in range(len(path) - 1):
+                    p1 = current_env.nodes[path[k]]
+                    p2 = current_env.nodes[path[k+1]]
+                    segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+                routes_cand.append((name, segs))
+                total_nodes_cand += len(path)
+                
+            if success:
+                crossings = count_segment_crossings(routes_cand)
+                score = get_solution_score(routes_cand, crossings)
+                
+                if score < best_score:
+                    best_score = score
+                    best_crossings = crossings
+                    best_routes = routes_cand
+                    best_total_nodes = total_nodes_cand
+                    
+                if crossings == 0:
+                    elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+                    status_text = f"Success: Routed all (tried {perm_attempts} iters, 0 crossings) in {elapsed_ms:.1f}ms"
+                    return routes_cand, status_text, elapsed_ms, total_nodes_cand
+                    
+                # 7. Apply history penalties
+                edge_counts = {}
+                node_counts = {}
+                for name, path in current_paths.items():
+                    if path is None:
+                        continue
+                    for u in path:
+                        node_counts[u] = node_counts.get(u, 0) + 1
+                    for k in range(len(path) - 1):
+                        edge = (min(path[k], path[k+1]), max(path[k], path[k+1]))
+                        edge_counts[edge] = edge_counts.get(edge, 0) + 1
+                        
+                for edge, count in edge_counts.items():
+                    if count > 1:
+                        history_congestion[edge] = history_congestion.get(edge, 0.0) + P_history
+                for node, count in node_counts.items():
+                    if count > 1:
+                        node_history_congestion[node] = node_history_congestion.get(node, 0.0) + 4000.0
+                        
+        # End of negotiated congestion loop
+        if best_routes is not None:
+            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+            status_text = f"Success: Routed all (tried {perm_attempts} iters, {best_crossings} crossings) in {elapsed_ms:.1f}ms"
+            return best_routes, status_text, elapsed_ms, best_total_nodes
+        else:
+            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+            return None, f"Routing Blocked (tried {perm_attempts} iters) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
     # Pass 1: Try collision-free solutions (block_nodes=True)
     for perm in all_perms:
