@@ -853,6 +853,13 @@ def block_path_and_node(path, chosen_pin_node_idx, accumulated_weights, env, blo
         for nbr, dist, direction in env.adj[chosen_pin_node_idx]:
             edge = (min(chosen_pin_node_idx, nbr), max(chosen_pin_node_idx, nbr))
             accumulated_weights[edge] = 1e9
+    # Block all incident edges to the terminal node (start of the path)
+    if len(path) > 0:
+        start_node_idx = path[0]
+        if start_node_idx in env.adj:
+            for nbr, dist, direction in env.adj[start_node_idx]:
+                edge = (min(start_node_idx, nbr), max(start_node_idx, nbr))
+                accumulated_weights[edge] = 1e9
     # Block all edges along the path
     for i in range(len(path) - 1):
         u, v = path[i], path[i+1]
