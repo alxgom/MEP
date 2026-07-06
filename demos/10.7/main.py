@@ -69,7 +69,8 @@ COLOR_PLOT_BG = (22, 22, 30)
 COLOR_ROOM = (45, 52, 54)
 COLOR_ROOM_COVERED = (52, 73, 94) # Slate Blue for false ceilings
 COLOR_HALLWAY = (57, 72, 85)
-COLOR_WALL = (99, 110, 114)
+COLOR_WALL = (125, 136, 142)
+WALL_DRAW_WIDTH = 2
 COLOR_COLUMN = (15, 76, 129)
 COLOR_SHAFT = (231, 76, 60)
 COLOR_SHAFT_BG = (231, 76, 60, 40)
@@ -2358,7 +2359,7 @@ def main():
                 continue
             coords = list(room.polygon.exterior.coords)
             screen_coords = [to_screen(x, y) for x, y in coords]
-            pygame.draw.polygon(screen, COLOR_WALL, screen_coords, 1)
+            pygame.draw.polygon(screen, COLOR_WALL, screen_coords, WALL_DRAW_WIDTH)
             
         for d in doors:
             # Draw door line segment
