@@ -26,6 +26,8 @@ SCALE_TO_MM    = 1000.0
 WALL_THICKNESS = 150.0
 GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
+PORT_STUB_LENGTH = 300.0
+MACHINE_CLEARANCE = 0.0
 FPS            = 20
 C_BEND         = 4000.0  # Turn penalty in mm
 
@@ -456,11 +458,15 @@ def update_dynamic_env(machine_poly):
         return
 
     t0 = time.perf_counter()
-    mx1, my1, mx2, my2 = machine_poly.bounds
-    prm = shapely_prep(machine_poly)
+    blocked_machine_poly = machine_poly.buffer(MACHINE_CLEARANCE, join_style=2)
+    mx1, my1, mx2, my2 = blocked_machine_poly.bounds
+    prm = shapely_prep(blocked_machine_poly)
     protected_nodes = set()
     protected_points = list(terminals.values())
-    protected_points.extend(get_machine_pins(machine_cx, machine_cy, machine_angle).values())
+    protected_points.extend(
+        spec["access_point"]
+        for spec in get_port_access_specs(get_machine_pins(machine_cx, machine_cy, machine_angle), machine_angle)
+    )
     for pt in protected_points:
         if str(pt).startswith("c_"):
             continue
@@ -497,7 +503,7 @@ def update_dynamic_env(machine_poly):
                 (float(grid_nodes[u, 0]), float(grid_nodes[u, 1])),
                 (float(grid_nodes[v, 0]), float(grid_nodes[v, 1]))
             ])
-            inter = line.intersection(machine_poly)
+            inter = line.intersection(blocked_machine_poly)
             if not inter.is_empty and inter.length > 1.0 and u not in protected_nodes and v not in protected_nodes:
                 blocked_edges.add(ei)
 
@@ -824,37 +830,13 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
         required_points.append((round(float(rep_pt.x)), round(float(rep_pt.y))))
 
     if machine_pins:
-        left_dir = 'W'
-        right_dir = 'E'
-        if machine_angle == 90:
-            left_dir = 'S'
-            right_dir = 'N'
-        elif machine_angle == 180:
-            left_dir = 'E'
-            right_dir = 'W'
-        elif machine_angle == 270:
-            left_dir = 'N'
-            right_dir = 'S'
-
-        dir_vecs = {
-            'E': (GRID_SPACING, 0),
-            'W': (-GRID_SPACING, 0),
-            'N': (0, GRID_SPACING),
-            'S': (0, -GRID_SPACING),
-        }
-        for name, pt in machine_pins.items():
-            if name.startswith("c_"):
-                continue
-            x, y = round(float(pt[0])), round(float(pt[1]))
+        for spec in get_port_access_specs(machine_pins, machine_angle):
+            x, y = spec["access_point"]
             xs.add(x)
             ys.add(y)
             preserve_x.add(x)
             preserve_y.add(y)
             required_points.append((x, y))
-            pin_dir = left_dir if name in ('left_mid', 'tl', 'bl') else right_dir
-            dx, dy = dir_vecs[pin_dir]
-            xs.add(x + dx)
-            ys.add(y + dy)
 
     xs = _merge_close_values(xs, threshold=120.0, preserve_values=preserve_x, priority_values=template["priority_x"])
     ys = _merge_close_values(ys, threshold=120.0, preserve_values=preserve_y, priority_values=template["priority_y"])
@@ -952,16 +934,71 @@ def get_machine_pins(cx, cy, angle_deg):
 def snap_pins_to_graph(global_pins):
     if grid_kd is None:
         return {}
-    pin_pts = np.array([list(pt) for name, pt in global_pins.items() if not name.startswith("c_")], dtype=float)
-    names = [name for name in global_pins.keys() if not name.startswith("c_")]
-    _, idxs = grid_kd.query(pin_pts)
-    return {name: int(idx) for name, idx in zip(names, idxs)}
+    targets = {}
+    for spec in get_port_access_specs(global_pins, machine_angle):
+        _, idx = grid_kd.query(spec["access_point"])
+        item = spec.copy()
+        item["node_idx"] = int(idx)
+        targets.setdefault(spec["pin"], []).append(item)
+    return targets
 
 # ──────────────────────────────────────────────────────────────────────────
 # ROUTING UTILITIES AND CONSTRAINTS
 # ──────────────────────────────────────────────────────────────────────────
 DIR_RIGHT, DIR_LEFT, DIR_UP, DIR_DOWN = 0, 1, 2, 3
 DIR_REV = {DIR_RIGHT: DIR_LEFT, DIR_LEFT: DIR_RIGHT, DIR_UP: DIR_DOWN, DIR_DOWN: DIR_UP}
+
+def _local_axis_to_world(local_vec, machine_angle):
+    lx, ly = local_vec
+    rad = math.radians(machine_angle)
+    gx = lx * math.cos(rad) - ly * math.sin(rad)
+    gy = lx * math.sin(rad) + ly * math.cos(rad)
+    if abs(gx) >= abs(gy):
+        return (1.0 if gx > 0 else -1.0, 0.0)
+    return (0.0, 1.0 if gy > 0 else -1.0)
+
+def _dir_from_axis(vec):
+    x, y = vec
+    if abs(x) >= abs(y):
+        return DIR_RIGHT if x > 0 else DIR_LEFT
+    return DIR_UP if y > 0 else DIR_DOWN
+
+def get_port_access_specs(global_pins, machine_angle):
+    allowed_local_dirs = {
+        "left_mid": [(-1.0, 0.0)],
+        "right_mid": [(1.0, 0.0)],
+        "tl": [(-1.0, 0.0), (0.0, 1.0)],
+        "tr": [(1.0, 0.0), (0.0, 1.0)],
+        "bl": [(-1.0, 0.0), (0.0, -1.0)],
+        "br": [(1.0, 0.0), (0.0, -1.0)],
+    }
+    specs = []
+    for pin_name, local_dirs in allowed_local_dirs.items():
+        if pin_name not in global_pins:
+            continue
+        pin_pt = global_pins[pin_name]
+        for local_dir in local_dirs:
+            wx, wy = _local_axis_to_world(local_dir, machine_angle)
+            access_pt = (
+                round(float(pin_pt[0]) + wx * PORT_STUB_LENGTH),
+                round(float(pin_pt[1]) + wy * PORT_STUB_LENGTH),
+            )
+            out_dir = _dir_from_axis((wx, wy))
+            specs.append({
+                "pin": pin_name,
+                "pin_point": (float(pin_pt[0]), float(pin_pt[1])),
+                "access_point": access_pt,
+                "out_dir": out_dir,
+                "in_dir": DIR_REV[out_dir],
+            })
+    return specs
+
+def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins):
+    if target_node_idx is None or pin_name not in global_pins:
+        return
+    access_pt = current_env.nodes[target_node_idx]
+    pin_pt = global_pins[pin_name]
+    segs.append(((float(access_pt[0]), float(access_pt[1])), (float(pin_pt[0]), float(pin_pt[1]))))
 
 def get_outward_vector(pin_name, machine_angle):
     rad = math.radians(machine_angle)
@@ -977,18 +1014,20 @@ def get_outward_vector(pin_name, machine_angle):
         return DIR_UP if gy > 0 else DIR_DOWN
 
 def block_path_and_node(path, pin_node_idx, accumulated_weights, env, block_nodes=True):
+    if not block_nodes:
+        return
+
     for i in range(len(path) - 1):
         e = (min(path[i], path[i+1]), max(path[i], path[i+1]))
         accumulated_weights[e] = 1e9
         
-    if block_nodes:
-        for idx, u in enumerate(path):
-            if u == pin_node_idx or idx == 0:
-                continue
-            if u in env.adj:
-                for nbr, dist, direction in env.adj[u]:
-                    edge = (min(u, nbr), max(u, nbr))
-                    accumulated_weights[edge] = 1e9
+    for idx, u in enumerate(path):
+        if u == pin_node_idx or idx == 0:
+            continue
+        if u in env.adj:
+            for nbr, dist, direction in env.adj[u]:
+                edge = (min(u, nbr), max(u, nbr))
+                accumulated_weights[edge] = 1e9
 
 def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if isinstance(start_node_indices, (int, np.integer)):
@@ -1015,14 +1054,11 @@ def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map
         
     pin_name_by_idx = {}
     for pin_name in target_pin_names:
-        pin_idx = pin_node_map[pin_name]
-        pin_name_by_idx[pin_idx] = pin_name
-        
-        allowed_out = get_outward_vector(pin_name, machine_angle)
-        inward_dir = DIR_REV[allowed_out]
-        
-        search_adj[pin_idx].append((super_sink_idx, 0.0, inward_dir))
-        search_adj[super_sink_idx].append((pin_idx, 0.0, allowed_out))
+        for target in pin_node_map.get(pin_name, []):
+            pin_idx = target["node_idx"]
+            pin_name_by_idx[pin_idx] = pin_name
+            search_adj[pin_idx].append((super_sink_idx, 0.0, target["in_dir"]))
+            search_adj[super_sink_idx].append((pin_idx, 0.0, target["out_dir"]))
         
     search_env = EnvView(search_nodes, search_adj)
     
@@ -1088,7 +1124,7 @@ def count_segment_crossings(routes):
 
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes):
     accumulated_weights = {}
-    exhaust_node_idx = pin_node_map[chosen_exhaust_pin]
+    exhaust_node_idx = shaft_path[-1] if shaft_path else None
     block_path_and_node(shaft_path, exhaust_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
 
     kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
@@ -1104,6 +1140,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         p1 = current_env.nodes[shaft_path[i]]
         p2 = current_env.nodes[shaft_path[i+1]]
         shaft_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    add_port_stub_segment(shaft_segs, chosen_exhaust_pin, exhaust_node_idx, global_pins)
     routes.append(("Shaft", shaft_segs))
     
     total_nodes = len(shaft_path)
@@ -1148,10 +1185,11 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             p1 = current_env.nodes[kitchen_path[i]]
             p2 = current_env.nodes[kitchen_path[i+1]]
             kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+        add_port_stub_segment(kitchen_segs, kitchen_pin_name, kitchen_path[-1], global_pins)
         routes.append(("Kitchen", kitchen_segs))
         total_nodes += len(kitchen_path)
         
-        kitchen_pin_node_idx = pin_node_map[kitchen_pin_name]
+        kitchen_pin_node_idx = kitchen_path[-1]
         block_path_and_node(kitchen_path, kitchen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
 
     # 2. Route small duct rooms in perm order
@@ -1182,10 +1220,11 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             p1 = current_env.nodes[room_path[i]]
             p2 = current_env.nodes[room_path[i+1]]
             room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+        add_port_stub_segment(room_segs, chosen_small_pin, room_path[-1], global_pins)
         routes.append((room_name, room_segs))
         total_nodes += len(room_path)
         
-        chosen_pin_node_idx = pin_node_map[chosen_small_pin]
+        chosen_pin_node_idx = room_path[-1]
         block_path_and_node(room_path, chosen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
         available_small_pins.remove(chosen_small_pin)
         
@@ -1617,6 +1656,8 @@ def solve_ventilation_routing():
                     p1 = current_env.nodes[path[k]]
                     p2 = current_env.nodes[path[k+1]]
                     segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+                if name in current_pins:
+                    add_port_stub_segment(segs, current_pins[name], path[-1], global_pins)
                 routes_cand.append((name, segs))
                 total_nodes_cand += len(path)
                 
