@@ -55,6 +55,12 @@ ROUTING_STRATEGIES = [
 ]
 routing_strategy_idx = 1
 
+ROUTER_BACKENDS = [
+    "State-expanded A*",
+    "Line graph L(G)"
+]
+router_backend_idx = 0
+
 AUTO_PLACEMENT_MODES = [
     "Manual",
     "Proximity (Option 1)",
@@ -1172,7 +1178,7 @@ def add_route_interaction_weights(prior_axis_records, current_diameter, accumula
             + CLEARANCE_PENALTY * clearance_counts.get(edge, 0)
         )
 
-def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
+def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if isinstance(start_node_indices, (int, np.integer)):
         start_node_indices = [start_node_indices]
     if not target_pin_names or not start_node_indices:
@@ -1220,6 +1226,128 @@ def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map
     path_without_virtual = path[1:-1]
     
     return path_without_virtual, path_len, chosen_pin_name, chosen_target
+
+def _weighted_edge_cost(edge_weights, u, v, dist):
+    if edge_weights is None:
+        return dist
+    return edge_weights.get((min(u, v), max(u, v)), dist)
+
+def _line_graph_dir_from_points(env, u, v):
+    pu = env.nodes[u]
+    pv = env.nodes[v]
+    dx = float(pv[0] - pu[0])
+    dy = float(pv[1] - pu[1])
+    if abs(dx) >= abs(dy):
+        return "E" if dx > 0 else "W"
+    return "N" if dy > 0 else "S"
+
+def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
+    if isinstance(start_node_indices, (int, np.integer)):
+        start_node_indices = [start_node_indices]
+    if not target_pin_names or not start_node_indices:
+        return None, 0.0, None, None
+
+    target_specs = [
+        target
+        for pin_name in target_pin_names
+        for target in pin_node_map.get(pin_name, [])
+    ]
+    if not target_specs:
+        return None, 0.0, None, None
+
+    targets_by_node = {}
+    target_nodes = []
+    for target in target_specs:
+        node_idx = int(target["node_idx"])
+        targets_by_node.setdefault(node_idx, []).append(target)
+        target_nodes.append(node_idx)
+
+    target_coords = env.nodes[target_nodes]
+
+    def heuristic(node_idx):
+        p = env.nodes[node_idx]
+        if len(target_coords) == 0:
+            return 0.0
+        return float(np.min(np.abs(target_coords[:, 0] - p[0]) + np.abs(target_coords[:, 1] - p[1])))
+
+    pq = []
+    counter = 0
+    g_scores = {}
+    came_from = {}
+    state_dirs = {}
+
+    for start_node in start_node_indices:
+        for v, dist, edge_dir in env.adj.get(int(start_node), []):
+            cost = _weighted_edge_cost(edge_weights, int(start_node), int(v), dist)
+            state = (int(start_node), int(v))
+            if cost < g_scores.get(state, float("inf")):
+                g_scores[state] = cost
+                state_dirs[state] = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, int(start_node), int(v))
+                heapq.heappush(pq, (cost + heuristic(int(v)), cost, counter, state))
+                counter += 1
+
+    best_final_cost = float("inf")
+    best_final_state = None
+    best_target = None
+    visited = set()
+
+    while pq:
+        f_score, g, _, state = heapq.heappop(pq)
+        if f_score >= best_final_cost:
+            break
+        if state in visited:
+            continue
+        visited.add(state)
+
+        u, v = state
+        curr_dir = state_dirs[state]
+
+        for target in targets_by_node.get(v, []):
+            final_penalty = C_bend if curr_dir != target["in_dir"] else 0.0
+            final_cost = g + final_penalty
+            if final_cost < best_final_cost:
+                best_final_cost = final_cost
+                best_final_state = state
+                best_target = target
+
+        for w, dist, next_dir in env.adj.get(v, []):
+            w = int(w)
+            if w == u:
+                continue
+            next_state = (v, w)
+            edge_cost = _weighted_edge_cost(edge_weights, v, w, dist)
+            turn_penalty = C_bend if curr_dir != next_dir else 0.0
+            next_g = g + edge_cost + turn_penalty
+            if next_g < g_scores.get(next_state, float("inf")):
+                g_scores[next_state] = next_g
+                came_from[next_state] = state
+                state_dirs[next_state] = next_dir
+                heapq.heappush(pq, (next_g + heuristic(w), next_g, counter, next_state))
+                counter += 1
+
+    if best_final_state is None or best_target is None:
+        return None, 0.0, None, None
+
+    states = []
+    curr = best_final_state
+    while curr in came_from:
+        states.append(curr)
+        curr = came_from[curr]
+    states.append(curr)
+    states.reverse()
+
+    path = [states[0][0]]
+    path.extend(state[1] for state in states)
+    return path, best_final_cost, best_target["pin"], best_target
+
+def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
+    if router_backend_idx == 1:
+        return _run_super_sink_line_graph_astar(
+            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
+        )
+    return _run_super_sink_state_astar(
+        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
+    )
 
 def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
     terminal_nodes = {}
@@ -2382,13 +2510,13 @@ def draw_plots(screen, font_small, font_bold):
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
-    global auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
+    global router_backend_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
     
     pygame.init()
     pygame.font.init()
     
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption("Integrated Auto-Placement & Ventilation Router (Demo 10.7)")
+    pygame.display.set_caption("Integrated Auto-Placement & Ventilation Router (Demo 10.75)")
     clock = pygame.time.Clock()
     
     font_title = pygame.font.SysFont("Outfit", 24, bold=True)
@@ -2504,6 +2632,14 @@ def main():
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
                         hist_event_markers.append((len(hist_length) - 1, f"Strat:{routing_strategy_idx}", (52, 152, 219)))
+
+                elif event.key == pygame.K_l:
+                    router_backend_idx = (router_backend_idx + 1) % len(ROUTER_BACKENDS)
+                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    if routes and not status.startswith("Blocked"):
+                        crossings_c = count_segment_crossings(routes)
+                        record_history(routes, crossings_c, elapsed_ms)
+                        hist_event_markers.append((len(hist_length) - 1, f"R:{router_backend_idx}", (230, 126, 34)))
                     
                 elif event.key == pygame.K_TAB:
                     graph_type_idx = (graph_type_idx + 1) % len(GRAPH_TYPES)
@@ -2739,14 +2875,16 @@ def main():
         screen.blit(lbl_solv_title, (25, 230))
         lbl_strat = font_small.render(f"Strategy: {ROUTING_STRATEGIES[routing_strategy_idx]}", True, COLOR_TEXT)
         screen.blit(lbl_strat, (25, 250))
+        lbl_router = font_small.render(f"Router: {ROUTER_BACKENDS[router_backend_idx]}", True, COLOR_TEXT)
+        screen.blit(lbl_router, (25, 270))
         lbl_graph = font_small.render(f"Grid type: {GRAPH_TYPES[graph_type_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_graph, (25, 270))
-        lbl_keys = font_small.render("[C] Cycle Strategy | [Tab] Cycle Grid", True, COLOR_MUTED)
-        screen.blit(lbl_keys, (25, 290))
+        screen.blit(lbl_graph, (25, 290))
+        lbl_keys = font_small.render("[C] Strategy | [L] Router | [Tab] Grid", True, COLOR_MUTED)
+        screen.blit(lbl_keys, (25, 310))
         lbl_gkey = font_small.render("[G] Toggle Grid Mesh Lines", True, COLOR_MUTED)
-        screen.blit(lbl_gkey, (25, 310))
+        screen.blit(lbl_gkey, (25, 325))
         lbl_skey = font_small.render("[Space] Gen New Apartment Dwelling", True, COLOR_MUTED)
-        screen.blit(lbl_skey, (25, 325))
+        screen.blit(lbl_skey, (25, 340))
         
         # 3. Placement Info Card
         pygame.draw.rect(screen, (40, 45, 55), (15, 350, CANVAS_LEFT - 40, 80), border_radius=6)

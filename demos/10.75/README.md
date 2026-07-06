@@ -1,14 +1,14 @@
-# MEP Ventilation Router Dashboard (Demo 10.7)
+# MEP Ventilation Router Dashboard (Demo 10.75)
 
-Interactive Pygame prototype for routing ventilation ducts from a compact ventilation machine to room terminals and shafts. Demo 10.7 focuses on fast Hannan-style grid routing, visible route-cost heatmaps, sequential crossing penalties, and a lightweight diameter-clearance penalty.
+Interactive Pygame prototype for routing ventilation ducts from a compact ventilation machine to room terminals and shafts. Demo 10.75 starts from the Demo 10.7 baseline and is intended for the routing-backend refactor, including a line-graph `L(G)` turn-aware A* option.
 
 ## Run
 
-Use the demo-local virtual environment when available:
+Use the existing Demo 10.7 virtual environment while 10.75 is still a refactor copy:
 
 ```powershell
-cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.7"
-.\.venv\Scripts\python.exe main.py
+cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.75"
+..\10.7\.venv\Scripts\python.exe main.py
 ```
 
 Or install the dependencies and run with another Python 3.10+ interpreter:
@@ -31,6 +31,7 @@ Machine placement:
 Routing and display:
 
 - `C`: cycle solver strategy.
+- `L`: cycle routing backend between state-expanded A* and line graph `L(G)` A*.
 - `Tab`: cycle routing grid.
 - `G`: toggle grid nodes and edges.
 - `V`: toggle the placement heatmap.
@@ -50,9 +51,14 @@ The strategy selector currently includes:
 
 The sequential strategies route the shaft first, then the kitchen, then the remaining room ducts according to the strategy ordering or permutation. Best Fit evaluates permutations using the same final score terms used for reporting, rather than choosing by length only.
 
+The router backend selector is independent of strategy:
+
+- State-expanded A*: routes with `(node, incoming_direction)` states.
+- Line graph `L(G)`: routes with directed-edge states, so turns are modeled as transitions from one physical edge to the next.
+
 ## Routing Grids
 
-Demo 10.7 supports two grid modes:
+Demo 10.75 supports two grid modes:
 
 - Regular 200 mm Grid
 - Hannan Grid (numpy)
