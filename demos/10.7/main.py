@@ -33,7 +33,6 @@ C_BEND         = 4000.0  # Turn penalty in mm
 GRAPH_TYPES = [
     "Regular 200mm Grid",
     "Hannan Grid (numpy)",
-    "Hannan + Shifted Nodes",
 ]
 
 ROUTING_STRATEGIES = [
@@ -58,8 +57,10 @@ WINDOW_WIDTH, WINDOW_HEIGHT = 1490, 850
 CANVAS_LEFT = 280
 CANVAS_TOP = 40
 PANEL_W = 240          # right-side plot panel
-CANVAS_W = WINDOW_WIDTH - CANVAS_LEFT - PANEL_W - 10
+COLORBAR_W = 56        # reserved lane between drawing canvas and right-side plots
+CANVAS_W = WINDOW_WIDTH - CANVAS_LEFT - PANEL_W - COLORBAR_W - 10
 CANVAS_H = WINDOW_HEIGHT - CANVAS_TOP - 40
+COLORBAR_LEFT = CANVAS_LEFT + CANVAS_W + 10
 
 # Color Scheme
 COLOR_BG = (28, 28, 36)
@@ -104,6 +105,7 @@ hist_ap_idx = None                              # sample index of last auto-plac
 hist_event_markers = []                         # list of (index, label, color) tuples
 weight_mode_idx = 0                             # 0 for Default, 1 for Equal Weights
 heatmap_scale_mode = 0                          # 0 for Linear (75% Saturation), 1 for Log Scale
+heatmap_palette_idx = 0                         # 0 for Turbo, 1 for Viridis
 heatmap_surface_cache = {"key": None, "surface": None}
 
 def to_screen(x, y):
@@ -909,10 +911,8 @@ def build_grid(machine_pins=None):
     global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env
     if graph_type_idx == 0:
         build_regular_grid()
-    elif graph_type_idx == 1:
-        build_hannan_grid(machine_pins=machine_pins, shift_walls=False)
     else:
-        build_hannan_grid(machine_pins=machine_pins, shift_walls=True)
+        build_hannan_grid(machine_pins=machine_pins, shift_walls=False)
 
 # Machine representation helper
 def get_machine_pins(cx, cy, angle_deg):
@@ -1438,7 +1438,7 @@ def solve_ventilation_routing():
     if graph_type_idx == 0:
         update_dynamic_env(machine_poly)
     else:
-        build_hannan_grid(machine_pins=global_pins, shift_walls=(graph_type_idx == 2))
+        build_hannan_grid(machine_pins=global_pins, shift_walls=False)
         update_dynamic_env(machine_poly)
 
     pin_node_map = snap_pins_to_graph(global_pins)
@@ -1869,14 +1869,41 @@ def get_turbo_color(t):
             return (r, g, b)
     return (122, 4, 3)
 
+def get_viridis_color(t):
+    t = max(0.0, min(1.0, t))
+    points = [
+        (0.0, (68, 1, 84)),
+        (0.15, (71, 44, 122)),
+        (0.30, (59, 81, 139)),
+        (0.45, (44, 113, 142)),
+        (0.60, (33, 144, 141)),
+        (0.75, (94, 201, 98)),
+        (1.0, (253, 231, 37)),
+    ]
+    for i in range(len(points) - 1):
+        t1, c1 = points[i]
+        t2, c2 = points[i+1]
+        if t1 <= t <= t2:
+            factor = (t - t1) / (t2 - t1)
+            r = int(c1[0] + factor * (c2[0] - c1[0]))
+            g = int(c1[1] + factor * (c2[1] - c1[1]))
+            b = int(c1[2] + factor * (c2[2] - c1[2]))
+            return (r, g, b)
+    return (253, 231, 37)
+
+def get_heatmap_color(t):
+    if heatmap_palette_idx == 1:
+        return get_viridis_color(t)
+    return get_turbo_color(t)
+
 def draw_colorbar(screen, node_scores):
     if not node_scores:
         return
         
-    cb_x = WINDOW_WIDTH - 85
+    cb_x = COLORBAR_LEFT + (COLORBAR_W - 20) // 2
     cb_y = CANVAS_TOP + 40
     cb_w = 20
-    cb_h = 250
+    cb_h = CANVAS_H - 150
     
     # Border
     pygame.draw.rect(screen, (255, 255, 255), (cb_x - 1, cb_y - 1, cb_w + 2, cb_h + 2), 1)
@@ -1886,21 +1913,24 @@ def draw_colorbar(screen, node_scores):
         t = 1.0 - (y / cb_h)
         if heatmap_scale_mode == 0:
             t_sat = min(1.0, t / 0.75)
-            c = get_turbo_color(t_sat)
+            c = get_heatmap_color(t_sat)
         else:
-            c = get_turbo_color(t)
+            c = get_heatmap_color(t)
         pygame.draw.line(screen, c, (cb_x, cb_y + y), (cb_x + cb_w - 1, cb_y + y))
         
     font_lbl = pygame.font.SysFont("Outfit", 14, bold=True)
     
-    lbl_high = font_lbl.render("Max Cost (Red)", True, (231, 76, 60))
-    screen.blit(lbl_high, (cb_x - lbl_high.get_width() - 8, cb_y))
+    high_color = get_heatmap_color(1.0)
+    low_color = get_heatmap_color(0.0)
+    lbl_high = font_lbl.render("HIGH", True, high_color)
+    screen.blit(lbl_high, (cb_x + cb_w // 2 - lbl_high.get_width() // 2, cb_y - 18))
     
-    lbl_low = font_lbl.render("Min Cost (Blue)", True, (52, 152, 219))
-    screen.blit(lbl_low, (cb_x - lbl_low.get_width() - 8, cb_y + cb_h - 12))
+    lbl_low = font_lbl.render("LOW", True, low_color)
+    screen.blit(lbl_low, (cb_x + cb_w // 2 - lbl_low.get_width() // 2, cb_y + cb_h + 6))
     
-    lbl_title = font_lbl.render("COST HEATMAP", True, COLOR_TEXT)
-    screen.blit(lbl_title, (cb_x + cb_w//2 - lbl_title.get_width()//2, cb_y - 20))
+    palette_name = "VIRIDIS" if heatmap_palette_idx == 1 else "TURBO"
+    lbl_title = font_lbl.render(palette_name, True, COLOR_TEXT)
+    screen.blit(lbl_title, (cb_x + cb_w // 2 - lbl_title.get_width() // 2, cb_y + cb_h + 24))
 
 def _score_to_heatmap_t(score, min_s, max_s):
     diff = max_s - min_s if max_s > min_s else 1.0
@@ -1982,7 +2012,7 @@ def _build_heatmap_surface(node_scores):
             score = _interpolate_regular_score(wx, wy, score_grid)
             if score is None:
                 continue
-            c = get_turbo_color(_score_to_heatmap_t(score, min_s, max_s))
+            c = get_heatmap_color(_score_to_heatmap_t(score, min_s, max_s))
             low.set_at((px, py), (c[0], c[1], c[2], alpha))
 
     return pygame.transform.smoothscale(low, (CANVAS_W, CANVAS_H))
@@ -1997,6 +2027,7 @@ def draw_distance_heatmap(screen, node_scores):
         min(node_scores.values()),
         max(node_scores.values()),
         heatmap_scale_mode,
+        heatmap_palette_idx,
         CANVAS_W,
         CANVAS_H,
     )
@@ -2120,7 +2151,7 @@ def draw_plots(screen, font_small, font_bold):
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
-    global auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode
+    global auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
     
     pygame.init()
     pygame.font.init()
@@ -2277,6 +2308,13 @@ def main():
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
                         hist_event_markers.append((len(hist_length) - 1, f"H:{'Log' if heatmap_scale_mode==1 else 'Lin'}", (150, 150, 150)))
+
+                elif event.key == pygame.K_b:
+                    heatmap_palette_idx = (heatmap_palette_idx + 1) % 2
+                    if routes and not status.startswith("Blocked"):
+                        crossings_c = count_segment_crossings(routes)
+                        record_history(routes, crossings_c, elapsed_ms)
+                        hist_event_markers.append((len(hist_length) - 1, f"Pal:{'Vir' if heatmap_palette_idx==1 else 'Tur'}", (26, 188, 156)))
                     
                 elif event.key == pygame.K_w:
                     weight_mode_idx = (weight_mode_idx + 1) % 2
@@ -2310,6 +2348,16 @@ def main():
             screen_coords = [to_screen(x, y) for x, y in coords]
             color = COLOR_ROOM_COVERED if room.has_cover else COLOR_ROOM
             pygame.draw.polygon(screen, color, screen_coords)
+
+        if show_heatmap and ap_scores:
+            draw_distance_heatmap(screen, ap_scores)
+            draw_colorbar(screen, ap_scores)
+
+        for room in rooms:
+            if not hasattr(room, 'polygon') or room.polygon.is_empty:
+                continue
+            coords = list(room.polygon.exterior.coords)
+            screen_coords = [to_screen(x, y) for x, y in coords]
             pygame.draw.polygon(screen, COLOR_WALL, screen_coords, 1)
             
         for d in doors:
@@ -2328,10 +2376,6 @@ def main():
             screen_coords = [to_screen(x, y) for x, y in coords]
             pygame.draw.polygon(screen, COLOR_SHAFT, screen_coords)
             
-        if show_heatmap and ap_scores:
-            draw_distance_heatmap(screen, ap_scores)
-            draw_colorbar(screen, ap_scores)
-
         if show_grid_graph and current_env is not None:
             for u in current_env.adj:
                 for v, dist, direction in current_env.adj[u]:
@@ -2447,10 +2491,12 @@ def main():
         screen.blit(lbl_ap_keys, (25, 125))
         h_text = "Disabled"
         if show_heatmap:
-            h_text = "Linear (75%)" if heatmap_scale_mode == 0 else "Log Scale"
+            scale_text = "Linear" if heatmap_scale_mode == 0 else "Log"
+            palette_text = "Viridis" if heatmap_palette_idx == 1 else "Turbo"
+            h_text = f"{palette_text} / {scale_text}"
         lbl_ap_heatmap = font_small.render(f"[V] Heatmap: {h_text}", True, COLOR_MUTED)
         screen.blit(lbl_ap_heatmap, (25, 145))
-        lbl_ap_scale = font_small.render("[H] Toggle Heatmap Scale", True, COLOR_MUTED)
+        lbl_ap_scale = font_small.render("[H] Scale | [B] Palette", True, COLOR_MUTED)
         screen.blit(lbl_ap_scale, (25, 160))
         w_text = "Default" if weight_mode_idx == 0 else "Equal (1.0)"
         lbl_ap_weights = font_small.render(f"[W] Placement Weights: {w_text}", True, COLOR_MUTED)
