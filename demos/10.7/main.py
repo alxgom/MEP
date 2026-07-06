@@ -33,9 +33,11 @@ MACHINE_BODY_H = 460.0
 MACHINE_OVERALL_W = 511.0
 MACHINE_SMALL_DUCT_D = 80.0
 MACHINE_LARGE_DUCT_D = 125.0
+DUCT_CLEARANCE_MARGIN = 30.0
 FPS            = 20
 C_BEND         = 4000.0  # Turn penalty in mm
 CROSSING_PENALTY = 5 * C_BEND
+CLEARANCE_PENALTY = CROSSING_PENALTY
 OVERLAP_BLOCK_WEIGHT = 1e9
 
 # Graph types
@@ -1067,44 +1069,101 @@ def _axis_segment_relation(a, b, eps=1e-7):
         return "cross"
     return None
 
-def add_route_interaction_weights(route_segs, accumulated_weights, env):
-    prior_axis_segs = []
+def _axis_segment_distance(a, b):
+    ax1, ay1, ax2, ay2, _ = a
+    bx1, by1, bx2, by2, _ = b
+    dx = max(bx1 - ax2, ax1 - bx2, 0.0)
+    dy = max(by1 - ay2, ay1 - by2, 0.0)
+    return math.hypot(dx, dy)
+
+def _route_axis_records(route_name, route_segs):
+    diameter = get_route_diameter(route_name)
+    records = []
     for p1, p2 in route_segs:
         seg = _normalize_axis_segment(p1, p2)
         if seg is not None:
-            prior_axis_segs.append(seg)
-    if not prior_axis_segs:
+            records.append((seg, diameter))
+    return records
+
+def get_route_diameter(route_name):
+    return MACHINE_LARGE_DUCT_D if route_name in ("Shaft", "Kitchen") else MACHINE_SMALL_DUCT_D
+
+def add_route_interaction_weights(prior_axis_records, current_diameter, accumulated_weights, env):
+    if not prior_axis_records or grid_edge_coords is None or grid_edge_list is None:
         return
 
-    seen_edges = set()
-    for u, neighbors in env.adj.items():
-        for v, dist, direction in neighbors:
+    coords = grid_edge_coords.astype(np.float64, copy=False)
+    edge_x1 = np.minimum(coords[:, 0], coords[:, 2])
+    edge_x2 = np.maximum(coords[:, 0], coords[:, 2])
+    edge_y1 = np.minimum(coords[:, 1], coords[:, 3])
+    edge_y2 = np.maximum(coords[:, 1], coords[:, 3])
+    edge_is_h = np.abs(coords[:, 1] - coords[:, 3]) < 1e-7
+
+    blocked_edges = set()
+    crossing_counts = {}
+    clearance_counts = {}
+
+    for prior_seg, prior_diameter in prior_axis_records:
+        px1, py1, px2, py2, prior_dir = prior_seg
+        required = (current_diameter + prior_diameter) / 2.0 + DUCT_CLEARANCE_MARGIN
+
+        if prior_dir == "H":
+            overlap_mask = (
+                edge_is_h
+                & (np.abs(edge_y1 - py1) < 1e-7)
+                & (np.minimum(edge_x2, px2) - np.maximum(edge_x1, px1) > 1e-7)
+            )
+            cross_mask = (
+                ~edge_is_h
+                & (edge_x1 >= px1 - 1e-7)
+                & (edge_x1 <= px2 + 1e-7)
+                & (edge_y1 <= py1 + 1e-7)
+                & (edge_y2 >= py1 - 1e-7)
+            )
+        else:
+            overlap_mask = (
+                ~edge_is_h
+                & (np.abs(edge_x1 - px1) < 1e-7)
+                & (np.minimum(edge_y2, py2) - np.maximum(edge_y1, py1) > 1e-7)
+            )
+            cross_mask = (
+                edge_is_h
+                & (edge_y1 >= py1 - 1e-7)
+                & (edge_y1 <= py2 + 1e-7)
+                & (edge_x1 <= px1 + 1e-7)
+                & (edge_x2 >= px1 - 1e-7)
+            )
+
+        dx = np.maximum.reduce([px1 - edge_x2, edge_x1 - px2, np.zeros_like(edge_x1)])
+        dy = np.maximum.reduce([py1 - edge_y2, edge_y1 - py2, np.zeros_like(edge_y1)])
+        clearance_mask = (np.hypot(dx, dy) < required) & ~overlap_mask & ~cross_mask
+
+        for ei in np.flatnonzero(overlap_mask):
+            u, v, _, _ = grid_edge_list[int(ei)]
+            blocked_edges.add((min(u, v), max(u, v)))
+        for ei in np.flatnonzero(cross_mask):
+            u, v, _, _ = grid_edge_list[int(ei)]
             edge = (min(u, v), max(u, v))
-            if edge in seen_edges:
-                continue
-            seen_edges.add(edge)
+            crossing_counts[edge] = crossing_counts.get(edge, 0) + 1
+        for ei in np.flatnonzero(clearance_mask):
+            u, v, _, _ = grid_edge_list[int(ei)]
+            edge = (min(u, v), max(u, v))
+            clearance_counts[edge] = clearance_counts.get(edge, 0) + 1
 
-            edge_seg = _normalize_axis_segment(env.nodes[u], env.nodes[v])
-            if edge_seg is None:
-                continue
+    for edge in blocked_edges:
+        accumulated_weights[edge] = OVERLAP_BLOCK_WEIGHT
 
-            crossing_count = 0
-            blocked = False
-            for prior_seg in prior_axis_segs:
-                relation = _axis_segment_relation(edge_seg, prior_seg)
-                if relation == "overlap":
-                    accumulated_weights[edge] = OVERLAP_BLOCK_WEIGHT
-                    blocked = True
-                    break
-                if relation == "cross":
-                    crossing_count += 1
-
-            if blocked or crossing_count == 0:
-                continue
-            if accumulated_weights.get(edge, 0.0) >= OVERLAP_BLOCK_WEIGHT:
-                continue
-            base_cost = accumulated_weights.get(edge, float(dist))
-            accumulated_weights[edge] = base_cost + CROSSING_PENALTY * crossing_count
+    for edge in set(crossing_counts) | set(clearance_counts):
+        if accumulated_weights.get(edge, 0.0) >= OVERLAP_BLOCK_WEIGHT:
+            continue
+        u, v = edge
+        base_dist = float(np.hypot(env.nodes[v][0] - env.nodes[u][0], env.nodes[v][1] - env.nodes[u][1]))
+        base_cost = accumulated_weights.get(edge, base_dist)
+        accumulated_weights[edge] = (
+            base_cost
+            + CROSSING_PENALTY * crossing_counts.get(edge, 0)
+            + CLEARANCE_PENALTY * clearance_counts.get(edge, 0)
+        )
 
 def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if isinstance(start_node_indices, (int, np.integer)):
@@ -1192,8 +1251,29 @@ def count_segment_crossings(routes):
                 continue
     return crossings
 
+def count_segment_clearance_conflicts(routes):
+    conflicts = 0
+    all_segs = [
+        (name, _normalize_axis_segment(p1, p2), get_route_diameter(name))
+        for name, segs in routes
+        for p1, p2 in segs
+    ]
+    all_segs = [(name, seg, diameter) for name, seg, diameter in all_segs if seg is not None]
+
+    for i, (name_a, seg_a, diameter_a) in enumerate(all_segs):
+        for name_b, seg_b, diameter_b in all_segs[i + 1:]:
+            if name_a == name_b:
+                continue
+            if _axis_segment_relation(seg_a, seg_b) is not None:
+                continue
+            required_clearance = (diameter_a + diameter_b) / 2.0 + DUCT_CLEARANCE_MARGIN
+            if _axis_segment_distance(seg_a, seg_b) < required_clearance:
+                conflicts += 1
+    return conflicts
+
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes):
     accumulated_weights = {}
+    prior_axis_records = []
     exhaust_node_idx = shaft_path[-1] if shaft_path else None
     block_path_and_node(shaft_path, exhaust_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
 
@@ -1212,15 +1292,14 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         shaft_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
     add_port_stub_segment(shaft_segs, chosen_exhaust_pin, exhaust_node_idx, global_pins)
     routes.append(("Shaft", shaft_segs))
-    add_route_interaction_weights(shaft_segs, accumulated_weights, current_env)
+    prior_axis_records.extend(_route_axis_records("Shaft", shaft_segs))
     
     total_nodes = len(shaft_path)
     
     # Pre-calculate terminal node indices
     terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
 
-    # Helper to block other terminals temporarily
-    def get_weights_blocking_other_terminals(curr_room, base_weights):
+    def get_weights_for_route(curr_room, base_weights):
         w = base_weights.copy()
         for r_name, t_node_idx in terminal_nodes.items():
             if r_name == curr_room:
@@ -1229,6 +1308,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
                 for nbr, dist, direction in current_env.adj[t_node_idx]:
                     edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
                     w[edge] = 1e9
+        add_route_interaction_weights(prior_axis_records, get_route_diameter(curr_room), w, current_env)
         return w
 
     # 1. Route Kitchen (Fixed position right after Shaft)
@@ -1237,7 +1317,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         _, kitchen_node_idx = grid_kd.query(kitchen_pt)
         kitchen_node_idx = int(kitchen_node_idx)
         
-        current_weights = get_weights_blocking_other_terminals("Kitchen", accumulated_weights)
+        current_weights = get_weights_for_route("Kitchen", accumulated_weights)
         kitchen_path, _, _ = run_super_sink_astar(
             current_env,
             kitchen_node_idx,
@@ -1258,7 +1338,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
         add_port_stub_segment(kitchen_segs, kitchen_pin_name, kitchen_path[-1], global_pins)
         routes.append(("Kitchen", kitchen_segs))
-        add_route_interaction_weights(kitchen_segs, accumulated_weights, current_env)
+        prior_axis_records.extend(_route_axis_records("Kitchen", kitchen_segs))
         total_nodes += len(kitchen_path)
         
         kitchen_pin_node_idx = kitchen_path[-1]
@@ -1273,7 +1353,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         _, room_node_idx = grid_kd.query(room_pt)
         room_node_idx = int(room_node_idx)
         
-        current_weights = get_weights_blocking_other_terminals(room_name, accumulated_weights)
+        current_weights = get_weights_for_route(room_name, accumulated_weights)
         room_path, _, chosen_small_pin = run_super_sink_astar(
             current_env,
             room_node_idx,
@@ -1294,7 +1374,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
         add_port_stub_segment(room_segs, chosen_small_pin, room_path[-1], global_pins)
         routes.append((room_name, room_segs))
-        add_route_interaction_weights(room_segs, accumulated_weights, current_env)
+        prior_axis_records.extend(_route_axis_records(room_name, room_segs))
         total_nodes += len(room_path)
         
         chosen_pin_node_idx = room_path[-1]
@@ -1309,7 +1389,13 @@ def get_solution_score(routes, crossings):
     for name, segs in routes:
         total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
         total_turns += calculate_tree_turns(segs)
-    score = int(total_len) + int(C_BEND) * total_turns + int(CROSSING_PENALTY) * crossings
+    clearance_conflicts = count_segment_clearance_conflicts(routes)
+    score = (
+        int(total_len)
+        + int(C_BEND) * total_turns
+        + int(CROSSING_PENALTY) * crossings
+        + int(CLEARANCE_PENALTY) * clearance_conflicts
+    )
     return score
 
 # ──────────────────────────────────────────────────────────────────────────
