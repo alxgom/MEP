@@ -104,6 +104,7 @@ hist_ap_idx = None                              # sample index of last auto-plac
 hist_event_markers = []                         # list of (index, label, color) tuples
 weight_mode_idx = 0                             # 0 for Default, 1 for Equal Weights
 heatmap_scale_mode = 0                          # 0 for Linear (75% Saturation), 1 for Log Scale
+heatmap_surface_cache = {"key": None, "surface": None}
 
 def to_screen(x, y):
     sx = OFFSET_X + x * SCALE_PX_PER_MM
@@ -1418,7 +1419,6 @@ def run_auto_placement():
 # MAIN SOLVER WRAPPER
 # ──────────────────────────────────────────────────────────────────────────
 def solve_ventilation_routing():
-    t_start = time.perf_counter()
     global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
 
     machine_poly = Polygon([
@@ -1427,12 +1427,10 @@ def solve_ventilation_routing():
 
     m_center = Point(machine_cx, machine_cy)
     if not routing_region_base or not routing_region_base.contains(m_center):
-        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        return None, "Blocked: Machine outside region", elapsed_ms, 0
+        return None, "Blocked: Machine outside region", 0.0, 0
 
     if any(machine_poly.intersects(col) for col in columns):
-        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        return None, "Blocked: Machine collides with column", elapsed_ms, 0
+        return None, "Blocked: Machine collides with column", 0.0, 0
 
     if grid_nodes is None:
         return None, "Building grid… press Space to retry", 0.0, 0
@@ -1445,8 +1443,7 @@ def solve_ventilation_routing():
 
     pin_node_map = snap_pins_to_graph(global_pins)
     if not pin_node_map or not shaft_extraction:
-        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
-        return None, "Blocked: Missing pins or shaft", elapsed_ms, 0
+        return None, "Blocked: Missing pins or shaft", 0.0, 0
 
     rep_pt = shaft_extraction.representative_point()
     shaft_center = (round(rep_pt.x), round(rep_pt.y))
@@ -1471,6 +1468,8 @@ def solve_ventilation_routing():
                 edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
                 shaft_weights[edge] = 1e9
 
+    t_solver = time.perf_counter()
+
     # 1. Route Shaft via Super Source/Sink
     shaft_path, _, chosen_exhaust_pin = run_super_sink_astar(
         current_env,
@@ -1484,7 +1483,7 @@ def solve_ventilation_routing():
     )
 
     if shaft_path is None:
-        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+        elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         return None, "Blocked: No path to shaft", elapsed_ms, 0
 
     # 2. Backtracking search over permutations of the small duct rooms
@@ -1631,7 +1630,7 @@ def solve_ventilation_routing():
                     best_total_nodes = total_nodes_cand
                     
                 if crossings == 0:
-                    elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+                    elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
                     status_text = f"Success: Routed all (tried {perm_attempts} iters, 0 crossings) in {elapsed_ms:.1f}ms"
                     return routes_cand, status_text, elapsed_ms, total_nodes_cand
                     
@@ -1654,11 +1653,11 @@ def solve_ventilation_routing():
                         node_history_congestion[node] = node_history_congestion.get(node, 0.0) + 4000.0
                         
         if best_routes is not None:
-            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+            elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
             status_text = f"Success: Routed all (tried {perm_attempts} iters, {best_crossings} crossings) in {elapsed_ms:.1f}ms"
             return best_routes, status_text, elapsed_ms, best_total_nodes
         else:
-            elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+            elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
             return None, f"Routing Blocked (tried {perm_attempts} iters) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
     # Pass 1: Try collision-free solutions (block_nodes=True)
@@ -1672,7 +1671,7 @@ def solve_ventilation_routing():
             score = get_solution_score(routes_cand, crossings)
             if crossings == 0:
                 if routing_strategy_idx == 1:
-                    elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+                    elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
                     status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings) in {elapsed_ms:.1f}ms"
                     return routes_cand, status_text, elapsed_ms, total_nodes_cand
                 else:
@@ -1707,11 +1706,11 @@ def solve_ventilation_routing():
                         break
 
     if best_routes is not None:
-        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+        elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         status_text = f"Success: Routed all (tried {perm_attempts} perms, {best_crossings} crossings) in {elapsed_ms:.1f}ms"
         return best_routes, status_text, elapsed_ms, best_total_nodes
     else:
-        elapsed_ms = (time.perf_counter() - t_start) * 1000.0
+        elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         return None, f"Routing Blocked (tried {perm_attempts} perms) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1903,43 +1902,108 @@ def draw_colorbar(screen, node_scores):
     lbl_title = font_lbl.render("COST HEATMAP", True, COLOR_TEXT)
     screen.blit(lbl_title, (cb_x + cb_w//2 - lbl_title.get_width()//2, cb_y - 20))
 
-def draw_distance_heatmap(screen, node_scores):
-    if not node_scores or base_regular_env is None:
-        return
+def _score_to_heatmap_t(score, min_s, max_s):
+    diff = max_s - min_s if max_s > min_s else 1.0
+    if heatmap_scale_mode == 0:
+        t = (score - min_s) / diff
+        return min(1.0, t / 0.75)
+
+    min_s_safe = max(1.0, min_s)
+    max_ratio = max_s / min_s_safe
+    max_log = math.log(max_ratio) if max_ratio > 1.0 else 1.0
+    s_norm = score / max(1.0, min_s)
+    val_log = math.log(max(1.0, s_norm))
+    return val_log / max_log if max_log > 0 else 0.0
+
+def _interpolate_regular_score(wx, wy, score_grid):
+    gx = wx / GRID_SPACING
+    gy = wy / GRID_SPACING
+    ix0 = math.floor(gx)
+    iy0 = math.floor(gy)
+    fx = gx - ix0
+    fy = gy - iy0
+
+    q00 = score_grid.get((ix0, iy0))
+    q10 = score_grid.get((ix0 + 1, iy0))
+    q01 = score_grid.get((ix0, iy0 + 1))
+    q11 = score_grid.get((ix0 + 1, iy0 + 1))
+
+    if q00 is not None and q10 is not None and q01 is not None and q11 is not None:
+        return (
+            q00 * (1.0 - fx) * (1.0 - fy) +
+            q10 * fx * (1.0 - fy) +
+            q01 * (1.0 - fx) * fy +
+            q11 * fx * fy
+        )
+
+    candidates = []
+    for ix, iy, score in (
+        (ix0, iy0, q00),
+        (ix0 + 1, iy0, q10),
+        (ix0, iy0 + 1, q01),
+        (ix0 + 1, iy0 + 1, q11),
+    ):
+        if score is None:
+            continue
+        dx = wx - ix * GRID_SPACING
+        dy = wy - iy * GRID_SPACING
+        d2 = dx * dx + dy * dy
+        candidates.append((d2, score))
+
+    if not candidates:
+        return None
+
+    d2, score = min(candidates, key=lambda item: item[0])
+    if d2 <= (GRID_SPACING * 1.45) ** 2:
+        return score
+    return None
+
+def _build_heatmap_surface(node_scores):
     min_s = min(node_scores.values())
     max_s = max(node_scores.values())
-    diff = max_s - min_s if max_s > min_s else 1.0
-    bg = COLOR_BG
-    alpha = 0.60  # blend fraction: 0 = invisible, 1 = full colour
-
-    # Precalculate log divisor if mode is 1
-    if heatmap_scale_mode == 1:
-        min_s_safe = max(1.0, min_s)
-        max_ratio = max_s / min_s_safe
-        max_log = math.log(max_ratio) if max_ratio > 1.0 else 1.0
-
+    score_grid = {}
     for node_idx, score in node_scores.items():
         if node_idx >= len(base_regular_env.nodes):
             continue
-        pt = base_regular_env.nodes[node_idx]
-        px, py = to_screen(pt[0], pt[1])
-        
-        if heatmap_scale_mode == 0:
-            t = (score - min_s) / diff
-            t_sat = min(1.0, t / 0.75)
-        else:
-            s_norm = score / max(1.0, min_s)
-            val_log = math.log(max(1.0, s_norm))
-            t_sat = val_log / max_log if max_log > 0 else 0.0
-            
-        tr, tg, tb = get_turbo_color(t_sat)
-        # blend toward background for a faint underlay
-        c = (
-            int(bg[0] + alpha * (tr - bg[0])),
-            int(bg[1] + alpha * (tg - bg[1])),
-            int(bg[2] + alpha * (tb - bg[2])),
-        )
-        pygame.draw.circle(screen, c, (px, py), 2)
+        x, y = base_regular_env.nodes[node_idx]
+        score_grid[(round(float(x) / GRID_SPACING), round(float(y) / GRID_SPACING))] = float(score)
+
+    low_w = 320
+    low_h = max(1, round(low_w * CANVAS_H / CANVAS_W))
+    low = pygame.Surface((low_w, low_h), pygame.SRCALPHA)
+    alpha = 150
+
+    for py in range(low_h):
+        abs_y = CANVAS_TOP + (py + 0.5) * CANVAS_H / low_h
+        wy = 11000.0 - (abs_y - OFFSET_Y) / SCALE_PX_PER_MM
+        for px in range(low_w):
+            abs_x = CANVAS_LEFT + (px + 0.5) * CANVAS_W / low_w
+            wx = (abs_x - OFFSET_X) / SCALE_PX_PER_MM
+            score = _interpolate_regular_score(wx, wy, score_grid)
+            if score is None:
+                continue
+            c = get_turbo_color(_score_to_heatmap_t(score, min_s, max_s))
+            low.set_at((px, py), (c[0], c[1], c[2], alpha))
+
+    return pygame.transform.smoothscale(low, (CANVAS_W, CANVAS_H))
+
+def draw_distance_heatmap(screen, node_scores):
+    if not node_scores or base_regular_env is None:
+        return
+    key = (
+        id(base_regular_env),
+        id(node_scores),
+        len(node_scores),
+        min(node_scores.values()),
+        max(node_scores.values()),
+        heatmap_scale_mode,
+        CANVAS_W,
+        CANVAS_H,
+    )
+    if heatmap_surface_cache["key"] != key:
+        heatmap_surface_cache["surface"] = _build_heatmap_surface(node_scores)
+        heatmap_surface_cache["key"] = key
+    screen.blit(heatmap_surface_cache["surface"], (CANVAS_LEFT, CANVAS_TOP))
 
 def record_history(routes, crossings_count, elapsed_ms):
     """Append one sample to the history buffers (called after every successful solve)."""
@@ -1965,7 +2029,7 @@ def draw_plots(screen, font_small, font_bold):
     pw = PANEL_W - 24
     ph = 118   # height of each chart area
     gap = 12   # gap between the plots
-    titles   = ["DUCT LENGTH  (m)", "COST SCORE", "TURNS", "TURNS / METRE", "EXEC TIME (ms)"]
+    titles   = ["DUCT LENGTH  (m)", "COST SCORE", "TURNS", "TURNS / METRE", "SOLVER TIME (ms)"]
     buffers  = [hist_length, hist_score, hist_turns, hist_turns_per_len, hist_exec_ms]
     colors   = [(46, 204, 113), (241, 196, 15), (155, 89, 182), (26, 188, 156), (52, 152, 219)]
     y_starts = [50 + i * (ph + gap) for i in range(len(buffers))]
