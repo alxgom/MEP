@@ -28,8 +28,15 @@ GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
 PORT_STUB_LENGTH = 300.0
 MACHINE_CLEARANCE = 0.0
+MACHINE_BODY_W = 410.0
+MACHINE_BODY_H = 460.0
+MACHINE_OVERALL_W = 511.0
+MACHINE_SMALL_DUCT_D = 80.0
+MACHINE_LARGE_DUCT_D = 125.0
 FPS            = 20
 C_BEND         = 4000.0  # Turn penalty in mm
+CROSSING_PENALTY = 5 * C_BEND
+OVERLAP_BLOCK_WEIGHT = 1e9
 
 # Graph types
 GRAPH_TYPES = [
@@ -899,14 +906,15 @@ def build_grid(machine_pins=None):
 
 # Machine representation helper
 def get_machine_pins(cx, cy, angle_deg):
-    w, h = 700.0, 600.0 # 70cm x 60cm
+    w, h = MACHINE_OVERALL_W, MACHINE_BODY_H
+    small_y = h / 2.0 - MACHINE_SMALL_DUCT_D / 2.0
     local_pins = {
         "left_mid": (-w/2, 0.0),
         "right_mid": (w/2, 0.0),
-        "tl": (-w/2, h/2),
-        "tr": (w/2, h/2),
-        "bl": (-w/2, -h/2),
-        "br": (w/2, -h/2)
+        "tl": (-w/2, small_y),
+        "tr": (w/2, small_y),
+        "bl": (-w/2, -small_y),
+        "br": (w/2, -small_y)
     }
     
     rad = math.radians(angle_deg)
@@ -1019,7 +1027,7 @@ def block_path_and_node(path, pin_node_idx, accumulated_weights, env, block_node
 
     for i in range(len(path) - 1):
         e = (min(path[i], path[i+1]), max(path[i], path[i+1]))
-        accumulated_weights[e] = 1e9
+        accumulated_weights[e] = OVERLAP_BLOCK_WEIGHT
         
     for idx, u in enumerate(path):
         if u == pin_node_idx or idx == 0:
@@ -1027,7 +1035,76 @@ def block_path_and_node(path, pin_node_idx, accumulated_weights, env, block_node
         if u in env.adj:
             for nbr, dist, direction in env.adj[u]:
                 edge = (min(u, nbr), max(u, nbr))
-                accumulated_weights[edge] = 1e9
+                accumulated_weights[edge] = OVERLAP_BLOCK_WEIGHT
+
+def _normalize_axis_segment(p1, p2, eps=1e-7):
+    x1, y1 = float(p1[0]), float(p1[1])
+    x2, y2 = float(p2[0]), float(p2[1])
+    if abs(x1 - x2) < eps and abs(y1 - y2) < eps:
+        return None
+    if abs(y1 - y2) < eps:
+        return (min(x1, x2), y1, max(x1, x2), y1, "H")
+    if abs(x1 - x2) < eps:
+        return (x1, min(y1, y2), x1, max(y1, y2), "V")
+    return None
+
+def _axis_segment_relation(a, b, eps=1e-7):
+    ax1, ay1, ax2, ay2, a_dir = a
+    bx1, by1, bx2, by2, b_dir = b
+
+    if a_dir == b_dir:
+        if a_dir == "H" and abs(ay1 - by1) < eps:
+            return "overlap" if min(ax2, bx2) - max(ax1, bx1) > eps else None
+        if a_dir == "V" and abs(ax1 - bx1) < eps:
+            return "overlap" if min(ay2, by2) - max(ay1, by1) > eps else None
+        return None
+
+    h = a if a_dir == "H" else b
+    v = a if a_dir == "V" else b
+    hx1, hy, hx2, _, _ = h
+    vx, vy1, _, vy2, _ = v
+    if hx1 - eps <= vx <= hx2 + eps and vy1 - eps <= hy <= vy2 + eps:
+        return "cross"
+    return None
+
+def add_route_interaction_weights(route_segs, accumulated_weights, env):
+    prior_axis_segs = []
+    for p1, p2 in route_segs:
+        seg = _normalize_axis_segment(p1, p2)
+        if seg is not None:
+            prior_axis_segs.append(seg)
+    if not prior_axis_segs:
+        return
+
+    seen_edges = set()
+    for u, neighbors in env.adj.items():
+        for v, dist, direction in neighbors:
+            edge = (min(u, v), max(u, v))
+            if edge in seen_edges:
+                continue
+            seen_edges.add(edge)
+
+            edge_seg = _normalize_axis_segment(env.nodes[u], env.nodes[v])
+            if edge_seg is None:
+                continue
+
+            crossing_count = 0
+            blocked = False
+            for prior_seg in prior_axis_segs:
+                relation = _axis_segment_relation(edge_seg, prior_seg)
+                if relation == "overlap":
+                    accumulated_weights[edge] = OVERLAP_BLOCK_WEIGHT
+                    blocked = True
+                    break
+                if relation == "cross":
+                    crossing_count += 1
+
+            if blocked or crossing_count == 0:
+                continue
+            if accumulated_weights.get(edge, 0.0) >= OVERLAP_BLOCK_WEIGHT:
+                continue
+            base_cost = accumulated_weights.get(edge, float(dist))
+            accumulated_weights[edge] = base_cost + CROSSING_PENALTY * crossing_count
 
 def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if isinstance(start_node_indices, (int, np.integer)):
@@ -1112,14 +1189,7 @@ def count_segment_crossings(routes):
                     if bx1 <= ax1 <= bx2 and ay1 <= by1 <= ay2:
                         crossings += 1
             else:
-                if is_horiz1:
-                    if abs(ay1 - by1) < 1e-7:
-                        if max(ax1, bx1) <= min(ax2, bx2):
-                            crossings += 1
-                else:
-                    if abs(ax1 - bx1) < 1e-7:
-                        if max(ay1, by1) <= min(ay2, by2):
-                            crossings += 1
+                continue
     return crossings
 
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, shaft_path, block_nodes):
@@ -1142,6 +1212,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         shaft_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
     add_port_stub_segment(shaft_segs, chosen_exhaust_pin, exhaust_node_idx, global_pins)
     routes.append(("Shaft", shaft_segs))
+    add_route_interaction_weights(shaft_segs, accumulated_weights, current_env)
     
     total_nodes = len(shaft_path)
     
@@ -1187,6 +1258,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
         add_port_stub_segment(kitchen_segs, kitchen_pin_name, kitchen_path[-1], global_pins)
         routes.append(("Kitchen", kitchen_segs))
+        add_route_interaction_weights(kitchen_segs, accumulated_weights, current_env)
         total_nodes += len(kitchen_path)
         
         kitchen_pin_node_idx = kitchen_path[-1]
@@ -1222,6 +1294,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
         add_port_stub_segment(room_segs, chosen_small_pin, room_path[-1], global_pins)
         routes.append((room_name, room_segs))
+        add_route_interaction_weights(room_segs, accumulated_weights, current_env)
         total_nodes += len(room_path)
         
         chosen_pin_node_idx = room_path[-1]
@@ -1236,7 +1309,7 @@ def get_solution_score(routes, crossings):
     for name, segs in routes:
         total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
         total_turns += calculate_tree_turns(segs)
-    score = int(total_len) + int(C_BEND) * total_turns + int(5 * C_BEND) * crossings
+    score = int(total_len) + int(C_BEND) * total_turns + int(CROSSING_PENALTY) * crossings
     return score
 
 # ──────────────────────────────────────────────────────────────────────────
