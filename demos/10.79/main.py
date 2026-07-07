@@ -48,6 +48,8 @@ MACHINE_LARGE_DUCT_D = 125.0
 DUCT_BUFFER_RATIO = 1.05
 ROUTING_WALL_CLEARANCE_MM = 100.0
 PATINEJO_CLEARANCE_MM = 200.0
+SHAFT_ENTRY_SEARCH_MM = 700.0
+SHAFT_ENTRY_MAX_CANDIDATES = 16
 MACHINE_CLEARANCE_SOFT_MARGIN_MM = 150.0
 FPS            = 20
 WHEEL_ROTATE_COOLDOWN_MS = 180
@@ -433,6 +435,97 @@ def get_representative_point(poly):
         return (round(centroid.x), round(centroid.y))
     rep = poly.representative_point()
     return (round(rep.x), round(rep.y))
+
+def _shaft_entry_geometry_for_node(node_idx, env=None):
+    if shaft_extraction is None:
+        return None
+    env = env or current_env
+    if env is None or node_idx is None:
+        return None
+
+    p = env.nodes[int(node_idx)]
+    node_pt = Point(float(p[0]), float(p[1]))
+    rep_x, rep_y = get_representative_point(shaft_extraction)
+    rep = np.array([float(rep_x), float(rep_y)], dtype=np.float64)
+
+    if shaft_extraction.contains(node_pt):
+        return {
+            "rep": (float(rep[0]), float(rep[1])),
+            "entry": (float(p[0]), float(p[1])),
+            "node": (float(p[0]), float(p[1])),
+            "distance": 0.0,
+            "orthogonality_error": 0.0,
+        }
+
+    boundary = shaft_extraction.boundary
+    entry_pt = boundary.interpolate(boundary.project(node_pt))
+    entry = np.array([float(entry_pt.x), float(entry_pt.y)], dtype=np.float64)
+    node = np.array([float(p[0]), float(p[1])], dtype=np.float64)
+
+    outward = node - entry
+    radial = entry - rep
+    outward_norm = float(np.linalg.norm(outward))
+    radial_norm = float(np.linalg.norm(radial))
+    if outward_norm < 1e-6 or radial_norm < 1e-6:
+        orthogonality_error = 1.0
+    else:
+        if float(np.dot(outward, radial)) < 0.0:
+            radial = -radial
+        cos_align = abs(float(np.dot(outward, radial)) / (outward_norm * radial_norm))
+        orthogonality_error = 1.0 - min(1.0, cos_align)
+
+    return {
+        "rep": (float(rep[0]), float(rep[1])),
+        "entry": (float(entry[0]), float(entry[1])),
+        "node": (float(node[0]), float(node[1])),
+        "distance": outward_norm,
+        "orthogonality_error": orthogonality_error,
+    }
+
+def get_shaft_entry_nodes(env, kd=None):
+    if shaft_extraction is None or env is None or len(env.nodes) == 0:
+        return [], None
+
+    candidates = []
+    for idx, pt in enumerate(env.nodes):
+        node_pt = Point(float(pt[0]), float(pt[1]))
+        if shaft_extraction.contains(node_pt):
+            continue
+        dist = node_pt.distance(shaft_extraction)
+        if dist > SHAFT_ENTRY_SEARCH_MM:
+            continue
+        geom = _shaft_entry_geometry_for_node(idx, env)
+        if geom is None:
+            continue
+        score = dist + geom["orthogonality_error"] * GRID_SPACING * 2.0
+        candidates.append((score, dist, geom["orthogonality_error"], int(idx)))
+
+    if candidates:
+        candidates.sort()
+        return [idx for _, _, _, idx in candidates[:SHAFT_ENTRY_MAX_CANDIDATES]], candidates[0][3]
+
+    rep_pt = shaft_extraction.representative_point()
+    if kd is not None:
+        _, fallback_idx = kd.query((round(rep_pt.x), round(rep_pt.y)))
+        return [int(fallback_idx)], int(fallback_idx)
+
+    diffs = np.hypot(env.nodes[:, 0] - rep_pt.x, env.nodes[:, 1] - rep_pt.y)
+    fallback_idx = int(np.argmin(diffs))
+    return [fallback_idx], fallback_idx
+
+def add_shaft_entry_segments(segs, first_node_idx):
+    geom = _shaft_entry_geometry_for_node(first_node_idx)
+    if geom is None:
+        return
+
+    rep = geom["rep"]
+    entry = geom["entry"]
+    node = geom["node"]
+
+    if math.hypot(entry[0] - rep[0], entry[1] - rep[1]) > 1.0:
+        segs.append((rep, entry))
+    if math.hypot(node[0] - entry[0], node[1] - entry[1]) > 1.0:
+        segs.append((entry, node))
 
 def _extract_bnd_segs(region):
     segs = []
@@ -2116,9 +2209,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
     # Shaft segments
     shaft_segs = []
     if shaft_path and shaft_extraction:
-        s_rep = get_representative_point(shaft_extraction)
-        p_start = current_env.nodes[shaft_path[0]]
-        shaft_segs.append(((float(s_rep[0]), float(s_rep[1])), (float(p_start[0]), float(p_start[1]))))
+        add_shaft_entry_segments(shaft_segs, shaft_path[0])
     for i in range(len(shaft_path) - 1):
         p1 = current_env.nodes[shaft_path[i]]
         p2 = current_env.nodes[shaft_path[i+1]]
@@ -2428,9 +2519,7 @@ def _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=None):
 def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None):
     segs = []
     if route_name == "Shaft" and path and shaft_extraction:
-        s_rep = get_representative_point(shaft_extraction)
-        p_start = current_env.nodes[path[0]]
-        segs.append(((float(s_rep[0]), float(s_rep[1])), (float(p_start[0]), float(p_start[1]))))
+        add_shaft_entry_segments(segs, path[0])
     for i in range(len(path) - 1):
         p1 = current_env.nodes[path[i]]
         p2 = current_env.nodes[path[i + 1]]
@@ -2813,15 +2902,7 @@ def ensure_placement_heatmap_scores():
     global ap_scores, ap_fields
     if ap_scores or base_regular_env is None or base_regular_kd is None or shaft_extraction is None:
         return
-    rep_pt = shaft_extraction.representative_point()
-    shaft_center = (round(rep_pt.x), round(rep_pt.y))
-    _, shaft_node_idx = base_regular_kd.query(shaft_center)
-    shaft_boundary_nodes = [
-        i for i, pt in enumerate(base_regular_env.nodes)
-        if Point(pt[0], pt[1]).distance(shaft_extraction) < 500.0
-    ]
-    if not shaft_boundary_nodes:
-        shaft_boundary_nodes = [int(shaft_node_idx)]
+    shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
     ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
 
 def _routing_frame_axes():
@@ -2952,13 +3033,7 @@ def run_auto_placement():
         
     rep_pt = shaft_extraction.representative_point()
     shaft_center = (round(rep_pt.x), round(rep_pt.y))
-    _, shaft_node_idx = base_regular_kd.query(shaft_center)
-    shaft_node_idx = int(shaft_node_idx)
-    
-    shaft_boundary_nodes = [i for i, pt in enumerate(base_regular_env.nodes) 
-                            if Point(pt[0], pt[1]).distance(shaft_extraction) < 500.0]
-    if not shaft_boundary_nodes:
-        shaft_boundary_nodes = [shaft_node_idx]
+    shaft_boundary_nodes, shaft_node_idx = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
     
     # ── Option 1: Proximity to Shaft ──
     if auto_placement_mode_idx == 1:
@@ -3104,15 +3179,7 @@ def solve_ventilation_routing():
     if not pin_node_map or not shaft_extraction:
         return None, "Blocked: Missing pins or shaft", 0.0, 0
 
-    rep_pt = shaft_extraction.representative_point()
-    shaft_center = (round(rep_pt.x), round(rep_pt.y))
-    _, shaft_node_idx = grid_kd.query(shaft_center)
-    shaft_node_idx = int(shaft_node_idx)
-    
-    shaft_boundary_nodes = [i for i, pt in enumerate(current_env.nodes) 
-                            if Point(pt[0], pt[1]).distance(shaft_extraction) < 500.0]
-    if not shaft_boundary_nodes:
-        shaft_boundary_nodes = [shaft_node_idx]
+    shaft_boundary_nodes, shaft_node_idx = get_shaft_entry_nodes(current_env, grid_kd)
 
     # Pre-calculate terminal node indices
     terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
@@ -3311,9 +3378,7 @@ def solve_ventilation_routing():
                     break
                 segs = []
                 if name == "Shaft" and path and shaft_extraction:
-                    s_rep = get_representative_point(shaft_extraction)
-                    p_start = current_env.nodes[path[0]]
-                    segs.append(((float(s_rep[0]), float(s_rep[1])), (float(p_start[0]), float(p_start[1]))))
+                    add_shaft_entry_segments(segs, path[0])
                 for k in range(len(path) - 1):
                     p1 = current_env.nodes[path[k]]
                     p2 = current_env.nodes[path[k+1]]
@@ -4452,13 +4517,7 @@ def main():
                         needs_auto_placement = True
                     else:
                         if base_regular_env is not None and shaft_extraction is not None:
-                            rep_pt = shaft_extraction.representative_point()
-                            shaft_center = (round(rep_pt.x), round(rep_pt.y))
-                            _, shaft_node_idx = base_regular_kd.query(shaft_center)
-                            shaft_boundary_nodes = [i for i, pt in enumerate(base_regular_env.nodes) 
-                                                    if Point(pt[0], pt[1]).distance(shaft_extraction) < 500.0]
-                            if not shaft_boundary_nodes:
-                                shaft_boundary_nodes = [int(shaft_node_idx)]
+                            shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
                             node_scores, distance_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
                             ap_scores = node_scores
                             ap_fields = distance_fields
