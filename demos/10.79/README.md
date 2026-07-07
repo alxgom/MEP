@@ -104,6 +104,7 @@ The geometry and clearance parameters are:
 | --- | ---: | --- |
 | `GRID_SPACING` | `200` mm | Regular grid spacing. |
 | `HANNAN_SCAFFOLD_SPACING` | `600` mm | Static Hannan connectivity scaffold. |
+| `CORE_EPSILON_GRID_MM` | `200` mm | Core-like epsilon axis offset for the experimental epsilon grid. |
 | `WALL_THICKNESS` | `150` mm | Wall display/filter thickness. |
 | `ROUTING_WALL_CLEARANCE_MM` | `100` mm | Minimum node/edge clearance from allowed-area boundaries and walls. |
 | `PATINEJO_CLEARANCE_MM` | `200` mm | Hard clearance from shafts for non-shaft ducts. |
@@ -165,14 +166,41 @@ The default start mode is `Room node set`. Instead of snapping each wet room to 
 
 ## Routing Grids
 
-Demo 10.79 supports two grid modes:
+Demo 10.79 supports three grid modes:
 
 - Regular 200 mm Grid
 - Hannan Grid (numpy)
+- Epsilon Grid (core-like numpy)
 
 The Hannan grid follows a simple axis construction inspired by `letsmep-routing-core`: it builds X/Y axes from relevant room, obstacle, machine, and terminal geometry, then constructs axis-aligned graph nodes and edges.
 
 This is comparable to the routing-core simple grid at the level of "axis lines from terminals, allowed boundaries, obstacles, and connector geometry", but it is not a byte-for-byte port. The demo keeps a precomputed static Hannan template and overlays dynamic machine axes for interactivity; routing-core rebuilds a simpler grid from supplied points, allowed-boundary offsets, and obstacle-buffer axes.
+
+The epsilon grid is an experimental routing-core-inspired alternative. It mirrors the core idea of adding axes at geometry/connector coordinates plus `+/- EPSILON`, but it deliberately keeps the demo's NumPy graph build and edge filtering instead of porting the core Shapely-heavy grid internals line-for-line. This keeps it interactive and makes the difference explicit.
+
+## Validation Warnings
+
+The status card shows warning-only route validation:
+
+- crossings
+- clearance conflicts
+- short duct pieces
+- segments outside allowed geometry
+- missing routing-core shaft entry metadata
+
+These warnings do not change score, reject a route, or trigger retries. Routing-core rejects some of these cases because it can keep trying alternate configurations; the demo keeps them visible because it is interactive.
+
+## TODO: Core Connector Heuristics
+
+The following routing-core connector-placement checks should remain TODOs until we decide how much should be hard feasibility versus placement/routing penalties:
+
+- `MIN_DISTANCE_MACHINE_PATINEJO`
+- `MIN_DISTANCE_MACHINE_BIG_PIPE`
+- `MIN_DISTANCE_MACHINE_NORMAL_PIPE`
+- `MIN_DISTANCE_CONECTOR_ALLOWED`
+- `MIN_DISTANCE_CONECTOR_ESPACIO`
+
+Some of these already exist in demo form as softer heuristics: pin projection lengths, machine clearance fields, allowed-boundary distance in Routing-Core Workflow placement, and diameter-specific route clearance. The open question is whether to expose them as warnings, placement penalties, or hard invalidation.
 
 ## Machine Model
 

@@ -37,6 +37,7 @@ SCALE_TO_MM    = 1000.0
 WALL_THICKNESS = 150.0
 GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
+CORE_EPSILON_GRID_MM = 200.0
 SMALL_PIN_STUB_LENGTH = 100.0
 LARGE_PIN_STUB_LENGTH = 250.0
 MACHINE_CLEARANCE = 0.0
@@ -67,6 +68,7 @@ min_piece_factor = MIN_PIECE_FACTOR_DEFAULT
 GRAPH_TYPES = [
     "Regular 200mm Grid",
     "Hannan Grid (numpy)",
+    "Epsilon Grid (core-like numpy)",
 ]
 
 ROUTING_STRATEGIES = [
@@ -405,6 +407,8 @@ walls = []
 wall_polys = []
 routing_region_base = None
 shaft_extraction = None
+shaft_core_entry_specs = []
+shaft_entry_geometry_by_node = {}
 terminals        = {}
 wet_room_names   = []
 machine_cx    = 0.0
@@ -436,7 +440,87 @@ def get_representative_point(poly):
     rep = poly.representative_point()
     return (round(rep.x), round(rep.y))
 
+def _transform_source_xy_to_demo(point_xy, metadata):
+    if not point_xy or metadata is None:
+        return None
+    x = float(point_xy[0])
+    y = float(point_xy[1])
+    frame = metadata.get("routing_frame") or {}
+    rotation_degrees = float(frame.get("rotation_degrees", 0.0) or 0.0)
+    origin = (metadata.get("metadata") or {}).get("source_rotation_origin", [0.0, 0.0])
+    bounds_origin = (metadata.get("metadata") or {}).get("bounds_origin", [0.0, 0.0])
+
+    if abs(rotation_degrees) > 1e-9:
+        theta = math.radians(-rotation_degrees)
+        ox = float(origin[0])
+        oy = float(origin[1])
+        dx = x - ox
+        dy = y - oy
+        x = ox + dx * math.cos(theta) - dy * math.sin(theta)
+        y = oy + dx * math.sin(theta) + dy * math.cos(theta)
+
+    return (
+        round((x - float(bounds_origin[0])) * SCALE_TO_MM),
+        round((y - float(bounds_origin[1])) * SCALE_TO_MM),
+    )
+
+def _build_core_shaft_entry_specs(scenario):
+    metadata = scenario_summary(scenario) if scenario_summary else {"metadata": getattr(scenario, "metadata", {})}
+    raw_meta = metadata.get("metadata") or {}
+    candidates = raw_meta.get("shaft_candidates") or []
+    candidate_idx = raw_meta.get("shaft_candidate_index")
+    if candidate_idx is None or candidate_idx < 0 or candidate_idx >= len(candidates):
+        candidates = [candidate for candidate in candidates if candidate.get("candidate_for_living")]
+    else:
+        candidates = [candidates[candidate_idx]]
+
+    specs = []
+    for candidate in candidates:
+        for routing in candidate.get("routing") or []:
+            centroid = _transform_source_xy_to_demo(routing.get("centroid"), metadata)
+            if centroid is None:
+                continue
+            exit_walls = []
+            for wall in routing.get("exit_walls") or []:
+                if len(wall) < 2:
+                    continue
+                p1 = _transform_source_xy_to_demo(wall[0], metadata)
+                p2 = _transform_source_xy_to_demo(wall[1], metadata)
+                if p1 is not None and p2 is not None:
+                    exit_walls.append((p1, p2))
+            entry_points = routing.get("entry_points") or []
+            if not entry_points and routing.get("entry_point"):
+                entry_points = [routing.get("entry_point")]
+            for entry_raw in entry_points:
+                entry = _transform_source_xy_to_demo(entry_raw, metadata)
+                if entry is None:
+                    continue
+                normal = np.array([entry[0] - centroid[0], entry[1] - centroid[1]], dtype=np.float64)
+                norm = float(np.linalg.norm(normal))
+                if norm < 1e-6:
+                    continue
+                normal /= norm
+                entry_point = Point(float(entry[0]), float(entry[1]))
+                matching_wall = None
+                if exit_walls:
+                    matching_wall = min(
+                        exit_walls,
+                        key=lambda wall: LineString(wall).distance(entry_point),
+                    )
+                    if LineString(matching_wall).distance(entry_point) > CORE_EPSILON_GRID_MM * 0.75:
+                        matching_wall = None
+                specs.append({
+                    "centroid": (float(centroid[0]), float(centroid[1])),
+                    "entry": (float(entry[0]), float(entry[1])),
+                    "normal": (float(normal[0]), float(normal[1])),
+                    "exit_wall": matching_wall,
+                    "id": routing.get("id"),
+                })
+    return specs
+
 def _shaft_entry_geometry_for_node(node_idx, env=None):
+    if node_idx in shaft_entry_geometry_by_node:
+        return shaft_entry_geometry_by_node[node_idx]
     if shaft_extraction is None:
         return None
     env = env or current_env
@@ -483,8 +567,74 @@ def _shaft_entry_geometry_for_node(node_idx, env=None):
     }
 
 def get_shaft_entry_nodes(env, kd=None):
+    global shaft_entry_geometry_by_node
     if shaft_extraction is None or env is None or len(env.nodes) == 0:
         return [], None
+
+    shaft_entry_geometry_by_node = {}
+    if shaft_core_entry_specs:
+        candidates = []
+        for spec_idx, spec in enumerate(shaft_core_entry_specs):
+            entry = np.array(spec["entry"], dtype=np.float64)
+            centroid = np.array(spec["centroid"], dtype=np.float64)
+            normal = np.array(spec["normal"], dtype=np.float64)
+            exit_wall = spec.get("exit_wall")
+            search_indices = range(len(env.nodes))
+            if kd is not None:
+                found = kd.query_ball_point(entry, SHAFT_ENTRY_SEARCH_MM)
+                if found:
+                    search_indices = found
+            for idx in search_indices:
+                p = env.nodes[int(idx)]
+                node = np.array([float(p[0]), float(p[1])], dtype=np.float64)
+                node_pt = Point(float(node[0]), float(node[1]))
+                if shaft_extraction.contains(node_pt):
+                    continue
+                offset = node - entry
+                dist = float(np.linalg.norm(offset))
+                if dist > SHAFT_ENTRY_SEARCH_MM:
+                    continue
+                offset_norm = float(np.linalg.norm(offset))
+                if offset_norm < 1e-6:
+                    align = 1.0
+                else:
+                    align = float(np.dot(offset / offset_norm, normal))
+                if align < -1e-6:
+                    continue
+                orthogonality_error = 1.0 - max(0.0, min(1.0, align))
+                exit_wall_penalty = 0.0
+                if exit_wall is not None:
+                    wall_line = LineString(exit_wall)
+                    exit_wall_penalty = min(CORE_EPSILON_GRID_MM, wall_line.distance(Point(float(entry[0]), float(entry[1]))))
+                shaft_distance = node_pt.distance(shaft_extraction)
+                score = dist + orthogonality_error * GRID_SPACING * 4.0 + shaft_distance * 0.25 + exit_wall_penalty
+                geom = {
+                    "rep": (float(centroid[0]), float(centroid[1])),
+                    "entry": (float(entry[0]), float(entry[1])),
+                    "node": (float(node[0]), float(node[1])),
+                    "distance": dist,
+                    "orthogonality_error": orthogonality_error,
+                    "source": "routing_core",
+                }
+                old = shaft_entry_geometry_by_node.get(int(idx))
+                if old is None or score < old.get("score", float("inf")):
+                    geom["score"] = score
+                    geom["spec_idx"] = spec_idx
+                    shaft_entry_geometry_by_node[int(idx)] = geom
+                candidates.append((score, dist, orthogonality_error, int(idx)))
+
+        if candidates:
+            candidates.sort()
+            chosen = []
+            seen = set()
+            for _, _, _, idx in candidates:
+                if idx in seen:
+                    continue
+                seen.add(idx)
+                chosen.append(idx)
+                if len(chosen) >= SHAFT_ENTRY_MAX_CANDIDATES:
+                    break
+            return chosen, chosen[0]
 
     candidates = []
     for idx, pt in enumerate(env.nodes):
@@ -1236,12 +1386,137 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
         f"in {ms_total:.1f}ms (axes {ms_axes:.1f}, nodes {ms_nodes:.1f}, edges {ms_edges:.1f})"
     )
 
+def _add_epsilon_axis_values(xs, ys, point, epsilon=CORE_EPSILON_GRID_MM):
+    x = round(float(point[0]))
+    y = round(float(point[1]))
+    for dx in (-epsilon, 0.0, epsilon):
+        xs.add(round(x + dx))
+    for dy in (-epsilon, 0.0, epsilon):
+        ys.add(round(y + dy))
+
+def _add_epsilon_geometry_axes(xs, ys, geom, epsilon=CORE_EPSILON_GRID_MM):
+    if geom is None or geom.is_empty:
+        return
+    for poly in _iter_polygons(geom):
+        for x, y in list(poly.exterior.coords)[:-1]:
+            _add_epsilon_axis_values(xs, ys, (x, y), epsilon)
+        for interior in poly.interiors:
+            for x, y in list(interior.coords)[:-1]:
+                _add_epsilon_axis_values(xs, ys, (x, y), epsilon)
+        minx, miny, maxx, maxy = poly.bounds
+        for pt in ((minx, miny), (minx, maxy), (maxx, miny), (maxx, maxy)):
+            _add_epsilon_axis_values(xs, ys, pt, epsilon)
+
+def build_epsilon_grid(machine_pins=None):
+    if routing_region_base is None:
+        return
+    t0 = time.perf_counter()
+    eps = CORE_EPSILON_GRID_MM
+    xs, ys = set(), set()
+    preserve_x, preserve_y = set(), set()
+    required_points = []
+
+    if routing_region_base is not None:
+        _add_epsilon_geometry_axes(xs, ys, routing_region_base, eps)
+        minx, miny, maxx, maxy = routing_region_base.bounds
+        scaffold_xs = np.arange(
+            math.floor(minx / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING,
+            math.ceil(maxx / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING + 1,
+            HANNAN_SCAFFOLD_SPACING,
+        )
+        scaffold_ys = np.arange(
+            math.floor(miny / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING,
+            math.ceil(maxy / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING + 1,
+            HANNAN_SCAFFOLD_SPACING,
+        )
+        xs.update(round(float(x)) for x in scaffold_xs)
+        ys.update(round(float(y)) for y in scaffold_ys)
+
+    for room in rooms:
+        if getattr(room, "has_cover", False):
+            _add_epsilon_geometry_axes(xs, ys, room.polygon, eps)
+
+    for geom in list(columns) + list(shafts) + list(wall_polys):
+        _add_epsilon_geometry_axes(xs, ys, geom, eps)
+
+    def add_required(point):
+        p = (round(float(point[0])), round(float(point[1])))
+        required_points.append(p)
+        _add_epsilon_axis_values(xs, ys, p, eps)
+        _add_point_axes(preserve_x, preserve_y, p)
+
+    for pt in terminals.values():
+        add_required(pt)
+
+    for spec in shaft_core_entry_specs:
+        add_required(spec["entry"])
+        add_required(spec["centroid"])
+        if spec.get("exit_wall"):
+            add_required(spec["exit_wall"][0])
+            add_required(spec["exit_wall"][1])
+
+    if shaft_extraction is not None and not shaft_core_entry_specs:
+        rep_pt = shaft_extraction.representative_point()
+        add_required((rep_pt.x, rep_pt.y))
+
+    if machine_pins:
+        for spec in get_port_access_specs(machine_pins, machine_angle):
+            add_required(spec["access_point"])
+
+    xs = _merge_close_values(xs, threshold=80.0, preserve_values=preserve_x)
+    ys = _merge_close_values(ys, threshold=80.0, preserve_values=preserve_y)
+    t1 = time.perf_counter()
+
+    preg = shapely_prep(_node_routing_region())
+    node_map = {}
+    nodes = []
+    for y in ys:
+        for x in xs:
+            if preg.contains(Point(float(x), float(y))):
+                node_map[(x, y)] = len(nodes)
+                nodes.append((x, y))
+
+    if not nodes:
+        _commit_grid(np.empty((0, 2), dtype=np.float32), [])
+        return
+
+    nodes_arr = np.array(nodes, dtype=np.float32)
+    t2 = time.perf_counter()
+
+    raw_edges = []
+    wall_bounds = [wp.bounds for wp in wall_polys]
+    for y in ys:
+        row = [x for x in xs if (x, y) in node_map]
+        for x1, x2 in zip(row, row[1:]):
+            line = LineString([(float(x1), float(y)), (float(x2), float(y))])
+            if _edge_allowed(line, wall_bounds):
+                raw_edges.append((node_map[(x1, y)], node_map[(x2, y)], float(abs(x2 - x1)), 'E'))
+    for x in xs:
+        col = [y for y in ys if (x, y) in node_map]
+        for y1, y2 in zip(col, col[1:]):
+            line = LineString([(float(x), float(y1)), (float(x), float(y2))])
+            if _edge_allowed(line, wall_bounds):
+                raw_edges.append((node_map[(x, y1)], node_map[(x, y2)], float(abs(y2 - y1)), 'N'))
+
+    raw_edges = _connect_isolated_required_nodes(nodes_arr, raw_edges, required_points, wall_bounds)
+    t3 = time.perf_counter()
+
+    _commit_grid(nodes_arr, raw_edges)
+    ms_total = (time.perf_counter() - t0) * 1000.0
+    print(
+        f"[Epsilon Core-like] eps={eps:.0f} axes={len(xs)}x{len(ys)} nodes={len(nodes_arr)} "
+        f"edges={len(raw_edges)} in {ms_total:.1f}ms "
+        f"(axes {(t1-t0)*1000:.1f}, nodes {(t2-t1)*1000:.1f}, edges {(t3-t2)*1000:.1f})"
+    )
+
 def build_grid(machine_pins=None):
     global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env
     if graph_type_idx == 0:
         build_regular_grid()
-    else:
+    elif graph_type_idx == 1:
         build_hannan_grid(machine_pins=machine_pins, shift_walls=False)
+    else:
+        build_epsilon_grid(machine_pins=machine_pins)
 
 # Machine representation helper
 def get_machine_pins(cx, cy, angle_deg):
@@ -2804,6 +3079,34 @@ def get_solution_score(routes, crossings):
     )
     return score
 
+def get_route_validation_warnings(routes):
+    if not routes:
+        return []
+    warnings = []
+    crossings = count_segment_crossings(routes)
+    if crossings:
+        warnings.append(f"{crossings} crossing(s)")
+    clearance_conflicts = count_segment_clearance_conflicts(routes)
+    if clearance_conflicts:
+        warnings.append(f"{clearance_conflicts} clearance conflict(s)")
+    short_pieces = count_solution_short_pieces(routes)
+    if short_pieces:
+        warnings.append(f"{short_pieces} short piece(s)")
+    if routing_region_base is not None:
+        out_count = 0
+        for name, segs in routes:
+            for p1, p2 in segs:
+                line = LineString([(float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))])
+                if name == "Shaft" and shaft_extraction is not None and line.distance(shaft_extraction) < 1.0:
+                    continue
+                if not line.covered_by(routing_region_base):
+                    out_count += 1
+        if out_count:
+            warnings.append(f"{out_count} segment(s) outside allowed")
+    if shaft_extraction is not None and DWELLING_SOURCE_MODES[dwelling_source_idx] == "Real DB" and not shaft_core_entry_specs:
+        warnings.append("missing core shaft entry metadata")
+    return warnings
+
 # ──────────────────────────────────────────────────────────────────────────
 # TOPOLOGICAL DISTANCE FIELDS AUTO-PLACEMENT ALGORITHMS
 # ──────────────────────────────────────────────────────────────────────────
@@ -3172,7 +3475,7 @@ def solve_ventilation_routing():
     if graph_type_idx == 0:
         update_dynamic_env(machine_poly)
     else:
-        build_hannan_grid(machine_pins=global_pins, shift_walls=False)
+        build_grid(machine_pins=global_pins)
         update_dynamic_env(machine_poly)
 
     pin_node_map = snap_pins_to_graph(global_pins)
@@ -3488,7 +3791,7 @@ def solve_ventilation_routing():
 def generate_synthetic_dwelling():
     global rooms, columns, shafts, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
-    global current_scenario_label, current_scenario_summary
+    global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node
     
     rooms_m = generative_layout.generate_layout(width=15.0, height=11.0, num_rooms=8)
     
@@ -3610,6 +3913,8 @@ def generate_synthetic_dwelling():
     wet_room_names = list(terminals.keys())
     current_scenario_label = "synthetic"
     current_scenario_summary = {}
+    shaft_core_entry_specs = []
+    shaft_entry_geometry_by_node = {}
     _bnd_segs = None
     hannan_static_cache = {}
     build_base_regular_grid()
@@ -3694,6 +3999,7 @@ def _load_real_dwelling():
 def generate_new_dwelling():
     global rooms, columns, shafts, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
+    global shaft_core_entry_specs, shaft_entry_geometry_by_node
 
     if DWELLING_SOURCE_MODES[dwelling_source_idx] == "Random Synthetic":
         generate_synthetic_dwelling()
@@ -3716,6 +4022,8 @@ def generate_new_dwelling():
     doors = []
     walls = _derive_real_walls()
     wall_polys = _build_wall_polys()
+    shaft_core_entry_specs = _build_core_shaft_entry_specs(scenario)
+    shaft_entry_geometry_by_node = {}
 
     machine_cx, machine_cy = _choose_initial_machine_position()
     machine_angle = 0
@@ -4837,6 +5145,14 @@ def main():
             lbl_line = font_small.render(ln, True, COLOR_TEXT)
             screen.blit(lbl_line, (25, y_off))
             y_off += 18
+
+        validation_warnings = get_route_validation_warnings(routes)
+        warn_text = "Warnings: none" if not validation_warnings else "Warnings: " + ", ".join(validation_warnings[:2])
+        if len(validation_warnings) > 2:
+            warn_text += f" +{len(validation_warnings) - 2}"
+        warn_color = COLOR_MUTED if not validation_warnings else (241, 196, 15)
+        lbl_warn = font_small.render(warn_text[:42], True, warn_color)
+        screen.blit(lbl_warn, (25, 815))
             
         lbl_runtime = font_small.render(f"Pathfinder time: {elapsed_ms:.1f} ms", True, COLOR_TEXT)
         screen.blit(lbl_runtime, (25, 850))
