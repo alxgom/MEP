@@ -96,6 +96,7 @@ The main routing weights are:
 | `CROSSING_PENALTY` | `5 * C_BEND` | Added for allowed perpendicular duct crossings. |
 | `CLEARANCE_PENALTY` | `CROSSING_PENALTY` | Added for route-route or machine soft-clearance violations. |
 | `OVERLAP_BLOCK_WEIGHT` | `1e9` | Effective hard block for exact duct overlaps and impossible edges. |
+| `OVERLAP_SCORE_PENALTY` | `50 * C_BEND` | Post-route score penalty for same-axis duct overlaps that still appear in fallback or simultaneous-routing results. |
 | `SHORT_PIECE_SCORE_PENALTY` | `2 * C_BEND` | Post-route score penalty per short physical duct piece. |
 
 The geometry and clearance parameters are:
@@ -139,6 +140,7 @@ score =
     total_length_mm
   + C_BEND * turns
   + CROSSING_PENALTY * crossings
+  + OVERLAP_SCORE_PENALTY * same_axis_overlaps
   + CLEARANCE_PENALTY * clearance_conflicts
   + SHORT_PIECE_SCORE_PENALTY * short_pieces
 ```
@@ -183,12 +185,13 @@ The epsilon grid is an experimental routing-core-inspired alternative. It mirror
 The status card shows warning-only route validation:
 
 - crossings
+- same-axis duct overlaps
 - clearance conflicts
 - short duct pieces
 - segments outside allowed geometry
 - missing routing-core shaft entry metadata
 
-These warnings do not change score, reject a route, or trigger retries. Routing-core rejects some of these cases because it can keep trying alternate configurations; the demo keeps them visible because it is interactive.
+Overlap, clearance, crossing, and short-piece counts contribute to score where listed above, but warnings do not reject a route or trigger retries. Routing-core rejects some of these cases because it can keep trying alternate configurations; the demo keeps them visible because it is interactive.
 
 ## TODO: Core Connector Heuristics
 
@@ -238,16 +241,16 @@ The placement heatmap is independent from the active placement mode. `[V]` displ
 
 ## Route Interaction Model
 
-Sequential routing keeps the super-sink connection model, but applies route interaction weights while each subsequent route is solved:
+Sequential routing keeps the super-sink connection model, but applies one canonical route interaction layer while each subsequent route is solved:
 
 - Same-axis duct overlap is effectively blocked.
 - Perpendicular crossings are allowed but penalized.
 - Near parallel or adjacent segments inside the core-like buffered-radius band are penalized.
 - Actual perpendicular crossings are not counted again as clearance conflicts.
-- Legacy sequential reservations only block exact used graph edges; they no longer block every edge adjacent to a routed path node.
+- The old strict/relaxed sequential reservation pass has been removed; there is no separate `block_nodes` weight mode.
 - Negotiated congestion applies the same overlap, crossing, and buffered-clearance interaction layer to its currently negotiated paths, in addition to present/history congestion weights.
 
-The interaction weights are applied during traversal and are reflected in the final score. Short-piece penalties are post-route score terms only. Static geometry clearance is also applied as an edge field before routing:
+The interaction weights are applied during traversal and are reflected in the final score. If a simultaneous or fallback strategy still produces a same-axis overlap, it is reported and receives `OVERLAP_SCORE_PENALTY`. Short-piece penalties are post-route score terms only. Static geometry clearance is also applied as an edge field before routing:
 
 - Walls/allowed-area exteriors are hard-blocked below `max(ROUTING_WALL_CLEARANCE_MM, buffered duct radius)`.
 - Patinejo/shaft clearance is hard-blocked below `max(PATINEJO_CLEARANCE_MM, buffered duct radius)` for non-shaft ducts. The current value is 200 mm, matching `BUFFER_ALLOWED_PATINEJO = 0.2 m` from the local routing-core config.

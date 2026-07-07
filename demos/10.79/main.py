@@ -58,6 +58,7 @@ C_BEND         = 4000.0  # Turn penalty in mm
 CROSSING_PENALTY = 5 * C_BEND
 CLEARANCE_PENALTY = CROSSING_PENALTY
 OVERLAP_BLOCK_WEIGHT = 1e9
+OVERLAP_SCORE_PENALTY = 50 * C_BEND
 MIN_PIECE_FACTOR_DEFAULT = 1.05
 MIN_PIECE_FACTOR_MIN = 0.50
 MIN_PIECE_FACTOR_MAX = 2.00
@@ -1646,14 +1647,6 @@ def get_outward_vector(pin_name, machine_angle):
     else:
         return DIR_UP if gy > 0 else DIR_DOWN
 
-def block_path_and_node(path, pin_node_idx, accumulated_weights, env, block_nodes=True):
-    if not block_nodes:
-        return
-
-    for i in range(len(path) - 1):
-        e = (min(path[i], path[i+1]), max(path[i], path[i+1]))
-        accumulated_weights[e] = OVERLAP_BLOCK_WEIGHT
-
 def _normalize_axis_segment(p1, p2, eps=1e-7):
     x1, y1 = float(p1[0]), float(p1[1])
     x2, y2 = float(p2[0]), float(p2[1])
@@ -2318,6 +2311,23 @@ def count_segment_clearance_conflicts(routes):
                 conflicts += 1
     return conflicts
 
+def count_segment_overlaps(routes):
+    overlaps = 0
+    all_segs = [
+        (name, _normalize_axis_segment(p1, p2))
+        for name, segs in routes
+        for p1, p2 in segs
+    ]
+    all_segs = [(name, seg) for name, seg in all_segs if seg is not None]
+
+    for i, (name_a, seg_a) in enumerate(all_segs):
+        for name_b, seg_b in all_segs[i + 1:]:
+            if name_a == name_b:
+                continue
+            if _axis_segment_relation(seg_a, seg_b) == "overlap":
+                overlaps += 1
+    return overlaps
+
 def _segment_metric_dir(route_name, idx, p1, p2, eps=1e-7):
     dx = float(p2[0] - p1[0])
     dy = float(p2[1] - p1[1])
@@ -2472,11 +2482,10 @@ def get_selected_pin_names(selected_route_name, routes, global_pins):
                     selected.add(pin_name)
     return selected
 
-def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, block_nodes):
-    accumulated_weights = {}
+def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
+    base_weights = {}
     prior_axis_records = []
     exhaust_node_idx = shaft_path[-1] if shaft_path else None
-    block_path_and_node(shaft_path, exhaust_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
 
     kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
     routes = []
@@ -2513,7 +2522,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
     # 1. Route Kitchen (Fixed position right after Shaft)
     kitchen_start_nodes = get_route_start_nodes("Kitchen")
     if kitchen_start_nodes:
-        current_weights = get_weights_for_route("Kitchen", accumulated_weights)
+        current_weights = get_weights_for_route("Kitchen", base_weights)
         kitchen_path, _, _, kitchen_target = run_super_sink_astar(
             current_env,
             kitchen_start_nodes,
@@ -2537,9 +2546,6 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         prior_axis_records.extend(_route_axis_records("Kitchen", kitchen_segs))
         total_nodes += len(kitchen_path)
         
-        kitchen_pin_node_idx = kitchen_path[-1]
-        block_path_and_node(kitchen_path, kitchen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
-
     # 2. Route small duct rooms in perm order
     available_small_pins = ["tl", "tr", "bl", "br"]
     for room_name in perm:
@@ -2549,7 +2555,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         if not room_start_nodes:
             return False, None, f"No start nodes for {room_name}", 0
         
-        current_weights = get_weights_for_route(room_name, accumulated_weights)
+        current_weights = get_weights_for_route(room_name, base_weights)
         room_path, _, chosen_small_pin, room_target = run_super_sink_astar(
             current_env,
             room_start_nodes,
@@ -2573,8 +2579,6 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         prior_axis_records.extend(_route_axis_records(room_name, room_segs))
         total_nodes += len(room_path)
         
-        chosen_pin_node_idx = room_path[-1]
-        block_path_and_node(room_path, chosen_pin_node_idx, accumulated_weights, current_env, block_nodes=block_nodes)
         available_small_pins.remove(chosen_small_pin)
         
     return True, routes, "Success", total_nodes
@@ -2832,7 +2836,7 @@ def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, ed
 def _run_large_pin_order_candidate(order, assignment, pin_node_map, shaft_start, kitchen_start_spec, initial_edge_weights=None):
     paths = {}
     targets = {}
-    accumulated_weights = (initial_edge_weights or {}).copy()
+    base_weights = (initial_edge_weights or {}).copy()
     prior_axis_records = []
     total_cost = 0.0
 
@@ -2842,7 +2846,7 @@ def _run_large_pin_order_candidate(order, assignment, pin_node_map, shaft_start,
     }
 
     for route_name in order:
-        current_weights = accumulated_weights.copy()
+        current_weights = base_weights.copy()
         add_route_clearance_weights(current_weights, route_name, current_env)
         add_route_interaction_weights(prior_axis_records, get_route_diameter(route_name), current_weights, current_env)
         path, target, cost = _route_one_pin_flow(
@@ -2861,7 +2865,6 @@ def _run_large_pin_order_candidate(order, assignment, pin_node_map, shaft_start,
 
         segs = _route_segments_from_path(route_name, path, target["pin"], None, target)
         prior_axis_records.extend(_route_axis_records(route_name, segs))
-        block_path_and_node(path, path[-1], accumulated_weights, current_env, block_nodes=True)
 
     meta = {
         "assignment": f"Shaft={assignment['Shaft']},Kitchen={assignment['Kitchen']}",
@@ -2918,7 +2921,7 @@ def _run_large_pin_candidate_search(pin_node_map, shaft_boundary_nodes, edge_wei
     return best_paths, best_targets, best_cost, best_flow, best_meta
 
 def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
-    accumulated_weights = {}
+    base_weights = {}
     prior_axis_records = []
     routes = []
 
@@ -2926,12 +2929,11 @@ def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, s
     routes.append(("Shaft", shaft_segs))
     prior_axis_records.extend(_route_axis_records("Shaft", shaft_segs))
     total_nodes = len(shaft_path)
-    block_path_and_node(shaft_path, shaft_path[-1], accumulated_weights, current_env, block_nodes=True)
 
     kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
     kitchen_start_nodes = get_route_start_nodes("Kitchen")
     if kitchen_start_nodes:
-        kitchen_weights = accumulated_weights.copy()
+        kitchen_weights = base_weights.copy()
         add_route_clearance_weights(kitchen_weights, "Kitchen", current_env)
         add_route_interaction_weights(prior_axis_records, get_route_diameter("Kitchen"), kitchen_weights, current_env)
         kitchen_path, _, _, kitchen_target = run_super_sink_astar(
@@ -2953,9 +2955,8 @@ def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, s
     routes.append(("Kitchen", kitchen_segs))
     prior_axis_records.extend(_route_axis_records("Kitchen", kitchen_segs))
     total_nodes += len(kitchen_path)
-    block_path_and_node(kitchen_path, kitchen_path[-1], accumulated_weights, current_env, block_nodes=True)
 
-    small_weights = accumulated_weights.copy()
+    small_weights = base_weights.copy()
     add_static_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
     add_machine_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env)
     add_route_interaction_weights(prior_axis_records, MACHINE_SMALL_DUCT_D, small_weights, current_env)
@@ -2991,14 +2992,11 @@ def _run_two_stage_big_first(room_names, pin_node_map, global_pins, shaft_path):
     if routes is None:
         return False, None, "Could not build large duct routes", 0
 
-    accumulated_weights = {}
     prior_axis_records = []
     for route_name, segs in routes:
         prior_axis_records.extend(_route_axis_records(route_name, segs))
-        path = large_paths[route_name]
-        block_path_and_node(path, path[-1], accumulated_weights, current_env, block_nodes=True)
 
-    small_weights = accumulated_weights.copy()
+    small_weights = {}
     add_static_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
     add_machine_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env)
     add_route_interaction_weights(prior_axis_records, MACHINE_SMALL_DUCT_D, small_weights, current_env)
@@ -3024,13 +3022,10 @@ def _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path
         return False, None, "Could not build small duct routes", 0
 
     prior_axis_records = []
-    accumulated_weights = {}
     for route_name, segs in small_routes:
         prior_axis_records.extend(_route_axis_records(route_name, segs))
-        path = small_paths[route_name]
-        block_path_and_node(path, path[-1], accumulated_weights, current_env, block_nodes=True)
 
-    large_weights = accumulated_weights.copy()
+    large_weights = {}
     add_static_clearance_weights(large_weights, MACHINE_LARGE_DUCT_D, current_env, allow_shaft_entry=False)
     add_machine_clearance_weights(large_weights, MACHINE_LARGE_DUCT_D, current_env)
     add_route_interaction_weights(prior_axis_records, MACHINE_LARGE_DUCT_D, large_weights, current_env)
@@ -3068,12 +3063,14 @@ def get_solution_score(routes, crossings):
     for name, segs in routes:
         total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
     total_turns = count_solution_turns(routes)
+    overlaps = count_segment_overlaps(routes)
     clearance_conflicts = count_segment_clearance_conflicts(routes)
     short_pieces = count_solution_short_pieces(routes)
     score = (
         int(total_len)
         + int(C_BEND) * total_turns
         + int(CROSSING_PENALTY) * crossings
+        + int(OVERLAP_SCORE_PENALTY) * overlaps
         + int(CLEARANCE_PENALTY) * clearance_conflicts
         + int(SHORT_PIECE_SCORE_PENALTY) * short_pieces
     )
@@ -3086,6 +3083,9 @@ def get_route_validation_warnings(routes):
     crossings = count_segment_crossings(routes)
     if crossings:
         warnings.append(f"{crossings} crossing(s)")
+    overlaps = count_segment_overlaps(routes)
+    if overlaps:
+        warnings.append(f"{overlaps} overlap(s)")
     clearance_conflicts = count_segment_clearance_conflicts(routes)
     if clearance_conflicts:
         warnings.append(f"{clearance_conflicts} clearance conflict(s)")
@@ -3106,6 +3106,19 @@ def get_route_validation_warnings(routes):
     if shaft_extraction is not None and DWELLING_SOURCE_MODES[dwelling_source_idx] == "Real DB" and not shaft_core_entry_specs:
         warnings.append("missing core shaft entry metadata")
     return warnings
+
+def get_route_conflict_summary(routes):
+    if not routes:
+        return "no routes"
+    crossings = count_segment_crossings(routes)
+    overlaps = count_segment_overlaps(routes)
+    clearance_conflicts = count_segment_clearance_conflicts(routes)
+    parts = [f"{crossings} crossings"]
+    if overlaps:
+        parts.append(f"{overlaps} overlaps")
+    if clearance_conflicts:
+        parts.append(f"{clearance_conflicts} clearance")
+    return ", ".join(parts)
 
 # ──────────────────────────────────────────────────────────────────────────
 # TOPOLOGICAL DISTANCE FIELDS AUTO-PLACEMENT ALGORITHMS
@@ -3534,8 +3547,7 @@ def solve_ventilation_routing():
         )
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         if success:
-            crossings = count_segment_crossings(routes_cand)
-            status_text = f"Success: Min-cost flow small pins ({crossings} crossings) in {elapsed_ms:.1f}ms"
+            status_text = f"Success: Min-cost flow small pins ({get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
             return routes_cand, status_text, elapsed_ms, total_nodes_cand
         return None, f"Routing Blocked: {status_cand} in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
@@ -3548,8 +3560,7 @@ def solve_ventilation_routing():
         )
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         if success:
-            crossings = count_segment_crossings(routes_cand)
-            status_text = f"Success: Two-stage MCMF {status_cand} ({crossings} crossings) in {elapsed_ms:.1f}ms"
+            status_text = f"Success: Two-stage MCMF {status_cand} ({get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
             return routes_cand, status_text, elapsed_ms, total_nodes_cand
         return None, f"Routing Blocked: {status_cand} in {elapsed_ms:.1f}ms", elapsed_ms, 0
     
@@ -3703,7 +3714,7 @@ def solve_ventilation_routing():
                     
                 if crossings == 0:
                     elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-                    status_text = f"Success: Routed all (tried {perm_attempts} iters, 0 crossings) in {elapsed_ms:.1f}ms"
+                    status_text = f"Success: Routed all (tried {perm_attempts} iters, {get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
                     return routes_cand, status_text, elapsed_ms, total_nodes_cand
                     
                 edge_counts = {}
@@ -3726,60 +3737,31 @@ def solve_ventilation_routing():
                         
         if best_routes is not None:
             elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-            status_text = f"Success: Routed all (tried {perm_attempts} iters, {best_crossings} crossings) in {elapsed_ms:.1f}ms"
+            status_text = f"Success: Routed all (tried {perm_attempts} iters, {get_route_conflict_summary(best_routes)}) in {elapsed_ms:.1f}ms"
             return best_routes, status_text, elapsed_ms, best_total_nodes
         else:
             elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
             return None, f"Routing Blocked (tried {perm_attempts} iters) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
-    # Pass 1: Try collision-free solutions (block_nodes=True)
     for perm in all_perms:
         perm_attempts += 1
         success, routes_cand, status_cand, total_nodes_cand = run_sequential_routing(
-            perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, block_nodes=True
+            perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path
         )
         if success:
             crossings = count_segment_crossings(routes_cand)
             score = get_solution_score(routes_cand, crossings)
-            if crossings == 0:
-                if routing_strategy_idx == 1:
-                    elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-                    status_text = f"Success: Routed all (tried {perm_attempts} perms, 0 crossings) in {elapsed_ms:.1f}ms"
-                    return routes_cand, status_text, elapsed_ms, total_nodes_cand
-                else:
-                    if score < best_score:
-                        best_score = score
-                        best_crossings = crossings
-                        best_routes = routes_cand
-                        best_total_nodes = total_nodes_cand
-            else:
-                if score < best_score:
-                    best_score = score
-                    best_crossings = crossings
-                    best_routes = routes_cand
-                    best_total_nodes = total_nodes_cand
-
-    # Pass 2: Fall back to allowing crossings (block_nodes=False) if no collision-free solution was found
-    if best_routes is None or best_crossings > 0:
-        for perm in all_perms:
-            perm_attempts += 1
-            success, routes_cand, status_cand, total_nodes_cand = run_sequential_routing(
-                perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, block_nodes=False
-            )
-            if success:
-                crossings = count_segment_crossings(routes_cand)
-                score = get_solution_score(routes_cand, crossings)
-                if score < best_score:
-                    best_score = score
-                    best_crossings = crossings
-                    best_routes = routes_cand
-                    best_total_nodes = total_nodes_cand
-                    if crossings == 0 and routing_strategy_idx == 1:
-                        break
+            if score < best_score:
+                best_score = score
+                best_crossings = crossings
+                best_routes = routes_cand
+                best_total_nodes = total_nodes_cand
+            if routing_strategy_idx == 1:
+                break
 
     if best_routes is not None:
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-        status_text = f"Success: Routed all (tried {perm_attempts} perms, {best_crossings} crossings) in {elapsed_ms:.1f}ms"
+        status_text = f"Success: Routed all (tried {perm_attempts} perms, {get_route_conflict_summary(best_routes)}) in {elapsed_ms:.1f}ms"
         return best_routes, status_text, elapsed_ms, best_total_nodes
     else:
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
