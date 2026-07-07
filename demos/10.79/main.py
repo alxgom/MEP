@@ -24,7 +24,7 @@ if DWELLING_EXPORT_ROOT.exists():
     sys.path.append(str(DWELLING_EXPORT_ROOT))
 
 import generative_layout
-from solver import state_expanded_astar, estimate_turns
+from solver import estimate_turns
 
 try:
     from dwelling_export.demo_loader import load_dwelling_scenario, scenario_summary
@@ -59,8 +59,6 @@ MIN_PIECE_FACTOR_DEFAULT = 1.05
 MIN_PIECE_FACTOR_MIN = 0.50
 MIN_PIECE_FACTOR_MAX = 2.00
 SHORT_PIECE_SCORE_PENALTY = 2 * C_BEND
-SHORT_PIECE_ROUTING_PENALTY = 2 * C_BEND
-RUN_LENGTH_BUCKET_MM = 100.0
 min_piece_factor = MIN_PIECE_FACTOR_DEFAULT
 
 # Graph types
@@ -1637,7 +1635,7 @@ def _target_heuristic(env, node_idx, incoming_dir, target_specs, C_bend):
             best = h
     return 0.0 if best == float("inf") else float(best)
 
-def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, route_name=None):
+def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if isinstance(start_node_indices, (int, np.integer)):
         start_node_indices = [start_node_indices]
     if not target_pin_names or not start_node_indices:
@@ -1677,21 +1675,18 @@ def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_n
     search_env = EnvView(search_nodes, search_adj)
     pq = []
     counter = 0
-    min_internal_len = get_min_piece_length(route_name, terminal_segment=False) if route_name else 0.0
-    g_scores = {(super_source_idx, None, 0): 0.0}
-    run_lengths = {(super_source_idx, None, 0): 0.0}
+    g_scores = {(super_source_idx, None): 0.0}
     came_from = {}
     visited = set()
-    heapq.heappush(pq, (0.0, 0.0, counter, super_source_idx, None, 0))
+    heapq.heappush(pq, (0.0, 0.0, counter, super_source_idx, None))
     best_target_state = None
 
     while pq:
-        _, g, _, u, u_dir, run_bucket = heapq.heappop(pq)
-        state = (u, u_dir, run_bucket)
+        _, g, _, u, u_dir = heapq.heappop(pq)
+        state = (u, u_dir)
         if state in visited:
             continue
         visited.add(state)
-        run_len = run_lengths.get(state, 0.0)
         if u == super_sink_idx:
             best_target_state = state
             break
@@ -1702,18 +1697,14 @@ def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_n
             turn_penalty = 0.0
             if u_dir is not None and edge_dir is not None and u_dir != edge_dir:
                 turn_penalty = C_bend
-                turn_penalty += _short_piece_turn_penalty(route_name, run_len, terminal_segment=(v == super_sink_idx))
-            next_run_len = 0.0 if edge_dir is None else (dist if u_dir is None or u_dir != edge_dir else run_len + dist)
-            next_bucket = _run_length_bucket(next_run_len, min_internal_len) if route_name and v < num_nodes else 0
             next_g = g + edge_cost + turn_penalty
-            next_state = (v, edge_dir, next_bucket)
+            next_state = (v, edge_dir)
             if next_g < g_scores.get(next_state, float("inf")):
                 g_scores[next_state] = next_g
-                run_lengths[next_state] = next_run_len
                 came_from[next_state] = state
                 h = 0.0 if v >= num_nodes else _target_heuristic(env, v, edge_dir, target_specs, C_bend)
                 counter += 1
-                heapq.heappush(pq, (next_g + h, next_g, counter, v, edge_dir, next_bucket))
+                heapq.heappush(pq, (next_g + h, next_g, counter, v, edge_dir))
                 
     if best_target_state is None:
         return None, 0.0, None, None
@@ -1737,7 +1728,7 @@ def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_n
     
     return path_without_virtual, _path_physical_length(env, path_without_virtual), chosen_pin_name, chosen_target
 
-def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, greedy=False, route_name=None):
+def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, greedy=False):
     if isinstance(start_node_indices, (int, np.integer)):
         start_node_indices = [start_node_indices]
     if not target_pin_names or not start_node_indices:
@@ -1761,19 +1752,15 @@ def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names,
     g_scores = {}
     came_from = {}
     state_dirs = {}
-    run_lengths = {}
-    min_internal_len = get_min_piece_length(route_name, terminal_segment=False) if route_name else 0.0
 
     for start_node in start_node_indices:
         for v, dist, edge_dir in env.adj.get(int(start_node), []):
             cost = _weighted_edge_cost(edge_weights, int(start_node), int(v), dist)
-            run_bucket = _run_length_bucket(dist, min_internal_len) if route_name else 0
-            state = (int(start_node), int(v), run_bucket)
+            state = (int(start_node), int(v))
             if cost < g_scores.get(state, float("inf")):
                 g_scores[state] = cost
                 state_dir = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, int(start_node), int(v))
                 state_dirs[state] = state_dir
-                run_lengths[state] = float(dist)
                 h = _target_heuristic(env, int(v), state_dir, target_specs, C_bend)
                 priority = h if greedy else cost + h
                 heapq.heappush(pq, (priority, cost, counter, state))
@@ -1792,14 +1779,11 @@ def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names,
             continue
         visited.add(state)
 
-        u, v, _ = state
+        u, v = state
         curr_dir = state_dirs[state]
-        run_len = run_lengths.get(state, 0.0)
 
         for target in targets_by_node.get(v, []):
             final_penalty = C_bend if curr_dir != target["in_dir"] else 0.0
-            if curr_dir != target["in_dir"]:
-                final_penalty += _short_piece_turn_penalty(route_name, run_len, terminal_segment=True)
             final_cost = g + final_penalty
             if final_cost < best_final_cost:
                 best_final_cost = final_cost
@@ -1813,19 +1797,13 @@ def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names,
             if w == u:
                 continue
             edge_cost = _weighted_edge_cost(edge_weights, v, w, dist)
-            turning = curr_dir != next_dir
-            turn_penalty = C_bend if turning else 0.0
-            if turning:
-                turn_penalty += _short_piece_turn_penalty(route_name, run_len, terminal_segment=False)
-            next_run_len = float(dist) if turning else run_len + float(dist)
-            next_bucket = _run_length_bucket(next_run_len, min_internal_len) if route_name else 0
-            next_state = (v, w, next_bucket)
+            turn_penalty = C_bend if curr_dir != next_dir else 0.0
+            next_state = (v, w)
             next_g = g + edge_cost + turn_penalty
             if next_g < g_scores.get(next_state, float("inf")):
                 g_scores[next_state] = next_g
                 came_from[next_state] = state
                 state_dirs[next_state] = next_dir
-                run_lengths[next_state] = next_run_len
                 h = _target_heuristic(env, w, next_dir, target_specs, C_bend)
                 priority = h if greedy else next_g + h
                 heapq.heappush(pq, (priority, next_g, counter, next_state))
@@ -1846,28 +1824,28 @@ def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names,
     path.extend(state[1] for state in states)
     return path, _path_physical_length(env, path), best_target["pin"], best_target
 
-def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, route_name=None):
+def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     return _run_super_sink_line_graph_search(
-        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=False, route_name=route_name
+        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=False
     )
 
-def _run_super_sink_line_graph_gbfs(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, route_name=None):
+def _run_super_sink_line_graph_gbfs(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     return _run_super_sink_line_graph_search(
-        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=True, route_name=route_name
+        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=True
     )
 
-def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, route_name=None):
+def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     record_edge_weight_overlay(edge_weights, env)
     if router_backend_idx == 1:
         return _run_super_sink_line_graph_astar(
-            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, route_name=route_name
+            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
         )
     if router_backend_idx == 2:
         return _run_super_sink_line_graph_gbfs(
-            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, route_name=route_name
+            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
         )
     return _run_super_sink_state_astar(
-        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, route_name=route_name
+        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
     )
 
 def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
@@ -2008,15 +1986,41 @@ def get_min_piece_length(route_name, terminal_segment=False):
     multiplier = 1.0 if terminal_segment else 2.0
     return diameter * multiplier * min_piece_factor
 
-def count_route_short_pieces(route_name, segs):
+def merged_route_piece_lengths(route_name, segs):
     if not segs:
-        return 0
-    count = 0
-    last_idx = len(segs) - 1
+        return []
+    pieces = []
+    current_dir = None
+    current_len = 0.0
     for idx, (p1, p2) in enumerate(segs):
         length = float(np.hypot(float(p2[0]) - float(p1[0]), float(p2[1]) - float(p1[1])))
         if length < 1.0:
             continue
+        seg_dir = _segment_metric_dir(route_name, idx, p1, p2)
+        if seg_dir is None:
+            if current_len > 0.0:
+                pieces.append(current_len)
+            pieces.append(length)
+            current_dir = None
+            current_len = 0.0
+        elif seg_dir == current_dir:
+            current_len += length
+        else:
+            if current_len > 0.0:
+                pieces.append(current_len)
+            current_dir = seg_dir
+            current_len = length
+    if current_len > 0.0:
+        pieces.append(current_len)
+    return pieces
+
+def count_route_short_pieces(route_name, segs):
+    pieces = merged_route_piece_lengths(route_name, segs)
+    if not pieces:
+        return 0
+    count = 0
+    last_idx = len(pieces) - 1
+    for idx, length in enumerate(pieces):
         min_len = get_min_piece_length(route_name, terminal_segment=(idx == 0 or idx == last_idx))
         if length + 1e-7 < min_len:
             count += 1
@@ -2024,16 +2028,6 @@ def count_route_short_pieces(route_name, segs):
 
 def count_solution_short_pieces(routes):
     return sum(count_route_short_pieces(name, segs) for name, segs in routes)
-
-def _run_length_bucket(run_len, min_len):
-    capped = min(float(run_len), float(min_len))
-    return int(round(capped / RUN_LENGTH_BUCKET_MM))
-
-def _short_piece_turn_penalty(route_name, run_len, terminal_segment=False):
-    if not route_name:
-        return 0.0
-    min_len = get_min_piece_length(route_name, terminal_segment=terminal_segment)
-    return SHORT_PIECE_ROUTING_PENALTY if run_len + 1e-7 < min_len else 0.0
 
 def find_route_at_point(routes, world_pt):
     hit = find_route_hit_at_point(routes, world_pt)
@@ -2144,8 +2138,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             if r_name == curr_room:
                 continue
             if t_node_idx in current_env.adj:
-                for nbr, dist, direction in current_env.adj[t_node_idx]:
-                    edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
+                for nbr, _, _ in current_env.adj[t_node_idx]:
                     set_terminal_block_weight(w, t_node_idx, nbr)
         add_route_clearance_weights(w, curr_room, current_env)
         add_route_interaction_weights(prior_axis_records, get_route_diameter(curr_room), w, current_env)
@@ -2164,7 +2157,6 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             machine_angle,
             C_BEND,
             edge_weights=current_weights,
-            route_name="Kitchen",
         )
         if kitchen_path is None:
             return False, None, "No path to Kitchen", 0
@@ -2201,7 +2193,6 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
             machine_angle,
             C_BEND,
             edge_weights=current_weights,
-            route_name=room_name,
         )
         if room_path is None:
             return False, None, f"No path to {room_name}", 0
@@ -2588,7 +2579,6 @@ def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, s
             machine_angle,
             C_BEND,
             edge_weights=kitchen_weights,
-            route_name="Kitchen",
         )
         if kitchen_path is None:
             return False, None, "No path to Kitchen", 0
@@ -3133,8 +3123,7 @@ def solve_ventilation_routing():
         if r_name == "Shaft":
             continue
         if t_node_idx in current_env.adj:
-                for nbr, dist, direction in current_env.adj[t_node_idx]:
-                    edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
+                for nbr, _, _ in current_env.adj[t_node_idx]:
                     set_terminal_block_weight(shaft_weights, t_node_idx, nbr)
     add_route_clearance_weights(shaft_weights, "Shaft", current_env)
 
@@ -3150,7 +3139,6 @@ def solve_ventilation_routing():
         machine_angle,
         C_BEND,
         edge_weights=shaft_weights,
-        route_name="Shaft",
     )
 
     if shaft_path is None:
@@ -3263,8 +3251,7 @@ def solve_ventilation_routing():
                     if r_name == net_name:
                         continue
                     if t_node_idx in current_env.adj:
-                        for nbr, dist, direction in current_env.adj[t_node_idx]:
-                            edge = (min(t_node_idx, nbr), max(t_node_idx, nbr))
+                        for nbr, _, _ in current_env.adj[t_node_idx]:
                             set_terminal_block_weight(current_weights, t_node_idx, nbr)
                             
                 for u in current_env.adj:
@@ -3307,7 +3294,6 @@ def solve_ventilation_routing():
                     machine_angle,
                     C_BEND,
                     edge_weights=current_weights,
-                    route_name=net_name,
                 )
                 
                 if path is not None:

@@ -47,11 +47,14 @@ Routing and display:
 - `M`: toggle the modified-edge-weight overlay.
 - `H`: toggle heatmap scale between linear and logarithmic.
 - `B`: toggle heatmap palette between Turbo and Viridis.
-- On-canvas `+`, `-`, and `1:1` buttons: zoom in, zoom out, and reset the drawing zoom.
+- `F11`: toggle fullscreen.
+- On-canvas `+`, `-`, and `1:1` buttons: zoom in up to 6x, zoom out, and reset the drawing zoom.
+- Hold `Shift` and use the mouse wheel to zoom at the cursor.
 - Hold `Shift` and left-drag, or hold the middle mouse button, to pan the zoomed view.
 - On-canvas `Weights` button: toggle the modified-edge-weight overlay.
 - On-canvas `Ruler` button: turn the pointer into a crosshair; click and hold on the canvas to measure a distance in mm. `Esc` exits ruler mode.
 - Click a duct or room to highlight its route. Other routes keep their width but turn black; unrelated rooms and pins are desaturated. Click empty canvas, or press `Esc` when not in ruler mode, to clear selection.
+- The solver card includes a `Min pieces factor` slider. It recomputes the current route and updates history as the factor changes.
 
 ## Current Solvers
 
@@ -82,6 +85,75 @@ The min-cost-flow strategies from Demo 10.78 remain available:
 
 - Min-Cost Flow (Small Pins): keeps the normal shaft route and kitchen route, then solves only the small duct rooms jointly.
 - Min-Cost Flow (Two-Stage): evaluates big-first and small-first stage orders and keeps the lower final score.
+
+## Heuristics and Constants
+
+The main routing weights are:
+
+| Name | Value | Use |
+| --- | ---: | --- |
+| `C_BEND` | `4000` mm | Added when a route changes direction. |
+| `CROSSING_PENALTY` | `5 * C_BEND` | Added for allowed perpendicular duct crossings. |
+| `CLEARANCE_PENALTY` | `CROSSING_PENALTY` | Added for route-route or machine soft-clearance violations. |
+| `OVERLAP_BLOCK_WEIGHT` | `1e9` | Effective hard block for exact duct overlaps and impossible edges. |
+| `SHORT_PIECE_SCORE_PENALTY` | `2 * C_BEND` | Post-route score penalty per short physical duct piece. |
+
+The geometry and clearance parameters are:
+
+| Name | Value | Use |
+| --- | ---: | --- |
+| `GRID_SPACING` | `200` mm | Regular grid spacing. |
+| `HANNAN_SCAFFOLD_SPACING` | `600` mm | Static Hannan connectivity scaffold. |
+| `WALL_THICKNESS` | `150` mm | Wall display/filter thickness. |
+| `ROUTING_WALL_CLEARANCE_MM` | `100` mm | Minimum node/edge clearance from allowed-area boundaries and walls. |
+| `PATINEJO_CLEARANCE_MM` | `200` mm | Hard clearance from shafts for non-shaft ducts. |
+| `MACHINE_CLEARANCE_SOFT_MARGIN_MM` | `150` mm | Soft-cost band outside machine-body hard clearance. |
+| `DUCT_BUFFER_RATIO` | `1.05` | Core-like radius inflation before clearance tests. |
+
+The machine and connector parameters are:
+
+| Name | Value | Use |
+| --- | ---: | --- |
+| `MACHINE_BODY_W` | `410` mm | Display/collision body width. |
+| `MACHINE_BODY_H` | `460` mm | Display/collision body height. |
+| `MACHINE_OVERALL_W` | `511` mm | Connector envelope width. |
+| `MACHINE_SMALL_DUCT_D` | `90` mm | Bathroom/toilet/washroom duct diameter. |
+| `MACHINE_LARGE_DUCT_D` | `125` mm | Kitchen and shaft duct diameter. |
+| `SMALL_PIN_STUB_LENGTH` | `100` mm | Small duct outside connector projection. |
+| `LARGE_PIN_STUB_LENGTH` | `250` mm | Kitchen/shaft outside connector projection. |
+
+The interactive ranges are:
+
+| Name | Value | Use |
+| --- | ---: | --- |
+| `MIN_PIECE_FACTOR_DEFAULT` | `1.05` | Default short-piece factor matching routing-core local config. |
+| `MIN_PIECE_FACTOR_MIN` | `0.50` | Minimum slider value. |
+| `MIN_PIECE_FACTOR_MAX` | `2.00` | Maximum slider value. |
+| Zoom range | `0.5x` to `6.0x` | Canvas zoom clamp. |
+
+The final cost score is currently:
+
+```text
+score =
+    total_length_mm
+  + C_BEND * turns
+  + CROSSING_PENALTY * crossings
+  + CLEARANCE_PENALTY * clearance_conflicts
+  + SHORT_PIECE_SCORE_PENALTY * short_pieces
+```
+
+## Minimum Duct Pieces
+
+Demo 10.79 reports and scores short duct pieces using the same core-style thresholds:
+
+```text
+terminal segment minimum = diameter * factor
+internal segment minimum = diameter * 2.0 * factor
+```
+
+The default factor is `1.05`, matching `FACTOR_CONDUCTO_MINIMA_LONGITUD` in the local routing-core config. The sidebar slider sweeps this factor from `0.50` to `2.00`.
+
+Short-piece handling is intentionally post-route, matching routing-core's current validation phase. The demo merges consecutive collinear graph edges into physical duct pieces before counting, so the metric is not inflated by grid discretization. The count contributes to `Total Cost Score` and is shown as `Short Pieces` in the KPI card, but it no longer expands A* search state. This keeps First Fit/Best Fit interactive while preserving comparability with routing-core validation.
 
 ## Room Starts
 
@@ -147,7 +219,7 @@ Sequential routing keeps the super-sink connection model, but applies route inte
 - Legacy sequential reservations only block exact used graph edges; they no longer block every edge adjacent to a routed path node.
 - Negotiated congestion applies the same overlap, crossing, and buffered-clearance interaction layer to its currently negotiated paths, in addition to present/history congestion weights.
 
-The interaction weights are applied during traversal and are reflected in the final score. Static geometry clearance is also applied as an edge field before routing:
+The interaction weights are applied during traversal and are reflected in the final score. Short-piece penalties are post-route score terms only. Static geometry clearance is also applied as an edge field before routing:
 
 - Walls/allowed-area exteriors are hard-blocked below `max(ROUTING_WALL_CLEARANCE_MM, buffered duct radius)`.
 - Patinejo/shaft clearance is hard-blocked below `max(PATINEJO_CLEARANCE_MM, buffered duct radius)` for non-shaft ducts. The current value is 200 mm, matching `BUFFER_ALLOWED_PATINEJO = 0.2 m` from the local routing-core config.
