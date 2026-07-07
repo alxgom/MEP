@@ -1693,6 +1693,43 @@ def _route_axis_records(route_name, route_segs):
             records.append((seg, diameter))
     return records
 
+def _merged_axis_segments(route_segs, eps=1e-7):
+    by_line = {}
+    for p1, p2 in route_segs:
+        seg = _normalize_axis_segment(p1, p2, eps=eps)
+        if seg is None:
+            continue
+        x1, y1, x2, y2, axis = seg
+        key = (axis, round(y1 if axis == "H" else x1, 6))
+        interval = (x1, x2) if axis == "H" else (y1, y2)
+        by_line.setdefault(key, []).append(interval)
+
+    merged = []
+    for (axis, coord), intervals in by_line.items():
+        intervals.sort()
+        start, end = intervals[0]
+        for curr_start, curr_end in intervals[1:]:
+            if curr_start <= end + eps:
+                end = max(end, curr_end)
+            else:
+                if axis == "H":
+                    merged.append((start, coord, end, coord, "H"))
+                else:
+                    merged.append((coord, start, coord, end, "V"))
+                start, end = curr_start, curr_end
+        if axis == "H":
+            merged.append((start, coord, end, coord, "H"))
+        else:
+            merged.append((coord, start, coord, end, "V"))
+    return merged
+
+def _merged_route_axis_segments(routes):
+    return [
+        (name, seg)
+        for name, route_segs in routes
+        for seg in _merged_axis_segments(route_segs)
+    ]
+
 def get_route_diameter(route_name):
     return MACHINE_LARGE_DUCT_D if route_name in ("Shaft", "Kitchen") else MACHINE_SMALL_DUCT_D
 
@@ -2262,43 +2299,40 @@ def get_route_start_nodes(route_name):
     return [int(node_idx)]
 
 def count_segment_crossings(routes):
-    crossings = 0
-    all_segs = []
-    for name, segs in routes:
-        for p1, p2 in segs:
-            x1, y1 = min(p1[0], p2[0]), min(p1[1], p2[1])
-            x2, y2 = max(p1[0], p2[0]), max(p1[1], p2[1])
-            all_segs.append((name, (x1, y1, x2, y2)))
-            
+    crossing_points = set()
+    all_segs = _merged_route_axis_segments(routes)
+
     for i in range(len(all_segs)):
-        name1, (ax1, ay1, ax2, ay2) = all_segs[i]
-        is_horiz1 = abs(ay1 - ay2) < 1e-7
-        
+        name1, seg1 = all_segs[i]
+        ax1, ay1, ax2, ay2, axis1 = seg1
+
         for j in range(i + 1, len(all_segs)):
-            name2, (bx1, by1, bx2, by2) = all_segs[j]
+            name2, seg2 = all_segs[j]
             if name1 == name2:
                 continue
-            is_horiz2 = abs(by1 - by2) < 1e-7
-            
-            if is_horiz1 != is_horiz2:
-                if is_horiz1:
-                    if ax1 <= bx1 <= ax2 and by1 <= ay1 <= by2:
-                        crossings += 1
-                else:
-                    if bx1 <= ax1 <= bx2 and ay1 <= by1 <= ay2:
-                        crossings += 1
-            else:
+            bx1, by1, bx2, by2, axis2 = seg2
+            if axis1 == axis2:
                 continue
-    return crossings
+
+            if axis1 == "H":
+                cross_x, cross_y = bx1, ay1
+                in_a = ax1 + 1e-7 < cross_x < ax2 - 1e-7
+                in_b = by1 + 1e-7 < cross_y < by2 - 1e-7
+            else:
+                cross_x, cross_y = ax1, by1
+                in_a = ay1 + 1e-7 < cross_y < ay2 - 1e-7
+                in_b = bx1 + 1e-7 < cross_x < bx2 - 1e-7
+            if in_a and in_b:
+                pair = tuple(sorted((name1, name2)))
+                crossing_points.add((pair, round(cross_x, 6), round(cross_y, 6)))
+    return len(crossing_points)
 
 def count_segment_clearance_conflicts(routes):
     conflicts = 0
     all_segs = [
-        (name, _normalize_axis_segment(p1, p2), get_route_diameter(name))
-        for name, segs in routes
-        for p1, p2 in segs
+        (name, seg, get_route_diameter(name))
+        for name, seg in _merged_route_axis_segments(routes)
     ]
-    all_segs = [(name, seg, diameter) for name, seg, diameter in all_segs if seg is not None]
 
     for i, (name_a, seg_a, diameter_a) in enumerate(all_segs):
         for name_b, seg_b, diameter_b in all_segs[i + 1:]:
@@ -2313,12 +2347,7 @@ def count_segment_clearance_conflicts(routes):
 
 def count_segment_overlaps(routes):
     overlaps = 0
-    all_segs = [
-        (name, _normalize_axis_segment(p1, p2))
-        for name, segs in routes
-        for p1, p2 in segs
-    ]
-    all_segs = [(name, seg) for name, seg in all_segs if seg is not None]
+    all_segs = _merged_route_axis_segments(routes)
 
     for i, (name_a, seg_a) in enumerate(all_segs):
         for name_b, seg_b in all_segs[i + 1:]:
@@ -3756,7 +3785,7 @@ def solve_ventilation_routing():
                 best_crossings = crossings
                 best_routes = routes_cand
                 best_total_nodes = total_nodes_cand
-            if routing_strategy_idx == 1:
+            if routing_strategy_idx == 1 and crossings == 0:
                 break
 
     if best_routes is not None:
