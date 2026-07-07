@@ -1730,6 +1730,26 @@ def _merged_route_axis_segments(routes):
         for seg in _merged_axis_segments(route_segs)
     ]
 
+def _metric_route_segments(routes):
+    segments = [
+        (name, ((seg[0], seg[1]), (seg[2], seg[3])))
+        for name, seg in _merged_route_axis_segments(routes)
+    ]
+    for name, route_segs in routes:
+        for p1, p2 in route_segs:
+            if _normalize_axis_segment(p1, p2) is not None:
+                continue
+            if math.hypot(float(p2[0]) - float(p1[0]), float(p2[1]) - float(p1[1])) < 1e-7:
+                continue
+            segments.append((name, ((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1])))))
+    return segments
+
+def _point_is_segment_endpoint(pt, seg, eps=1e-7):
+    return (
+        math.hypot(pt[0] - seg[0][0], pt[1] - seg[0][1]) < eps
+        or math.hypot(pt[0] - seg[1][0], pt[1] - seg[1][1]) < eps
+    )
+
 def get_route_diameter(route_name):
     return MACHINE_LARGE_DUCT_D if route_name in ("Shaft", "Kitchen") else MACHINE_SMALL_DUCT_D
 
@@ -2300,31 +2320,25 @@ def get_route_start_nodes(route_name):
 
 def count_segment_crossings(routes):
     crossing_points = set()
-    all_segs = _merged_route_axis_segments(routes)
+    all_segs = _metric_route_segments(routes)
 
     for i in range(len(all_segs)):
         name1, seg1 = all_segs[i]
-        ax1, ay1, ax2, ay2, axis1 = seg1
+        line1 = LineString(seg1)
 
         for j in range(i + 1, len(all_segs)):
             name2, seg2 = all_segs[j]
             if name1 == name2:
                 continue
-            bx1, by1, bx2, by2, axis2 = seg2
-            if axis1 == axis2:
+            line2 = LineString(seg2)
+            inter = line1.intersection(line2)
+            if inter.is_empty or not isinstance(inter, Point):
                 continue
-
-            if axis1 == "H":
-                cross_x, cross_y = bx1, ay1
-                in_a = ax1 + 1e-7 < cross_x < ax2 - 1e-7
-                in_b = by1 + 1e-7 < cross_y < by2 - 1e-7
-            else:
-                cross_x, cross_y = ax1, by1
-                in_a = ay1 + 1e-7 < cross_y < ay2 - 1e-7
-                in_b = bx1 + 1e-7 < cross_x < bx2 - 1e-7
-            if in_a and in_b:
-                pair = tuple(sorted((name1, name2)))
-                crossing_points.add((pair, round(cross_x, 6), round(cross_y, 6)))
+            pt = (float(inter.x), float(inter.y))
+            if _point_is_segment_endpoint(pt, seg1) and _point_is_segment_endpoint(pt, seg2):
+                continue
+            pair = tuple(sorted((name1, name2)))
+            crossing_points.add((pair, round(pt[0], 6), round(pt[1], 6)))
     return len(crossing_points)
 
 def count_segment_clearance_conflicts(routes):
