@@ -135,9 +135,15 @@ DUCT_BUFFER_RATIO = 1.05
 ROUTING_WALL_CLEARANCE_MM = 100
 TERMINAL_REGULATION_CLEARANCE_MM = ROUTING_WALL_CLEARANCE_MM
 BUFFER_ROOM_TERMINALES_AIRE_MM = 150
-CLIMA_GRILLE_WIDTH_MM = 300
+CLIMA_GRILLE_IMPULSION_WIDTH_MM = 1000
+CLIMA_GRILLE_RETURN_WIDTH_MM = 1050
 CLIMA_GRILLE_MIN_WALL_LENGTH_MM = 500
-CLIMA_GRILLE_MIN_SEPARATION_MM = 450
+CLIMA_GRILLE_MIN_WALL_DISTANCE_MM = 50
+CLIMA_GRILLE_MIN_BETWEEN_MM = 0
+CLIMA_GRILLE_MAX_OVERLAP_MM = 0
+CLIMA_GRILLE_MAX_OFFSET_MM = 400
+CLIMA_GRILLE_BUFFER_ALLOWED_MM = 300
+CLIMA_GRILLE_MIN_FALSE_CEILING_AREA_MM2 = 500000
 PATINEJO_CLEARANCE_MM = 200
 SHAFT_ENTRY_SEARCH_MM = 700
 SHAFT_ENTRY_MAX_CANDIDATES = 16
@@ -840,6 +846,16 @@ def _point_allowed_for_terminal(room, pt):
         return False
     return True
 
+def _point_allowed_for_grille(room, pt):
+    point = Point(float(pt[0]), float(pt[1]))
+    if not (room.polygon.contains(point) or room.polygon.distance(point) < 1e-7):
+        return False
+    if routing_region_base is not None:
+        allowed = routing_region_base.buffer(CLIMA_GRILLE_BUFFER_ALLOWED_MM, cap_style=2, join_style=3)
+        if not (allowed.contains(point) or allowed.distance(point) < 1e-7):
+            return False
+    return True
+
 def _route_base_room_name(route_name):
     for suffix in (" Supply", " Return"):
         if route_name.endswith(suffix):
@@ -866,50 +882,222 @@ def _segment_unit_and_normal(p0, p1, room_poly):
             return unit, normal, length
     return unit, normals[0], length
 
-def _grille_candidate_points_for_segment(room, p0, p1, segment_idx):
+def _line_candidate_from_segment(room, p0, p1, segment_idx, distance_along, grille_width, role):
     unit, normal, length = _segment_unit_and_normal(p0, p1, room.polygon)
-    min_span = CLIMA_GRILLE_WIDTH_MM + 2 * TERMINAL_REGULATION_CLEARANCE_MM
-    if unit is None or length < max(CLIMA_GRILLE_MIN_WALL_LENGTH_MM, min_span):
-        return []
-
+    if unit is None or length <= 1e-7:
+        return None
     p0 = np.array(p0, dtype=np.float64)
-    p1 = np.array(p1, dtype=np.float64)
-    inward_offset = max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM)
-    edge_margin = TERMINAL_REGULATION_CLEARANCE_MM + CLIMA_GRILLE_WIDTH_MM / 2.0
-    distances = [length / 2.0]
-    if length >= CLIMA_GRILLE_WIDTH_MM * 3.0:
-        distances.extend([edge_margin, length - edge_margin])
+    pt = p0 + unit * float(distance_along)
+    rounded = (round(float(pt[0])), round(float(pt[1])))
+    if not _point_allowed_for_grille(room, rounded):
+        return None
+    return {
+        "point": rounded,
+        "role": role,
+        "segment_idx": segment_idx,
+        "segment": (tuple(map(float, p0)), tuple(map(float, np.array(p1, dtype=np.float64)))),
+        "segment_length": length,
+        "distance_along": float(distance_along),
+        "width": float(grille_width),
+    }
 
-    candidates = []
-    seen = set()
-    for dist in distances:
-        if dist < edge_margin - 1e-7 or dist > length - edge_margin + 1e-7:
+def _simplified_polygon_boundary_lines(poly):
+    coords = list(poly.exterior.coords)
+    if len(coords) <= 4:
+        simplified = coords
+    else:
+        simplified = [coords[0]]
+        for i in range(1, len(coords) - 1):
+            p0 = np.array(simplified[-1], dtype=np.float64)
+            p1 = np.array(coords[i], dtype=np.float64)
+            p2 = np.array(coords[i + 1], dtype=np.float64)
+            v1 = p1 - p0
+            v2 = p2 - p1
+            if np.linalg.norm(v1) < 20.0 or np.linalg.norm(v2) < 20.0:
+                continue
+            cross = abs(float(v1[0] * v2[1] - v1[1] * v2[0]))
+            denom = max(float(np.linalg.norm(v1) * np.linalg.norm(v2)), 1.0)
+            if cross / denom < math.sin(0.3):
+                continue
+            simplified.append(coords[i])
+        simplified.append(simplified[0])
+    return [
+        LineString([p0, p1])
+        for p0, p1 in zip(simplified[:-1], simplified[1:])
+        if LineString([p0, p1]).length > 1e-7
+    ]
+
+def _single_linestrings(geom):
+    if geom is None or geom.is_empty:
+        return []
+    if isinstance(geom, LineString):
+        return [geom]
+    if isinstance(geom, MultiLineString):
+        return [line for line in geom.geoms if isinstance(line, LineString) and not line.is_empty]
+    if hasattr(geom, "geoms"):
+        return [
+            line
+            for part in geom.geoms
+            for line in _single_linestrings(part)
+        ]
+    return []
+
+def _core_like_segments_room_allowed(room_polygon, allowed, minimal_length):
+    if allowed is None or allowed.is_empty or room_polygon.is_empty:
+        return []
+    result = []
+    for line in _simplified_polygon_boundary_lines(room_polygon):
+        if line.length < minimal_length:
             continue
-        base = p0 + unit * dist
-        pt = base + normal * inward_offset
-        rounded = (round(float(pt[0])), round(float(pt[1])))
-        if rounded in seen or not _point_allowed_for_terminal(room, rounded):
-            continue
-        seen.add(rounded)
-        center_bias = abs(dist - length / 2.0) / max(length / 2.0, 1.0)
-        candidates.append({
-            "point": rounded,
-            "segment_idx": segment_idx,
-            "segment_length": length,
-            "distance_along": float(dist),
-            "score": float(length - center_bias * 200.0),
-        })
-    return candidates
+        distance = float(allowed.distance(line))
+        factor = 300.0 if math.isclose(distance, 0.0, abs_tol=100.0) else min(distance * 1.2, 300.0)
+        subgeom = allowed.buffer(factor, cap_style=2, join_style=3).intersection(line)
+        for subline in _single_linestrings(subgeom):
+            if subline.length < minimal_length:
+                continue
+            coords = list(subline.coords)
+            result.append({
+                "p0": tuple(map(float, coords[0])),
+                "p1": tuple(map(float, coords[-1])),
+                "length": float(subline.length),
+            })
+    return result
+
+def _segment_candidate_at_center(room, segment, segment_idx, grille_width, role):
+    return _line_candidate_from_segment(
+        room,
+        segment["p0"],
+        segment["p1"],
+        segment_idx,
+        segment["length"] / 2.0,
+        grille_width,
+        role,
+    )
+
+def _segment_candidate_at_start(room, segment, segment_idx, grille_width, role):
+    dist = CLIMA_GRILLE_MIN_WALL_DISTANCE_MM + grille_width / 2.0
+    return _line_candidate_from_segment(room, segment["p0"], segment["p1"], segment_idx, dist, grille_width, role)
+
+def _segment_candidate_at_end(room, segment, segment_idx, grille_width, role):
+    dist = segment["length"] - (CLIMA_GRILLE_MIN_WALL_DISTANCE_MM + grille_width / 2.0)
+    return _line_candidate_from_segment(room, segment["p0"], segment["p1"], segment_idx, dist, grille_width, role)
+
+def _grille_overlap_on_same_segment(a, b):
+    if a["segment_idx"] != b["segment_idx"]:
+        return 0.0
+    span_a = (a["distance_along"] - a["width"] / 2.0, a["distance_along"] + a["width"] / 2.0)
+    span_b = (b["distance_along"] - b["width"] / 2.0, b["distance_along"] + b["width"] / 2.0)
+    return max(0.0, min(span_a[1], span_b[1]) - max(span_a[0], span_b[0]))
+
+def _valid_grille_pair(supply, ret):
+    if supply is None or ret is None:
+        return False
+    overlap = _grille_overlap_on_same_segment(supply, ret)
+    if overlap > CLIMA_GRILLE_MAX_OVERLAP_MM:
+        return False
+    if supply["segment_idx"] == ret["segment_idx"]:
+        center_gap = abs(supply["distance_along"] - ret["distance_along"])
+        min_gap = (supply["width"] + ret["width"]) / 2.0 + CLIMA_GRILLE_MIN_BETWEEN_MM
+        if center_gap + CLIMA_GRILLE_MAX_OVERLAP_MM < min_gap:
+            return False
+    return True
+
+def _same_wall_options(room, segment, segment_idx):
+    supply_start = _segment_candidate_at_start(room, segment, segment_idx, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+    return_end = _segment_candidate_at_end(room, segment, segment_idx, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
+    options = []
+    if _valid_grille_pair(supply_start, return_end):
+        options.append({"type": "common_wall", "supply": supply_start, "return": return_end})
+    return_start = _segment_candidate_at_start(room, segment, segment_idx, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
+    supply_end = _segment_candidate_at_end(room, segment, segment_idx, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+    if _valid_grille_pair(supply_end, return_start):
+        options.append({"type": "common_wall_alt", "supply": supply_end, "return": return_start})
+    return options
+
+def _two_wall_options(room, segments):
+    options = []
+    for i, segment in enumerate(segments):
+        supply = _segment_candidate_at_center(room, segment, i, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+        for j, other in enumerate(segments[i + 1:], start=i + 1):
+            ret = _segment_candidate_at_center(room, other, j, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
+            if _valid_grille_pair(supply, ret):
+                options.append({"type": "different_walls", "supply": supply, "return": ret})
+            supply_b = _segment_candidate_at_center(room, other, j, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+            ret_b = _segment_candidate_at_center(room, segment, i, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
+            if _valid_grille_pair(supply_b, ret_b):
+                options.append({"type": "different_walls_alt", "supply": supply_b, "return": ret_b})
+    return options
 
 def _clima_grille_candidates_for_room(room):
-    if not hasattr(room.polygon, "exterior"):
-        return []
-    coords = list(room.polygon.exterior.coords)
+    options = _clima_grille_options_for_room(room)
     candidates = []
-    for idx, (p0, p1) in enumerate(zip(coords, coords[1:])):
-        candidates.extend(_grille_candidate_points_for_segment(room, p0, p1, idx))
-    candidates.sort(key=lambda item: item["score"], reverse=True)
+    seen = set()
+    for option_idx, option in enumerate(options):
+        for role in ("supply", "return"):
+            candidate = dict(option[role])
+            key = (candidate["point"], candidate["role"])
+            if key in seen:
+                continue
+            seen.add(key)
+            candidate["option_idx"] = option_idx
+            candidate["option_type"] = option["type"]
+            candidates.append(candidate)
     return candidates
+
+def _largest_polygon(geom):
+    if geom is None or geom.is_empty:
+        return None
+    if isinstance(geom, Polygon):
+        return geom
+    if hasattr(geom, "geoms"):
+        polygons = [part for part in geom.geoms if isinstance(part, Polygon) and not part.is_empty]
+        if polygons:
+            return max(polygons, key=lambda part: part.area)
+    return None
+
+def _horizontal_return_candidate(room, allowed_part):
+    if allowed_part is None or allowed_part.is_empty:
+        return None
+    pt = get_representative_point(allowed_part)
+    return {
+        "point": pt,
+        "role": "Return",
+        "segment_idx": -1,
+        "segment": None,
+        "segment_length": 0.0,
+        "distance_along": 0.0,
+        "width": float(CLIMA_GRILLE_RETURN_WIDTH_MM),
+    }
+
+def _clima_grille_options_for_room(room):
+    if routing_region_base is None or routing_region_base.is_empty:
+        allowed = room.polygon
+    else:
+        allowed = routing_region_base
+    false_ceiling = _largest_polygon(room.polygon.intersection(allowed))
+    has_false_ceiling = false_ceiling is not None and false_ceiling.area >= CLIMA_GRILLE_MIN_FALSE_CEILING_AREA_MM2
+
+    if has_false_ceiling:
+        room_without_allowed = _largest_polygon(room.polygon.difference(allowed))
+        if room_without_allowed is not None:
+            min_len = CLIMA_GRILLE_IMPULSION_WIDTH_MM + 2 * CLIMA_GRILLE_MIN_WALL_DISTANCE_MM
+            segments = _core_like_segments_room_allowed(room_without_allowed, allowed, min_len)
+            ret = _horizontal_return_candidate(room, false_ceiling)
+            options = []
+            for idx, segment in enumerate(segments):
+                supply = _segment_candidate_at_center(room, segment, idx, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+                if _valid_grille_pair(supply, ret):
+                    options.append({"type": "return_horizontal", "supply": supply, "return": ret})
+            if options:
+                return options
+
+    min_len = CLIMA_GRILLE_MIN_WALL_LENGTH_MM
+    segments = _core_like_segments_room_allowed(room.polygon, allowed, min_len)
+    options = []
+    for idx, segment in enumerate(segments):
+        options.extend(_same_wall_options(room, segment, idx))
+    options.extend(_two_wall_options(room, segments))
+    return options
 
 def _fallback_terminal_points(room):
     allowed = _room_allowed_region(room)
@@ -929,25 +1117,8 @@ def _fallback_terminal_points(room):
         points.append(rounded if _point_allowed_for_terminal(room, rounded) else base)
     return points[0], points[1]
 
-def _select_clima_grille_pair(room, candidates):
-    if len(candidates) < 2:
-        return None
-    best = None
-    for i, a in enumerate(candidates):
-        for b in candidates[i + 1:]:
-            pa = np.array(a["point"], dtype=np.float64)
-            pb = np.array(b["point"], dtype=np.float64)
-            sep = float(np.hypot(*(pa - pb)))
-            if sep < CLIMA_GRILLE_MIN_SEPARATION_MM:
-                continue
-            different_wall_bonus = 350.0 if a["segment_idx"] != b["segment_idx"] else 0.0
-            score = sep + different_wall_bonus + 0.1 * (a["segment_length"] + b["segment_length"])
-            if best is None or score > best[0]:
-                best = (score, a, b)
-    if best is None:
-        return None
-    _, supply, ret = best
-    return supply, ret
+def _select_clima_grille_option(options):
+    return options[0] if options else None
 
 def build_clima_terminals_from_rooms():
     global terminal_candidate_options
@@ -974,14 +1145,15 @@ def build_clima_terminals_from_rooms():
         counts[base_name] = counts.get(base_name, 0) + 1
         room_name = base_name if counts[base_name] == 1 else f"{base_name} {counts[base_name]}"
         room.name = room_name
+        grille_options = _clima_grille_options_for_room(room)
         grille_candidates = _clima_grille_candidates_for_room(room)
         terminal_candidate_options[room_name] = grille_candidates
-        pair = _select_clima_grille_pair(room, grille_candidates)
-        if pair is None:
+        option = _select_clima_grille_option(grille_options)
+        if option is None:
             supply_pt, return_pt = _fallback_terminal_points(room)
         else:
-            supply_pt = pair[0]["point"]
-            return_pt = pair[1]["point"]
+            supply_pt = option["supply"]["point"]
+            return_pt = option["return"]["point"]
         result[f"{room_name} Supply"] = supply_pt
         result[f"{room_name} Return"] = return_pt
     return result
