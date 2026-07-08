@@ -113,6 +113,13 @@ AUTO_PLACEMENT_MODES = [
     "Routing-Core Workflow"
 ]
 auto_placement_mode_idx = 2
+ROTATION_MODES = [
+    "Torque",
+    "Field",
+]
+rotation_mode_idx = 0
+ROTATION_FIELD_EPS = 1e-6
+rotation_field_scores = {"H": 0.0, "V": 0.0, "selected": None}
 show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
@@ -4005,6 +4012,128 @@ def _core_like_machine_candidate_score(cx, cy, angle, room):
         distance_to_targets,
     )
 
+def _room_field_target_point(room_name):
+    room_poly = get_route_room_polygon(room_name)
+    if room_poly is None or room_poly.is_empty:
+        return terminals.get(room_name)
+    centroid = room_poly.centroid
+    if room_poly.contains(centroid):
+        return (float(centroid.x), float(centroid.y))
+    return get_representative_point(room_poly)
+
+def _rotation_field_rooms_for_pin(pin_name):
+    if pin_name in ("left_mid", "right_mid"):
+        return [name for name in ("Shaft", "Kitchen") if name in terminals or name == "Shaft"]
+    return [name for name in wet_room_names if name not in ("Shaft", "Kitchen")]
+
+def _rotation_room_weight(room_name):
+    if weight_mode_idx == 1:
+        return 1.0
+    if room_name == "Shaft":
+        return 2.0
+    if room_name == "Kitchen":
+        return 1.5
+    return 1.0
+
+def _field_alignment_pin_dirs(pin_name, angle):
+    local_dirs = {
+        "left_mid": [(-1.0, 0.0)],
+        "right_mid": [(1.0, 0.0)],
+        "tl": [(-1.0, 0.0), (0.0, 1.0)],
+        "tr": [(1.0, 0.0), (0.0, 1.0)],
+        "bl": [(-1.0, 0.0), (0.0, -1.0)],
+        "br": [(1.0, 0.0), (0.0, -1.0)],
+    }.get(pin_name, [])
+    return [_local_axis_to_world(local_dir, angle) for local_dir in local_dirs]
+
+def _score_rotation_field_at(cx, cy, angle):
+    pins = get_machine_pins(cx, cy, angle)
+    total_score = 0.0
+    for pin_name in ("left_mid", "right_mid", "tl", "tr", "bl", "br"):
+        pin_pt = pins[pin_name]
+        fx = 0.0
+        fy = 0.0
+        for room_name in _rotation_field_rooms_for_pin(pin_name):
+            if room_name == "Shaft":
+                if not shaft_extraction:
+                    continue
+                target = get_representative_point(shaft_extraction)
+            else:
+                target = _room_field_target_point(room_name)
+            if target is None:
+                continue
+            dx = float(target[0]) - float(pin_pt[0])
+            dy = float(target[1]) - float(pin_pt[1])
+            dist = math.hypot(dx, dy)
+            if dist <= 1e-7:
+                continue
+            # Inverse-distance falloff keeps nearby rooms influential without
+            # making far rooms numerically disappear in large apartments.
+            w = _rotation_room_weight(room_name) / max(250.0, dist)
+            fx += w * dx / dist
+            fy += w * dy / dist
+        field_mag = math.hypot(fx, fy)
+        if field_mag <= 1e-12:
+            continue
+        field_x = fx / field_mag
+        field_y = fy / field_mag
+        best_pin_alignment = 0.0
+        for dir_x, dir_y in _field_alignment_pin_dirs(pin_name, angle):
+            best_pin_alignment = max(best_pin_alignment, dir_x * field_x + dir_y * field_y)
+        total_score += max(0.0, best_pin_alignment) * field_mag
+    return total_score
+
+def apply_field_alignment_rotation():
+    global machine_angle, rotation_field_scores
+    current_class = "H" if int(machine_angle) % 180 == 0 else "V"
+    candidate_angles = {
+        "H": [int(machine_angle)] if current_class == "H" else [],
+        "V": [int(machine_angle)] if current_class == "V" else [],
+    }
+    candidate_angles["H"].extend([0, 180])
+    candidate_angles["V"].extend([90, 270])
+    scores = {}
+    selected_angles = {}
+    for orient, angles in candidate_angles.items():
+        best_score = None
+        best_angle = None
+        seen = set()
+        for angle in angles:
+            angle = int(angle) % 360
+            if angle in seen:
+                continue
+            seen.add(angle)
+            if not is_machine_placement_valid(machine_cx, machine_cy, angle):
+                continue
+            score = _score_rotation_field_at(machine_cx, machine_cy, angle)
+            if best_score is None or score > best_score:
+                best_score = score
+                best_angle = angle
+        scores[orient] = float(best_score) if best_score is not None else float("-inf")
+        selected_angles[orient] = best_angle
+    best_orient = max(scores, key=lambda key: scores[key])
+    selected = current_class
+    current_score = scores.get(current_class, float("-inf"))
+    if selected_angles.get(best_orient) is not None and scores[best_orient] > current_score + ROTATION_FIELD_EPS:
+        selected = best_orient
+        machine_angle = selected_angles[best_orient]
+    rotation_field_scores = {
+        "H": 0.0 if not math.isfinite(scores.get("H", 0.0)) else float(scores.get("H", 0.0)),
+        "V": 0.0 if not math.isfinite(scores.get("V", 0.0)) else float(scores.get("V", 0.0)),
+        "selected": selected,
+    }
+    return selected, scores
+
+def apply_rotation_mode_once():
+    if rotation_mode_idx != 1:
+        rotation_field_scores.update({"H": 0.0, "V": 0.0, "selected": "Torque"})
+        return
+    before = machine_angle
+    apply_field_alignment_rotation()
+    if machine_angle != before:
+        pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+        build_grid(machine_pins=pins)
+
 def run_core_workflow_machine_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
     t0 = time.perf_counter()
@@ -5018,6 +5147,7 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
         "routing_strategy_idx": routing_strategy_idx,
         "router_backend_idx": router_backend_idx,
         "heuristic_mode_idx": heuristic_mode_idx,
+        "rotation_mode_idx": rotation_mode_idx,
         "room_start_mode_idx": room_start_mode_idx,
         "weight_mode_idx": weight_mode_idx,
         "edge_weight_view_mode_idx": edge_weight_view_mode_idx,
@@ -5101,6 +5231,7 @@ def update_auto_best_logs(routes, status, elapsed_ms, total_nodes):
 def restore_solution_log(log_entry):
     global machine_cx, machine_cy, machine_angle
     global graph_type_idx, routing_strategy_idx, router_backend_idx, heuristic_mode_idx, room_start_mode_idx
+    global rotation_mode_idx
     global weight_mode_idx, edge_weight_view_mode_idx, route_real_diameter_width_enabled, min_piece_factor
     global C_BEND, crossing_penalty_multiplier
     global preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id
@@ -5110,6 +5241,7 @@ def restore_solution_log(log_entry):
     routing_strategy_idx = log_entry["routing_strategy_idx"]
     router_backend_idx = log_entry["router_backend_idx"]
     heuristic_mode_idx = log_entry["heuristic_mode_idx"]
+    rotation_mode_idx = log_entry.get("rotation_mode_idx", 0)
     room_start_mode_idx = log_entry["room_start_mode_idx"]
     weight_mode_idx = log_entry["weight_mode_idx"]
     edge_weight_view_mode_idx = log_entry["edge_weight_view_mode_idx"]
@@ -5325,6 +5457,7 @@ HELP_TEXT = {
     "auto": [
         "[A] Auto-placement on/off",
         "[P] Cycle placement mode",
+        "[U] Rotation mode",
         "[V] Placement heatmap",
         "[H] Heatmap scale",
         "[B] Heatmap palette",
@@ -5349,6 +5482,7 @@ HELP_TEXT = {
     "machine": [
         "Drag machine with mouse",
         "Wheel: rotate machine",
+        "[U] Torque/field rotation",
         "Shift+wheel: zoom",
         "Shift+drag or middle drag: pan",
         "[D] Dwelling source",
@@ -5422,6 +5556,7 @@ def main():
     global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
     global real_scenario_idx, routing_frame_idx, dwelling_source_idx, room_start_mode_idx
     global edge_weight_heatmap_enabled, edge_weight_view_mode_idx, route_real_diameter_width_enabled
+    global rotation_mode_idx
     global view_pan_x_px, view_pan_y_px
     global zoom_level
     global help_popup_card
@@ -5874,6 +6009,15 @@ def main():
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
                     routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+
+                elif event.key == pygame.K_u:
+                    rotation_mode_idx = (rotation_mode_idx + 1) % len(ROTATION_MODES)
+                    apply_rotation_mode_once()
+                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    if routes and not status.startswith("Blocked"):
+                        crossings_c = count_segment_crossings(routes)
+                        record_history(routes, crossings_c, elapsed_ms)
+                        hist_event_markers.append((hist_sample_count - 1, f"RotMode:{rotation_mode_idx}", (95, 178, 218)))
                     
                 elif event.key == pygame.K_v:
                     show_heatmap = not show_heatmap
@@ -6146,6 +6290,9 @@ def main():
         w_text = "Default" if weight_mode_idx == 0 else "Equal (1.0)"
         lbl_ap_weights = font_small.render(f"[W] Placement Weights: {w_text}", True, COLOR_MUTED)
         screen.blit(lbl_ap_weights, (25, 180))
+        rot_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
+        lbl_ap_rot = font_small.render(f"[U] Rotation: {rot_mode_short}", True, COLOR_MUTED)
+        screen.blit(lbl_ap_rot, (25, 195))
         
         # 2. Solver Config Card
         solver_card = pygame.Rect(15, 220, CANVAS_LEFT - 40, 250)
@@ -6192,7 +6339,15 @@ def main():
         screen.blit(lbl_frame, (25, 530))
         lbl_coord = font_small.render(f"Position: ({int(machine_cx)}, {int(machine_cy)}) mm", True, COLOR_TEXT)
         screen.blit(lbl_coord, (25, 550))
-        lbl_rot = font_small.render(f"Rotation: {machine_angle}°", True, COLOR_TEXT)
+        rot_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
+        if rotation_mode_idx == 1:
+            h_score = rotation_field_scores.get("H", 0.0)
+            v_score = rotation_field_scores.get("V", 0.0)
+            selected = rotation_field_scores.get("selected") or "-"
+            rot_text = f"Rot: {machine_angle}° {rot_mode_short} {selected} H{h_score:.3f}/V{v_score:.3f}"
+        else:
+            rot_text = f"Rotation: {machine_angle}° / {rot_mode_short}"
+        lbl_rot = font_small.render(rot_text[:38], True, COLOR_TEXT)
         screen.blit(lbl_rot, (25, 570))
         
         # 4. KPI Metrics Card

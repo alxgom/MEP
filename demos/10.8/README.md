@@ -288,3 +288,4 @@ Manual solution logs are drawn as diamond markers with `L1`, `L2`, etc. Automati
 - Scope machine placement and rotation changes separately from the current terminal-preference work.
 - Add a NumPy-only detector for edges parallel to walls that run inside wall gaps or wall cavities.
 - Add click-to-enlarge behavior for dashboard plots, opening the selected plot in a popup.
+- Replace or augment centroid-field rotation with a graph/allowed-space-aware rotation heuristic, since local egress and surrounding routable space dominate machine orientation quality.
