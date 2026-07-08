@@ -1,13 +1,13 @@
-# MEP Ventilation Router Dashboard (Demo 10.8)
+# MEP Clima Placement Dashboard (Demo 10.8_cli)
 
-Interactive Pygame prototype for routing ventilation ducts from a compact ventilation machine to room starts, machine pins, and shafts. Demo 10.8 uses Demo 10.79 as its base, preserving the line-graph backends, min-cost-flow strategies, real/synthetic dwelling source selection, and room-node-set starts.
+Interactive Pygame prototype for exploring Clima machine and grille placement. Demo 10.8_cli starts as an exact copy of Demo 10.8, then switches the first milestone to Clima placement only: it derives supply/return grille targets from covered non-service rooms, places the machine, builds the routing grid, and deliberately stops before duct routing.
 
 ## Run
 
-Use the existing Demo 10.7 virtual environment while 10.8 is still a refactor copy:
+Use the existing Demo 10.7 virtual environment while 10.8_cli is still a refactor copy:
 
 ```powershell
-cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.8"
+cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.8_cli"
 ..\10.7\.venv\Scripts\python.exe main.py
 ```
 
@@ -62,6 +62,8 @@ Routing and display:
 - The solver card includes sliders for `Min pieces factor`, bend weight, and crossing multiplier. Bend weight moves in 100-unit integer steps. The bend and crossing sliders include icon-only reset buttons.
 
 ## Current Solvers
+
+Routing is intentionally disabled in the first Clima pass. The copied routing controls remain visible to preserve the Demo 10.8 UI/UX, but `solve_ventilation_routing()` currently returns a placement-only status after machine placement and grid rebuild.
 
 The strategy selector includes:
 

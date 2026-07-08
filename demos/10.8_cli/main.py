@@ -32,6 +32,8 @@ except ImportError:
     load_dwelling_scenario = None
     scenario_summary = None
 
+DEMO_DOMAIN = "Clima"
+
 # Constants
 SCALE_TO_MM    = 1000
 WALL_THICKNESS = 150
@@ -198,8 +200,18 @@ ROUTE_COLORS = {
     "Bathroom 1": (52, 152, 219), # Blue
     "Bathroom 2": (155, 89, 182), # Purple
     "Toilet": (230, 126, 34),     # Orange
-    "Washroom": (26, 188, 156)    # Turquoise
+    "Washroom": (26, 188, 156),   # Turquoise
+    "Return": (231, 76, 60),
 }
+
+def get_route_color(route_name, default=COLOR_TEXT if "COLOR_TEXT" in globals() else (236, 240, 241)):
+    if route_name in ROUTE_COLORS:
+        return ROUTE_COLORS[route_name]
+    if str(route_name).endswith(" Return"):
+        return ROUTE_COLORS["Return"]
+    if str(route_name).endswith(" Supply"):
+        return (52, 152, 219)
+    return default
 
 REAL_DWELLING_DB = DWELLING_EXPORT_ROOT / "data" / "dwellings.sqlite"
 REAL_DWELLING_SCENARIOS = [
@@ -622,6 +634,107 @@ def get_representative_point(poly):
         return (round(centroid.x), round(centroid.y))
     rep = poly.representative_point()
     return (round(rep.x), round(rep.y))
+
+def _room_text(room):
+    values = [
+        str(getattr(room, attr, "") or "")
+        for attr in ("name", "type", "tag")
+    ]
+    return " ".join(values).lower()
+
+def _is_service_room(room):
+    text = _room_text(room)
+    service_keys = (
+        "kitchen", "cocina",
+        "bath", "bano", "baño",
+        "toilet", "aseo",
+        "washroom", "lavadero",
+    )
+    return any(key in text for key in service_keys)
+
+def _is_clima_terminal_room(room):
+    if not getattr(room, "has_cover", False):
+        return False
+    if not hasattr(room, "polygon") or room.polygon.is_empty:
+        return False
+    if _is_service_room(room):
+        return False
+    text = _room_text(room)
+    positive_keys = (
+        "bedroom", "dormitorio", "habitacion", "habitación",
+        "living", "salon", "salón", "comedor", "office", "estudio",
+    )
+    return any(key in text for key in positive_keys)
+
+def _terminal_point_in_routing_region(room):
+    if routing_region_base is None:
+        return get_representative_point(room.polygon)
+    allowed_room = room.polygon.intersection(routing_region_base)
+    if allowed_room.is_empty:
+        return get_representative_point(room.polygon)
+    return get_representative_point(allowed_room)
+
+def _point_allowed_for_terminal(room, pt):
+    point = Point(float(pt[0]), float(pt[1]))
+    if not room.polygon.contains(point):
+        return False
+    if routing_region_base is not None and not routing_region_base.contains(point):
+        return False
+    return True
+
+def _clima_supply_return_points(room):
+    base = _terminal_point_in_routing_region(room)
+    minx, miny, maxx, maxy = room.polygon.bounds
+    width = maxx - minx
+    height = maxy - miny
+    offset = max(250.0, min(width, height) * 0.22)
+    if width >= height:
+        candidates = ((base[0] - offset, base[1]), (base[0] + offset, base[1]))
+    else:
+        candidates = ((base[0], base[1] - offset), (base[0], base[1] + offset))
+
+    points = []
+    for pt in candidates:
+        rounded = (round(pt[0]), round(pt[1]))
+        points.append(rounded if _point_allowed_for_terminal(room, rounded) else base)
+    return points[0], points[1]
+
+def build_clima_terminals_from_rooms():
+    candidates = [room for room in rooms if _is_clima_terminal_room(room)]
+    if not candidates:
+        candidates = [
+            room for room in rooms
+            if getattr(room, "has_cover", False)
+            and hasattr(room, "polygon")
+            and not room.polygon.is_empty
+            and not _is_service_room(room)
+        ]
+    if not candidates:
+        candidates = [
+            room for room in rooms
+            if hasattr(room, "polygon") and not room.polygon.is_empty
+        ]
+
+    result = {}
+    counts = {}
+    for room in candidates:
+        base_name = str(getattr(room, "name", "") or "Clima").strip() or "Clima"
+        counts[base_name] = counts.get(base_name, 0) + 1
+        room_name = base_name if counts[base_name] == 1 else f"{base_name} {counts[base_name]}"
+        supply_pt, return_pt = _clima_supply_return_points(room)
+        result[f"{room_name} Supply"] = supply_pt
+        result[f"{room_name} Return"] = return_pt
+        room.name = room_name
+    return result
+
+def _is_clima_machine_room(room):
+    if not getattr(room, "has_cover", False):
+        return False
+    if not hasattr(room, "polygon") or room.polygon.is_empty:
+        return False
+    text = _room_text(room)
+    preferred = ("hall", "pasillo", "living", "salon", "salón", "comedor")
+    return any(key in text for key in preferred) or not _is_service_room(room)
 
 def _transform_source_xy_to_demo(point_xy, metadata):
     if not point_xy or metadata is None:
@@ -3820,26 +3933,10 @@ def compute_dijkstra_distance_field(start_nodes, env):
     return distances
 
 def get_placement_weights():
-    if weight_mode_idx == 1:
-        return {
-            "Shaft": 1.0,
-            "Kitchen": 1.0,
-            "Bathroom": 1.0,
-            "Bathroom 1": 1.0,
-            "Bathroom 2": 1.0,
-            "Toilet": 1.0,
-            "Washroom": 1.0
-        }
-    else:
-        return {
-            "Shaft": 2.5,
-            "Kitchen": 1.5,
-            "Bathroom": 1.0,
-            "Bathroom 1": 1.0,
-            "Bathroom 2": 1.0,
-            "Toilet": 1.0,
-            "Washroom": 1.0
-        }
+    base = {name: 1.0 for name in terminals.keys()}
+    if shaft_extraction is not None:
+        base["Shaft"] = 1.0 if weight_mode_idx == 1 else 1.5
+    return base
 
 def get_auto_placement_scores(env, shaft_boundary_nodes):
     terminal_nodes = {}
@@ -3850,7 +3947,8 @@ def get_auto_placement_scores(env, shaft_boundary_nodes):
     weights = get_placement_weights()
     
     distance_fields = {}
-    distance_fields["Shaft"] = compute_dijkstra_distance_field(shaft_boundary_nodes, env)
+    if shaft_boundary_nodes:
+        distance_fields["Shaft"] = compute_dijkstra_distance_field(shaft_boundary_nodes, env)
     for name, node_idx in terminal_nodes.items():
         distance_fields[name] = compute_dijkstra_distance_field(node_idx, env)
         
@@ -3873,9 +3971,11 @@ def get_auto_placement_scores(env, shaft_boundary_nodes):
 
 def ensure_placement_heatmap_scores():
     global ap_scores, ap_fields
-    if ap_scores or base_regular_env is None or base_regular_kd is None or shaft_extraction is None:
+    if ap_scores or base_regular_env is None or base_regular_kd is None:
         return
-    shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
+    shaft_boundary_nodes = []
+    if shaft_extraction is not None:
+        shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
     ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
 
 def _routing_frame_axes():
@@ -3884,9 +3984,7 @@ def _routing_frame_axes():
 def _candidate_machine_rooms():
     candidates = [
         room for room in rooms
-        if getattr(room, "has_cover", False)
-        and hasattr(room, "polygon")
-        and not room.polygon.is_empty
+        if _is_clima_machine_room(room)
         and room.polygon.area >= MACHINE_OVERALL_W * MACHINE_BODY_H
     ]
     return candidates or [
@@ -3948,31 +4046,37 @@ def _core_like_machine_candidate_score(cx, cy, angle, room):
     pins = get_machine_pins(cx, cy, angle)
 
     shaft_pt = get_representative_point(shaft_extraction) if shaft_extraction else (cx, cy)
-    kitchen_pt = terminals.get("Kitchen", (cx, cy))
+    terminal_points = list(terminals.values())
+    target_centroid = (
+        tuple(np.mean(np.array(terminal_points, dtype=np.float64), axis=0))
+        if terminal_points else (cx, cy)
+    )
 
-    large_pin_options = []
-    for shaft_pin, kitchen_pin in (("left_mid", "right_mid"), ("right_mid", "left_mid")):
-        shaft_dir = _local_axis_to_world((-1.0, 0.0) if shaft_pin == "left_mid" else (1.0, 0.0), angle)
-        kitchen_dir = _local_axis_to_world((-1.0, 0.0) if kitchen_pin == "left_mid" else (1.0, 0.0), angle)
-        shaft_angle = abs(_point_angle_to_target(pins[shaft_pin], shaft_dir, shaft_pt))
-        kitchen_angle = abs(_point_angle_to_target(pins[kitchen_pin], kitchen_dir, kitchen_pt))
-        large_pin_options.append((shaft_angle + kitchen_angle, shaft_angle, kitchen_angle, shaft_pin, kitchen_pin))
-    _, shaft_angle, kitchen_angle, shaft_pin, kitchen_pin = min(large_pin_options, key=lambda item: item[0])
+    airflow_options = []
+    for supply_pin, return_pin in (("left_mid", "right_mid"), ("right_mid", "left_mid")):
+        supply_dir = _local_axis_to_world((-1.0, 0.0) if supply_pin == "left_mid" else (1.0, 0.0), angle)
+        return_dir = _local_axis_to_world((-1.0, 0.0) if return_pin == "left_mid" else (1.0, 0.0), angle)
+        supply_angle = abs(_point_angle_to_target(pins[supply_pin], supply_dir, target_centroid))
+        return_angle = abs(_point_angle_to_target(pins[return_pin], return_dir, shaft_pt))
+        airflow_options.append((supply_angle + return_angle, supply_angle, return_angle, supply_pin, return_pin))
+    _, supply_angle, return_angle, supply_pin, return_pin = min(airflow_options, key=lambda item: item[0])
 
     out_pct = _area_out_percentage(machine_poly, room.polygon)
-    shaft_clear = _distance_to_allowed_boundary(pins[shaft_pin])
-    kitchen_clear = _distance_to_allowed_boundary(pins[kitchen_pin])
-    distance_to_targets = math.hypot(cx - shaft_pt[0], cy - shaft_pt[1])
-    if "Kitchen" in terminals:
-        distance_to_targets += 0.35 * math.hypot(cx - kitchen_pt[0], cy - kitchen_pt[1])
+    supply_clear = _distance_to_allowed_boundary(pins[supply_pin])
+    return_clear = _distance_to_allowed_boundary(pins[return_pin])
+    distance_to_targets = 0.0
+    if terminal_points:
+        distance_to_targets = sum(math.hypot(cx - pt[0], cy - pt[1]) for pt in terminal_points) / len(terminal_points)
+    if shaft_extraction is not None:
+        distance_to_targets += 0.35 * math.hypot(cx - shaft_pt[0], cy - shaft_pt[1])
 
     return (
         out_pct,
-        shaft_angle + kitchen_angle,
-        shaft_angle,
-        kitchen_angle,
-        -shaft_clear,
-        -kitchen_clear,
+        supply_angle + return_angle,
+        supply_angle,
+        return_angle,
+        -supply_clear,
+        -return_clear,
         distance_to_targets,
     )
 
@@ -4001,10 +4105,12 @@ def run_core_workflow_machine_placement():
 
 def run_auto_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
-    if base_regular_env is None or not shaft_extraction:
+    if base_regular_env is None:
         return
-        
-    shaft_boundary_nodes, shaft_node_idx = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
+
+    shaft_boundary_nodes = []
+    if shaft_extraction is not None:
+        shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
     
     # Topological Distance Fields
     if auto_placement_mode_idx == 1:
@@ -4033,45 +4139,24 @@ def run_auto_placement():
                         if pin_name.startswith("c_"): continue
                         _, p_idx = base_regular_kd.query(pt)
                         pin_nodes[pin_name] = int(p_idx)
-                        
-                    d_left = distance_fields["Shaft"].get(pin_nodes["left_mid"], 1e9)
-                    d_right = distance_fields["Shaft"].get(pin_nodes["right_mid"], 1e9)
-                    if d_left < d_right:
-                        chosen_exhaust = "left_mid"
-                        kitchen_pin = "right_mid"
-                        shaft_dist = d_left
-                    else:
-                        chosen_exhaust = "right_mid"
-                        kitchen_pin = "left_mid"
-                        shaft_dist = d_right
-                        
-                    kitchen_dist = 0.0
-                    if "Kitchen" in distance_fields:
-                        kitchen_dist = distance_fields["Kitchen"].get(pin_nodes[kitchen_pin], 1e9)
-                        
+
                     small_pins = ["tl", "tr", "bl", "br"]
                     room_dists = 0.0
-                    remaining_rooms = [r for r in wet_room_names if r != "Kitchen"]
-                    used_pins = set()
-                    
-                    for r_name in remaining_rooms:
+
+                    for r_name in wet_room_names:
                         best_d = 1e9
-                        best_p = None
                         for p in small_pins:
-                            if p in used_pins:
-                                continue
                             d = distance_fields[r_name].get(pin_nodes[p], 1e9)
                             if d < best_d:
                                 best_d = d
-                                best_p = p
-                        if best_p is not None:
-                            used_pins.add(best_p)
-                            room_dists += best_d
-                        else:
-                            room_dists += 1e9
-                            
-                    w = get_placement_weights()
-                    rot_score = w["Shaft"] * shaft_dist + w["Kitchen"] * kitchen_dist + room_dists
+                        room_dists += best_d
+
+                    if shaft_boundary_nodes and "Shaft" in distance_fields:
+                        d_left = distance_fields["Shaft"].get(pin_nodes["left_mid"], 1e9)
+                        d_right = distance_fields["Shaft"].get(pin_nodes["right_mid"], 1e9)
+                        room_dists += 0.35 * min(d_left, d_right)
+
+                    rot_score = room_dists
                     if rot_score < min_rot_score:
                         min_rot_score = rot_score
                         best_rot = rot
@@ -4096,6 +4181,7 @@ def solve_ventilation_routing():
     global edge_weight_debug_map, edge_weight_overlay_excluded_edges
     edge_weight_debug_map = {}
     edge_weight_overlay_excluded_edges = set()
+    t_solver = time.perf_counter()
     global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
 
     machine_poly = Polygon([
@@ -4118,6 +4204,14 @@ def solve_ventilation_routing():
         build_grid(machine_pins=global_pins)
         update_dynamic_env(machine_poly)
 
+    elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
+    total_nodes = len(current_env.nodes) if current_env is not None else 0
+    status = (
+        f"Placement only: {DEMO_DOMAIN} machine and {len(terminals)} grille targets ready; "
+        f"routing not enabled yet in {elapsed_ms:.1f}ms"
+    )
+    return None, status, elapsed_ms, total_nodes
+
     pin_node_map = snap_pins_to_graph(global_pins)
     if not pin_node_map or not shaft_extraction:
         return None, "Blocked: Missing pins or shaft", 0.0, 0
@@ -4136,8 +4230,6 @@ def solve_ventilation_routing():
                 for nbr, _, _ in current_env.adj[t_node_idx]:
                     set_terminal_block_weight(shaft_weights, t_node_idx, nbr)
     add_route_clearance_weights(shaft_weights, "Shaft", current_env)
-
-    t_solver = time.perf_counter()
 
     # 1. Route Shaft via Super Source/Sink
     shaft_path, _, chosen_exhaust_pin, chosen_exhaust_target = run_super_sink_astar(
@@ -4495,24 +4587,23 @@ def generate_synthetic_dwelling():
         
     shaft_extraction = shafts[0] if shafts else None
     
-    wet_rooms = [r for r in rooms if any(w in r.name for w in ["Kitchen", "Bathroom", "Toilet", "Washroom"])]
-    terminals = {}
-    for r in wet_rooms:
-        t_pt = get_representative_point(r.polygon)
-        terminals[r.name] = t_pt
+    terminals = build_clima_terminals_from_rooms()
         
     best_room = None
     best_dist = 1e9
-    if shaft_extraction:
-        rep_pt = shaft_extraction.representative_point()
-        sx, sy = rep_pt.x, rep_pt.y
-        for r in wet_rooms:
-            if any(w in r.name for w in ["Bathroom", "Washroom"]):
-                rx, ry = r.polygon.centroid.x, r.polygon.centroid.y
-                dist = abs(sx - rx) + abs(sy - ry)
-                if dist < best_dist:
-                    best_dist = dist
-                    best_room = r
+    target_pts = list(terminals.values())
+    target_centroid = (
+        np.mean(np.array(target_pts, dtype=np.float64), axis=0)
+        if target_pts else np.array([7500.0, 5500.0], dtype=np.float64)
+    )
+    for r in rooms:
+        if not _is_clima_machine_room(r):
+            continue
+        rx, ry = get_representative_point(r.polygon)
+        dist = abs(target_centroid[0] - rx) + abs(target_centroid[1] - ry)
+        if dist < best_dist:
+            best_dist = dist
+            best_room = r
                     
     if best_room:
         machine_cx, machine_cy = get_representative_point(best_room.polygon)
@@ -4522,7 +4613,11 @@ def generate_synthetic_dwelling():
     machine_angle = 0
     wet_room_names = list(terminals.keys())
     current_scenario_label = "synthetic"
-    current_scenario_summary = {}
+    current_scenario_summary = {
+        "domain": DEMO_DOMAIN,
+        "terminals": terminals,
+        "placement_only": True,
+    }
     shaft_core_entry_specs = []
     shaft_entry_geometry_by_node = {}
     _bnd_segs = None
@@ -4574,18 +4669,23 @@ def _build_wall_polys():
     return polys
 
 def _choose_initial_machine_position():
-    if not terminals:
-        return (7500.0, 5500.0)
-    if not shaft_extraction:
+    machine_rooms = [room for room in rooms if _is_clima_machine_room(room)]
+    if machine_rooms:
+        terminal_points = list(terminals.values())
+        target = (
+            np.mean(np.array(terminal_points, dtype=np.float64), axis=0)
+            if terminal_points else None
+        )
+        candidates = []
+        for room in machine_rooms:
+            pt = get_representative_point(room.polygon)
+            dist = 0.0 if target is None else abs(target[0] - pt[0]) + abs(target[1] - pt[1])
+            candidates.append((dist, -room.polygon.area, pt))
+        candidates.sort()
+        return candidates[0][2]
+    if terminals:
         return next(iter(terminals.values()))
-
-    sx, sy = get_representative_point(shaft_extraction)
-    candidates = []
-    for name, pt in terminals.items():
-        priority = 0 if any(key in name for key in ["Bathroom", "Washroom", "Toilet"]) else 1
-        candidates.append((priority, abs(sx - pt[0]) + abs(sy - pt[1]), pt))
-    candidates.sort(key=lambda item: (item[0], item[1]))
-    return candidates[0][2]
+    return (7500.0, 5500.0)
 
 def _load_real_dwelling():
     global current_scenario_label, current_scenario_summary
@@ -4632,8 +4732,11 @@ def generate_new_dwelling():
     covers = list(getattr(scenario, "covers", []) or [room.polygon for room in rooms if getattr(room, "has_cover", False)])
     shaft_extraction = scenario.shaft_extraction
     routing_region_base = scenario.routing_region_base
-    terminals = dict(scenario.terminals)
+    terminals = build_clima_terminals_from_rooms()
     wet_room_names = list(terminals.keys())
+    current_scenario_summary["domain"] = DEMO_DOMAIN
+    current_scenario_summary["terminals"] = terminals
+    current_scenario_summary["placement_only"] = True
     doors = []
     walls = _derive_real_walls()
     wall_polys = _build_wall_polys()
@@ -5940,7 +6043,7 @@ def main():
             
         for r_name, pt in terminals.items():
             s_pt = to_screen(pt[0], pt[1])
-            c_core = ROUTE_COLORS.get(r_name, (255, 255, 255))
+            c_core = get_route_color(r_name, (255, 255, 255))
             if selected_route_name and r_name != selected_route_name:
                 c_core = COLOR_DESELECTED_PIN
                 ring_color = (70, 74, 78)
@@ -6016,25 +6119,8 @@ def main():
             pygame.draw.circle(screen, ring_color, sp, size, 1)
             
         if auto_placement_mode_idx == 1 and ap_fields:
-            s_rep = get_representative_point(shaft_extraction)
-            _, p_left_idx = grid_kd.query(g_pins["left_mid"])
-            _, p_right_idx = grid_kd.query(g_pins["right_mid"])
-            d_left = ap_fields["Shaft"].get(int(p_left_idx), 1e9)
-            d_right = ap_fields["Shaft"].get(int(p_right_idx), 1e9)
-            exhaust_pt = g_pins["left_mid"] if d_left < d_right else g_pins["right_mid"]
-            kitchen_pin = "right_mid" if d_left < d_right else "left_mid"
-            
-            sp_port = to_screen(exhaust_pt[0], exhaust_pt[1])
-            sp_term = to_screen(s_rep[0], s_rep[1])
-            pygame.draw.line(screen, (46, 204, 113), sp_port, sp_term, 2)
-            
-            if "Kitchen" in terminals:
-                k_term = terminals["Kitchen"]
-                k_port = g_pins[kitchen_pin]
-                pygame.draw.line(screen, (241, 196, 15), to_screen(k_port[0], k_port[1]), to_screen(k_term[0], k_term[1]), 2)
-                
             small_pins = ["tl", "tr", "bl", "br"]
-            remaining_rooms = [r for r in wet_room_names if r != "Kitchen"]
+            remaining_rooms = list(wet_room_names)
             used_pins = set()
             for r_name in remaining_rooms:
                 term_pt = terminals[r_name]
@@ -6050,7 +6136,7 @@ def main():
                 if best_p:
                     used_pins.add(best_p)
                     port_pt = g_pins[best_p]
-                    pygame.draw.line(screen, ROUTE_COLORS.get(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
+                    pygame.draw.line(screen, get_route_color(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
 
         # ── SIDEBAR PANEL ──
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
