@@ -1055,6 +1055,15 @@ def _largest_polygon(geom):
             return max(polygons, key=lambda part: part.area)
     return None
 
+def _room_cover_region(room):
+    coverings = getattr(room, "space_coverings", None) or []
+    cover_polys = [cover for cover, _full in coverings if cover is not None and not cover.is_empty]
+    if cover_polys:
+        return unary_union(cover_polys)
+    if routing_region_base is None or routing_region_base.is_empty:
+        return None
+    return room.polygon.intersection(routing_region_base)
+
 def _horizontal_return_candidate(room, allowed_part):
     if allowed_part is None or allowed_part.is_empty:
         return None
@@ -1070,10 +1079,9 @@ def _horizontal_return_candidate(room, allowed_part):
     }
 
 def _clima_grille_options_for_room(room):
-    if routing_region_base is None or routing_region_base.is_empty:
+    allowed = _room_cover_region(room)
+    if allowed is None or allowed.is_empty:
         allowed = room.polygon
-    else:
-        allowed = routing_region_base
     false_ceiling = _largest_polygon(room.polygon.intersection(allowed))
     has_false_ceiling = false_ceiling is not None and false_ceiling.area >= CLIMA_GRILLE_MIN_FALSE_CEILING_AREA_MM2
 
