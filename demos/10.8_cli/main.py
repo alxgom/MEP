@@ -43,11 +43,94 @@ CORE_EPSILON_GRID_MM = 200
 SMALL_PIN_STUB_LENGTH = 100
 LARGE_PIN_STUB_LENGTH = 250
 MACHINE_CLEARANCE = 0
-MACHINE_BODY_W = 410
-MACHINE_BODY_H = 460
-MACHINE_OVERALL_W = 511
-MACHINE_SMALL_DUCT_D = 90
-MACHINE_LARGE_DUCT_D = 125
+CLIMA_MACHINES = [
+    {
+        "label": "PEAD M35JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M35JA",
+        "body_w": 1028,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (528, 366, 250),
+        "air_connector": (860, 178),
+    },
+    {
+        "label": "PEAD M50JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M50JA",
+        "body_w": 1028,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (528, 366, 250),
+        "air_connector": (860, 178),
+    },
+    {
+        "label": "PEAD M60JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M60JA",
+        "body_w": 1228,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (628, 366, 250),
+        "air_connector": (1060, 178),
+    },
+    {
+        "label": "PEAD M71JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M71JA",
+        "body_w": 1228,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (628, 366, 250),
+        "air_connector": (1060, 178),
+    },
+    {
+        "label": "PEAD M100JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M100JA",
+        "body_w": 1528,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (778, 366, 250),
+        "air_connector": (1360, 178),
+    },
+    {
+        "label": "PEAD M125JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M125JA",
+        "body_w": 1528,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (778, 366, 250),
+        "air_connector": (1360, 178),
+    },
+    {
+        "label": "PEAD M140JA",
+        "family": "Cli_UnidadInterior_Mitsubishi_PEAD",
+        "type": "M140JA",
+        "body_w": 1728,
+        "body_h": 700,
+        "body_z": 250,
+        "insertion": (878, 366, 250),
+        "air_connector": (1560, 178),
+    },
+    {
+        "label": "ERST20D VM2D",
+        "family": "Cli_UnidadInterior_Mitsubishi_ERST20D",
+        "type": "VM2D",
+        "body_w": 595,
+        "body_h": 680,
+        "body_z": 1720,
+        "insertion": (298, 680, 0),
+        "air_connector": (0, 0),
+    },
+]
+selected_machine_idx = 3
+MACHINE_BODY_W = CLIMA_MACHINES[selected_machine_idx]["body_w"]
+MACHINE_BODY_H = CLIMA_MACHINES[selected_machine_idx]["body_h"]
+MACHINE_OVERALL_W = MACHINE_BODY_W
+MACHINE_SMALL_DUCT_D = CLIMA_MACHINES[selected_machine_idx]["air_connector"][1]
+MACHINE_LARGE_DUCT_D = CLIMA_MACHINES[selected_machine_idx]["air_connector"][1]
 DUCT_BUFFER_RATIO = 1.05
 ROUTING_WALL_CLEARANCE_MM = 100
 TERMINAL_REGULATION_CLEARANCE_MM = ROUTING_WALL_CLEARANCE_MM
@@ -163,6 +246,33 @@ crossing_weight_slider_rect = pygame.Rect(0, 0, 1, 1)
 bend_weight_reset_rect = pygame.Rect(0, 0, 1, 1)
 crossing_weight_reset_rect = pygame.Rect(0, 0, 1, 1)
 preference_reset_rect = pygame.Rect(0, 0, 1, 1)
+machine_dropdown_rect = pygame.Rect(0, 0, 1, 1)
+machine_dropdown_option_rects = []
+machine_dropdown_open = False
+
+def get_current_machine():
+    return CLIMA_MACHINES[selected_machine_idx]
+
+def refresh_machine_constants():
+    global MACHINE_BODY_W, MACHINE_BODY_H, MACHINE_OVERALL_W
+    global MACHINE_SMALL_DUCT_D, MACHINE_LARGE_DUCT_D
+    machine = get_current_machine()
+    MACHINE_BODY_W = int(machine["body_w"])
+    MACHINE_BODY_H = int(machine["body_h"])
+    MACHINE_OVERALL_W = MACHINE_BODY_W
+    air_height = int(machine["air_connector"][1] or 178)
+    MACHINE_SMALL_DUCT_D = air_height
+    MACHINE_LARGE_DUCT_D = air_height
+
+def set_selected_machine(idx):
+    global selected_machine_idx, ap_scores, ap_fields
+    if not 0 <= idx < len(CLIMA_MACHINES) or idx == selected_machine_idx:
+        return False
+    selected_machine_idx = idx
+    refresh_machine_constants()
+    ap_scores = {}
+    ap_fields = {}
+    return True
 
 # Color Scheme
 COLOR_BG = (240, 238, 233)
@@ -539,6 +649,58 @@ def draw_canvas_tool_controls(screen, font_small, ruler_mode):
         hint = "click add, Ctrl+click erase" if preferred_terminal_tool_mode == "point" else "drag area, Ctrl+drag erase"
         term_lbl = font_small.render(f"terminal {preferred_terminal_tool_mode}: {hint}", True, COLOR_TEXT)
         screen.blit(term_lbl, (CANVAS_LEFT + 86, CANVAS_TOP + 64))
+
+def draw_machine_dropdown_button(screen, font_small, x, y, width):
+    global machine_dropdown_rect
+    machine_dropdown_rect = pygame.Rect(x, y, width, 24)
+    machine = get_current_machine()
+    pygame.draw.rect(screen, (32, 36, 44), machine_dropdown_rect, border_radius=4)
+    pygame.draw.rect(screen, (150, 158, 166), machine_dropdown_rect, 1, border_radius=4)
+    label = f"Machine: {machine['label']}"
+    lbl = font_small.render(label[:28], True, COLOR_TEXT)
+    screen.blit(lbl, (machine_dropdown_rect.x + 8, machine_dropdown_rect.y + 5))
+    arrow_x = machine_dropdown_rect.right - 15
+    arrow_y = machine_dropdown_rect.centery
+    if machine_dropdown_open:
+        pts = [(arrow_x - 5, arrow_y + 3), (arrow_x + 5, arrow_y + 3), (arrow_x, arrow_y - 3)]
+    else:
+        pts = [(arrow_x - 5, arrow_y - 3), (arrow_x + 5, arrow_y - 3), (arrow_x, arrow_y + 3)]
+    pygame.draw.polygon(screen, COLOR_MUTED, pts)
+
+def draw_machine_dropdown_options(screen, font_small):
+    global machine_dropdown_option_rects
+    machine_dropdown_option_rects = []
+    if not machine_dropdown_open:
+        return
+    option_h = 23
+    x = machine_dropdown_rect.x
+    y = machine_dropdown_rect.bottom + 2
+    width = machine_dropdown_rect.width
+    for idx, machine in enumerate(CLIMA_MACHINES):
+        rect = pygame.Rect(x, y + idx * option_h, width, option_h)
+        machine_dropdown_option_rects.append((rect, idx))
+        active = idx == selected_machine_idx
+        fill = (58, 80, 94) if active else (32, 36, 44)
+        pygame.draw.rect(screen, fill, rect)
+        pygame.draw.rect(screen, (95, 104, 112), rect, 1)
+        dims = f"{machine['body_w']}x{machine['body_h']}x{machine['body_z']}"
+        text = f"{machine['label']}  {dims}"
+        lbl = font_small.render(text[:32], True, COLOR_TEXT)
+        screen.blit(lbl, (rect.x + 8, rect.y + 4))
+
+def handle_machine_dropdown_click(pos):
+    global machine_dropdown_open
+    if machine_dropdown_rect.collidepoint(pos):
+        machine_dropdown_open = not machine_dropdown_open
+        return ("toggle", None)
+    if machine_dropdown_open:
+        for rect, idx in machine_dropdown_option_rects:
+            if rect.collidepoint(pos):
+                machine_dropdown_open = False
+                return ("select", idx)
+        machine_dropdown_open = False
+        return ("close", None)
+    return None
 
 def set_ruler_cursor(enabled):
     try:
@@ -5071,6 +5233,7 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
         "routing_frame_idx": routing_frame_idx,
         "scenario_label": current_scenario_label,
         "machine": (float(machine_cx), float(machine_cy), int(machine_angle)),
+        "selected_machine_idx": int(selected_machine_idx),
         "graph_type_idx": graph_type_idx,
         "routing_strategy_idx": routing_strategy_idx,
         "router_backend_idx": router_backend_idx,
@@ -5157,12 +5320,15 @@ def update_auto_best_logs(routes, status, elapsed_ms, total_nodes):
 
 def restore_solution_log(log_entry):
     global machine_cx, machine_cy, machine_angle
+    global selected_machine_idx
     global graph_type_idx, routing_strategy_idx, router_backend_idx, heuristic_mode_idx, room_start_mode_idx
     global weight_mode_idx, edge_weight_view_mode_idx, route_real_diameter_width_enabled, min_piece_factor
     global C_BEND, crossing_penalty_multiplier
     global preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id
 
     machine_cx, machine_cy, machine_angle = log_entry["machine"]
+    selected_machine_idx = int(log_entry.get("selected_machine_idx", selected_machine_idx))
+    refresh_machine_constants()
     graph_type_idx = log_entry["graph_type_idx"]
     routing_strategy_idx = log_entry["routing_strategy_idx"]
     router_backend_idx = log_entry["router_backend_idx"]
@@ -5474,6 +5640,7 @@ def main():
     global help_popup_card
     global min_piece_factor, is_fullscreen
     global preferred_terminal_tool_mode
+    global selected_machine_idx, machine_dropdown_open
     global selected_log_id
     
     pygame.init()
@@ -5546,6 +5713,17 @@ def main():
                             clicked_help = True
                             break
                     if clicked_help:
+                        continue
+                    machine_dropdown_action = handle_machine_dropdown_click((mx, my))
+                    if machine_dropdown_action:
+                        action, idx = machine_dropdown_action
+                        if action == "select" and set_selected_machine(idx):
+                            auto_best_logs.clear()
+                            if auto_placement_mode_idx > 0:
+                                run_auto_placement()
+                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                            if routes and not status.startswith("Blocked"):
+                                record_current_solution(routes, elapsed_ms, f"Machine:{selected_machine_idx}", (52, 152, 219))
                         continue
                     if min_piece_slider_rect.collidepoint((mx, my)):
                         dragging_min_piece_slider = True
@@ -6214,15 +6392,14 @@ def main():
         scenario_short = current_scenario_label[-22:]
         lbl_scenario = font_small.render(f"Source: {source_label[:10]} / {scenario_short}", True, COLOR_TEXT)
         screen.blit(lbl_scenario, (25, 510))
-        frame = current_scenario_summary.get("routing_frame") or {}
-        frame_name = str(frame.get("name") or ROUTING_FRAME_OPTIONS[routing_frame_idx]).replace("_", " ")
-        lbl_frame = font_small.render(f"Frame: {frame_name[:24]}", True, COLOR_MUTED)
-        screen.blit(lbl_frame, (25, 530))
-        lbl_coord = font_small.render(f"Position: ({int(machine_cx)}, {int(machine_cy)}) mm", True, COLOR_TEXT)
-        screen.blit(lbl_coord, (25, 550))
-        lbl_rot = font_small.render(f"Rotation: {machine_angle}°", True, COLOR_TEXT)
-        screen.blit(lbl_rot, (25, 570))
-        
+        draw_machine_dropdown_button(screen, font_small, 25, 530, CANVAS_LEFT - 70)
+        machine = get_current_machine()
+        dims_text = f"Dims: {machine['body_w']} x {machine['body_h']} x {machine['body_z']} mm"
+        lbl_dims = font_small.render(dims_text, True, COLOR_MUTED)
+        screen.blit(lbl_dims, (25, 558))
+        pos_text = f"Pos: ({int(machine_cx)}, {int(machine_cy)}) mm | Rot: {machine_angle} deg"
+        lbl_coord = font_small.render(pos_text[:34], True, COLOR_TEXT)
+        screen.blit(lbl_coord, (25, 575))
         # 4. KPI Metrics Card
         kpi_card = pygame.Rect(15, 595, CANVAS_LEFT - 40, 135)
         pygame.draw.rect(screen, (40, 45, 55), kpi_card, border_radius=6)
@@ -6289,6 +6466,7 @@ def main():
         screen.blit(lbl_nodes, (25, 885))
         lbl_fps = font_small.render(f"Render engine: Pygame ({clock.get_fps():.0f} FPS)", True, COLOR_MUTED)
         screen.blit(lbl_fps, (25, 905))
+        draw_machine_dropdown_options(screen, font_small)
         
         # ── RIGHT PANEL: plots ──────────────────────────────────────────────
         panel_x = WINDOW_WIDTH - PANEL_W
