@@ -33,25 +33,27 @@ except ImportError:
     scenario_summary = None
 
 # Constants
-SCALE_TO_MM    = 1000.0
-WALL_THICKNESS = 150.0
+SCALE_TO_MM    = 1000
+WALL_THICKNESS = 150
 GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
-CORE_EPSILON_GRID_MM = 200.0
-SMALL_PIN_STUB_LENGTH = 100.0
-LARGE_PIN_STUB_LENGTH = 250.0
-MACHINE_CLEARANCE = 0.0
-MACHINE_BODY_W = 410.0
-MACHINE_BODY_H = 460.0
-MACHINE_OVERALL_W = 511.0
-MACHINE_SMALL_DUCT_D = 90.0
-MACHINE_LARGE_DUCT_D = 125.0
+CORE_EPSILON_GRID_MM = 200
+SMALL_PIN_STUB_LENGTH = 100
+LARGE_PIN_STUB_LENGTH = 250
+MACHINE_CLEARANCE = 0
+MACHINE_BODY_W = 410
+MACHINE_BODY_H = 460
+MACHINE_OVERALL_W = 511
+MACHINE_SMALL_DUCT_D = 90
+MACHINE_LARGE_DUCT_D = 125
 DUCT_BUFFER_RATIO = 1.05
-ROUTING_WALL_CLEARANCE_MM = 100.0
-PATINEJO_CLEARANCE_MM = 200.0
-SHAFT_ENTRY_SEARCH_MM = 700.0
+ROUTING_WALL_CLEARANCE_MM = 100
+TERMINAL_REGULATION_CLEARANCE_MM = ROUTING_WALL_CLEARANCE_MM
+BUFFER_ROOM_TERMINALES_AIRE_MM = 150
+PATINEJO_CLEARANCE_MM = 200
+SHAFT_ENTRY_SEARCH_MM = 700
 SHAFT_ENTRY_MAX_CANDIDATES = 16
-MACHINE_CLEARANCE_SOFT_MARGIN_MM = 150.0
+MACHINE_CLEARANCE_SOFT_MARGIN_MM = 150
 FPS            = 20
 WHEEL_ROTATE_COOLDOWN_MS = 180
 C_BEND_DEFAULT = 4000.0
@@ -118,7 +120,10 @@ route_real_diameter_width_enabled = False
 edge_weight_debug_map = {}
 edge_weight_overlay_excluded_edges = set()
 static_clearance_cache = {"key": None, "wall": None, "shaft": None}
+geometry_distance_cache = {}
 help_popup_card = None
+transient_message = None
+transient_message_until_ms = 0
 help_button_rects = {}
 preferred_terminal_tool_mode = None
 preferred_terminal_points_by_room = {}
@@ -864,6 +869,108 @@ def _extract_bnd_segs(region):
                 _add_poly(g)
     return np.array(segs, dtype=np.float64) if segs else np.empty((0,4), dtype=np.float64)
 
+def _extract_line_segs(line_geom):
+    segs = []
+    def _add_coords(coords):
+        c = list(coords)
+        for i in range(len(c) - 1):
+            segs.append([c[i][0], c[i][1], c[i + 1][0], c[i + 1][1]])
+
+    if line_geom is None or line_geom.is_empty:
+        return np.empty((0, 4), dtype=np.float64)
+    if line_geom.geom_type == "LineString":
+        _add_coords(line_geom.coords)
+    elif line_geom.geom_type == "MultiLineString" or hasattr(line_geom, "geoms"):
+        for g in line_geom.geoms:
+            if g.geom_type == "LineString":
+                _add_coords(g.coords)
+    return np.array(segs, dtype=np.float64) if segs else np.empty((0, 4), dtype=np.float64)
+
+def _point_segment_min_distances(points, segments, chunk_size=128):
+    points = np.asarray(points, dtype=np.float64)
+    segments = np.asarray(segments, dtype=np.float64)
+    if len(points) == 0:
+        return np.empty((0,), dtype=np.float64)
+    if len(segments) == 0:
+        return np.full((len(points),), np.inf, dtype=np.float64)
+
+    out = np.full((len(points),), np.inf, dtype=np.float64)
+    ax = segments[:, 0]
+    ay = segments[:, 1]
+    bx = segments[:, 2]
+    by = segments[:, 3]
+    vx = bx - ax
+    vy = by - ay
+    denom = np.maximum(vx * vx + vy * vy, 1e-9)
+
+    for start in range(0, len(points), chunk_size):
+        pts = points[start:start + chunk_size]
+        px = pts[:, 0:1]
+        py = pts[:, 1:2]
+        t = ((px - ax) * vx + (py - ay) * vy) / denom
+        t = np.clip(t, 0.0, 1.0)
+        cx = ax + t * vx
+        cy = ay + t * vy
+        out[start:start + chunk_size] = np.sqrt(np.min((px - cx) ** 2 + (py - cy) ** 2, axis=1))
+    return out
+
+def _edge_segment_min_distances(edge_coords, segments, sample_count=5, chunk_size=128):
+    edge_coords = np.asarray(edge_coords, dtype=np.float64)
+    if len(edge_coords) == 0:
+        return np.empty((0,), dtype=np.float64)
+    if len(segments) == 0:
+        return np.full((len(edge_coords),), np.inf, dtype=np.float64)
+
+    samples_t = np.linspace(0.0, 1.0, int(sample_count), dtype=np.float64)
+    out = np.full((len(edge_coords),), np.inf, dtype=np.float64)
+    for start in range(0, len(edge_coords), chunk_size):
+        coords = edge_coords[start:start + chunk_size]
+        xs = coords[:, 0:1] + (coords[:, 2:3] - coords[:, 0:1]) * samples_t
+        ys = coords[:, 1:2] + (coords[:, 3:4] - coords[:, 1:2]) * samples_t
+        sample_points = np.column_stack([xs.ravel(), ys.ravel()])
+        sample_distances = _point_segment_min_distances(sample_points, segments)
+        out[start:start + chunk_size] = sample_distances.reshape(len(coords), len(samples_t)).min(axis=1)
+    return out
+
+def _edge_parallel_segment_min_distances(edge_coords, segments, eps=1e-7, chunk_size=512):
+    edge_coords = np.asarray(edge_coords, dtype=np.float64)
+    segments = np.asarray(segments, dtype=np.float64)
+    if len(edge_coords) == 0:
+        return np.empty((0,), dtype=np.float64)
+    if len(segments) == 0:
+        return np.full((len(edge_coords),), np.inf, dtype=np.float64)
+
+    sx1 = np.minimum(segments[:, 0], segments[:, 2])
+    sx2 = np.maximum(segments[:, 0], segments[:, 2])
+    sy1 = np.minimum(segments[:, 1], segments[:, 3])
+    sy2 = np.maximum(segments[:, 1], segments[:, 3])
+    seg_h = np.abs(segments[:, 1] - segments[:, 3]) <= eps
+    seg_v = np.abs(segments[:, 0] - segments[:, 2]) <= eps
+
+    out = np.full((len(edge_coords),), np.inf, dtype=np.float64)
+    for start in range(0, len(edge_coords), chunk_size):
+        coords = edge_coords[start:start + chunk_size]
+        ex1 = np.minimum(coords[:, 0], coords[:, 2])[:, None]
+        ex2 = np.maximum(coords[:, 0], coords[:, 2])[:, None]
+        ey1 = np.minimum(coords[:, 1], coords[:, 3])[:, None]
+        ey2 = np.maximum(coords[:, 1], coords[:, 3])[:, None]
+        edge_h = (np.abs(coords[:, 1] - coords[:, 3]) <= eps)[:, None]
+        edge_v = (np.abs(coords[:, 0] - coords[:, 2]) <= eps)[:, None]
+
+        h_overlap = (np.minimum(ex2, sx2) - np.maximum(ex1, sx1)) > eps
+        h_dist = np.abs(coords[:, 1:2] - segments[:, 1])
+        h_mask = edge_h & seg_h & h_overlap
+
+        v_overlap = (np.minimum(ey2, sy2) - np.maximum(ey1, sy1)) > eps
+        v_dist = np.abs(coords[:, 0:1] - segments[:, 0])
+        v_mask = edge_v & seg_v & v_overlap
+
+        d = np.full((len(coords), len(segments)), np.inf, dtype=np.float64)
+        d[h_mask] = h_dist[h_mask]
+        d[v_mask] = v_dist[v_mask]
+        out[start:start + chunk_size] = np.min(d, axis=1)
+    return out
+
 def _cast_rays_numpy(interest_pts_arr, bnd, eps=0.5):
     h_segs, v_segs = [], []
     dx_s = bnd[:, 2] - bnd[:, 0]
@@ -916,7 +1023,7 @@ def _ray_ray_intersections_numpy(h_segs, v_segs, eps=0.5):
     return [(float(v[j, 0]), float(h[i, 0])) for i, j in zip(hi, vi)]
 
 def _commit_grid(nodes_arr, valid_edges):
-    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache
+    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache, geometry_distance_cache
     DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
 
     if shaft_extraction is not None and len(nodes_arr) > 0:
@@ -926,8 +1033,8 @@ def _commit_grid(nodes_arr, valid_edges):
         minx_s, miny_s, maxx_s, maxy_s = shaft_extraction.bounds
         cx_s = (minx_s + maxx_s) / 2
         cy_s = (miny_s + maxy_s) / 2
-        
-        offset_val = 100.0
+
+        offset_val = ROUTING_WALL_CLEARANCE_MM
         face_pts = [
             (maxx_s + offset_val, cy_s, 'W'),
             (minx_s - offset_val, cy_s, 'E'),
@@ -1009,6 +1116,7 @@ def _commit_grid(nodes_arr, valid_edges):
     grid_kd          = cKDTree(grid_nodes)
     current_env      = EnvView(grid_nodes, adj)
     static_clearance_cache = {"key": None, "wall": None, "shaft": None}
+    geometry_distance_cache = {}
     invalidate_room_start_node_cache()
 
 def _wall_filter(raw_edges, nodes_arr):
@@ -1357,7 +1465,7 @@ def _get_hannan_static_template(shift_walls=False):
         minx_s, miny_s, maxx_s, maxy_s = shaft_extraction.bounds
         cx_s = (minx_s + maxx_s) / 2
         cy_s = (miny_s + maxy_s) / 2
-        offset_val = 100.0
+        offset_val = ROUTING_WALL_CLEARANCE_MM
         for pt in [
             (maxx_s + offset_val, cy_s),
             (minx_s - offset_val, cy_s),
@@ -1374,16 +1482,16 @@ def _get_hannan_static_template(shift_walls=False):
                 _add_polygon_vertex_axes(xs, ys, inset)
 
     for col in columns:
-        _add_bounds_axes(xs, ys, col, clearance=100.0)
+        _add_bounds_axes(xs, ys, col, clearance=ROUTING_WALL_CLEARANCE_MM)
 
     for shaft in shafts:
-        _add_bounds_axes(xs, ys, shaft, clearance=100.0)
+        _add_bounds_axes(xs, ys, shaft, clearance=ROUTING_WALL_CLEARANCE_MM)
 
     for wp in wall_polys:
-        _add_bounds_axes(xs, ys, wp, clearance=25.0)
+        _add_bounds_axes(xs, ys, wp, clearance=25)
 
     if shift_walls:
-        shift = int(WALL_THICKNESS / 2) + 1
+        shift = ROUTING_WALL_CLEARANCE_MM
         for wall in walls:
             coords = list(wall.coords)
             for i in range(len(coords) - 1):
@@ -1686,7 +1794,7 @@ def build_grid(machine_pins=None):
     if graph_type_idx == 0:
         build_regular_grid()
     elif graph_type_idx == 1:
-        build_hannan_grid(machine_pins=machine_pins, shift_walls=False)
+        build_hannan_grid(machine_pins=machine_pins, shift_walls=True)
     else:
         build_epsilon_grid(machine_pins=machine_pins)
 
@@ -1954,17 +2062,33 @@ def _machine_edge_clearance_distances():
     outside_y = np.maximum(np.abs(local_y) - half_h, 0.0)
     return np.min(np.hypot(outside_x, outside_y), axis=1)
 
-def _line_distance_vector(geometry):
-    if geometry is None or geometry.is_empty or grid_edge_coords is None or len(grid_edge_coords) == 0:
-        return None
-    coords = grid_edge_coords.astype(np.float64, copy=False)
-    return np.array(
-        [
-            LineString([(float(x1), float(y1)), (float(x2), float(y2))]).distance(geometry)
-            for x1, y1, x2, y2 in coords
-        ],
-        dtype=np.float64,
-    )
+def _static_wall_distance_segments():
+    segments = []
+    if routing_region_base is not None and not routing_region_base.is_empty:
+        bnd = _extract_bnd_segs(routing_region_base)
+        if len(bnd):
+            segments.append(bnd)
+    for room in rooms:
+        bnd = _extract_bnd_segs(room.polygon)
+        if len(bnd):
+            segments.append(bnd)
+    for wall in walls:
+        line = _extract_line_segs(wall)
+        if len(line):
+            segments.append(line)
+    for wp in wall_polys:
+        bnd = _extract_bnd_segs(wp)
+        if len(bnd):
+            segments.append(bnd)
+    return np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+
+def _static_shaft_distance_segments():
+    segments = []
+    for shaft in shafts:
+        bnd = _extract_bnd_segs(shaft)
+        if len(bnd):
+            segments.append(bnd)
+    return np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
 
 def _static_clearance_distances():
     global static_clearance_cache
@@ -1974,26 +2098,18 @@ def _static_clearance_distances():
     key = (
         id(routing_region_base),
         len(grid_edge_list or []),
+        len(rooms),
         len(wall_polys),
         len(shafts),
+        tuple(room.polygon.bounds for room in rooms),
         tuple(poly.bounds for poly in shafts),
         tuple(poly.bounds for poly in wall_polys),
     )
     if static_clearance_cache.get("key") == key:
         return static_clearance_cache.get("wall"), static_clearance_cache.get("shaft")
 
-    wall_geoms = []
-    if routing_region_base is not None and not routing_region_base.is_empty:
-        if isinstance(routing_region_base, Polygon):
-            wall_geoms.append(routing_region_base.exterior)
-        elif hasattr(routing_region_base, "geoms"):
-            wall_geoms.extend(geom.exterior for geom in routing_region_base.geoms if isinstance(geom, Polygon))
-    wall_geoms.extend(wall_polys)
-    wall_geom = unary_union(wall_geoms) if wall_geoms else None
-    shaft_geom = unary_union(shafts) if shafts else None
-
-    wall_distances = _line_distance_vector(wall_geom)
-    shaft_distances = _line_distance_vector(shaft_geom)
+    wall_distances = _edge_parallel_segment_min_distances(grid_edge_coords, _static_wall_distance_segments())
+    shaft_distances = _edge_segment_min_distances(grid_edge_coords, _static_shaft_distance_segments())
     static_clearance_cache = {"key": key, "wall": wall_distances, "shaft": shaft_distances}
     return wall_distances, shaft_distances
 
@@ -2005,7 +2121,7 @@ def add_static_clearance_weights(edge_weights, route_diameter, env, allow_shaft_
     radius = float(get_buffered_radius_mm(route_diameter))
     blocked_mask = np.zeros(len(grid_edge_list), dtype=bool)
     if wall_distances is not None:
-        wall_limit = max(float(ROUTING_WALL_CLEARANCE_MM), radius)
+        wall_limit = radius
         blocked_mask |= wall_distances < wall_limit - 1e-7
     if shaft_distances is not None and not allow_shaft_entry:
         shaft_limit = max(float(PATINEJO_CLEARANCE_MM), radius)
@@ -2451,6 +2567,47 @@ def _room_polygon_by_name(room_name):
             return room.polygon
     return None
 
+def _room_terminal_boundary_segments(room_name):
+    cache_key = ("room_terminal_boundary", room_name, id(routing_region_base), len(rooms), len(wall_polys))
+    if cache_key in geometry_distance_cache:
+        return geometry_distance_cache[cache_key]
+
+    room_poly = _room_polygon_by_name(room_name)
+    segments = []
+    if room_poly is not None:
+        bnd = _extract_bnd_segs(room_poly)
+        if len(bnd):
+            segments.append(bnd)
+    for room in rooms:
+        bnd = _extract_bnd_segs(room.polygon)
+        if len(bnd):
+            segments.append(bnd)
+    for wall in walls:
+        line = _extract_line_segs(wall)
+        if len(line):
+            segments.append(line)
+    for wp in wall_polys:
+        bnd = _extract_bnd_segs(wp)
+        if len(bnd):
+            segments.append(bnd)
+    result = np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+    geometry_distance_cache[cache_key] = result
+    return result
+
+def _filter_terminal_candidate_nodes_by_wall_distance(room_name, candidate_nodes):
+    if current_env is None or not candidate_nodes:
+        return []
+    segments = _room_terminal_boundary_segments(room_name)
+    if len(segments) == 0:
+        return list(candidate_nodes)
+
+    node_indices = np.array(candidate_nodes, dtype=np.int64)
+    pts = current_env.nodes[node_indices]
+    distances = _point_segment_min_distances(pts, segments)
+    min_clearance = max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM)
+    keep = distances >= float(min_clearance) - 1e-7
+    return [int(i) for i in node_indices[keep]]
+
 def get_room_candidate_start_nodes(route_name):
     if grid_kd is None or current_env is None:
         return []
@@ -2469,10 +2626,6 @@ def get_room_candidate_start_nodes(route_name):
         return list(nodes)
 
     valid_region = room_poly.intersection(routing_region_base)
-    if ROUTING_WALL_CLEARANCE_MM > 0:
-        inset = valid_region.buffer(-ROUTING_WALL_CLEARANCE_MM, join_style=2)
-        if not inset.is_empty:
-            valid_region = inset
 
     prepared = shapely_prep(valid_region)
     nodes = [
@@ -2480,6 +2633,7 @@ def get_room_candidate_start_nodes(route_name):
         for i, pt in enumerate(current_env.nodes)
         if current_env.adj.get(int(i)) and prepared.contains(Point(float(pt[0]), float(pt[1])))
     ]
+    nodes = _filter_terminal_candidate_nodes_by_wall_distance(route_name, nodes)
     if nodes:
         nodes.sort(
             key=lambda i: float(
@@ -2489,8 +2643,7 @@ def get_room_candidate_start_nodes(route_name):
         room_start_node_cache[route_name] = nodes
         return list(nodes)
 
-    _, node_idx = grid_kd.query(terminal_pt)
-    nodes = [int(node_idx)]
+    nodes = []
     room_start_node_cache[route_name] = nodes
     return list(nodes)
 
@@ -5164,6 +5317,20 @@ def draw_help_popup(screen, font_small):
         lbl = font_small.render(line, True, COLOR_TEXT)
         screen.blit(lbl, (rect.x + 10, rect.y + 10 + i * line_h))
 
+def set_transient_message(text, duration_ms=2400):
+    global transient_message, transient_message_until_ms
+    transient_message = str(text)
+    transient_message_until_ms = pygame.time.get_ticks() + int(duration_ms)
+
+def draw_transient_message(screen, font_small):
+    if not transient_message or pygame.time.get_ticks() > transient_message_until_ms:
+        return
+    surf = font_small.render(transient_message, True, COLOR_TEXT)
+    rect = pygame.Rect(CANVAS_LEFT + 16, CANVAS_TOP + 16, surf.get_width() + 20, surf.get_height() + 12)
+    pygame.draw.rect(screen, (55, 45, 35), rect, border_radius=5)
+    pygame.draw.rect(screen, (241, 196, 15), rect, 1, border_radius=5)
+    screen.blit(surf, (rect.left + 10, rect.top + 6))
+
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
     global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
@@ -5339,6 +5506,8 @@ def main():
                         changed, marker_room = apply_preferred_terminal_point((world_x, world_y), remove=remove_marker)
                         if marker_room:
                             selected_route_name = marker_room
+                        elif not remove_marker:
+                            set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
                         if changed:
                             routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                             if routes and not status.startswith("Blocked"):
@@ -6006,6 +6175,7 @@ def main():
         draw_plots(screen, font_small, font_bold)
         draw_solution_logs_panel(screen, font_small, font_bold)
         draw_help_popup(screen, font_small)
+        draw_transient_message(screen, font_small)
 
         pygame.display.flip()
         clock.tick(FPS)

@@ -258,7 +258,8 @@ Sequential routing keeps the super-sink connection model, but applies one canoni
 
 The interaction weights are applied during traversal and are reflected in the final score. If a simultaneous or fallback strategy still produces a same-axis overlap, it is reported and receives `OVERLAP_SCORE_PENALTY`. Short-piece penalties are post-route score terms only. Static geometry clearance is also applied as an edge field before routing:
 
-- Walls/allowed-area exteriors are hard-blocked below `max(ROUTING_WALL_CLEARANCE_MM, buffered duct radius)`.
+- Terminal candidates are disconnected from their virtual room source when they are inside either the 100 mm regulation terminal clearance or `BUFFER_ROOM_TERMINALES_AIRE_MM`.
+- Walls/allowed-area exteriors are hard-blocked below the buffered duct radius.
 - Patinejo/shaft clearance is hard-blocked below `max(PATINEJO_CLEARANCE_MM, buffered duct radius)` for non-shaft ducts. The current value is 200 mm, matching `BUFFER_ALLOWED_PATINEJO = 0.2 m` from the local routing-core config.
 - The shaft route itself is exempt from the patinejo clearance field so it can enter the shaft.
 
@@ -285,3 +286,4 @@ Manual solution logs are drawn as diamond markers with `L1`, `L2`, etc. Automati
 - Add optional export for session logs if visual exploration later needs CSV/JSON output.
 - Revisit routing-core alignment after the demo placement workflow stabilizes.
 - Scope machine placement and rotation changes separately from the current terminal-preference work.
+- Add a NumPy-only detector for edges parallel to walls that run inside wall gaps or wall cavities.
