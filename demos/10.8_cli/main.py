@@ -135,6 +135,9 @@ DUCT_BUFFER_RATIO = 1.05
 ROUTING_WALL_CLEARANCE_MM = 100
 TERMINAL_REGULATION_CLEARANCE_MM = ROUTING_WALL_CLEARANCE_MM
 BUFFER_ROOM_TERMINALES_AIRE_MM = 150
+CLIMA_GRILLE_WIDTH_MM = 300
+CLIMA_GRILLE_MIN_WALL_LENGTH_MM = 500
+CLIMA_GRILLE_MIN_SEPARATION_MM = 450
 PATINEJO_CLEARANCE_MM = 200
 SHAFT_ENTRY_SEARCH_MM = 700
 SHAFT_ENTRY_MAX_CANDIDATES = 16
@@ -220,7 +223,7 @@ PREFERRED_TERMINAL_REMAP_TOLERANCE_MM = 300.0
 
 ROOM_START_MODES = [
     "Room node set",
-    "Centroid terminal",
+    "Selected grille point",
 ]
 room_start_mode_idx = 0
 
@@ -763,6 +766,7 @@ shaft_extraction = None
 shaft_core_entry_specs = []
 shaft_entry_geometry_by_node = {}
 terminals        = {}
+terminal_candidate_options = {}
 wet_room_names   = []
 machine_cx    = 0.0
 machine_cy    = 0.0
@@ -828,14 +832,6 @@ def _is_clima_terminal_room(room):
     )
     return any(key in text for key in positive_keys)
 
-def _terminal_point_in_routing_region(room):
-    if routing_region_base is None:
-        return get_representative_point(room.polygon)
-    allowed_room = room.polygon.intersection(routing_region_base)
-    if allowed_room.is_empty:
-        return get_representative_point(room.polygon)
-    return get_representative_point(allowed_room)
-
 def _point_allowed_for_terminal(room, pt):
     point = Point(float(pt[0]), float(pt[1]))
     if not room.polygon.contains(point):
@@ -844,24 +840,118 @@ def _point_allowed_for_terminal(room, pt):
         return False
     return True
 
-def _clima_supply_return_points(room):
-    base = _terminal_point_in_routing_region(room)
+def _route_base_room_name(route_name):
+    for suffix in (" Supply", " Return"):
+        if route_name.endswith(suffix):
+            return route_name[:-len(suffix)]
+    return route_name
+
+def _room_allowed_region(room):
+    if routing_region_base is None:
+        return room.polygon
+    allowed = room.polygon.intersection(routing_region_base)
+    return allowed if not allowed.is_empty else room.polygon
+
+def _segment_unit_and_normal(p0, p1, room_poly):
+    vec = np.array([float(p1[0]) - float(p0[0]), float(p1[1]) - float(p0[1])], dtype=np.float64)
+    length = float(np.hypot(vec[0], vec[1]))
+    if length <= 1e-7:
+        return None, None, 0.0
+    unit = vec / length
+    normals = (np.array([-unit[1], unit[0]]), np.array([unit[1], -unit[0]]))
+    mid = (np.array(p0, dtype=np.float64) + np.array(p1, dtype=np.float64)) / 2.0
+    for normal in normals:
+        probe = mid + normal * 80.0
+        if room_poly.contains(Point(float(probe[0]), float(probe[1]))):
+            return unit, normal, length
+    return unit, normals[0], length
+
+def _grille_candidate_points_for_segment(room, p0, p1, segment_idx):
+    unit, normal, length = _segment_unit_and_normal(p0, p1, room.polygon)
+    min_span = CLIMA_GRILLE_WIDTH_MM + 2 * TERMINAL_REGULATION_CLEARANCE_MM
+    if unit is None or length < max(CLIMA_GRILLE_MIN_WALL_LENGTH_MM, min_span):
+        return []
+
+    p0 = np.array(p0, dtype=np.float64)
+    p1 = np.array(p1, dtype=np.float64)
+    inward_offset = max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM)
+    edge_margin = TERMINAL_REGULATION_CLEARANCE_MM + CLIMA_GRILLE_WIDTH_MM / 2.0
+    distances = [length / 2.0]
+    if length >= CLIMA_GRILLE_WIDTH_MM * 3.0:
+        distances.extend([edge_margin, length - edge_margin])
+
+    candidates = []
+    seen = set()
+    for dist in distances:
+        if dist < edge_margin - 1e-7 or dist > length - edge_margin + 1e-7:
+            continue
+        base = p0 + unit * dist
+        pt = base + normal * inward_offset
+        rounded = (round(float(pt[0])), round(float(pt[1])))
+        if rounded in seen or not _point_allowed_for_terminal(room, rounded):
+            continue
+        seen.add(rounded)
+        center_bias = abs(dist - length / 2.0) / max(length / 2.0, 1.0)
+        candidates.append({
+            "point": rounded,
+            "segment_idx": segment_idx,
+            "segment_length": length,
+            "distance_along": float(dist),
+            "score": float(length - center_bias * 200.0),
+        })
+    return candidates
+
+def _clima_grille_candidates_for_room(room):
+    if not hasattr(room.polygon, "exterior"):
+        return []
+    coords = list(room.polygon.exterior.coords)
+    candidates = []
+    for idx, (p0, p1) in enumerate(zip(coords, coords[1:])):
+        candidates.extend(_grille_candidate_points_for_segment(room, p0, p1, idx))
+    candidates.sort(key=lambda item: item["score"], reverse=True)
+    return candidates
+
+def _fallback_terminal_points(room):
+    allowed = _room_allowed_region(room)
+    base = get_representative_point(allowed)
     minx, miny, maxx, maxy = room.polygon.bounds
     width = maxx - minx
     height = maxy - miny
     offset = max(250.0, min(width, height) * 0.22)
-    if width >= height:
-        candidates = ((base[0] - offset, base[1]), (base[0] + offset, base[1]))
-    else:
-        candidates = ((base[0], base[1] - offset), (base[0], base[1] + offset))
-
+    raw = (
+        ((base[0] - offset, base[1]), (base[0] + offset, base[1]))
+        if width >= height
+        else ((base[0], base[1] - offset), (base[0], base[1] + offset))
+    )
     points = []
-    for pt in candidates:
+    for pt in raw:
         rounded = (round(pt[0]), round(pt[1]))
         points.append(rounded if _point_allowed_for_terminal(room, rounded) else base)
     return points[0], points[1]
 
+def _select_clima_grille_pair(room, candidates):
+    if len(candidates) < 2:
+        return None
+    best = None
+    for i, a in enumerate(candidates):
+        for b in candidates[i + 1:]:
+            pa = np.array(a["point"], dtype=np.float64)
+            pb = np.array(b["point"], dtype=np.float64)
+            sep = float(np.hypot(*(pa - pb)))
+            if sep < CLIMA_GRILLE_MIN_SEPARATION_MM:
+                continue
+            different_wall_bonus = 350.0 if a["segment_idx"] != b["segment_idx"] else 0.0
+            score = sep + different_wall_bonus + 0.1 * (a["segment_length"] + b["segment_length"])
+            if best is None or score > best[0]:
+                best = (score, a, b)
+    if best is None:
+        return None
+    _, supply, ret = best
+    return supply, ret
+
 def build_clima_terminals_from_rooms():
+    global terminal_candidate_options
+    terminal_candidate_options = {}
     candidates = [room for room in rooms if _is_clima_terminal_room(room)]
     if not candidates:
         candidates = [
@@ -883,10 +973,17 @@ def build_clima_terminals_from_rooms():
         base_name = str(getattr(room, "name", "") or "Clima").strip() or "Clima"
         counts[base_name] = counts.get(base_name, 0) + 1
         room_name = base_name if counts[base_name] == 1 else f"{base_name} {counts[base_name]}"
-        supply_pt, return_pt = _clima_supply_return_points(room)
+        room.name = room_name
+        grille_candidates = _clima_grille_candidates_for_room(room)
+        terminal_candidate_options[room_name] = grille_candidates
+        pair = _select_clima_grille_pair(room, grille_candidates)
+        if pair is None:
+            supply_pt, return_pt = _fallback_terminal_points(room)
+        else:
+            supply_pt = pair[0]["point"]
+            return_pt = pair[1]["point"]
         result[f"{room_name} Supply"] = supply_pt
         result[f"{room_name} Return"] = return_pt
-        room.name = room_name
     return result
 
 def _is_clima_machine_room(room):
@@ -2846,8 +2943,9 @@ def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
     return terminal_nodes
 
 def _room_polygon_by_name(room_name):
+    base_name = _route_base_room_name(room_name)
     for room in rooms:
-        if room.name == room_name:
+        if room.name == room_name or room.name == base_name:
             return room.polygon
     return None
 
@@ -3116,6 +3214,27 @@ def draw_preferred_terminal_areas(screen, selected_route_name=None):
                 n_rect = pygame.Rect(0, 0, marker_side, marker_side)
                 n_rect.center = (sx, sy)
                 pygame.draw.rect(screen, node_color, n_rect, 1)
+
+def draw_auto_grille_candidate_markers(screen, selected_route_name=None):
+    if not terminal_candidate_options:
+        return
+    selected_base = _route_base_room_name(selected_route_name) if selected_route_name else None
+    chosen_points = set(terminals.values())
+    for room_name, candidates in terminal_candidate_options.items():
+        muted = bool(selected_base and room_name != selected_base)
+        for candidate in candidates:
+            pt = candidate["point"]
+            sx, sy = to_screen(float(pt[0]), float(pt[1]))
+            if pt in chosen_points:
+                rect = pygame.Rect(0, 0, 12, 12)
+                rect.center = (sx, sy)
+                color = (255, 255, 255) if not muted else (86, 90, 94)
+                pygame.draw.rect(screen, color, rect, 2)
+                continue
+            rect = pygame.Rect(0, 0, 5, 5)
+            rect.center = (sx, sy)
+            color = (52, 152, 219) if not muted else (70, 74, 78)
+            pygame.draw.rect(screen, color, rect)
 
 def draw_preferred_terminal_markers(screen, selected_route_name=None, routes=None):
     if current_env is None:
@@ -6264,6 +6383,7 @@ def main():
                     pygame.draw.line(screen, c, sp1, sp2, width)
 
         draw_preferred_terminal_areas(screen, selected_route_name)
+        draw_auto_grille_candidate_markers(screen, selected_route_name)
         draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name)
         draw_preferred_terminal_markers(screen, selected_route_name, routes)
         draw_terminal_area_drag(screen, terminal_area_start_mm, terminal_area_end_mm if terminal_area_dragging else None)
