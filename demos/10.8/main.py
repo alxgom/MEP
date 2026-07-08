@@ -163,15 +163,17 @@ crossing_weight_reset_rect = pygame.Rect(0, 0, 1, 1)
 preference_reset_rect = pygame.Rect(0, 0, 1, 1)
 
 # Color Scheme
-COLOR_BG = (28, 28, 36)
+COLOR_BG = (240, 238, 233)
 COLOR_PANEL = (35, 35, 45)
 COLOR_PLOT_BG = (22, 22, 30)
 COLOR_ROOM = (45, 52, 54)
-COLOR_ROOM_COVERED = (52, 73, 94) # Slate Blue for false ceilings
+COLOR_ROOM_COVERED = (248, 247, 243)
+COLOR_COVER_OVERLAY = (96, 104, 112, 34)
 COLOR_HALLWAY = (57, 72, 85)
-COLOR_WALL = (125, 136, 142)
+COLOR_WALL = (0, 0, 0)
+COLOR_WET_ROOM_ACCENT = (95, 178, 218)
 WALL_DRAW_WIDTH = 2
-COLOR_COLUMN = (15, 76, 129)
+COLOR_COLUMN = (0, 0, 0)
 COLOR_SHAFT = (231, 76, 60)
 COLOR_SHAFT_BG = (231, 76, 60, 40)
 COLOR_DOOR = (220, 220, 220)
@@ -183,7 +185,11 @@ COLOR_DESELECTED_ROUTE = (7, 8, 10)
 COLOR_DESELECTED_ROOM = (39, 42, 43)
 COLOR_DESELECTED_PIN = (112, 116, 120)
 COLOR_SELECTION_HALO = (210, 235, 255)
-COLOR_BLOCKED_EDGE = (178, 184, 190)
+COLOR_BLOCKED_EDGE = (82, 76, 88)
+COLOR_GRAPH_EDGE = (122, 130, 140)
+COLOR_GRAPH_NODE = (96, 106, 116)
+COLOR_PLAN_LABEL = (18, 22, 28)
+COLOR_PLAN_LABEL_HALO = (255, 255, 255)
 
 # Route Colors
 ROUTE_COLORS = {
@@ -298,13 +304,17 @@ def get_canvas_tool_buttons():
     y0 = CANVAS_TOP + 12
     reset_w = 46
     cursor = x0 + 2 * (size + gap) + reset_w + gap
+    ruler_rect = pygame.Rect(cursor, y0, 58, size)
+    weights_rect = pygame.Rect(ruler_rect.right + gap, y0, 72, size)
+    weight_switch_rect = get_weight_view_switch_rect(weights_rect)
+    diameter_rect = pygame.Rect(weight_switch_rect.right + gap, y0, 54, size)
     return [
         ("in", pygame.Rect(x0, y0, size, size), "+"),
         ("out", pygame.Rect(x0 + size + gap, y0, size, size), "-"),
         ("reset", pygame.Rect(x0 + 2 * (size + gap), y0, reset_w, size), "1:1"),
-        ("ruler", pygame.Rect(cursor, y0, 58, size), "Ruler"),
-        ("weights", pygame.Rect(cursor + 58 + gap, y0, 72, size), "Weights"),
-        ("diameter", pygame.Rect(cursor + 58 + gap + 72 + gap + 74, y0, 54, size), "Diam"),
+        ("ruler", ruler_rect, "Ruler"),
+        ("weights", weights_rect, "Weights"),
+        ("diameter", diameter_rect, "Diam"),
     ]
 
 def handle_canvas_tool_button_click(pos):
@@ -325,14 +335,11 @@ def handle_canvas_tool_button_click(pos):
         return "weight_view"
     return None
 
-def get_weight_view_switch_rect():
-    size = 28
+def get_weight_view_switch_rect(weights_rect=None):
     gap = 6
-    x0 = CANVAS_LEFT + 12
-    y0 = CANVAS_TOP + 12
-    reset_w = 46
-    cursor = x0 + 2 * (size + gap) + reset_w + gap
-    return pygame.Rect(cursor + 58 + gap + 72 + gap, y0 + 4, 64, 20)
+    if weights_rect is None:
+        weights_rect = next(rect for action, rect, _ in get_canvas_tool_buttons() if action == "weights")
+    return pygame.Rect(weights_rect.right + gap, weights_rect.y + 2, 92, 24)
 
 def min_piece_factor_from_slider_x(x):
     if min_piece_slider_rect.width <= 0:
@@ -394,8 +401,8 @@ def draw_min_piece_slider(screen, font_small, x, y, width):
     pygame.draw.rect(screen, COLOR_MUTED, min_piece_slider_rect, 1, border_radius=4)
     t = (min_piece_factor - MIN_PIECE_FACTOR_MIN) / (MIN_PIECE_FACTOR_MAX - MIN_PIECE_FACTOR_MIN)
     knob_x = int(min_piece_slider_rect.x + t * min_piece_slider_rect.width)
-    pygame.draw.circle(screen, (241, 196, 15), (knob_x, min_piece_slider_rect.centery), 8)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, min_piece_slider_rect.centery), 8, 1)
+    pygame.draw.circle(screen, (255, 255, 255), (knob_x, min_piece_slider_rect.centery), 8)
+    pygame.draw.circle(screen, (190, 196, 204), (knob_x, min_piece_slider_rect.centery), 8, 1)
     min_lbl = font_small.render(f"{MIN_PIECE_FACTOR_MIN:.1f}", True, COLOR_MUTED)
     max_lbl = font_small.render(f"{MIN_PIECE_FACTOR_MAX:.1f}", True, COLOR_MUTED)
     screen.blit(min_lbl, (min_piece_slider_rect.x, min_piece_slider_rect.bottom + 3))
@@ -420,14 +427,15 @@ def draw_weight_slider(screen, font_small, x, y, width, label, value, min_value,
     span = max_value - min_value
     t = 0.0 if span <= 0 else (value - min_value) / span
     knob_x = int(rect.x + max(0.0, min(1.0, t)) * rect.width)
-    pygame.draw.circle(screen, color, (knob_x, rect.centery), 8)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), 8, 1)
+    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), 8)
+    pygame.draw.circle(screen, (190, 196, 204), (knob_x, rect.centery), 8, 1)
     reset_rect = bend_weight_reset_rect if rect_name == "bend" else crossing_weight_reset_rect
-    pygame.draw.rect(screen, (38, 44, 54), reset_rect, border_radius=4)
-    pygame.draw.rect(screen, COLOR_MUTED, reset_rect, 1, border_radius=4)
+    pygame.draw.rect(screen, (32, 34, 38), reset_rect, border_radius=4)
+    pygame.draw.rect(screen, (128, 136, 144), reset_rect, 1, border_radius=4)
     cx, cy = reset_rect.center
-    pygame.draw.arc(screen, COLOR_TEXT, pygame.Rect(cx - 5, cy - 5, 10, 10), math.radians(35), math.radians(315), 2)
-    pygame.draw.polygon(screen, COLOR_TEXT, [(cx + 4, cy - 6), (cx + 8, cy - 5), (cx + 5, cy - 2)])
+    icon_color = (198, 204, 210)
+    pygame.draw.arc(screen, icon_color, pygame.Rect(cx - 5, cy - 5, 10, 10), math.radians(35), math.radians(315), 2)
+    pygame.draw.polygon(screen, icon_color, [(cx + 4, cy - 6), (cx + 8, cy - 5), (cx + 5, cy - 2)])
 
 def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
     if routes:
@@ -458,16 +466,17 @@ def handle_terminal_tool_button_click(pos):
 
 def draw_weight_view_switch(screen, font_small):
     rect = get_weight_view_switch_rect()
-    pygame.draw.rect(screen, (38, 44, 54), rect, border_radius=10)
-    pygame.draw.rect(screen, (170, 180, 190), rect, 1, border_radius=10)
     left_active = edge_weight_view_mode_idx == 0
-    knob_x = rect.left + 10 if left_active else rect.right - 10
-    fill = (46, 204, 113) if left_active else (52, 152, 219)
-    pygame.draw.circle(screen, fill, (knob_x, rect.centery), 8)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), 8, 1)
+    pygame.draw.rect(screen, (32, 34, 38), rect, border_radius=rect.height // 2)
+    pygame.draw.rect(screen, (150, 158, 166), rect, 1, border_radius=rect.height // 2)
+    knob_radius = 4 if left_active else 8
+    knob_x = rect.left + 13 if left_active else rect.right - 13
+    pygame.draw.circle(screen, (198, 204, 210), (knob_x, rect.centery), knob_radius)
+    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), knob_radius, 1)
     label = "Small" if left_active else "Big"
     lbl = font_small.render(label, True, COLOR_TEXT)
-    screen.blit(lbl, (rect.centerx - lbl.get_width() // 2, rect.bottom + 3))
+    label_x = rect.x + 28 if left_active else rect.x + 14
+    screen.blit(lbl, (label_x, rect.centery - lbl.get_height() // 2))
 
 def draw_terminal_tool_buttons(screen, font_bold, font_small):
     global terminal_tool_button_rects
@@ -570,8 +579,10 @@ def snap_to_integer_grid(geom):
 
 # Global layout variables
 rooms = []
+wet_room_outer_accents = []
 columns = []
 shafts = []
+covers = []
 doors = []
 walls = []
 wall_polys = []
@@ -2891,6 +2902,52 @@ def draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name=No
         pygame.draw.rect(screen, fill, rect)
         pygame.draw.rect(screen, border, rect, 2)
 
+def draw_geometry_overlay(screen, geometries, color_rgba):
+    if not geometries:
+        return
+    overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+    for geom in geometries:
+        if geom is None or geom.is_empty:
+            continue
+        for poly in _iter_polygons(geom):
+            coords = [to_screen(x, y) for x, y in poly.exterior.coords]
+            if len(coords) >= 3:
+                pygame.draw.polygon(overlay, color_rgba, coords)
+    screen.blit(overlay, (0, 0))
+
+def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
+    if len(points) < 2:
+        return
+    for p1, p2 in zip(points, points[1:]):
+        x1, y1 = p1
+        x2, y2 = p2
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.hypot(dx, dy)
+        if length <= 1e-6:
+            continue
+        ux = dx / length
+        uy = dy / length
+        travelled = 0.0
+        while travelled < length:
+            seg_end = min(travelled + dash_len, length)
+            start = (int(round(x1 + ux * travelled)), int(round(y1 + uy * travelled)))
+            end = (int(round(x1 + ux * seg_end)), int(round(y1 + uy * seg_end)))
+            pygame.draw.line(screen, color, start, end, width)
+            travelled += dash_len + gap_len
+
+def draw_wet_room_outer_accents(screen):
+    for geom in wet_room_outer_accents:
+        for poly in _iter_polygons(geom):
+            coords = [to_screen(x, y) for x, y in poly.exterior.coords]
+            pygame.draw.lines(screen, COLOR_WET_ROOM_ACCENT, True, coords, 3)
+
+def draw_outlined_text(screen, font, text, pos, color, outline_color=COLOR_PLAN_LABEL_HALO):
+    x, y = pos
+    for ox, oy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        screen.blit(font.render(text, True, outline_color), (x + ox, y + oy))
+    screen.blit(font.render(text, True, color), (x, y))
+
 def draw_terminal_area_drag(screen, start_world, end_world):
     if start_world is None or end_world is None:
         return
@@ -4370,7 +4427,7 @@ def solve_ventilation_routing():
 # DWELLING AND ROOM GENERATORS
 # ──────────────────────────────────────────────────────────────────────────
 def generate_synthetic_dwelling():
-    global rooms, columns, shafts, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
+    global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node
     
@@ -4383,6 +4440,7 @@ def generate_synthetic_dwelling():
         room_scaled = generative_layout.Room(scaled_poly, r.name)
         room_scaled.has_cover = any(cn in r.name for cn in covered_names)
         rooms.append(room_scaled)
+    covers = [r.polygon for r in rooms if getattr(r, "has_cover", False)]
         
     shafts_m = generative_layout.generate_mep_shafts(rooms_m)
     shafts = [snap_to_integer_grid(shapely_scale(s, xfact=SCALE_TO_MM, yfact=SCALE_TO_MM, origin=(0,0))) for s in shafts_m]
@@ -4492,6 +4550,7 @@ def generate_synthetic_dwelling():
         
     machine_angle = 0
     wet_room_names = list(terminals.keys())
+    rebuild_wet_room_outer_accents()
     current_scenario_label = "synthetic"
     current_scenario_summary = {}
     shaft_core_entry_specs = []
@@ -4558,6 +4617,21 @@ def _choose_initial_machine_position():
     candidates.sort(key=lambda item: (item[0], item[1]))
     return candidates[0][2]
 
+def rebuild_wet_room_outer_accents():
+    global wet_room_outer_accents
+    wet_names = set(wet_room_names)
+    accents = []
+    for room in rooms:
+        if getattr(room, "name", None) not in wet_names:
+            continue
+        poly = getattr(room, "polygon", None)
+        if poly is None or poly.is_empty:
+            continue
+        accent = poly.buffer(10.0, join_style=2)
+        if not accent.is_empty:
+            accents.append(accent)
+    wet_room_outer_accents = accents
+
 def _load_real_dwelling():
     global current_scenario_label, current_scenario_summary
     if load_dwelling_scenario is None:
@@ -4578,7 +4652,7 @@ def _load_real_dwelling():
     return scenario
 
 def generate_new_dwelling():
-    global rooms, columns, shafts, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
+    global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
     global shaft_core_entry_specs, shaft_entry_geometry_by_node
     global preferred_terminal_points_by_room, preferred_terminal_areas
@@ -4600,10 +4674,12 @@ def generate_new_dwelling():
     rooms = scenario.rooms
     columns = list(scenario.columns)
     shafts = list(scenario.shafts)
+    covers = list(getattr(scenario, "covers", []) or [room.polygon for room in rooms if getattr(room, "has_cover", False)])
     shaft_extraction = scenario.shaft_extraction
     routing_region_base = scenario.routing_region_base
     terminals = dict(scenario.terminals)
     wet_room_names = list(terminals.keys())
+    rebuild_wet_room_outer_accents()
     doors = []
     walls = _derive_real_walls()
     wall_polys = _build_wall_polys()
@@ -5331,6 +5407,16 @@ def draw_transient_message(screen, font_small):
     pygame.draw.rect(screen, (241, 196, 15), rect, 1, border_radius=5)
     screen.blit(surf, (rect.left + 10, rect.top + 6))
 
+def draw_viewer_legend(screen, font_small):
+    label = font_small.render("wet rooms", True, COLOR_PLAN_LABEL)
+    rect = pygame.Rect(CANVAS_LEFT + 18, CANVAS_TOP + CANVAS_H - 34, label.get_width() + 58, 24)
+    pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
+    pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
+    y = rect.centery
+    pygame.draw.line(screen, COLOR_WET_ROOM_ACCENT, (rect.x + 10, y), (rect.x + 36, y), 3)
+    pygame.draw.line(screen, COLOR_WALL, (rect.x + 10, y + 3), (rect.x + 36, y + 3), 1)
+    screen.blit(label, (rect.x + 44, rect.centery - label.get_height() // 2))
+
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
     global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
@@ -5859,6 +5945,8 @@ def main():
                 color = COLOR_ROOM_COVERED if room.has_cover else COLOR_ROOM
             pygame.draw.polygon(screen, color, screen_coords)
 
+        draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY)
+
         if show_heatmap:
             ensure_placement_heatmap_scores()
             if ap_scores:
@@ -5870,6 +5958,8 @@ def main():
             refresh_edge_weight_view_overlay(routes)
         draw_edge_weight_heatmap(screen)
         draw_edge_weight_colorbar(screen)
+
+        draw_wet_room_outer_accents(screen)
 
         for room in rooms:
             if not hasattr(room, 'polygon') or room.polygon.is_empty:
@@ -5902,9 +5992,9 @@ def main():
                         p2 = current_env.nodes[v]
                         sp1 = to_screen(p1[0], p1[1])
                         sp2 = to_screen(p2[0], p2[1])
-                        pygame.draw.line(screen, (95, 95, 120), sp1, sp2, 1)
+                        pygame.draw.line(screen, COLOR_GRAPH_EDGE, sp1, sp2, 1)
             for p in current_env.nodes:
-                pygame.draw.circle(screen, (135, 135, 160), to_screen(p[0], p[1]), 2)
+                pygame.draw.circle(screen, COLOR_GRAPH_NODE, to_screen(p[0], p[1]), 2)
             
         for r_name, pt in terminals.items():
             s_pt = to_screen(pt[0], pt[1])
@@ -5912,15 +6002,21 @@ def main():
             if selected_route_name and r_name != selected_route_name:
                 c_core = COLOR_DESELECTED_PIN
                 ring_color = (70, 74, 78)
-                text_color = COLOR_MUTED
+                text_color = (84, 88, 94)
             else:
                 ring_color = (255, 255, 255)
-                text_color = COLOR_TEXT
+                text_color = COLOR_PLAN_LABEL
             pygame.draw.circle(screen, ring_color, s_pt, 7)
             pygame.draw.circle(screen, c_core, s_pt, 5)
             lbl_name = r_name.replace("Bathroom", "Bath").replace("Washroom", "Wash")
             text_surf = font_small.render(lbl_name, True, text_color)
-            screen.blit(text_surf, (s_pt[0] - text_surf.get_width()//2, s_pt[1] + 10))
+            draw_outlined_text(
+                screen,
+                font_small,
+                lbl_name,
+                (s_pt[0] - text_surf.get_width() // 2, s_pt[1] + 10),
+                text_color,
+            )
             
         if shaft_extraction:
             s_rep = get_representative_point(shaft_extraction)
@@ -6030,7 +6126,7 @@ def main():
         # 1. Auto-placement State Card
         auto_card = pygame.Rect(15, 75, CANVAS_LEFT - 40, 135)
         pygame.draw.rect(screen, (40, 45, 55), auto_card, border_radius=6)
-        lbl_ap_title = font_bold.render("AUTO-PLACEMENT STATE", True, (230, 126, 34))
+        lbl_ap_title = font_bold.render("AUTO-PLACEMENT STATE", True, COLOR_TEXT)
         screen.blit(lbl_ap_title, (25, 85))
         draw_card_help_button(screen, "auto", auto_card, font_small)
         mode_text = AUTO_PLACEMENT_MODES[auto_placement_mode_idx]
@@ -6054,7 +6150,7 @@ def main():
         # 2. Solver Config Card
         solver_card = pygame.Rect(15, 220, CANVAS_LEFT - 40, 250)
         pygame.draw.rect(screen, (40, 45, 55), solver_card, border_radius=6)
-        lbl_solv_title = font_bold.render("ROUTING PATH SOLVER", True, (52, 152, 219))
+        lbl_solv_title = font_bold.render("ROUTING PATH SOLVER", True, COLOR_TEXT)
         screen.blit(lbl_solv_title, (25, 230))
         draw_card_help_button(screen, "solver", solver_card, font_small)
         lbl_strat = font_small.render(f"Strategy: {ROUTING_STRATEGIES[routing_strategy_idx]}", True, COLOR_TEXT)
@@ -6083,7 +6179,7 @@ def main():
         # 3. Placement Info Card
         machine_card = pygame.Rect(15, 480, CANVAS_LEFT - 40, 105)
         pygame.draw.rect(screen, (40, 45, 55), machine_card, border_radius=6)
-        lbl_pos_title = font_bold.render("MACHINE PLACEMENT", True, (46, 204, 113))
+        lbl_pos_title = font_bold.render("MACHINE PLACEMENT", True, COLOR_TEXT)
         screen.blit(lbl_pos_title, (25, 490))
         draw_card_help_button(screen, "machine", machine_card, font_small)
         source_label = DWELLING_SOURCE_MODES[dwelling_source_idx]
@@ -6102,7 +6198,7 @@ def main():
         # 4. KPI Metrics Card
         kpi_card = pygame.Rect(15, 595, CANVAS_LEFT - 40, 135)
         pygame.draw.rect(screen, (40, 45, 55), kpi_card, border_radius=6)
-        lbl_kpi_title = font_bold.render("ROUTING RUNTIME KPIs", True, (241, 196, 15))
+        lbl_kpi_title = font_bold.render("ROUTING RUNTIME KPIs", True, COLOR_TEXT)
         screen.blit(lbl_kpi_title, (25, 605))
         draw_card_help_button(screen, "kpi", kpi_card, font_small)
         
@@ -6129,7 +6225,7 @@ def main():
         # 5. Status Box
         status_card = pygame.Rect(15, 740, CANVAS_LEFT - 40, 170)
         pygame.draw.rect(screen, (40, 45, 55), status_card, border_radius=6)
-        lbl_status_title = font_bold.render("SOLVER EXECUTION STATUS", True, (155, 89, 182))
+        lbl_status_title = font_bold.render("SOLVER EXECUTION STATUS", True, COLOR_TEXT)
         screen.blit(lbl_status_title, (25, 750))
         draw_card_help_button(screen, "status", status_card, font_small)
         
@@ -6167,6 +6263,8 @@ def main():
         screen.blit(lbl_fps, (25, 905))
         
         # ── RIGHT PANEL: plots ──────────────────────────────────────────────
+        draw_viewer_legend(screen, font_small)
+
         panel_x = WINDOW_WIDTH - PANEL_W
         pygame.draw.rect(screen, COLOR_PANEL, (panel_x, 0, PANEL_W, WINDOW_HEIGHT))
         pygame.draw.line(screen, (55, 55, 70), (panel_x, 0), (panel_x, WINDOW_HEIGHT))
