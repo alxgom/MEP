@@ -825,6 +825,9 @@ def _is_service_room(room):
     return any(key in text for key in service_keys)
 
 def _is_clima_terminal_room(room):
+    core_role = getattr(room, "clima_is_target", None)
+    if core_role is not None:
+        return bool(core_role)
     if not getattr(room, "has_cover", False):
         return False
     if not hasattr(room, "polygon") or room.polygon.is_empty:
@@ -982,6 +985,79 @@ def _segment_candidate_at_end(room, segment, segment_idx, grille_width, role):
     dist = segment["length"] - (CLIMA_GRILLE_MIN_WALL_DISTANCE_MM + grille_width / 2.0)
     return _line_candidate_from_segment(room, segment["p0"], segment["p1"], segment_idx, dist, grille_width, role)
 
+def _machine_supply_ray_towards(target_point):
+    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+    options = []
+    for pin_name, local_dir in (("left_mid", (-1.0, 0.0)), ("right_mid", (1.0, 0.0))):
+        if pin_name not in pins:
+            continue
+        direction = _local_axis_to_world(local_dir, machine_angle)
+        pin = pins[pin_name]
+        origin = (
+            float(pin[0]) + direction[0] * 700.0,
+            float(pin[1]) + direction[1] * 700.0,
+        )
+        angle = abs(_point_angle_to_target(origin, direction, target_point))
+        distance = math.hypot(origin[0] - target_point[0], origin[1] - target_point[1])
+        options.append((angle, distance, origin, direction))
+    if not options:
+        return None, None
+    _, _, origin, direction = min(options, key=lambda item: item[:2])
+    return origin, direction
+
+def _machine_aligned_candidate_from_segment(room, segment, segment_idx, grille_width, role):
+    target = get_representative_point(room.polygon)
+    origin, direction = _machine_supply_ray_towards(target)
+    if origin is None or direction is None:
+        return None
+    ray = LineString([
+        origin,
+        (origin[0] + direction[0] * 4000.0, origin[1] + direction[1] * 4000.0),
+    ])
+    wall = LineString([segment["p0"], segment["p1"]])
+    hit = wall.intersection(ray)
+    if hit.is_empty or not isinstance(hit, Point):
+        return None
+    p0 = np.array(segment["p0"], dtype=np.float64)
+    p1 = np.array(segment["p1"], dtype=np.float64)
+    vec = p1 - p0
+    length = float(np.hypot(vec[0], vec[1]))
+    if length <= 1e-7:
+        return None
+    unit = vec / length
+    hit_vec = np.array([hit.x, hit.y], dtype=np.float64) - p0
+    distance_along = float(np.dot(hit_vec, unit))
+    min_dist = CLIMA_GRILLE_MIN_WALL_DISTANCE_MM + grille_width / 2.0
+    if distance_along < min_dist or distance_along > length - min_dist:
+        return None
+    return _line_candidate_from_segment(
+        room,
+        segment["p0"],
+        segment["p1"],
+        segment_idx,
+        distance_along,
+        grille_width,
+        role,
+    )
+
+def _return_candidate_on_remaining_segment(room, segment, segment_idx, supply, prefer_start):
+    if supply is None:
+        return None
+    vector_side = CLIMA_GRILLE_MIN_WALL_DISTANCE_MM + CLIMA_GRILLE_RETURN_WIDTH_MM / 2.0
+    if prefer_start:
+        dist = vector_side
+    else:
+        dist = segment["length"] - vector_side
+    return _line_candidate_from_segment(
+        room,
+        segment["p0"],
+        segment["p1"],
+        segment_idx,
+        dist,
+        CLIMA_GRILLE_RETURN_WIDTH_MM,
+        "Return",
+    )
+
 def _grille_overlap_on_same_segment(a, b):
     if a["segment_idx"] != b["segment_idx"]:
         return 0.0
@@ -1006,6 +1082,21 @@ def _same_wall_options(room, segment, segment_idx):
     supply_start = _segment_candidate_at_start(room, segment, segment_idx, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
     return_end = _segment_candidate_at_end(room, segment, segment_idx, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
     options = []
+    supply_aligned = _machine_aligned_candidate_from_segment(
+        room, segment, segment_idx, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply"
+    )
+    if supply_aligned is not None:
+        dist_to_start = supply_aligned["distance_along"]
+        dist_to_end = segment["length"] - supply_aligned["distance_along"]
+        ret = _return_candidate_on_remaining_segment(
+            room,
+            segment,
+            segment_idx,
+            supply_aligned,
+            prefer_start=dist_to_start > dist_to_end,
+        )
+        if _valid_grille_pair(supply_aligned, ret):
+            options.append({"type": "common_wall_machine_aligned", "supply": supply_aligned, "return": ret})
     if _valid_grille_pair(supply_start, return_end):
         options.append({"type": "common_wall", "supply": supply_start, "return": return_end})
     return_start = _segment_candidate_at_start(room, segment, segment_idx, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
@@ -1017,7 +1108,10 @@ def _same_wall_options(room, segment, segment_idx):
 def _two_wall_options(room, segments):
     options = []
     for i, segment in enumerate(segments):
-        supply = _segment_candidate_at_center(room, segment, i, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+        supply = (
+            _machine_aligned_candidate_from_segment(room, segment, i, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+            or _segment_candidate_at_center(room, segment, i, CLIMA_GRILLE_IMPULSION_WIDTH_MM, "Supply")
+        )
         for j, other in enumerate(segments[i + 1:], start=i + 1):
             ret = _segment_candidate_at_center(room, other, j, CLIMA_GRILLE_RETURN_WIDTH_MM, "Return")
             if _valid_grille_pair(supply, ret):
@@ -1167,6 +1261,9 @@ def build_clima_terminals_from_rooms():
     return result
 
 def _is_clima_machine_room(room):
+    core_role = getattr(room, "clima_is_machine_candidate", None)
+    if core_role is not None:
+        return bool(core_role)
     if not getattr(room, "has_cover", False):
         return False
     if not hasattr(room, "polygon") or room.polygon.is_empty:
@@ -5086,6 +5183,9 @@ def generate_synthetic_dwelling():
     build_base_regular_grid()
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
+    rebuild_clima_terminals_after_machine_placement()
+    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+    build_grid(machine_pins=pins)
 
 def _iter_lines(geom):
     if geom.is_empty:
@@ -5147,6 +5247,12 @@ def _choose_initial_machine_position():
     if terminals:
         return next(iter(terminals.values()))
     return (7500.0, 5500.0)
+
+def rebuild_clima_terminals_after_machine_placement():
+    global terminals, wet_room_names
+    terminals = build_clima_terminals_from_rooms()
+    wet_room_names = list(terminals.keys())
+    current_scenario_summary["terminals"] = terminals
 
 def _load_real_dwelling():
     global current_scenario_label, current_scenario_summary
@@ -5210,6 +5316,7 @@ def generate_new_dwelling():
     hannan_static_cache = {}
     build_base_regular_grid()
     run_auto_placement()
+    rebuild_clima_terminals_after_machine_placement()
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
 
