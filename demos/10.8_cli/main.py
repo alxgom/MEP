@@ -34,7 +34,7 @@ except ImportError:
 
 DEMO_DOMAIN = "Clima"
 CLI_ROUTE_PHASE = "Supply Air"
-CLI_ROUTE_METHOD = "Greedy shared tree"
+CLI_ROUTE_METHOD = "Preview scaffold"
 DEMO_SHAFT_INSTALLATION = "Cli"
 
 # Constants
@@ -4900,8 +4900,8 @@ def solve_clima_routing():
     if routes is None:
         return None, f"Routing Blocked: {reason} in {elapsed_ms:.1f}ms", elapsed_ms, total_nodes
     status = (
-        f"Success: Clima supply tree routed {len(_clima_supply_route_names())} impulsion grille(s); "
-        f"return/refrigeration pending in {elapsed_ms:.1f}ms"
+        f"Preview: supply tree scaffold for {len(_clima_supply_route_names())} impulsion grille(s); "
+        f"real routing/return/refrigeration pending in {elapsed_ms:.1f}ms"
     )
     return routes, status, elapsed_ms, total_nodes
 
