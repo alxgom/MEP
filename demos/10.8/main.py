@@ -137,6 +137,8 @@ preferred_terminal_points_by_room = {}
 preferred_terminal_areas = []
 room_start_node_cache = {}
 terminal_tool_button_rects = {}
+terminal_validity_overlay_enabled = False
+terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
 PREFERRED_TERMINAL_MARKER_SIZE_MM = 125.0
 PREFERRED_TERMINAL_REMAP_TOLERANCE_MM = 300.0
 
@@ -199,6 +201,9 @@ COLOR_GRAPH_EDGE = (122, 130, 140)
 COLOR_GRAPH_NODE = (96, 106, 116)
 COLOR_PLAN_LABEL = (18, 22, 28)
 COLOR_PLAN_LABEL_HALO = (255, 255, 255)
+COLOR_TERMINAL_ALLOWED = (78, 158, 178)
+COLOR_TERMINAL_BLOCKED = (142, 78, 86)
+COLOR_TERMINAL_BLOCKED_HATCH = (96, 54, 62)
 
 # Route Colors
 ROUTE_COLORS = {
@@ -460,16 +465,20 @@ def get_terminal_tool_buttons():
     return [
         ("point", pygame.Rect(x, y, 132, 70), "Terminal"),
         ("area", pygame.Rect(x, y + 82, 132, 70), "Term. area"),
-        ("reset", pygame.Rect(x, y + 164, 132, 34), "Reset prefs"),
+        ("map", pygame.Rect(x, y + 164, 132, 52), "Term. map"),
+        ("reset", pygame.Rect(x, y + 226, 132, 34), "Reset prefs"),
     ]
 
 def handle_terminal_tool_button_click(pos):
-    global preferred_terminal_tool_mode
+    global preferred_terminal_tool_mode, terminal_validity_overlay_enabled
     for mode, rect, _ in get_terminal_tool_buttons():
         if rect.collidepoint(pos):
             if mode == "reset":
                 preferred_terminal_tool_mode = None
                 return "reset"
+            if mode == "map":
+                terminal_validity_overlay_enabled = not terminal_validity_overlay_enabled
+                return "map"
             preferred_terminal_tool_mode = None if preferred_terminal_tool_mode == mode else mode
             return "mode"
     return None
@@ -493,7 +502,7 @@ def draw_terminal_tool_buttons(screen, font_bold, font_small):
     terminal_tool_button_rects = {}
     for mode, rect, label in get_terminal_tool_buttons():
         terminal_tool_button_rects[mode] = rect
-        active = preferred_terminal_tool_mode == mode
+        active = terminal_validity_overlay_enabled if mode == "map" else preferred_terminal_tool_mode == mode
         fill = (45, 54, 80) if active else (38, 44, 54)
         border = (255, 255, 255) if active else (170, 180, 190)
         pygame.draw.rect(screen, fill, rect, border_radius=10)
@@ -506,13 +515,23 @@ def draw_terminal_tool_buttons(screen, font_bold, font_small):
         if mode == "point":
             icon = pygame.Rect(rect.right - 31, rect.y + 38, 16, 16)
             pygame.draw.rect(screen, COLOR_MUTED, icon, 2)
-        else:
+        elif mode == "area":
             icon = pygame.Rect(rect.right - 74, rect.y + 38, 58, 22)
             pygame.draw.rect(screen, (155, 89, 182), icon)
             pygame.draw.rect(screen, (255, 255, 255), icon, 2)
             for x in range(icon.left, icon.right, 8):
                 pygame.draw.line(screen, (155, 89, 182), (x, icon.top), (x + 4, icon.top), 1)
                 pygame.draw.line(screen, (155, 89, 182), (x, icon.bottom), (x + 4, icon.bottom), 1)
+        else:
+            icon = pygame.Rect(rect.right - 31, rect.y + 28, 16, 16)
+            draw_dashed_polyline(
+                screen,
+                [icon.topleft, icon.topright, icon.bottomright, icon.bottomleft, icon.topleft],
+                COLOR_TERMINAL_ALLOWED,
+                2,
+                dash_len=4,
+                gap_len=3,
+            )
 
 def draw_canvas_tool_controls(screen, font_small, ruler_mode):
     for action, rect, label in get_canvas_tool_buttons():
@@ -621,6 +640,10 @@ show_grid_graph = False
 def invalidate_room_start_node_cache():
     global room_start_node_cache
     room_start_node_cache = {}
+
+def invalidate_terminal_validity_cache():
+    global terminal_validity_cache
+    terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
 
 # Auto-placement cache
 ap_scores = {}
@@ -1139,6 +1162,7 @@ def _commit_grid(nodes_arr, valid_edges):
     static_clearance_cache = {"key": None, "wall": None, "shaft": None}
     geometry_distance_cache = {}
     invalidate_room_start_node_cache()
+    invalidate_terminal_validity_cache()
 
 def _wall_filter(raw_edges, nodes_arr):
     wall_bounds = [wp.bounds for wp in wall_polys]
@@ -2964,6 +2988,168 @@ def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
             end = (int(round(x1 + ux * seg_end)), int(round(y1 + uy * seg_end)))
             pygame.draw.line(screen, color, start, end, width)
             travelled += dash_len + gap_len
+
+def _terminal_validity_cache_key():
+    return (
+        id(current_env.nodes) if current_env is not None else None,
+        len(current_env.nodes) if current_env is not None else 0,
+        tuple(sorted(terminals.keys())),
+        id(routing_region_base),
+        len(rooms),
+        len(walls),
+        len(wall_polys),
+    )
+
+def get_terminal_validity_entries():
+    if current_env is None:
+        return [], {}
+
+    key = _terminal_validity_cache_key()
+    if terminal_validity_cache.get("key") == key:
+        return terminal_validity_cache["entries"], terminal_validity_cache["reasons_by_node"]
+
+    node_count = len(current_env.nodes)
+    allowed_nodes = set()
+    blocked_reasons = {}
+    terminal_room_nodes = set()
+
+    if routing_region_base is not None:
+        for room_name in terminals.keys():
+            room_poly = _room_polygon_by_name(room_name)
+            if room_poly is None or room_poly.is_empty:
+                continue
+
+            valid_region = room_poly.intersection(routing_region_base)
+            if valid_region.is_empty:
+                continue
+
+            prepared = shapely_prep(valid_region)
+            room_node_indices = [
+                int(i)
+                for i, pt in enumerate(current_env.nodes)
+                if current_env.adj.get(int(i)) and prepared.contains(Point(float(pt[0]), float(pt[1])))
+            ]
+            terminal_room_nodes.update(room_node_indices)
+            if not room_node_indices:
+                continue
+
+            segments = _room_terminal_boundary_segments(room_name)
+            if len(segments) == 0:
+                allowed_nodes.update(room_node_indices)
+                continue
+
+            pts = current_env.nodes[np.array(room_node_indices, dtype=np.int64)]
+            distances = _point_segment_min_distances(pts, segments)
+            required_clearance = max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM)
+            for node_idx, distance in zip(room_node_indices, distances):
+                if float(distance) >= float(required_clearance) - 1e-7:
+                    allowed_nodes.add(int(node_idx))
+                    continue
+
+                reasons = []
+                if float(distance) < float(TERMINAL_REGULATION_CLEARANCE_MM) - 1e-7:
+                    reasons.append(f"inside {int(TERMINAL_REGULATION_CLEARANCE_MM)} mm regulation clearance")
+                if float(distance) < float(BUFFER_ROOM_TERMINALES_AIRE_MM) - 1e-7:
+                    reasons.append(f"inside {int(BUFFER_ROOM_TERMINALES_AIRE_MM)} mm terminal buffer")
+                if not reasons:
+                    reasons.append(f"clearance below {int(required_clearance)} mm")
+                blocked_reasons[int(node_idx)] = reasons
+
+    entries = []
+    reasons_by_node = {}
+    for node_idx in range(node_count):
+        pt = current_env.nodes[int(node_idx)]
+        if int(node_idx) in allowed_nodes:
+            allowed = True
+            reasons = ["allowed terminal placement"]
+        else:
+            allowed = False
+            if not current_env.adj.get(int(node_idx)):
+                reasons = ["isolated graph node"]
+            elif int(node_idx) in blocked_reasons:
+                reasons = blocked_reasons[int(node_idx)]
+            elif int(node_idx) not in terminal_room_nodes:
+                reasons = ["outside terminal room"]
+            else:
+                reasons = ["blocked terminal placement"]
+        entries.append((float(pt[0]), float(pt[1]), int(node_idx), allowed))
+        reasons_by_node[int(node_idx)] = reasons
+
+    terminal_validity_cache["key"] = key
+    terminal_validity_cache["entries"] = entries
+    terminal_validity_cache["reasons_by_node"] = reasons_by_node
+    return entries, reasons_by_node
+
+def draw_terminal_validity_square(screen, center, side, allowed):
+    x, y = center
+    half = max(2, side // 2)
+    rect = pygame.Rect(int(x - half), int(y - half), half * 2, half * 2)
+    if allowed:
+        draw_dashed_polyline(
+            screen,
+            [rect.topleft, rect.topright, rect.bottomright, rect.bottomleft, rect.topleft],
+            COLOR_TERMINAL_ALLOWED,
+            1,
+            dash_len=4,
+            gap_len=3,
+        )
+        return
+
+    pygame.draw.rect(screen, COLOR_TERMINAL_BLOCKED, rect, 2)
+    previous_clip = screen.get_clip()
+    screen.set_clip(rect)
+    for offset in range(-rect.height, rect.width + rect.height, 6):
+        start = (rect.left + offset, rect.bottom)
+        end = (rect.left + offset + rect.height, rect.top)
+        pygame.draw.line(screen, COLOR_TERMINAL_BLOCKED_HATCH, start, end, 1)
+    screen.set_clip(previous_clip)
+
+def draw_terminal_validity_overlay(screen):
+    if not terminal_validity_overlay_enabled:
+        return
+    entries, _ = get_terminal_validity_entries()
+    marker_side = max(4, min(13, int(round(70 * SCALE_PX_PER_MM))))
+    for x, y, _node_idx, allowed in entries:
+        sx, sy = to_screen(x, y)
+        if sx < CANVAS_LEFT - marker_side or sx > CANVAS_LEFT + CANVAS_W + marker_side:
+            continue
+        if sy < CANVAS_TOP - marker_side or sy > CANVAS_TOP + CANVAS_H + marker_side:
+            continue
+        draw_terminal_validity_square(screen, (sx, sy), marker_side, allowed)
+
+def draw_terminal_validity_tooltip(screen, font_small):
+    if not terminal_validity_overlay_enabled or grid_kd is None or current_env is None:
+        return
+    mx, my = pygame.mouse.get_pos()
+    if not (CANVAS_LEFT <= mx <= CANVAS_LEFT + CANVAS_W and CANVAS_TOP <= my <= CANVAS_TOP + CANVAS_H):
+        return
+
+    world_pt = to_mm(mx, my)
+    _, node_idx = grid_kd.query(world_pt)
+    node_idx = int(node_idx)
+    if node_idx < 0 or node_idx >= len(current_env.nodes):
+        return
+
+    node_pt = current_env.nodes[node_idx]
+    sx, sy = to_screen(float(node_pt[0]), float(node_pt[1]))
+    if math.hypot(mx - sx, my - sy) > 14:
+        return
+
+    _entries, reasons_by_node = get_terminal_validity_entries()
+    reasons = reasons_by_node.get(node_idx, ["terminal status unknown"])
+    lines = [f"node {node_idx}"] + reasons[:3]
+    surfaces = [font_small.render(line, True, COLOR_TEXT) for line in lines]
+    width = max(s.get_width() for s in surfaces) + 18
+    height = len(surfaces) * 18 + 12
+    rect = pygame.Rect(mx + 14, my + 14, width, height)
+    if rect.right > WINDOW_WIDTH - 8:
+        rect.right = mx - 14
+    if rect.bottom > WINDOW_HEIGHT - 8:
+        rect.bottom = my - 14
+    pygame.draw.rect(screen, (32, 34, 38), rect, border_radius=5)
+    pygame.draw.rect(screen, (130, 138, 146), rect, 1, border_radius=5)
+    for i, surf in enumerate(surfaces):
+        screen.blit(surf, (rect.x + 9, rect.y + 7 + i * 18))
 
 def draw_wet_room_outer_accents(screen):
     for geom in wet_room_outer_accents:
@@ -5565,13 +5751,29 @@ def draw_transient_message(screen, font_small):
     screen.blit(surf, (rect.left + 10, rect.top + 6))
 
 def draw_viewer_legend(screen, font_small):
+    x = CANVAS_LEFT + 18
+    y = CANVAS_TOP + CANVAS_H - 34
+
+    if terminal_validity_overlay_enabled:
+        allowed_label = font_small.render("allowed", True, COLOR_PLAN_LABEL)
+        blocked_label = font_small.render("blocked", True, COLOR_PLAN_LABEL)
+        width = 34 + allowed_label.get_width() + 28 + blocked_label.get_width() + 18
+        rect = pygame.Rect(x, y - 30, width, 24)
+        pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
+        pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
+        draw_terminal_validity_square(screen, (rect.x + 15, rect.centery), 12, True)
+        screen.blit(allowed_label, (rect.x + 28, rect.centery - allowed_label.get_height() // 2))
+        blocked_x = rect.x + 34 + allowed_label.get_width() + 22
+        draw_terminal_validity_square(screen, (blocked_x, rect.centery), 12, False)
+        screen.blit(blocked_label, (blocked_x + 14, rect.centery - blocked_label.get_height() // 2))
+
     label = font_small.render("wet rooms", True, COLOR_PLAN_LABEL)
-    rect = pygame.Rect(CANVAS_LEFT + 18, CANVAS_TOP + CANVAS_H - 34, label.get_width() + 58, 24)
+    rect = pygame.Rect(x, y, label.get_width() + 58, 24)
     pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
     pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
-    y = rect.centery
-    pygame.draw.line(screen, COLOR_WET_ROOM_ACCENT, (rect.x + 10, y), (rect.x + 36, y), 3)
-    pygame.draw.line(screen, COLOR_WALL, (rect.x + 10, y + 3), (rect.x + 36, y + 3), 1)
+    line_y = rect.centery
+    pygame.draw.line(screen, COLOR_WET_ROOM_ACCENT, (rect.x + 10, line_y), (rect.x + 36, line_y), 3)
+    pygame.draw.line(screen, COLOR_WALL, (rect.x + 10, line_y + 3), (rect.x + 36, line_y + 3), 1)
     screen.blit(label, (rect.x + 44, rect.centery - label.get_height() // 2))
 
 def main():
@@ -6125,6 +6327,7 @@ def main():
             refresh_edge_weight_view_overlay(routes)
         draw_edge_weight_heatmap(screen)
         draw_edge_weight_colorbar(screen)
+        draw_terminal_validity_overlay(screen)
 
         draw_wet_room_outer_accents(screen)
 
@@ -6457,6 +6660,7 @@ def main():
         draw_solution_logs_panel(screen, font_small, font_bold)
         draw_help_popup(screen, font_small)
         draw_transient_message(screen, font_small)
+        draw_terminal_validity_tooltip(screen, font_small)
 
         pygame.display.flip()
         clock.tick(FPS)
