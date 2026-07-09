@@ -214,6 +214,8 @@ The Routing-Core Workflow mode mirrors the core placement phase at demo scale: i
 
 The inherited Topological Fields placement mode was removed from the Cli demo because it optimizes the machine like a many-to-one hub. That is useful for Sal-style problems, but it is the wrong abstraction for the indoor Cli supply phase: the machine has one active ventilation output and should behave closer to a source/terminal for the supply tree. Placing it between grilles can block or bias the route in ways core routing would not intentionally select.
 
+Cli supply grilles use their generated grille point to find nearby connected graph nodes. This intentionally bypasses the inherited Sal-style interior room-start filter, because Cli grilles are wall-adjacent by construction and can otherwise lose all valid start nodes before routing begins. The rendered supply tree includes short leaf stubs from the grille point to the selected graph node so the route remains visually attached to the terminal.
+
 ## TODO: Outdoor and Common Areas
 
 Outdoor units and common-area routing are intentionally out of scope for this indoor placement/routing pass. Future interactive work should add outdoor unit selection, refrigerant pair matching by connector size/type rather than name, common-area shaft-to-outdoor routing, and multi-dwelling aggregation.

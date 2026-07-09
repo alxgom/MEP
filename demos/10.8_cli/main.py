@@ -3528,6 +3528,22 @@ def get_route_start_nodes(route_name):
         return preferred_nodes
     return candidate_nodes
 
+def _nearest_connected_graph_nodes(pt, max_nodes=8):
+    if grid_kd is None or current_env is None or len(current_env.nodes) == 0:
+        return []
+    query_count = min(len(current_env.nodes), max(max_nodes * 4, max_nodes))
+    distances, indices = grid_kd.query(pt, k=query_count)
+    if np.isscalar(indices):
+        indices = [int(indices)]
+    result = []
+    for node_idx in indices:
+        node_idx = int(node_idx)
+        if current_env.adj.get(node_idx):
+            result.append(node_idx)
+            if len(result) >= max_nodes:
+                break
+    return result
+
 def get_clima_grille_start_nodes(route_name):
     if grid_kd is None or current_env is None:
         return []
@@ -3538,13 +3554,17 @@ def get_clima_grille_start_nodes(route_name):
     candidate_nodes = get_room_candidate_start_nodes(route_name)
     if _preferred_points_for_room(route_name):
         preferred_nodes, _ = _map_preferred_points_to_nodes(route_name, candidate_nodes)
-        return preferred_nodes
+        if preferred_nodes:
+            return preferred_nodes
+        return _nearest_connected_graph_nodes(_preferred_points_for_room(route_name)[0])
 
     _, node_idx = grid_kd.query(terminal_pt)
     nearest = int(node_idx)
     if nearest in candidate_nodes:
         return [nearest]
-    return candidate_nodes[:1]
+    if candidate_nodes:
+        return candidate_nodes[:1]
+    return _nearest_connected_graph_nodes(terminal_pt)
 
 def _terminal_marker_side_px():
     return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
@@ -4988,6 +5008,20 @@ def run_clima_supply_steiner_routing(global_pins, pin_node_map):
         p1 = current_env.nodes[u]
         p2 = current_env.nodes[v]
         segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    for route_name in supply_routes:
+        terminal_pt = terminals.get(route_name)
+        if terminal_pt is None:
+            continue
+        leaf_nodes = [int(n) for n in get_clima_grille_start_nodes(route_name) if int(n) in tree_nodes]
+        if not leaf_nodes:
+            continue
+        leaf_node = min(
+            leaf_nodes,
+            key=lambda n: float(np.hypot(current_env.nodes[n][0] - terminal_pt[0], current_env.nodes[n][1] - terminal_pt[1])),
+        )
+        leaf_pt = current_env.nodes[leaf_node]
+        if float(np.hypot(leaf_pt[0] - terminal_pt[0], leaf_pt[1] - terminal_pt[1])) > 1.0:
+            segs.append(((float(terminal_pt[0]), float(terminal_pt[1])), (float(leaf_pt[0]), float(leaf_pt[1]))))
     add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
     return [("Supply Air Tree", segs)], "Success", len(tree_nodes)
 
