@@ -208,16 +208,17 @@ Sidebar cards show only the main shortcuts. Use each card's `?` button to open a
 `[P]` cycles through placement modes:
 
 - Manual
-- Topological Fields
 - Routing-Core Workflow (default)
 
 The Routing-Core Workflow mode mirrors the core placement phase at demo scale: it generates candidates from machine-room centroids, optional +/-100 mm translations along routing-frame axes, and four connector-aligned rotations. Candidates are feasibility-filtered against room/obstacle geometry, then sorted by core-like machine metrics: percentage outside room, connector angular alignment to patinejo/kitchen, connector clearance to allowed boundaries, and distance to main targets. It does not run full routing for each candidate; this keeps the demo interactive while preserving the core placement workflow structure.
+
+The inherited Topological Fields placement mode was removed from the Cli demo because it optimizes the machine like a many-to-one hub. That is useful for Sal-style problems, but it is the wrong abstraction for the indoor Cli supply phase: the machine has one active ventilation output and should behave closer to a source/terminal for the supply tree. Placing it between grilles can block or bias the route in ways core routing would not intentionally select.
 
 ## TODO: Outdoor and Common Areas
 
 Outdoor units and common-area routing are intentionally out of scope for this indoor placement/routing pass. Future interactive work should add outdoor unit selection, refrigerant pair matching by connector size/type rather than name, common-area shaft-to-outdoor routing, and multi-dwelling aggregation.
 
-The placement heatmap is independent from the active placement mode. `[V]` displays the placement score field for Manual, Topological Fields, and Routing-Core Workflow modes.
+The placement heatmap is independent from the active placement mode. `[V]` displays the placement score field for Manual and Routing-Core Workflow modes.
 
 
 ## Route Interaction Model

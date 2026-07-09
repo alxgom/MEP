@@ -233,10 +233,9 @@ heuristic_mode_idx = 0
 
 AUTO_PLACEMENT_MODES = [
     "Manual",
-    "Topological Fields",
     "Routing-Core Workflow"
 ]
-auto_placement_mode_idx = 2
+auto_placement_mode_idx = 1
 show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
@@ -4866,61 +4865,7 @@ def run_auto_placement():
     if base_regular_env is None:
         return
 
-    shaft_boundary_nodes = []
-    if shaft_extraction is not None:
-        shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
-    
-    # Topological Distance Fields
     if auto_placement_mode_idx == 1:
-        t0 = time.perf_counter()
-        
-        node_scores, distance_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
-        ap_scores = node_scores
-        ap_fields = distance_fields
-        
-        if not node_scores:
-            return
-            
-        sorted_nodes = sorted(node_scores.keys(), key=lambda n: node_scores[n])
-        
-        for n_idx in sorted_nodes:
-            n_x, n_y = base_regular_env.nodes[n_idx][0], base_regular_env.nodes[n_idx][1]
-            
-            best_rot = None
-            min_rot_score = 1e18
-            
-            for rot in [0, 90, 180, 270]:
-                if is_machine_placement_valid(n_x, n_y, rot):
-                    global_pins = get_machine_pins(n_x, n_y, rot)
-                    pin_nodes = {}
-                    for pin_name, pt in global_pins.items():
-                        if pin_name.startswith("c_"): continue
-                        _, p_idx = base_regular_kd.query(pt)
-                        pin_nodes[pin_name] = int(p_idx)
-
-                    room_dists = 0.0
-
-                    for r_name in wet_room_names:
-                        room_dists += distance_fields[r_name].get(pin_nodes["air_out"], 1e9)
-
-                    if shaft_boundary_nodes and "Shaft" in distance_fields:
-                        room_dists += 0.35 * distance_fields["Shaft"].get(pin_nodes["freon2"], 1e9)
-
-                    rot_score = room_dists
-                    if rot_score < min_rot_score:
-                        min_rot_score = rot_score
-                        best_rot = rot
-                        
-            if best_rot is not None:
-                machine_cx, machine_cy = n_x, n_y
-                machine_angle = best_rot
-                pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-                build_grid(machine_pins=pins)
-                elapsed_ms = (time.perf_counter() - t0) * 1000.0
-                print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
-                return
-
-    elif auto_placement_mode_idx == 2:
         run_core_workflow_machine_placement()
         return
 
@@ -6512,7 +6457,7 @@ def main():
                     if auto_placement_mode_idx > 0:
                         auto_placement_mode_idx = 0
                     else:
-                        auto_placement_mode_idx = 2
+                        auto_placement_mode_idx = 1
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
                     routes, status, elapsed_ms, total_nodes = solve_clima_routing()
@@ -6726,13 +6671,6 @@ def main():
             pygame.draw.circle(screen, color, sp, size)
             pygame.draw.circle(screen, ring_color, sp, size, 1)
             
-        if auto_placement_mode_idx == 1 and ap_fields:
-            remaining_rooms = list(wet_room_names)
-            for r_name in remaining_rooms:
-                term_pt = terminals[r_name]
-                port_pt = g_pins["air_out"]
-                pygame.draw.line(screen, get_route_color(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
-
         # ── SIDEBAR PANEL ──
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
         draw_canvas_tool_controls(screen, font_small, ruler_mode)
