@@ -1,6 +1,6 @@
 # MEP Clima Placement Dashboard (Demo 10.8_cli)
 
-Interactive Pygame prototype for exploring Clima machine, grille placement, and indoor supply-routing ideas. Demo 10.8_cli starts as an exact copy of Demo 10.8, then switches the first milestone to Clima: it derives supply/return grille targets from covered non-service rooms, places the machine, builds the routing grid, and currently draws only a preview supply-air tree scaffold from the machine `air_out` connector to impulsion grilles.
+Interactive Pygame prototype for exploring Clima machine, grille placement, and indoor supply-routing ideas. Demo 10.8_cli starts as an exact copy of Demo 10.8, then switches the first milestone to Clima: it derives supply/return grille targets from covered non-service rooms, places the machine, builds the routing grid, and routes a first indoor supply-air tree approximation from the machine `air_out` connector to impulsion grilles.
 
 ## Run
 
@@ -58,9 +58,9 @@ Routing and display:
 
 ## Current Solvers
 
-The active Clima solver is still a preview scaffold. `solve_clima_routing()` connects the PEAD `air_out` connector to every `* Supply` grille target with a greedy tree-growing diagnostic so the UI can be tested, but this is not the real routing milestone. Return grilles remain visible metadata and refrigeration/common-area routing remains pending.
+The active Clima solver now handles a first indoor supply-air routing approximation. `solve_clima_routing()` connects the PEAD `air_out` connector to every `* Supply` grille target by building a line-graph metric closure over terminal groups and taking a minimum spanning tree over those shortest paths. Return grilles remain visible metadata and refrigeration/common-area routing remains pending.
 
-This is intentionally not yet a byte-for-byte port of core `route_steiner` or a true `L(G)` Steiner implementation. The preview grows a shared tree from the `air_out` access node by repeatedly routing each impulsion grille to the existing tree with the current NumPy graph, Dijkstra state `(node, incoming_direction)`, bend penalties, route clearance weights, and existing segment conversion. This keeps the app dependency-light and interactive while the UI stabilizes. The next routing milestone should replace or compare this scaffold with the closer `L(G)`/Steiner formulation discussed for Demo 8.
+This is intentionally not yet a byte-for-byte port of core `route_steiner`, and it is still an approximation to the Steiner problem. Pairwise group paths are solved on directed edge states `(u, v)` so turns are transition costs in `L(G)`, then the selected metric-closure paths are unioned into one route named `Supply Air Tree`. This keeps the app dependency-light and interactive while giving us a more relevant baseline than the previous greedy preview scaffold. The next routing milestone should compare this against the core behavior and tighten differences in grid construction, connector stubs, and validation.
 
 The visible app surface is now Cli-only. Inherited Sal strategy/backend/heuristic controls are hidden because they describe many-to-one Sal experiments, not the current supply-air tree problem. The first refactor keeps the old code internally while the Cli app stabilizes; later cleanup should move or delete those inactive Sal branches instead of maintaining them in this file.
 

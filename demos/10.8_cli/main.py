@@ -34,7 +34,7 @@ except ImportError:
 
 DEMO_DOMAIN = "Clima"
 CLI_ROUTE_PHASE = "Supply Air"
-CLI_ROUTE_METHOD = "Preview scaffold"
+CLI_ROUTE_METHOD = "L(G) Steiner MST"
 DEMO_SHAFT_INSTALLATION = "Cli"
 
 # Constants
@@ -351,6 +351,7 @@ ROUTE_COLORS = {
     "Toilet": (230, 126, 34),     # Orange
     "Washroom": (26, 188, 156),   # Turquoise
     "Return": (231, 76, 60),
+    "Supply Air Tree": (52, 152, 219),
 }
 
 def get_route_color(route_name, default=COLOR_TEXT if "COLOR_TEXT" in globals() else (236, 240, 241)):
@@ -3291,6 +3292,109 @@ def _run_to_tree_dijkstra(env, start_node_indices, target_node_indices, C_bend, 
     path = [state[0] for state in states]
     return path, _path_physical_length(env, path)
 
+def _run_group_to_group_line_graph(env, start_node_indices, target_node_indices, C_bend, edge_weights=None):
+    start_nodes = [int(n) for n in start_node_indices]
+    target_nodes = {int(n) for n in target_node_indices}
+    if not start_nodes or not target_nodes:
+        return None, 0.0
+    for start_node in start_nodes:
+        if start_node in target_nodes:
+            return [start_node], 0.0
+
+    pq = []
+    counter = 0
+    g_scores = {}
+    came_from = {}
+    state_dirs = {}
+
+    for start_node in start_nodes:
+        for v, dist, edge_dir in env.adj.get(start_node, []):
+            v = int(v)
+            cost = _weighted_edge_cost(edge_weights, start_node, v, dist)
+            state = (start_node, v)
+            if cost < g_scores.get(state, float("inf")):
+                g_scores[state] = cost
+                state_dir = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, start_node, v)
+                state_dirs[state] = state_dir
+                heapq.heappush(pq, (cost, counter, state))
+                counter += 1
+
+    best_state = None
+    best_cost = 0.0
+    visited = set()
+    while pq:
+        g, _, state = heapq.heappop(pq)
+        if state in visited:
+            continue
+        visited.add(state)
+
+        u, v = state
+        curr_dir = state_dirs[state]
+        if v in target_nodes:
+            best_state = state
+            best_cost = g
+            break
+
+        for w, dist, next_dir in env.adj.get(v, []):
+            w = int(w)
+            if w == u:
+                continue
+            edge_cost = _weighted_edge_cost(edge_weights, v, w, dist)
+            turn_penalty = C_bend if curr_dir is not None and next_dir is not None and curr_dir != next_dir else 0.0
+            next_state = (v, w)
+            next_g = g + edge_cost + turn_penalty
+            if next_g < g_scores.get(next_state, float("inf")):
+                g_scores[next_state] = next_g
+                came_from[next_state] = state
+                state_dirs[next_state] = next_dir
+                heapq.heappush(pq, (next_g, counter, next_state))
+                counter += 1
+
+    if best_state is None:
+        return None, 0.0
+
+    states = []
+    curr = best_state
+    while curr in came_from:
+        states.append(curr)
+        curr = came_from[curr]
+    states.append(curr)
+    states.reverse()
+    path = [states[0][0]]
+    path.extend(state[1] for state in states)
+    return path, best_cost
+
+def _minimum_spanning_metric_edges(metric_edges, group_count):
+    parent = list(range(group_count))
+    rank = [0] * group_count
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return False
+        if rank[ra] < rank[rb]:
+            parent[ra] = rb
+        elif rank[ra] > rank[rb]:
+            parent[rb] = ra
+        else:
+            parent[rb] = ra
+            rank[ra] += 1
+        return True
+
+    selected = []
+    for cost, i, j, path in sorted(metric_edges, key=lambda item: item[0]):
+        if union(i, j):
+            selected.append((cost, i, j, path))
+            if len(selected) == group_count - 1:
+                break
+    return selected if len(selected) == group_count - 1 else None
+
 def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
     terminal_nodes = {}
     terminal_nodes["Shaft"] = shaft_node_idx
@@ -4867,6 +4971,63 @@ def run_clima_supply_tree_routing(global_pins, pin_node_map):
 
     return routes, "Success", total_nodes
 
+def run_clima_supply_steiner_routing(global_pins, pin_node_map):
+    supply_routes = _clima_supply_route_names()
+    if not supply_routes:
+        return None, "No supply grille targets", 0
+    air_targets = pin_node_map.get("air_out", [])
+    if not air_targets:
+        return None, "Missing air_out graph access", 0
+
+    root_target = air_targets[0]
+    root_node = int(root_target["node_idx"])
+    groups = [{"name": "air_out", "nodes": [root_node]}]
+    for route_name in supply_routes:
+        start_nodes = get_route_start_nodes(route_name)
+        if not start_nodes:
+            return None, f"No start nodes for {route_name}", 0
+        groups.append({"name": route_name, "nodes": [int(n) for n in start_nodes]})
+
+    weights = {}
+    add_static_clearance_weights(weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
+    add_machine_clearance_weights(weights, MACHINE_SMALL_DUCT_D, current_env)
+    record_edge_weight_overlay(weights, current_env)
+
+    metric_edges = []
+    for i in range(len(groups)):
+        for j in range(i + 1, len(groups)):
+            path, cost = _run_group_to_group_line_graph(
+                current_env,
+                groups[i]["nodes"],
+                groups[j]["nodes"],
+                C_BEND,
+                edge_weights=weights,
+            )
+            if path is not None:
+                metric_edges.append((cost, i, j, path))
+
+    selected_edges = _minimum_spanning_metric_edges(metric_edges, len(groups))
+    if selected_edges is None:
+        return None, "No connected Steiner metric closure", 0
+
+    tree_edges = set()
+    tree_nodes = {root_node}
+    for _, _, _, path in selected_edges:
+        tree_nodes.update(int(n) for n in path)
+        for idx in range(len(path) - 1):
+            u = int(path[idx])
+            v = int(path[idx + 1])
+            if u != v:
+                tree_edges.add((min(u, v), max(u, v)))
+
+    segs = []
+    for u, v in sorted(tree_edges):
+        p1 = current_env.nodes[u]
+        p2 = current_env.nodes[v]
+        segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
+    return [("Supply Air Tree", segs)], "Success", len(tree_nodes)
+
 def solve_clima_routing():
     global edge_weight_debug_map, edge_weight_overlay_excluded_edges
     edge_weight_debug_map = {}
@@ -4895,13 +5056,13 @@ def solve_clima_routing():
         update_dynamic_env(machine_poly)
 
     pin_node_map = snap_pins_to_graph(global_pins)
-    routes, reason, total_nodes = run_clima_supply_tree_routing(global_pins, pin_node_map)
+    routes, reason, total_nodes = run_clima_supply_steiner_routing(global_pins, pin_node_map)
     elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
     if routes is None:
         return None, f"Routing Blocked: {reason} in {elapsed_ms:.1f}ms", elapsed_ms, total_nodes
     status = (
-        f"Preview: supply tree scaffold for {len(_clima_supply_route_names())} impulsion grille(s); "
-        f"real routing/return/refrigeration pending in {elapsed_ms:.1f}ms"
+        f"Success: L(G) Steiner MST supply route for {len(_clima_supply_route_names())} impulsion grille(s); "
+        f"return/refrigeration pending in {elapsed_ms:.1f}ms"
     )
     return routes, status, elapsed_ms, total_nodes
 
