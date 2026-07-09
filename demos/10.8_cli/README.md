@@ -218,6 +218,8 @@ Cli supply grilles use their generated grille point to find nearby connected gra
 
 The routed supply tree now follows the core connector-point split at demo scale: the L(G) terminal is the grille Steiner point at `MIN_DISTANCE_REJA` from the grille connector, the last `SIZE_FIRST_TRAMO_REJA` is kept as a separate grille-width connector tramo, and the machine air connector uses `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE` with its final `SIZE_FIRST_TRAMO_MAQUINA_AIRE` split. This keeps the interactive geometry closer to `RouteClimaLivingRouting` while still drawing a single blue supply tree.
 
+Grille and machine connector directions are also fed into the L(G) metric closure. The demo applies a finite bend-like penalty when the first/last graph edge does not match the connector vector. This differs from a hard validity filter on purpose: with the interactive Hannan/epsilon graph, a strict direction requirement can remove all connected metric-closure edges for otherwise routable cases.
+
 ## TODO: Outdoor and Common Areas
 
 Outdoor units and common-area routing are intentionally out of scope for this indoor placement/routing pass. Future interactive work should add outdoor unit selection, refrigerant pair matching by connector size/type rather than name, common-area shaft-to-outdoor routing, and multi-dwelling aggregation.

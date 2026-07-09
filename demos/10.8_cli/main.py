@@ -2619,6 +2619,9 @@ def _dir_from_axis(vec):
         return DIR_RIGHT if x > 0 else DIR_LEFT
     return DIR_UP if y > 0 else DIR_DOWN
 
+def _opposite_dir(direction):
+    return DIR_REV.get(direction)
+
 def get_pin_stub_length(pin_name):
     canonical = CLIMA_CONNECTOR_ALIASES.get(pin_name, pin_name)
     if canonical in ("air_out", "air_in"):
@@ -3076,6 +3079,11 @@ def _path_physical_length(env, path):
         for i in range(len(path) - 1)
     ))
 
+def _direction_constraint_penalty(direction, allowed_dirs, C_bend):
+    if not allowed_dirs or direction in allowed_dirs:
+        return 0.0
+    return 2.0 * C_bend
+
 def _target_heuristic(env, node_idx, incoming_dir, target_specs, C_bend):
     if node_idx < 0 or node_idx >= len(env.nodes):
         return 0.0
@@ -3368,11 +3376,21 @@ def _run_to_tree_dijkstra(env, start_node_indices, target_node_indices, C_bend, 
     path = [state[0] for state in states]
     return path, _path_physical_length(env, path)
 
-def _run_group_to_group_line_graph(env, start_node_indices, target_node_indices, C_bend, edge_weights=None):
+def _run_group_to_group_line_graph(
+    env,
+    start_node_indices,
+    target_node_indices,
+    C_bend,
+    edge_weights=None,
+    start_dirs_by_node=None,
+    target_in_dirs_by_node=None,
+):
     start_nodes = [int(n) for n in start_node_indices]
     target_nodes = {int(n) for n in target_node_indices}
     if not start_nodes or not target_nodes:
         return None, 0.0
+    start_dirs_by_node = start_dirs_by_node or {}
+    target_in_dirs_by_node = target_in_dirs_by_node or {}
     for start_node in start_nodes:
         if start_node in target_nodes:
             return [start_node], 0.0
@@ -3384,22 +3402,28 @@ def _run_group_to_group_line_graph(env, start_node_indices, target_node_indices,
     state_dirs = {}
 
     for start_node in start_nodes:
+        allowed_start_dirs = start_dirs_by_node.get(start_node)
         for v, dist, edge_dir in env.adj.get(start_node, []):
             v = int(v)
-            cost = _weighted_edge_cost(edge_weights, start_node, v, dist)
+            state_dir = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, start_node, v)
+            cost = (
+                _weighted_edge_cost(edge_weights, start_node, v, dist)
+                + _direction_constraint_penalty(state_dir, allowed_start_dirs, C_bend)
+            )
             state = (start_node, v)
             if cost < g_scores.get(state, float("inf")):
                 g_scores[state] = cost
-                state_dir = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, start_node, v)
                 state_dirs[state] = state_dir
                 heapq.heappush(pq, (cost, counter, state))
                 counter += 1
 
     best_state = None
-    best_cost = 0.0
+    best_cost = float("inf")
     visited = set()
     while pq:
         g, _, state = heapq.heappop(pq)
+        if best_state is not None and g >= best_cost:
+            break
         if state in visited:
             continue
         visited.add(state)
@@ -3407,9 +3431,12 @@ def _run_group_to_group_line_graph(env, start_node_indices, target_node_indices,
         u, v = state
         curr_dir = state_dirs[state]
         if v in target_nodes:
-            best_state = state
-            best_cost = g
-            break
+            allowed_target_dirs = target_in_dirs_by_node.get(v)
+            target_cost = g + _direction_constraint_penalty(curr_dir, allowed_target_dirs, C_bend)
+            if target_cost < best_cost:
+                best_state = state
+                best_cost = target_cost
+            continue
 
         for w, dist, next_dir in env.adj.get(v, []):
             w = int(w)
@@ -3641,6 +3668,13 @@ def get_clima_grille_start_nodes(route_name):
     if nearest in candidate_nodes:
         return [nearest]
     return _nearest_connected_graph_nodes(route_pt)
+
+def get_clima_grille_out_dir(route_name):
+    spec = terminal_connection_specs.get(route_name, {})
+    normal = _normalized_or_none(spec.get("normal"))
+    if normal is None:
+        return None
+    return _dir_from_axis((float(normal[0]), float(normal[1])))
 
 def _terminal_marker_side_px():
     return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
@@ -5067,12 +5101,27 @@ def run_clima_supply_steiner_routing(global_pins, pin_node_map):
 
     root_target = air_targets[0]
     root_node = int(root_target["node_idx"])
-    groups = [{"name": "air_out", "nodes": [root_node]}]
+    air_out_dir = root_target.get("out_dir")
+    air_in_dir = _opposite_dir(air_out_dir)
+    groups = [{
+        "name": "air_out",
+        "nodes": [root_node],
+        "start_dirs": {root_node: {air_out_dir}} if air_out_dir else {},
+        "target_dirs": {root_node: {air_in_dir}} if air_in_dir else {},
+    }]
     for route_name in supply_routes:
         start_nodes = get_clima_grille_start_nodes(route_name)
         if not start_nodes:
             return None, f"No start nodes for {route_name}", 0
-        groups.append({"name": route_name, "nodes": [int(n) for n in start_nodes]})
+        grille_out_dir = get_clima_grille_out_dir(route_name)
+        grille_in_dir = _opposite_dir(grille_out_dir)
+        nodes = [int(n) for n in start_nodes]
+        groups.append({
+            "name": route_name,
+            "nodes": nodes,
+            "start_dirs": {node: {grille_out_dir} for node in nodes} if grille_out_dir else {},
+            "target_dirs": {node: {grille_in_dir} for node in nodes} if grille_in_dir else {},
+        })
 
     weights = {}
     add_static_clearance_weights(weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
@@ -5088,6 +5137,8 @@ def run_clima_supply_steiner_routing(global_pins, pin_node_map):
                 groups[j]["nodes"],
                 C_BEND,
                 edge_weights=weights,
+                start_dirs_by_node=groups[i].get("start_dirs"),
+                target_in_dirs_by_node=groups[j].get("target_dirs"),
             )
             if path is not None:
                 metric_edges.append((cost, i, j, path))
