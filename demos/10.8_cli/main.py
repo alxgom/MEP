@@ -6082,11 +6082,11 @@ def main():
                         if marker_room:
                             selected_route_name = marker_room
                         elif not remove_marker:
-                            set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
+                            set_transient_message("Invalid grille point: too close to wall or outside allowed room buffer")
                         if changed:
                             routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                             if routes and not status.startswith("Blocked"):
-                                label = "Term-" if remove_marker else "Term+"
+                                label = "Grille-" if remove_marker else "Grille+"
                                 record_current_solution(routes, elapsed_ms, label, (26, 188, 156))
                         continue
                     if preferred_terminal_tool_mode == "area":

@@ -128,21 +128,19 @@ score =
 Demo 10.8 reports and scores short duct pieces using the same core-style thresholds:
 
 ```text
-terminal segment minimum = diameter * factor
+grille segment minimum = diameter * factor
 internal segment minimum = diameter * 2.0 * factor
 ```
 
 The default factor is `1.05`, matching `FACTOR_CONDUCTO_MINIMA_LONGITUD` in the local routing-core config. The sidebar slider sweeps this factor from `0.50` to `2.00`.
 
-Short-piece handling is intentionally post-route, matching routing-core's current validation phase. The demo merges consecutive collinear graph edges into physical duct pieces before counting, so the metric is not inflated by grid discretization. The count contributes to `Total Cost Score` and is shown as `Short Pieces` in the KPI card, but it no longer expands A* search state. This keeps First Fit/Best Fit interactive while preserving comparability with routing-core validation.
+Short-piece handling is intentionally post-route, matching routing-core's current validation phase. The demo merges consecutive collinear graph edges into physical duct pieces before counting, so the metric is not inflated by grid discretization. The count contributes to `Total Cost Score` and is shown as `Short Pieces` in the KPI card, but it no longer expands routing search state.
 
-## Room Starts
+## Grille Preferences
 
-The default start mode is `Room node set`. Instead of snapping each wet room to a single centroid terminal, each route starts from a virtual source connected to every valid graph node inside that room and inside the false-ceiling region. This keeps the current room-to-machine routing direction but removes unnecessary dependence on a centroid point.
+The Cli app routes supply-air grilles from room-side candidate nodes rather than exposing the old Sal room-start selector. Each supply grille can start from valid graph nodes inside its room and inside the false-ceiling region.
 
-Preferred terminals keep the same virtual-source abstraction. When a room has one or more preferred square markers, the virtual source connects only to those mapped graph nodes with zero cost; the other room nodes are disconnected for that route. Rooms without preferred markers keep the full room-node set. Candidate room nodes are not drawn by default; use `G` to inspect graph nodes and edges when needed.
-
-`Centroid terminal` is kept as a comparison mode. It uses the previous single nearest grid node for each terminal.
+Preferred grille points keep the same virtual-source abstraction. When a room has one or more preferred square markers, the virtual source connects only to those mapped graph nodes with zero cost; the other room nodes are disconnected for that route. Rooms without preferred markers keep the full room-node set. Candidate room nodes are not drawn by default; use `G` to inspect graph nodes and edges when needed.
 
 `ROUTING_WALL_CLEARANCE_MM` currently defaults to 100 mm. It insets candidate routing nodes from the false-ceiling boundary for both regular and Hannan grids; edge validation still uses the actual false-ceiling geometry.
 
