@@ -34,18 +34,13 @@ Dwelling and routing setup:
 - `D`: toggle dwelling source between Real DB and Random Synthetic.
 - `Space`: advance the active source. In Real DB mode this cycles the configured real scenarios; in Random Synthetic mode this generates a new random layout.
 - `O`: cycle the real-dwelling routing frame.
-- `T`: toggle room starts between Room node set and Centroid terminal.
 
 Routing and display:
 
-- `C`: cycle solver strategy.
-- `L`: cycle routing backend between state-expanded A*, line graph `L(G)` A*, and line graph `L(G)` GBFS.
-- `Y`: cycle A* heuristic mode.
 - `Tab`: cycle routing grid.
 - `G`: toggle grid nodes and edges.
 - `V`: toggle the placement heatmap.
 - `M`: toggle the modified-edge-weight overlay.
-- `N`: toggle the modified-edge-weight view between small and big duct weights. The same control is also available as the on-canvas switch next to `Weights`.
 - `H`: toggle heatmap scale between linear and logarithmic.
 - `B`: toggle heatmap palette between Turbo and Viridis.
 - `F11`: toggle fullscreen.
@@ -54,8 +49,8 @@ Routing and display:
 - Hold `Shift` and left-drag, or hold the middle mouse button, to pan the zoomed view.
 - On-canvas `Weights` button: toggle the modified-edge-weight overlay.
 - On-canvas `Ruler` button: turn the pointer into a crosshair; click and hold on the canvas to measure a distance in mm. `Esc` exits ruler mode.
-- Right-side `Terminal` tool: click inside a room to add the nearest valid room start node as a preferred terminal; `Ctrl+click` removes an existing preferred terminal.
-- Right-side `Term. area` tool: drag a rectangle to add every valid room start node inside the area; `Ctrl+drag` removes preferred terminals inside the area.
+- Right-side `Grille` tool: click inside a room to add the nearest valid room start node as a preferred grille-routing node; `Ctrl+click` removes an existing preferred point.
+- Right-side `Grille area` tool: drag a rectangle to add every valid room start node inside the area; `Ctrl+drag` removes preferred points inside the area.
 - Preferred areas are drawn as translucent filled regions with dotted borders. Nodes inside preferred areas are hollow; the node actually used by the routed solution is filled.
 - Right-side `Log` button: store the current session-local routing state, add a marker to the KPI plots, and list the logged KPIs. Click a log row to restore that configuration and recompute the route.
 - Click a duct or room to highlight its route. Other routes keep their width but turn black; unrelated rooms and pins are desaturated. Click empty canvas, or press `Esc` when not in ruler mode, to clear selection.
@@ -67,35 +62,7 @@ The active Clima router now handles only the first indoor air phase: `solve_vent
 
 This is intentionally a demo approximation of the routing-core supply-air phase, not yet a byte-for-byte port of core `route_steiner` or a true `L(G)` Steiner implementation. The demo grows a shared tree from the `air_out` access node by repeatedly routing each impulsion grille to the existing tree with the current NumPy graph, Dijkstra state `(node, incoming_direction)`, bend penalties, route clearance weights, and existing segment conversion. This keeps the app dependency-light and interactive in the current virtual environment, where NetworkX/core graph tooling is not available. The next routing milestone should replace or compare this greedy tree grower with the closer `L(G)`/Steiner formulation discussed for Demo 8.
 
-The copied routing controls remain visible to preserve the Demo 10.8 UI/UX. Some controls still belong to the inherited Sal routing experiments and are inactive or diagnostic for the current Clima supply-tree path.
-
-The strategy selector includes:
-
-- Greedy (Dual-Sort)
-- First Fit
-- Best Fit
-- Negotiated Congestion
-- Negotiated Congestion (Favour Large)
-- Min-Cost Flow (Small Pins)
-- Min-Cost Flow (Two-Stage)
-
-The router backend selector is independent of strategy:
-
-- State-expanded A*: routes with `(node, incoming_direction)` states.
-- Line graph `L(G)` A*: routes with directed-edge states, so turns are modeled as transitions from one physical edge to the next.
-- Line graph `L(G)` GBFS: uses the same super-sink target model and accumulated bend/crossing/clearance weights, but orders expansion by the line-graph heuristic only.
-
-The heuristic selector is also independent of strategy where A* is used:
-
-- Pin + bends: current baseline, using Manhattan distance to candidate pin access nodes plus estimated remaining bend penalty.
-- Pin distance: Manhattan distance to candidate pin access nodes without bend estimation.
-- Machine envelope: pin-agnostic lower bound using distance to the machine centre minus the maximum L1 radius of the active pin access candidates.
-- Zero: Dijkstra-style diagnostic mode with no remaining-distance estimate.
-
-The min-cost-flow strategies from Demo 10.78 remain available:
-
-- Min-Cost Flow (Small Pins): keeps the normal shaft route and kitchen route, then solves only the small duct rooms jointly.
-- Min-Cost Flow (Two-Stage): evaluates big-first and small-first stage orders and keeps the lower final score.
+The visible app surface is now Cli-only. Inherited Sal strategy/backend/heuristic controls are hidden because they describe many-to-one Sal experiments, not the current supply-air tree problem. The first refactor keeps the old code internally while the Cli app stabilizes; later cleanup should move or delete those inactive Sal branches instead of maintaining them in this file.
 
 ## Heuristics and Constants
 

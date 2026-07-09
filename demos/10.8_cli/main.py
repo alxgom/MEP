@@ -33,6 +33,8 @@ except ImportError:
     scenario_summary = None
 
 DEMO_DOMAIN = "Clima"
+CLI_ROUTE_PHASE = "Supply Air"
+CLI_ROUTE_METHOD = "Greedy shared tree"
 DEMO_SHAFT_INSTALLATION = "Cli"
 
 # Constants
@@ -464,8 +466,7 @@ def get_canvas_tool_buttons():
     cursor = x0 + 2 * (size + gap) + reset_w + gap
     ruler_rect = pygame.Rect(cursor, y0, 58, size)
     weights_rect = pygame.Rect(ruler_rect.right + gap, y0, 72, size)
-    weight_switch_rect = get_weight_view_switch_rect(weights_rect)
-    diameter_rect = pygame.Rect(weight_switch_rect.right + gap, y0, 54, size)
+    diameter_rect = pygame.Rect(weights_rect.right + gap, y0, 54, size)
     return [
         ("in", pygame.Rect(x0, y0, size, size), "+"),
         ("out", pygame.Rect(x0 + size + gap, y0, size, size), "-"),
@@ -489,8 +490,6 @@ def handle_canvas_tool_button_click(pos):
         elif action == "diameter":
             route_real_diameter_width_enabled = not route_real_diameter_width_enabled
         return action
-    if get_weight_view_switch_rect().collidepoint(pos):
-        return "weight_view"
     return None
 
 def get_weight_view_switch_rect(weights_rect=None):
@@ -606,8 +605,8 @@ def get_terminal_tool_buttons():
     x = CANVAS_LEFT + CANVAS_W - 145
     y = CANVAS_TOP + 92
     return [
-        ("point", pygame.Rect(x, y, 132, 70), "Terminal"),
-        ("area", pygame.Rect(x, y + 82, 132, 70), "Term. area"),
+        ("point", pygame.Rect(x, y, 132, 70), "Grille"),
+        ("area", pygame.Rect(x, y + 82, 132, 70), "Grille area"),
         ("reset", pygame.Rect(x, y + 164, 132, 34), "Reset prefs"),
     ]
 
@@ -623,18 +622,7 @@ def handle_terminal_tool_button_click(pos):
     return None
 
 def draw_weight_view_switch(screen, font_small):
-    rect = get_weight_view_switch_rect()
-    left_active = edge_weight_view_mode_idx == 0
-    pygame.draw.rect(screen, (32, 34, 38), rect, border_radius=rect.height // 2)
-    pygame.draw.rect(screen, (150, 158, 166), rect, 1, border_radius=rect.height // 2)
-    knob_radius = 4 if left_active else 8
-    knob_x = rect.left + 13 if left_active else rect.right - 13
-    pygame.draw.circle(screen, (198, 204, 210), (knob_x, rect.centery), knob_radius)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), knob_radius, 1)
-    label = "Small" if left_active else "Big"
-    lbl = font_small.render(label, True, COLOR_TEXT)
-    label_x = rect.x + 28 if left_active else rect.x + 14
-    screen.blit(lbl, (label_x, rect.centery - lbl.get_height() // 2))
+    return
 
 def draw_terminal_tool_buttons(screen, font_bold, font_small):
     global terminal_tool_button_rects
@@ -675,16 +663,14 @@ def draw_canvas_tool_controls(screen, font_small, ruler_mode):
         pygame.draw.rect(screen, border, rect, 1, border_radius=4)
         lbl = font_small.render(label, True, COLOR_TEXT)
         screen.blit(lbl, (rect.centerx - lbl.get_width() // 2, rect.centery - lbl.get_height() // 2))
-    draw_weight_view_switch(screen, font_small)
     zoom_lbl = font_small.render(f"{zoom_level:.2f}x", True, COLOR_TEXT)
     screen.blit(zoom_lbl, (CANVAS_LEFT + 12, CANVAS_TOP + 46))
     if edge_weight_heatmap_enabled:
-        weight_view = "small pipe" if edge_weight_view_mode_idx == 0 else "big pipe"
-        wgt_lbl = font_small.render(f"modified edge weights: {weight_view}", True, COLOR_TEXT)
+        wgt_lbl = font_small.render("modified edge weights: air duct", True, COLOR_TEXT)
         screen.blit(wgt_lbl, (CANVAS_LEFT + 86, CANVAS_TOP + 46))
     if preferred_terminal_tool_mode:
         hint = "click add, Ctrl+click erase" if preferred_terminal_tool_mode == "point" else "drag area, Ctrl+drag erase"
-        term_lbl = font_small.render(f"terminal {preferred_terminal_tool_mode}: {hint}", True, COLOR_TEXT)
+        term_lbl = font_small.render(f"grille preference: {hint}", True, COLOR_TEXT)
         screen.blit(term_lbl, (CANVAS_LEFT + 86, CANVAS_TOP + 64))
 
 def draw_machine_dropdown_button(screen, font_small, x, y, width):
@@ -6110,20 +6096,16 @@ HELP_TEXT = {
         "[W] Placement weights",
     ],
     "solver": [
-        "[C] Routing strategy",
-        "[L] Router backend",
-        "[Y] A* heuristic",
         "[Tab] Grid type",
         "[G] Grid mesh",
-        "[T] Start mode",
-        "Terminal: click nearest node",
-        "Term. area: drag rectangle",
+        "Grille: click preferred node",
+        "Grille area: drag rectangle",
         "Ctrl removes preferences",
         "Reset prefs clears all",
         "Sliders: piece/bend/cross",
         "[M] Edge weights",
-        "[N] Small/big weight view",
         "[X] Real pipe width",
+        "Sal strategies are hidden",
     ],
     "machine": [
         "Drag machine with mouse",
@@ -6139,7 +6121,7 @@ HELP_TEXT = {
         "Solver time excludes rendering.",
     ],
     "status": [
-        "Routing status and solver time.",
+        "Cli routing status and solver time.",
         "Right log panel stores",
         "session-local states.",
         "[Esc] Clear selection / ruler",
@@ -6204,7 +6186,7 @@ def main():
     
     update_window_layout(WINDOW_WIDTH, WINDOW_HEIGHT)
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
-    pygame.display.set_caption("Integrated Auto-Placement & Ventilation Router (Demo 10.8)")
+    pygame.display.set_caption("Clima Placement & Indoor Routing Explorer (Demo 10.8_cli)")
     clock = pygame.time.Clock()
     
     font_title = pygame.font.SysFont("Outfit", 24, bold=True)
@@ -6566,11 +6548,7 @@ def main():
                     show_grid_graph = not show_grid_graph
                     
                 elif event.key == pygame.K_c:
-                    routing_strategy_idx = (routing_strategy_idx + 1) % len(ROUTING_STRATEGIES)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
+                    set_transient_message("Sal routing strategies are hidden in the Cli app")
 
                 elif event.key == pygame.K_d:
                     dwelling_source_idx = (dwelling_source_idx + 1) % len(DWELLING_SOURCE_MODES)
@@ -6607,29 +6585,13 @@ def main():
                         hist_event_markers.append((hist_sample_count - 1, f"Frame:{routing_frame_idx}", (230, 126, 34)))
 
                 elif event.key == pygame.K_t:
-                    room_start_mode_idx = (room_start_mode_idx + 1) % len(ROOM_START_MODES)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Start:{room_start_mode_idx}", (155, 89, 182)))
-                        hist_event_markers.append((hist_sample_count - 1, f"Strat:{routing_strategy_idx}", (52, 152, 219)))
+                    set_transient_message("Room-start modes are hidden in the Cli app")
 
                 elif event.key == pygame.K_l:
-                    router_backend_idx = (router_backend_idx + 1) % len(ROUTER_BACKENDS)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"R:{router_backend_idx}", (230, 126, 34)))
+                    set_transient_message("Router backends are hidden in the Cli app")
 
                 elif event.key == pygame.K_y:
-                    heuristic_mode_idx = (heuristic_mode_idx + 1) % len(HEURISTIC_MODES)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Heur:{heuristic_mode_idx}", (241, 196, 15)))
+                    set_transient_message("A* heuristics are hidden in the Cli app")
                     
                 elif event.key == pygame.K_TAB:
                     graph_type_idx = (graph_type_idx + 1) % len(GRAPH_TYPES)
@@ -6665,7 +6627,7 @@ def main():
                     edge_weight_heatmap_enabled = not edge_weight_heatmap_enabled
 
                 elif event.key == pygame.K_n:
-                    edge_weight_view_mode_idx = (edge_weight_view_mode_idx + 1) % 2
+                    set_transient_message("Cli currently has one indoor air-duct size")
 
                 elif event.key == pygame.K_x:
                     route_real_diameter_width_enabled = not route_real_diameter_width_enabled
@@ -6874,9 +6836,9 @@ def main():
         pygame.draw.rect(screen, COLOR_PANEL, (0, 0, CANVAS_LEFT - 10, WINDOW_HEIGHT))
         pygame.draw.line(screen, COLOR_WALL, (CANVAS_LEFT - 10, 0), (CANVAS_LEFT - 10, WINDOW_HEIGHT), 2)
         
-        title_surf = font_title.render("Auto-Placement visualizer", True, COLOR_TEXT)
+        title_surf = font_title.render("Clima routing explorer", True, COLOR_TEXT)
         screen.blit(title_surf, (20, 20))
-        sub_surf = font_small.render("Vents & Extraction Router Dashboard", True, COLOR_MUTED)
+        sub_surf = font_small.render("Indoor machine, grilles, and supply-air routing", True, COLOR_MUTED)
         screen.blit(sub_surf, (20, 42))
         
         # 1. Auto-placement State Card
@@ -6903,31 +6865,28 @@ def main():
         lbl_ap_weights = font_small.render(f"[W] Placement Weights: {w_text}", True, COLOR_MUTED)
         screen.blit(lbl_ap_weights, (25, 180))
         
-        # 2. Solver Config Card
+        # 2. Cli Routing Config Card
         solver_card = pygame.Rect(15, 220, CANVAS_LEFT - 40, 250)
         pygame.draw.rect(screen, (40, 45, 55), solver_card, border_radius=6)
-        lbl_solv_title = font_bold.render("ROUTING PATH SOLVER", True, COLOR_TEXT)
+        lbl_solv_title = font_bold.render("CLIMA ROUTING", True, COLOR_TEXT)
         screen.blit(lbl_solv_title, (25, 230))
         draw_card_help_button(screen, "solver", solver_card, font_small)
-        lbl_strat = font_small.render(f"Strategy: {ROUTING_STRATEGIES[routing_strategy_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_strat, (25, 250))
-        lbl_router = font_small.render(f"Router: {ROUTER_BACKENDS[router_backend_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_router, (25, 270))
-        lbl_heur = font_small.render(f"Heuristic: {HEURISTIC_MODES[heuristic_mode_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_heur, (25, 290))
-        lbl_graph = font_small.render(f"Grid type: {GRAPH_TYPES[graph_type_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_graph, (25, 310))
-        lbl_start = font_small.render(f"Starts: {ROOM_START_MODES[room_start_mode_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_start, (25, 330))
+        lbl_phase = font_small.render(f"Phase: {CLI_ROUTE_PHASE}", True, COLOR_TEXT)
+        screen.blit(lbl_phase, (25, 250))
+        lbl_method = font_small.render(f"Method: {CLI_ROUTE_METHOD}", True, COLOR_TEXT)
+        screen.blit(lbl_method, (25, 270))
+        lbl_graph = font_small.render(f"Grid: {GRAPH_TYPES[graph_type_idx]}", True, COLOR_TEXT)
+        screen.blit(lbl_graph, (25, 290))
         mw_mode = "On" if edge_weight_heatmap_enabled else "Off"
         diameter_mode = "Real" if route_real_diameter_width_enabled else "Fixed"
-        weight_view = "Small" if edge_weight_view_mode_idx == 0 else "Big"
-        lbl_mw = font_small.render(f"Edge weights: {mw_mode}/{weight_view} | Pipes: {diameter_mode}", True, COLOR_TEXT)
-        screen.blit(lbl_mw, (25, 350))
+        lbl_mw = font_small.render(f"Edge weights: {mw_mode} | Ducts: {diameter_mode}", True, COLOR_TEXT)
+        screen.blit(lbl_mw, (25, 310))
         selected_text = selected_route_name if selected_route_name else "None"
         preferred_count = sum(len(points) for points in preferred_terminal_points_by_room.values())
-        lbl_selected = font_small.render(f"Selected: {selected_text[:14]} | Prefs: {preferred_count}", True, COLOR_TEXT)
-        screen.blit(lbl_selected, (25, 365))
+        lbl_selected = font_small.render(f"Selected: {selected_text[:14]} | Grille prefs: {preferred_count}", True, COLOR_TEXT)
+        screen.blit(lbl_selected, (25, 330))
+        lbl_pending = font_small.render("Pending: return + refrigeration routing", True, COLOR_MUTED)
+        screen.blit(lbl_pending, (25, 350))
         draw_min_piece_slider(screen, font_small, 25, 385, CANVAS_LEFT - 70)
         draw_weight_slider(screen, font_small, 25, 420, CANVAS_LEFT - 70, "Bend weight", C_BEND, C_BEND_MIN, C_BEND_MAX, (155, 89, 182), "bend", integer=True)
         draw_weight_slider(screen, font_small, 25, 452, CANVAS_LEFT - 70, "Cross x bend", crossing_penalty_multiplier, CROSSING_MULTIPLIER_MIN, CROSSING_MULTIPLIER_MAX, (230, 126, 34), "crossing", "x")
