@@ -43,6 +43,8 @@ HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Ha
 CORE_EPSILON_GRID_MM = 200
 SMALL_PIN_STUB_LENGTH = 100
 LARGE_PIN_STUB_LENGTH = 250
+MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM = 700
+MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM = 25
 MACHINE_CLEARANCE = 0
 CLIMA_MACHINES = [
     {
@@ -53,7 +55,12 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (528, 366, 250),
-        "air_connector": (860, 178),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (860, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (860, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-507, 198, -122), "normal": (-1, 0), "radius": 3.18},
+            "freon2": {"desc": "Freon2", "offset": (-528, 131, -155), "normal": (-1, 0), "radius": 6.35},
+        },
     },
     {
         "label": "PEAD M50JA",
@@ -63,7 +70,12 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (528, 366, 250),
-        "air_connector": (860, 178),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (860, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (860, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-507, 198, -122), "normal": (-1, 0), "radius": 3.18},
+            "freon2": {"desc": "Freon2", "offset": (-528, 131, -155), "normal": (-1, 0), "radius": 6.35},
+        },
     },
     {
         "label": "PEAD M60JA",
@@ -73,7 +85,12 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (628, 366, 250),
-        "air_connector": (1060, 178),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (1060, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (1060, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-607, 198, -122), "normal": (-1, 0), "radius": 4.76},
+            "freon2": {"desc": "Freon2", "offset": (-628, 131, -155), "normal": (-1, 0), "radius": 7.95},
+        },
     },
     {
         "label": "PEAD M71JA",
@@ -83,7 +100,12 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (628, 366, 250),
-        "air_connector": (1060, 178),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (1060, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (1060, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-607, 198, -122), "normal": (-1, 0), "radius": 4.76},
+            "freon2": {"desc": "Freon2", "offset": (-628, 131, -155), "normal": (-1, 0), "radius": 7.95},
+        },
     },
     {
         "label": "PEAD M100JA",
@@ -93,7 +115,12 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (778, 366, 250),
-        "air_connector": (1360, 178),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (1360, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (1360, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-757, 198, -122), "normal": (-1, 0), "radius": 4.76},
+            "freon2": {"desc": "Freon2", "offset": (-778, 131, -155), "normal": (-1, 0), "radius": 7.95},
+        },
     },
     {
         "label": "PEAD M125JA",
@@ -103,7 +130,12 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (778, 366, 250),
-        "air_connector": (1360, 178),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (1360, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (1360, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-757, 198, -122), "normal": (-1, 0), "radius": 4.76},
+            "freon2": {"desc": "Freon2", "offset": (-778, 131, -155), "normal": (-1, 0), "radius": 7.95},
+        },
     },
     {
         "label": "PEAD M140JA",
@@ -113,25 +145,20 @@ CLIMA_MACHINES = [
         "body_h": 700,
         "body_z": 250,
         "insertion": (878, 366, 250),
-        "air_connector": (1560, 178),
-    },
-    {
-        "label": "ERST20D VM2D",
-        "family": "Cli_UnidadInterior_Mitsubishi_ERST20D",
-        "type": "VM2D",
-        "body_w": 595,
-        "body_h": 680,
-        "body_z": 1720,
-        "insertion": (298, 680, 0),
-        "air_connector": (0, 0),
+        "connectors": {
+            "air_out": {"desc": "Supply Air1", "offset": (0, 334, -112), "normal": (0, 1), "size": (1560, 178)},
+            "air_in": {"desc": "Supply Air2", "offset": (0, -366, -125), "normal": (0, -1), "size": (1560, 178)},
+            "freon1": {"desc": "Freon1", "offset": (-857, 198, -122), "normal": (-1, 0), "radius": 4.76},
+            "freon2": {"desc": "Freon2", "offset": (-878, 131, -155), "normal": (-1, 0), "radius": 7.95},
+        },
     },
 ]
 selected_machine_idx = 3
 MACHINE_BODY_W = CLIMA_MACHINES[selected_machine_idx]["body_w"]
 MACHINE_BODY_H = CLIMA_MACHINES[selected_machine_idx]["body_h"]
 MACHINE_OVERALL_W = MACHINE_BODY_W
-MACHINE_SMALL_DUCT_D = CLIMA_MACHINES[selected_machine_idx]["air_connector"][1]
-MACHINE_LARGE_DUCT_D = CLIMA_MACHINES[selected_machine_idx]["air_connector"][1]
+MACHINE_SMALL_DUCT_D = CLIMA_MACHINES[selected_machine_idx]["connectors"]["air_out"]["size"][1]
+MACHINE_LARGE_DUCT_D = CLIMA_MACHINES[selected_machine_idx]["connectors"]["air_out"]["size"][1]
 DUCT_BUFFER_RATIO = 1.05
 ROUTING_WALL_CLEARANCE_MM = 100
 TERMINAL_REGULATION_CLEARANCE_MM = ROUTING_WALL_CLEARANCE_MM
@@ -270,7 +297,7 @@ def refresh_machine_constants():
     MACHINE_BODY_W = int(machine["body_w"])
     MACHINE_BODY_H = int(machine["body_h"])
     MACHINE_OVERALL_W = MACHINE_BODY_W
-    air_height = int(machine["air_connector"][1] or 178)
+    air_height = int(machine["connectors"]["air_out"]["size"][1])
     MACHINE_SMALL_DUCT_D = air_height
     MACHINE_LARGE_DUCT_D = air_height
 
@@ -988,22 +1015,14 @@ def _segment_candidate_at_end(room, segment, segment_idx, grille_width, role):
 
 def _machine_supply_ray_towards(target_point):
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    options = []
-    for pin_name, local_dir in (("left_mid", (-1.0, 0.0)), ("right_mid", (1.0, 0.0))):
-        if pin_name not in pins:
-            continue
-        direction = _local_axis_to_world(local_dir, machine_angle)
-        pin = pins[pin_name]
-        origin = (
-            float(pin[0]) + direction[0] * 700.0,
-            float(pin[1]) + direction[1] * 700.0,
-        )
-        angle = abs(_point_angle_to_target(origin, direction, target_point))
-        distance = math.hypot(origin[0] - target_point[0], origin[1] - target_point[1])
-        options.append((angle, distance, origin, direction))
-    if not options:
+    if "air_out" not in pins:
         return None, None
-    _, _, origin, direction = min(options, key=lambda item: item[:2])
+    direction = _local_axis_to_world(get_current_machine()["connectors"]["air_out"]["normal"], machine_angle)
+    pin = pins["air_out"]
+    origin = (
+        float(pin[0]) + direction[0] * MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM,
+        float(pin[1]) + direction[1] * MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM,
+    )
     return origin, direction
 
 def _machine_aligned_candidate_from_segment(room, segment, segment_idx, grille_width, role):
@@ -2458,16 +2477,34 @@ def build_grid(machine_pins=None):
         build_epsilon_grid(machine_pins=machine_pins)
 
 # Machine representation helper
+CLIMA_CONNECTOR_PIN_NAMES = ("air_out", "air_in", "freon1", "freon2")
+CLIMA_CONNECTOR_ALIASES = {
+    "right_mid": "air_out",
+    "left_mid": "freon2",
+    "tl": "freon1",
+    "tr": "freon2",
+    "bl": "air_in",
+    "br": "air_out",
+}
+
+def _machine_connector_local_xy(machine, connector_name):
+    connector = machine["connectors"][connector_name]
+    insertion_x, insertion_y, _ = machine["insertion"]
+    offset_x, offset_y, _ = connector["offset"]
+    return (
+        float(insertion_x) + float(offset_x) - float(machine["body_w"]) / 2.0,
+        float(insertion_y) + float(offset_y) - float(machine["body_h"]) / 2.0,
+    )
+
 def get_machine_pins(cx, cy, angle_deg):
     w, h = MACHINE_OVERALL_W, MACHINE_BODY_H
-    small_y = h / 2.0 - MACHINE_SMALL_DUCT_D / 2.0
+    machine = get_current_machine()
+    # Exported family connectors are insertion-relative. The demo keeps
+    # dragging centered on the body, so offsets are converted to body-center
+    # coordinates here instead of changing all placement state semantics.
     local_pins = {
-        "left_mid": (-w/2, 0.0),
-        "right_mid": (w/2, 0.0),
-        "tl": (-w/2, small_y),
-        "tr": (w/2, small_y),
-        "bl": (-w/2, -small_y),
-        "br": (w/2, -small_y)
+        name: _machine_connector_local_xy(machine, name)
+        for name in CLIMA_CONNECTOR_PIN_NAMES
     }
     
     rad = math.radians(angle_deg)
@@ -2489,8 +2526,15 @@ def get_machine_pins(cx, cy, angle_deg):
         gx = cx + px * math.cos(rad) - py * math.sin(rad)
         gy = cy + px * math.sin(rad) + py * math.cos(rad)
         global_corners[name] = (round(gx), round(gy))
-        
-    return {**global_pins, **global_corners}
+
+    # Compatibility aliases keep inactive copied routing experiments from
+    # crashing while the canonical Clima connector names drive new behavior.
+    alias_pins = {
+        alias: global_pins[target]
+        for alias, target in CLIMA_CONNECTOR_ALIASES.items()
+        if target in global_pins
+    }
+    return {**global_pins, **alias_pins, **global_corners}
 
 def snap_pins_to_graph(global_pins):
     if grid_kd is None:
@@ -2525,16 +2569,18 @@ def _dir_from_axis(vec):
     return DIR_UP if y > 0 else DIR_DOWN
 
 def get_pin_stub_length(pin_name):
-    return LARGE_PIN_STUB_LENGTH if pin_name in ("left_mid", "right_mid") else SMALL_PIN_STUB_LENGTH
+    canonical = CLIMA_CONNECTOR_ALIASES.get(pin_name, pin_name)
+    if canonical in ("air_out", "air_in"):
+        return MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM
+    if canonical in ("freon1", "freon2"):
+        return MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM
+    return SMALL_PIN_STUB_LENGTH
 
 def get_port_access_specs(global_pins, machine_angle):
+    machine = get_current_machine()
     allowed_local_dirs = {
-        "left_mid": [(-1.0, 0.0)],
-        "right_mid": [(1.0, 0.0)],
-        "tl": [(-1.0, 0.0), (0.0, 1.0)],
-        "tr": [(1.0, 0.0), (0.0, 1.0)],
-        "bl": [(-1.0, 0.0), (0.0, -1.0)],
-        "br": [(1.0, 0.0), (0.0, -1.0)],
+        name: [tuple(machine["connectors"][name]["normal"])]
+        for name in CLIMA_CONNECTOR_PIN_NAMES
     }
     specs = []
     for pin_name, local_dirs in allowed_local_dirs.items():
@@ -2573,17 +2619,10 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_s
     segs.append((access_pt, pin_pt))
 
 def get_outward_vector(pin_name, machine_angle):
-    rad = math.radians(machine_angle)
-    is_left = pin_name in ('left_mid', 'tl', 'bl')
-    local_normal = (-1.0, 0.0) if is_left else (1.0, 0.0)
-    
-    gx = local_normal[0] * math.cos(rad) - local_normal[1] * math.sin(rad)
-    gy = local_normal[0] * math.sin(rad) + local_normal[1] * math.cos(rad)
-    
-    if abs(gx) > abs(gy):
-        return DIR_RIGHT if gx > 0 else DIR_LEFT
-    else:
-        return DIR_UP if gy > 0 else DIR_DOWN
+    canonical = CLIMA_CONNECTOR_ALIASES.get(pin_name, pin_name)
+    connector = get_current_machine()["connectors"].get(canonical)
+    local_normal = connector["normal"] if connector else (1.0, 0.0)
+    return _dir_from_axis(_local_axis_to_world(local_normal, machine_angle))
 
 def _normalize_axis_segment(p1, p2, eps=1e-7):
     x1, y1 = float(p1[0]), float(p1[1])
@@ -3797,7 +3836,7 @@ def find_room_route_at_point(world_pt, route_names):
 def get_selected_pin_names(selected_route_name, routes, global_pins):
     if not selected_route_name or not routes or not global_pins:
         return set()
-    pin_names = [p for p in ("tl", "tr", "bl", "br", "left_mid", "right_mid") if p in global_pins]
+    pin_names = [p for p in CLIMA_CONNECTOR_PIN_NAMES if p in global_pins]
     selected = set()
     for route_name, segs in routes:
         if route_name != selected_route_name:
@@ -4611,18 +4650,16 @@ def _core_like_machine_candidate_score(cx, cy, angle, room):
         if terminal_points else (cx, cy)
     )
 
-    airflow_options = []
-    for supply_pin, return_pin in (("left_mid", "right_mid"), ("right_mid", "left_mid")):
-        supply_dir = _local_axis_to_world((-1.0, 0.0) if supply_pin == "left_mid" else (1.0, 0.0), angle)
-        return_dir = _local_axis_to_world((-1.0, 0.0) if return_pin == "left_mid" else (1.0, 0.0), angle)
-        supply_angle = abs(_point_angle_to_target(pins[supply_pin], supply_dir, target_centroid))
-        return_angle = abs(_point_angle_to_target(pins[return_pin], return_dir, shaft_pt))
-        airflow_options.append((supply_angle + return_angle, supply_angle, return_angle, supply_pin, return_pin))
-    _, supply_angle, return_angle, supply_pin, return_pin = min(airflow_options, key=lambda item: item[0])
+    supply_pin = "air_out"
+    frigo_pin = "freon2" if "freon2" in pins else "freon1"
+    supply_dir = _local_axis_to_world(get_current_machine()["connectors"]["air_out"]["normal"], angle)
+    frigo_dir = _local_axis_to_world(get_current_machine()["connectors"][frigo_pin]["normal"], angle)
+    supply_angle = abs(_point_angle_to_target(pins[supply_pin], supply_dir, target_centroid))
+    frigo_angle = abs(_point_angle_to_target(pins[frigo_pin], frigo_dir, shaft_pt))
 
     out_pct = _area_out_percentage(machine_poly, room.polygon)
     supply_clear = _distance_to_allowed_boundary(pins[supply_pin])
-    return_clear = _distance_to_allowed_boundary(pins[return_pin])
+    frigo_clear = _distance_to_allowed_boundary(pins[frigo_pin])
     distance_to_targets = 0.0
     if terminal_points:
         distance_to_targets = sum(math.hypot(cx - pt[0], cy - pt[1]) for pt in terminal_points) / len(terminal_points)
@@ -4631,11 +4668,11 @@ def _core_like_machine_candidate_score(cx, cy, angle, room):
 
     return (
         out_pct,
-        supply_angle + return_angle,
+        supply_angle + frigo_angle,
         supply_angle,
-        return_angle,
+        frigo_angle,
         -supply_clear,
-        -return_clear,
+        -frigo_clear,
         distance_to_targets,
     )
 
@@ -4699,21 +4736,13 @@ def run_auto_placement():
                         _, p_idx = base_regular_kd.query(pt)
                         pin_nodes[pin_name] = int(p_idx)
 
-                    small_pins = ["tl", "tr", "bl", "br"]
                     room_dists = 0.0
 
                     for r_name in wet_room_names:
-                        best_d = 1e9
-                        for p in small_pins:
-                            d = distance_fields[r_name].get(pin_nodes[p], 1e9)
-                            if d < best_d:
-                                best_d = d
-                        room_dists += best_d
+                        room_dists += distance_fields[r_name].get(pin_nodes["air_out"], 1e9)
 
                     if shaft_boundary_nodes and "Shaft" in distance_fields:
-                        d_left = distance_fields["Shaft"].get(pin_nodes["left_mid"], 1e9)
-                        d_right = distance_fields["Shaft"].get(pin_nodes["right_mid"], 1e9)
-                        room_dists += 0.35 * min(d_left, d_right)
+                        room_dists += 0.35 * distance_fields["Shaft"].get(pin_nodes["freon2"], 1e9)
 
                     rot_score = room_dists
                     if rot_score < min_rot_score:
@@ -6692,38 +6721,31 @@ def main():
 
         selected_pins = get_selected_pin_names(selected_route_name, routes, g_pins) if selected_route_name else set()
         
-        for pin_name in ["tl", "tr", "bl", "br", "left_mid", "right_mid"]:
+        connector_colors = {
+            "air_out": (52, 152, 219),
+            "air_in": (155, 89, 182),
+            "freon1": (241, 196, 15),
+            "freon2": (230, 126, 34),
+        }
+        for pin_name in CLIMA_CONNECTOR_PIN_NAMES:
             pt = g_pins[pin_name]
             sp = to_screen(pt[0], pt[1])
-            is_large = pin_name in ("left_mid", "right_mid")
-            color = (241, 196, 15) if is_large else (230, 126, 34)
+            is_air = pin_name in ("air_out", "air_in")
+            color = connector_colors.get(pin_name, COLOR_TEXT)
             ring_color = (255, 255, 255)
             if selected_route_name and pin_name not in selected_pins:
                 color = COLOR_DESELECTED_PIN
                 ring_color = (80, 84, 88)
-            size = 5 if is_large else 4
+            size = 5 if is_air else 4
             pygame.draw.circle(screen, color, sp, size)
             pygame.draw.circle(screen, ring_color, sp, size, 1)
             
         if auto_placement_mode_idx == 1 and ap_fields:
-            small_pins = ["tl", "tr", "bl", "br"]
             remaining_rooms = list(wet_room_names)
-            used_pins = set()
             for r_name in remaining_rooms:
                 term_pt = terminals[r_name]
-                best_d = 1e9
-                best_p = None
-                for p in small_pins:
-                    if p in used_pins: continue
-                    _, p_idx = grid_kd.query(g_pins[p])
-                    d = ap_fields[r_name].get(int(p_idx), 1e9)
-                    if d < best_d:
-                        best_d = d
-                        best_p = p
-                if best_p:
-                    used_pins.add(best_p)
-                    port_pt = g_pins[best_p]
-                    pygame.draw.line(screen, get_route_color(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
+                port_pt = g_pins["air_out"]
+                pygame.draw.line(screen, get_route_color(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
 
         # ── SIDEBAR PANEL ──
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)

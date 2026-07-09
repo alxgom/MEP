@@ -118,18 +118,18 @@ The geometry and clearance parameters are:
 | `PATINEJO_CLEARANCE_MM` | `200` mm | Hard clearance from shafts for non-shaft ducts. |
 | `MACHINE_CLEARANCE_SOFT_MARGIN_MM` | `150` mm | Soft-cost band outside machine-body hard clearance. |
 | `DUCT_BUFFER_RATIO` | `1.05` | Core-like radius inflation before clearance tests. |
+| `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM` | `700` mm | Core `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE`, used for the `air_out` and visible `air_in` connector stubs. |
+| `MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM` | `25` mm | Core `MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO`, used for the visible `Freon1`/`Freon2` connector stubs. |
 
-The machine and connector parameters are:
+The machine and connector parameters are derived from the indoor Clima family metadata:
 
 | Name | Value | Use |
 | --- | ---: | --- |
-| `MACHINE_BODY_W` | `410` mm | Display/collision body width. |
-| `MACHINE_BODY_H` | `460` mm | Display/collision body height. |
-| `MACHINE_OVERALL_W` | `511` mm | Connector envelope width. |
-| `MACHINE_SMALL_DUCT_D` | `90` mm | Bathroom/toilet/washroom duct diameter. |
-| `MACHINE_LARGE_DUCT_D` | `125` mm | Kitchen and shaft duct diameter. |
-| `SMALL_PIN_STUB_LENGTH` | `100` mm | Small duct outside connector projection. |
-| `LARGE_PIN_STUB_LENGTH` | `250` mm | Kitchen/shaft outside connector projection. |
+| `MACHINE_BODY_W` | selected PEAD type width | Display/collision body width. |
+| `MACHINE_BODY_H` | `700` mm for PEAD | Display/collision body height. |
+| `MACHINE_OVERALL_W` | selected PEAD type width | Kept equal to body width for the current indoor model. |
+| `MACHINE_SMALL_DUCT_D` | selected PEAD air connector height, currently `178` mm | Active air-routing clearance diameter. |
+| `MACHINE_LARGE_DUCT_D` | selected PEAD air connector height, currently `178` mm | Compatibility value for copied routing experiments. |
 
 The interactive ranges are:
 
@@ -216,21 +216,21 @@ Some of these already exist in demo form as softer heuristics: pin projection le
 
 ## Machine Model
 
-The default machine is based on the S&P Ozeo Flat family dimensions used for the current test scenario:
+The active machine list is the indoor Mitsubishi PEAD family exported under `Cli_UnidadInterior_Mitsubishi_PEAD_*`. ERST20D metadata exists, but it is not selectable in this demo because it has no rectangular HVAC `SupplyAir` connector; current routing-core air routing would reject it for this phase.
 
-- Overall envelope: 511 x 460 mm
-- Body envelope used for collision and display: 410 x 460 mm
-- Large ducts: 125 mm
-- Small ducts: 90 mm
-- Small pin projection: 100 mm
-- Large/kitchen/shaft pin projection: 250 mm
-- Duct buffer ratio: 1.05, using integer `ceil(diameter / 2 * ratio)` buffered radii
+The canonical demo connector names are:
 
-Small duct pin behavior constrains exits to the allowed side directions with a short outside allowance. Large duct connections enter perpendicular to the machine side.
+- `air_out`: exported `Supply Air1`, `DomainHvac`, `DuctSystemType=SupplyAir`, `Direction=Out`. This is the only air connector used as the source for the current core-like route-to-rooms phase.
+- `air_in`: exported `Supply Air2`, `DomainHvac`, `DuctSystemType=SupplyAir`, `Direction=In`. It is drawn and kept as metadata, but return routing is not active because current core creates retorno grilles without routing a return duct tree in `RouteClimaLivingRouting`.
+- `freon1` and `freon2`: exported refrigeration connectors, `DomainPiping`, `Direction=Bidirectional`, `PipeSystemType=SupplyHydronic`. They are drawn for the later machine-to-Cli-shaft refrigeration phase.
+
+The family JSON connector offsets are insertion-relative. The demo still treats `machine_cx/machine_cy` as the body center because that is how the inherited interactive dragging and collision code works. To keep behavior stable, `get_machine_pins()` converts exported insertion-relative offsets into body-centered local coordinates before applying the current machine rotation. This is an intentional demo adaptation, not a core behavior change.
+
+The current core-like placement score uses `air_out` angular alignment toward the supply grille centroid and `freon2` angular alignment toward the Cli shaft. This mirrors core behavior more closely than the previous inherited left/right ventilation pins, but the `freon2` choice should be revisited when we implement the refrigeration phase because routing-core currently selects the first `SupplyHydronic` connector and family JSON order is not a robust semantic contract.
 
 Pipe rendering can be toggled from fixed-width strokes to real-diameter strokes with the on-canvas `Diam` button or `[X]`. In real-diameter mode, each route is drawn as `diameter_mm * current_px_per_mm`, so zooming changes the visible stroke width consistently with the plan scale.
 
-The edge-weight overlay has a viewpoint toggle next to `Weights`. The `Small`/`Big` pill, or `[N]`, switches the displayed field between a generic 90 mm duct and a generic 125 mm duct. The field is recomputed against the current walls, shaft, machine, and routed ducts without rerunning the route solver.
+The edge-weight overlay has a viewpoint toggle next to `Weights`. The `Small`/`Big` pill, or `[N]`, currently switches between the same selected PEAD air connector height because this first Clima pass has only one active indoor air-duct size. The field is recomputed against the current walls, shaft, machine, and routed ducts without rerunning the route solver.
 
 Sidebar cards show only the main shortcuts. Use each card's `?` button to open a compact binding popup for the less common controls.
 
@@ -243,6 +243,10 @@ Sidebar cards show only the main shortcuts. Use each card's `?` button to open a
 - Routing-Core Workflow (default)
 
 The Routing-Core Workflow mode mirrors the core placement phase at demo scale: it generates candidates from machine-room centroids, optional +/-100 mm translations along routing-frame axes, and four connector-aligned rotations. Candidates are feasibility-filtered against room/obstacle geometry, then sorted by core-like machine metrics: percentage outside room, connector angular alignment to patinejo/kitchen, connector clearance to allowed boundaries, and distance to main targets. It does not run full routing for each candidate; this keeps the demo interactive while preserving the core placement workflow structure.
+
+## TODO: Outdoor and Common Areas
+
+Outdoor units and common-area routing are intentionally out of scope for this indoor placement/routing pass. Future interactive work should add outdoor unit selection, refrigerant pair matching by connector size/type rather than name, common-area shaft-to-outdoor routing, and multi-dwelling aggregation.
 
 The placement heatmap is independent from the active placement mode. `[V]` displays the placement score field for Manual, Topological Fields, and Routing-Core Workflow modes.
 
