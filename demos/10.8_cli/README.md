@@ -1,6 +1,6 @@
 # MEP Clima Placement Dashboard (Demo 10.8_cli)
 
-Interactive Pygame prototype for exploring Clima machine and grille placement. Demo 10.8_cli starts as an exact copy of Demo 10.8, then switches the first milestone to Clima placement only: it derives supply/return grille targets from covered non-service rooms, places the machine, builds the routing grid, and deliberately stops before duct routing.
+Interactive Pygame prototype for exploring Clima machine, grille placement, and indoor supply routing. Demo 10.8_cli starts as an exact copy of Demo 10.8, then switches the first milestone to Clima: it derives supply/return grille targets from covered non-service rooms, places the machine, builds the routing grid, and routes the first indoor supply-air tree from the machine `air_out` connector to impulsion grilles.
 
 ## Run
 
@@ -63,7 +63,11 @@ Routing and display:
 
 ## Current Solvers
 
-Routing is intentionally disabled in the first Clima pass. The copied routing controls remain visible to preserve the Demo 10.8 UI/UX, but `solve_ventilation_routing()` currently returns a placement-only status after machine placement and grid rebuild.
+The active Clima router now handles only the first indoor air phase: `solve_ventilation_routing()` connects the PEAD `air_out` connector to every `* Supply` grille target. Return grilles remain visible metadata and refrigeration/common-area routing remains pending.
+
+This is intentionally a demo approximation of the routing-core supply-air phase, not yet a byte-for-byte port of core `route_steiner` or a true `L(G)` Steiner implementation. The demo grows a shared tree from the `air_out` access node by repeatedly routing each impulsion grille to the existing tree with the current NumPy graph, Dijkstra state `(node, incoming_direction)`, bend penalties, route clearance weights, and existing segment conversion. This keeps the app dependency-light and interactive in the current virtual environment, where NetworkX/core graph tooling is not available. The next routing milestone should replace or compare this greedy tree grower with the closer `L(G)`/Steiner formulation discussed for Demo 8.
+
+The copied routing controls remain visible to preserve the Demo 10.8 UI/UX. Some controls still belong to the inherited Sal routing experiments and are inactive or diagnostic for the current Clima supply-tree path.
 
 The strategy selector includes:
 

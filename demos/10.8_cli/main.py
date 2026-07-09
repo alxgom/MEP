@@ -3251,6 +3251,60 @@ def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map
         env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
     )
 
+def _run_to_tree_dijkstra(env, start_node_indices, target_node_indices, C_bend, edge_weights=None):
+    if isinstance(start_node_indices, (int, np.integer)):
+        start_node_indices = [start_node_indices]
+    target_nodes = {int(n) for n in target_node_indices}
+    start_nodes = [int(n) for n in start_node_indices]
+    if not start_nodes or not target_nodes:
+        return None, 0.0
+
+    pq = []
+    counter = 0
+    g_scores = {}
+    came_from = {}
+    for start_node in start_nodes:
+        state = (start_node, None)
+        g_scores[state] = 0.0
+        heapq.heappush(pq, (0.0, counter, state))
+        counter += 1
+
+    best_state = None
+    visited = set()
+    while pq:
+        g, _, state = heapq.heappop(pq)
+        if state in visited:
+            continue
+        visited.add(state)
+        u, incoming_dir = state
+        if u in target_nodes:
+            best_state = state
+            break
+        for v, dist, edge_dir in env.adj.get(u, []):
+            v = int(v)
+            edge_cost = _weighted_edge_cost(edge_weights, u, v, dist)
+            turn_penalty = C_bend if incoming_dir is not None and edge_dir is not None and incoming_dir != edge_dir else 0.0
+            next_state = (v, edge_dir)
+            next_g = g + edge_cost + turn_penalty
+            if next_g < g_scores.get(next_state, float("inf")):
+                g_scores[next_state] = next_g
+                came_from[next_state] = state
+                heapq.heappush(pq, (next_g, counter, next_state))
+                counter += 1
+
+    if best_state is None:
+        return None, 0.0
+
+    states = []
+    curr = best_state
+    while curr in came_from:
+        states.append(curr)
+        curr = came_from[curr]
+    states.append(curr)
+    states.reverse()
+    path = [state[0] for state in states]
+    return path, _path_physical_length(env, path)
+
 def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
     terminal_nodes = {}
     terminal_nodes["Shaft"] = shaft_node_idx
@@ -4765,6 +4819,68 @@ def run_auto_placement():
 # ──────────────────────────────────────────────────────────────────────────
 # MAIN SOLVER WRAPPER
 # ──────────────────────────────────────────────────────────────────────────
+def _clima_supply_route_names():
+    return sorted(
+        [name for name in terminals.keys() if str(name).endswith(" Supply")],
+        key=lambda name: math.hypot(terminals[name][0] - machine_cx, terminals[name][1] - machine_cy),
+    )
+
+def _path_to_segments(path):
+    segs = []
+    if not path:
+        return segs
+    for i in range(len(path) - 1):
+        p1 = current_env.nodes[path[i]]
+        p2 = current_env.nodes[path[i + 1]]
+        segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    return segs
+
+def run_clima_supply_tree_routing(global_pins, pin_node_map):
+    supply_routes = _clima_supply_route_names()
+    if not supply_routes:
+        return None, "No supply grille targets", 0
+    air_targets = pin_node_map.get("air_out", [])
+    if not air_targets:
+        return None, "Missing air_out graph access", 0
+
+    root_target = air_targets[0]
+    root_node = int(root_target["node_idx"])
+    tree_nodes = {root_node}
+    routes = []
+    total_nodes = 0
+    connector_stub_added = False
+    prior_axis_records = []
+
+    for route_name in supply_routes:
+        start_nodes = get_route_start_nodes(route_name)
+        if not start_nodes:
+            return None, f"No start nodes for {route_name}", total_nodes
+
+        weights = {}
+        add_route_clearance_weights(weights, route_name, current_env)
+        add_route_interaction_weights(prior_axis_records, get_route_diameter(route_name), weights, current_env)
+
+        path, _ = _run_to_tree_dijkstra(
+            current_env,
+            start_nodes,
+            tree_nodes,
+            C_BEND,
+            edge_weights=weights,
+        )
+        if path is None:
+            return None, f"No path from {route_name} to supply tree", total_nodes
+
+        segs = _path_to_segments(path)
+        if not connector_stub_added and root_node in path:
+            add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
+            connector_stub_added = True
+        routes.append((route_name, segs))
+        prior_axis_records.extend(_route_axis_records(route_name, segs))
+        tree_nodes.update(int(n) for n in path)
+        total_nodes += len(path)
+
+    return routes, "Success", total_nodes
+
 def solve_ventilation_routing():
     global edge_weight_debug_map, edge_weight_overlay_excluded_edges
     edge_weight_debug_map = {}
@@ -4792,13 +4908,16 @@ def solve_ventilation_routing():
         build_grid(machine_pins=global_pins)
         update_dynamic_env(machine_poly)
 
+    pin_node_map = snap_pins_to_graph(global_pins)
+    routes, reason, total_nodes = run_clima_supply_tree_routing(global_pins, pin_node_map)
     elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-    total_nodes = len(current_env.nodes) if current_env is not None else 0
+    if routes is None:
+        return None, f"Routing Blocked: {reason} in {elapsed_ms:.1f}ms", elapsed_ms, total_nodes
     status = (
-        f"Placement only: {DEMO_DOMAIN} machine and {len(terminals)} grille targets ready; "
-        f"routing not enabled yet in {elapsed_ms:.1f}ms"
+        f"Success: Clima supply tree routed {len(_clima_supply_route_names())} impulsion grille(s); "
+        f"return/refrigeration pending in {elapsed_ms:.1f}ms"
     )
-    return None, status, elapsed_ms, total_nodes
+    return routes, status, elapsed_ms, total_nodes
 
     pin_node_map = snap_pins_to_graph(global_pins)
     if not pin_node_map or not shaft_extraction:
