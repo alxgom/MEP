@@ -45,6 +45,9 @@ HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Ha
 CORE_EPSILON_GRID_MM = 200
 SMALL_PIN_STUB_LENGTH = 100
 LARGE_PIN_STUB_LENGTH = 250
+SIZE_FIRST_TRAMO_REJA_MM = 100
+SIZE_FIRST_TRAMO_MAQUINA_AIRE_MM = 200
+MIN_DISTANCE_REJA_MM = 400
 MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM = 700
 MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM = 25
 MACHINE_CLEARANCE = 0
@@ -787,6 +790,7 @@ shaft_core_entry_specs = []
 shaft_entry_geometry_by_node = {}
 terminals        = {}
 terminal_candidate_options = {}
+terminal_connection_specs = {}
 wet_room_names   = []
 machine_cx    = 0.0
 machine_cy    = 0.0
@@ -911,6 +915,7 @@ def _line_candidate_from_segment(room, p0, p1, segment_idx, distance_along, gril
     return {
         "point": rounded,
         "role": role,
+        "normal": (float(normal[0]), float(normal[1])),
         "segment_idx": segment_idx,
         "segment": (tuple(map(float, p0)), tuple(map(float, np.array(p1, dtype=np.float64)))),
         "segment_length": length,
@@ -1229,8 +1234,9 @@ def _select_clima_grille_option(options):
     return options[0] if options else None
 
 def build_clima_terminals_from_rooms():
-    global terminal_candidate_options
+    global terminal_candidate_options, terminal_connection_specs
     terminal_candidate_options = {}
+    terminal_connection_specs = {}
     candidates = [room for room in rooms if _is_clima_terminal_room(room)]
     if not candidates:
         candidates = [
@@ -1259,11 +1265,29 @@ def build_clima_terminals_from_rooms():
         option = _select_clima_grille_option(grille_options)
         if option is None:
             supply_pt, return_pt = _fallback_terminal_points(room)
+            supply_spec = {
+                "point": supply_pt,
+                "role": "Supply",
+                "normal": None,
+                "width": float(CLIMA_GRILLE_IMPULSION_WIDTH_MM),
+            }
+            return_spec = {
+                "point": return_pt,
+                "role": "Return",
+                "normal": None,
+                "width": float(CLIMA_GRILLE_RETURN_WIDTH_MM),
+            }
         else:
-            supply_pt = option["supply"]["point"]
-            return_pt = option["return"]["point"]
-        result[f"{room_name} Supply"] = supply_pt
-        result[f"{room_name} Return"] = return_pt
+            supply_spec = dict(option["supply"])
+            return_spec = dict(option["return"])
+            supply_pt = supply_spec["point"]
+            return_pt = return_spec["point"]
+        supply_route = f"{room_name} Supply"
+        return_route = f"{room_name} Return"
+        result[supply_route] = supply_pt
+        result[return_route] = return_pt
+        terminal_connection_specs[supply_route] = supply_spec
+        terminal_connection_specs[return_route] = return_spec
     return result
 
 def _is_clima_machine_room(room):
@@ -2251,6 +2275,38 @@ def _connect_isolated_required_nodes(nodes_arr, raw_edges, required_points, wall
 
     return raw_edges
 
+def _normalized_or_none(vec):
+    if vec is None:
+        return None
+    arr = np.array(vec, dtype=np.float64)
+    norm = float(np.hypot(arr[0], arr[1]))
+    if norm <= 1e-7:
+        return None
+    return arr / norm
+
+def get_clima_grille_steiner_point(route_name):
+    terminal_pt = terminals.get(route_name)
+    if terminal_pt is None:
+        return None
+    spec = terminal_connection_specs.get(route_name, {})
+    normal = _normalized_or_none(spec.get("normal"))
+    if normal is None:
+        return (round(float(terminal_pt[0])), round(float(terminal_pt[1])))
+    return (
+        round(float(terminal_pt[0]) + normal[0] * MIN_DISTANCE_REJA_MM),
+        round(float(terminal_pt[1]) + normal[1] * MIN_DISTANCE_REJA_MM),
+    )
+
+def get_clima_supply_routing_points():
+    points = []
+    for route_name in terminals.keys():
+        if not str(route_name).endswith(" Supply"):
+            continue
+        pt = get_clima_grille_steiner_point(route_name)
+        if pt is not None:
+            points.append(pt)
+    return points
+
 def build_hannan_grid(machine_pins=None, shift_walls=False):
     if routing_region_base is None:
         return
@@ -2265,6 +2321,13 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
 
     for pt in terminals.values():
         required_points.append((round(float(pt[0])), round(float(pt[1]))))
+    for pt in get_clima_supply_routing_points():
+        x, y = round(float(pt[0])), round(float(pt[1]))
+        xs.add(x)
+        ys.add(y)
+        preserve_x.add(x)
+        preserve_y.add(y)
+        required_points.append((x, y))
     if shaft_extraction is not None:
         rep_pt = shaft_extraction.representative_point()
         required_points.append((round(float(rep_pt.x)), round(float(rep_pt.y))))
@@ -2390,6 +2453,8 @@ def build_epsilon_grid(machine_pins=None):
         _add_point_axes(preserve_x, preserve_y, p)
 
     for pt in terminals.values():
+        add_required(pt)
+    for pt in get_clima_supply_routing_points():
         add_required(pt)
 
     for spec in shaft_core_entry_specs:
@@ -2602,7 +2667,19 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_s
     pin_pt = (float(pin_pt[0]), float(pin_pt[1]))
     if math.hypot(access_pt[0] - node_pt[0], access_pt[1] - node_pt[1]) > 1e-7:
         segs.append((node_pt, access_pt))
-    segs.append((access_pt, pin_pt))
+    canonical = CLIMA_CONNECTOR_ALIASES.get(pin_name, pin_name)
+    first_tramo = SIZE_FIRST_TRAMO_MAQUINA_AIRE_MM if canonical == "air_out" else get_pin_stub_length(pin_name)
+    distance_total = math.hypot(pin_pt[0] - access_pt[0], pin_pt[1] - access_pt[1])
+    if distance_total > first_tramo and first_tramo > 1.0:
+        ratio = (distance_total - first_tramo) / distance_total
+        intermediate = (
+            access_pt[0] + (pin_pt[0] - access_pt[0]) * ratio,
+            access_pt[1] + (pin_pt[1] - access_pt[1]) * ratio,
+        )
+        segs.append((access_pt, intermediate))
+        segs.append((intermediate, pin_pt))
+    else:
+        segs.append((access_pt, pin_pt))
 
 def get_outward_vector(pin_name, machine_angle):
     canonical = CLIMA_CONNECTOR_ALIASES.get(pin_name, pin_name)
@@ -3550,6 +3627,7 @@ def get_clima_grille_start_nodes(route_name):
     terminal_pt = terminals.get(route_name)
     if terminal_pt is None:
         return []
+    route_pt = get_clima_grille_steiner_point(route_name) or terminal_pt
 
     candidate_nodes = get_room_candidate_start_nodes(route_name)
     if _preferred_points_for_room(route_name):
@@ -3558,13 +3636,11 @@ def get_clima_grille_start_nodes(route_name):
             return preferred_nodes
         return _nearest_connected_graph_nodes(_preferred_points_for_room(route_name)[0])
 
-    _, node_idx = grid_kd.query(terminal_pt)
+    _, node_idx = grid_kd.query(route_pt)
     nearest = int(node_idx)
     if nearest in candidate_nodes:
         return [nearest]
-    if candidate_nodes:
-        return candidate_nodes[:1]
-    return _nearest_connected_graph_nodes(terminal_pt)
+    return _nearest_connected_graph_nodes(route_pt)
 
 def _terminal_marker_side_px():
     return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
@@ -4908,6 +4984,32 @@ def _path_to_segments(path):
         segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
     return segs
 
+def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
+    terminal_pt = terminals.get(route_name)
+    route_pt = get_clima_grille_steiner_point(route_name)
+    if terminal_pt is None or route_pt is None or leaf_node_idx is None:
+        return
+    leaf_pt = current_env.nodes[int(leaf_node_idx)]
+    leaf_pt = (float(leaf_pt[0]), float(leaf_pt[1]))
+    route_pt = (float(route_pt[0]), float(route_pt[1]))
+    terminal_pt = (float(terminal_pt[0]), float(terminal_pt[1]))
+    if math.hypot(leaf_pt[0] - route_pt[0], leaf_pt[1] - route_pt[1]) > 1.0:
+        segs.append((leaf_pt, route_pt))
+
+    distance_total = math.hypot(terminal_pt[0] - route_pt[0], terminal_pt[1] - route_pt[1])
+    if distance_total <= 1.0:
+        return
+    if distance_total > SIZE_FIRST_TRAMO_REJA_MM:
+        ratio = (distance_total - SIZE_FIRST_TRAMO_REJA_MM) / distance_total
+        intermediate = (
+            route_pt[0] + (terminal_pt[0] - route_pt[0]) * ratio,
+            route_pt[1] + (terminal_pt[1] - route_pt[1]) * ratio,
+        )
+        segs.append((route_pt, intermediate))
+        segs.append((intermediate, terminal_pt))
+    else:
+        segs.append((route_pt, terminal_pt))
+
 def run_clima_supply_tree_routing(global_pins, pin_node_map):
     supply_routes = _clima_supply_route_names()
     if not supply_routes:
@@ -4947,6 +5049,7 @@ def run_clima_supply_tree_routing(global_pins, pin_node_map):
         if not connector_stub_added and root_node in path:
             add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
             connector_stub_added = True
+        add_clima_grille_stub_segments(segs, route_name, path[0])
         routes.append((route_name, segs))
         prior_axis_records.extend(_route_axis_records(route_name, segs))
         tree_nodes.update(int(n) for n in path)
@@ -5015,13 +5118,12 @@ def run_clima_supply_steiner_routing(global_pins, pin_node_map):
         leaf_nodes = [int(n) for n in get_clima_grille_start_nodes(route_name) if int(n) in tree_nodes]
         if not leaf_nodes:
             continue
+        route_pt = get_clima_grille_steiner_point(route_name) or terminal_pt
         leaf_node = min(
             leaf_nodes,
-            key=lambda n: float(np.hypot(current_env.nodes[n][0] - terminal_pt[0], current_env.nodes[n][1] - terminal_pt[1])),
+            key=lambda n: float(np.hypot(current_env.nodes[n][0] - route_pt[0], current_env.nodes[n][1] - route_pt[1])),
         )
-        leaf_pt = current_env.nodes[leaf_node]
-        if float(np.hypot(leaf_pt[0] - terminal_pt[0], leaf_pt[1] - terminal_pt[1])) > 1.0:
-            segs.append(((float(terminal_pt[0]), float(terminal_pt[1])), (float(leaf_pt[0]), float(leaf_pt[1]))))
+        add_clima_grille_stub_segments(segs, route_name, leaf_node)
     add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
     return [("Supply Air Tree", segs)], "Success", len(tree_nodes)
 

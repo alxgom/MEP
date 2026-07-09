@@ -216,6 +216,8 @@ The inherited Topological Fields placement mode was removed from the Cli demo be
 
 Cli supply grilles use their generated grille point to find nearby connected graph nodes. This intentionally bypasses the inherited Sal-style interior room-start filter, because Cli grilles are wall-adjacent by construction and can otherwise lose all valid start nodes before routing begins. The rendered supply tree includes short leaf stubs from the grille point to the selected graph node so the route remains visually attached to the terminal.
 
+The routed supply tree now follows the core connector-point split at demo scale: the L(G) terminal is the grille Steiner point at `MIN_DISTANCE_REJA` from the grille connector, the last `SIZE_FIRST_TRAMO_REJA` is kept as a separate grille-width connector tramo, and the machine air connector uses `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE` with its final `SIZE_FIRST_TRAMO_MAQUINA_AIRE` split. This keeps the interactive geometry closer to `RouteClimaLivingRouting` while still drawing a single blue supply tree.
+
 ## TODO: Outdoor and Common Areas
 
 Outdoor units and common-area routing are intentionally out of scope for this indoor placement/routing pass. Future interactive work should add outdoor unit selection, refrigerant pair matching by connector size/type rather than name, common-area shaft-to-outdoor routing, and multi-dwelling aggregation.
