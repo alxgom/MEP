@@ -4905,9 +4905,6 @@ def solve_clima_routing():
     )
     return routes, status, elapsed_ms, total_nodes
 
-def solve_ventilation_routing():
-    return solve_clima_routing()
-
 # ──────────────────────────────────────────────────────────────────────────
 # DWELLING AND ROOM GENERATORS
 # ──────────────────────────────────────────────────────────────────────────
@@ -5623,7 +5620,7 @@ def restore_solution_log(log_entry):
     selected_log_id = log_entry["id"]
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
-    return solve_ventilation_routing()
+    return solve_clima_routing()
 
 def handle_solution_log_click(pos):
     if log_button_rect.collidepoint(pos):
@@ -5949,14 +5946,14 @@ def main():
     total_nodes = 0
     
     needs_auto_placement = (auto_placement_mode_idx > 0)
-    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
     
     running = True
     while running:
         if needs_auto_placement:
             needs_auto_placement = False
             run_auto_placement()
-            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+            routes, status, elapsed_ms, total_nodes = solve_clima_routing()
             if routes and not status.startswith("Blocked"):
                 crossings_c = count_segment_crossings(routes)
                 record_history(routes, crossings_c, elapsed_ms)
@@ -5988,40 +5985,40 @@ def main():
                             auto_best_logs.clear()
                             if auto_placement_mode_idx > 0:
                                 run_auto_placement()
-                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                            routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                             if routes and not status.startswith("Blocked"):
                                 record_current_solution(routes, elapsed_ms, f"Machine:{selected_machine_idx}", (52, 152, 219))
                         continue
                     if min_piece_slider_rect.collidepoint((mx, my)):
                         dragging_min_piece_slider = True
                         set_min_piece_factor_from_slider_x(mx)
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                         if routes and not status.startswith("Blocked"):
                             record_current_solution(routes, elapsed_ms, f"Min:{min_piece_factor:.2f}", (241, 196, 15))
                         continue
                     if bend_weight_slider_rect.collidepoint((mx, my)):
                         dragging_bend_weight_slider = True
                         set_bend_weight_from_slider_x(mx)
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                         if routes and not status.startswith("Blocked"):
                             record_current_solution(routes, elapsed_ms, f"B:{C_BEND:.0f}", (155, 89, 182))
                         continue
                     if bend_weight_reset_rect.collidepoint((mx, my)):
                         reset_bend_weight()
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                         if routes and not status.startswith("Blocked"):
                             record_current_solution(routes, elapsed_ms, "B:reset", (155, 89, 182))
                         continue
                     if crossing_weight_slider_rect.collidepoint((mx, my)):
                         dragging_crossing_weight_slider = True
                         set_crossing_weight_from_slider_x(mx)
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                         if routes and not status.startswith("Blocked"):
                             record_current_solution(routes, elapsed_ms, f"X:{crossing_penalty_multiplier:.1f}", (230, 126, 34))
                         continue
                     if crossing_weight_reset_rect.collidepoint((mx, my)):
                         reset_crossing_weight()
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                         if routes and not status.startswith("Blocked"):
                             record_current_solution(routes, elapsed_ms, "X:reset", (230, 126, 34))
                         continue
@@ -6057,7 +6054,7 @@ def main():
                         if terminal_tool_action == "reset":
                             preferred_terminal_points_by_room.clear()
                             preferred_terminal_areas.clear()
-                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                            routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                             if routes and not status.startswith("Blocked"):
                                 record_current_solution(routes, elapsed_ms, "Prefs reset", (26, 188, 156))
                         if preferred_terminal_tool_mode:
@@ -6087,7 +6084,7 @@ def main():
                         elif not remove_marker:
                             set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
                         if changed:
-                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                            routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                             if routes and not status.startswith("Blocked"):
                                 label = "Term-" if remove_marker else "Term+"
                                 record_current_solution(routes, elapsed_ms, label, (26, 188, 156))
@@ -6137,7 +6134,7 @@ def main():
                     last_wheel_rotate_ms = now_ms
                     auto_placement_mode_idx = 0
                     machine_angle = (machine_angle + 90) % 360
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6153,7 +6150,7 @@ def main():
                     last_wheel_rotate_ms = now_ms
                     auto_placement_mode_idx = 0
                     machine_angle = (machine_angle - 90) % 360
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6170,7 +6167,7 @@ def main():
                         if marker_room:
                             selected_route_name = marker_room
                         if changed:
-                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                            routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                             if routes and not status.startswith("Blocked"):
                                 label = "Area-" if terminal_area_remove else "Area+"
                                 record_current_solution(routes, elapsed_ms, label, (155, 89, 182))
@@ -6187,17 +6184,17 @@ def main():
             elif event.type == pygame.MOUSEMOTION:
                 if dragging_min_piece_slider:
                     set_min_piece_factor_from_slider_x(event.pos[0])
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         record_current_solution(routes, elapsed_ms)
                 elif dragging_bend_weight_slider:
                     set_bend_weight_from_slider_x(event.pos[0])
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         record_current_solution(routes, elapsed_ms)
                 elif dragging_crossing_weight_slider:
                     set_crossing_weight_from_slider_x(event.pos[0])
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         record_current_solution(routes, elapsed_ms)
                 elif panning_view and pan_last_pos is not None:
@@ -6217,7 +6214,7 @@ def main():
                     wx, wy = to_mm(mx, my)
                     machine_cx = wx - drag_offset_x
                     machine_cy = wy - drag_offset_y
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6259,7 +6256,7 @@ def main():
                     hist_event_markers.clear()
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6267,7 +6264,7 @@ def main():
                 elif event.key == pygame.K_r:
                     auto_placement_mode_idx = 0
                     machine_angle = (machine_angle + 90) % 360
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6293,7 +6290,7 @@ def main():
                     hist_event_markers.clear()
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6307,7 +6304,7 @@ def main():
                     selected_log_id = None
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6326,7 +6323,7 @@ def main():
                     graph_type_idx = (graph_type_idx + 1) % len(GRAPH_TYPES)
                     g_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
                     build_grid(machine_pins=g_pins)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
@@ -6339,13 +6336,13 @@ def main():
                         auto_placement_mode_idx = 2
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     
                 elif event.key == pygame.K_p:
                     auto_placement_mode_idx = (auto_placement_mode_idx + 1) % len(AUTO_PLACEMENT_MODES)
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     
                 elif event.key == pygame.K_v:
                     show_heatmap = not show_heatmap
@@ -6385,7 +6382,7 @@ def main():
                             node_scores, distance_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
                             ap_scores = node_scores
                             ap_fields = distance_fields
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
