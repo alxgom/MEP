@@ -3529,6 +3529,24 @@ def get_route_start_nodes(route_name):
         return preferred_nodes
     return candidate_nodes
 
+def get_clima_grille_start_nodes(route_name):
+    if grid_kd is None or current_env is None:
+        return []
+    terminal_pt = terminals.get(route_name)
+    if terminal_pt is None:
+        return []
+
+    candidate_nodes = get_room_candidate_start_nodes(route_name)
+    if _preferred_points_for_room(route_name):
+        preferred_nodes, _ = _map_preferred_points_to_nodes(route_name, candidate_nodes)
+        return preferred_nodes
+
+    _, node_idx = grid_kd.query(terminal_pt)
+    nearest = int(node_idx)
+    if nearest in candidate_nodes:
+        return [nearest]
+    return candidate_nodes[:1]
+
 def _terminal_marker_side_px():
     return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
 
@@ -4942,7 +4960,7 @@ def run_clima_supply_tree_routing(global_pins, pin_node_map):
     prior_axis_records = []
 
     for route_name in supply_routes:
-        start_nodes = get_route_start_nodes(route_name)
+        start_nodes = get_clima_grille_start_nodes(route_name)
         if not start_nodes:
             return None, f"No start nodes for {route_name}", total_nodes
 
@@ -4983,7 +5001,7 @@ def run_clima_supply_steiner_routing(global_pins, pin_node_map):
     root_node = int(root_target["node_idx"])
     groups = [{"name": "air_out", "nodes": [root_node]}]
     for route_name in supply_routes:
-        start_nodes = get_route_start_nodes(route_name)
+        start_nodes = get_clima_grille_start_nodes(route_name)
         if not start_nodes:
             return None, f"No start nodes for {route_name}", 0
         groups.append({"name": route_name, "nodes": [int(n) for n in start_nodes]})

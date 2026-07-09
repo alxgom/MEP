@@ -138,9 +138,9 @@ Short-piece handling is intentionally post-route, matching routing-core's curren
 
 ## Grille Preferences
 
-The Cli app routes supply-air grilles from room-side candidate nodes rather than exposing the old Sal room-start selector. Each supply grille can start from valid graph nodes inside its room and inside the false-ceiling region.
+The Cli app routes supply-air grilles from the graph node nearest to the placed grille point, rather than exposing the old Sal room-start selector. The node must still be a valid graph node inside the room and inside the false-ceiling region.
 
-Preferred grille points keep the same virtual-source abstraction. When a room has one or more preferred square markers, the virtual source connects only to those mapped graph nodes with zero cost; the other room nodes are disconnected for that route. Rooms without preferred markers keep the full room-node set. Candidate room nodes are not drawn by default; use `G` to inspect graph nodes and edges when needed.
+Preferred grille points override the automatic nearest-grille node. When a room has one or more preferred square markers, the route group uses only those mapped graph nodes; rooms without preferred markers use the nearest valid graph node to the generated grille point. Candidate room nodes are not drawn by default; use `G` to inspect graph nodes and edges when needed.
 
 `ROUTING_WALL_CLEARANCE_MM` currently defaults to 100 mm. It insets candidate routing nodes from the false-ceiling boundary for both regular and Hannan grids; edge validation still uses the actual false-ceiling geometry.
 
