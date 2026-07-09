@@ -33,6 +33,7 @@ except ImportError:
     scenario_summary = None
 
 DEMO_DOMAIN = "Clima"
+DEMO_SHAFT_INSTALLATION = "Cli"
 
 # Constants
 SCALE_TO_MM    = 1000
@@ -5268,6 +5269,7 @@ def _load_real_dwelling():
         dwelling_id=dwelling_id,
         scale_to_mm=True,
         frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx % len(ROUTING_FRAME_OPTIONS)],
+        preferred_shaft_installation=DEMO_SHAFT_INSTALLATION,
     )
     current_scenario_label = f"{execution} / {dwelling_id}"
     current_scenario_summary = scenario_summary(scenario) if scenario_summary else {}
