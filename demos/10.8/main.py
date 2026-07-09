@@ -183,6 +183,8 @@ WALL_DRAW_WIDTH = 2
 COLOR_COLUMN = (0, 0, 0)
 COLOR_SHAFT = (231, 76, 60)
 COLOR_SHAFT_BG = (231, 76, 60, 40)
+COLOR_SHAFT_INACTIVE = (154, 84, 82)
+COLOR_SHAFT_INACTIVE_HATCH = (92, 58, 58)
 COLOR_DOOR = (220, 220, 220)
 COLOR_MACHINE = (127, 140, 141)
 COLOR_MACHINE_HOVER = (149, 165, 166)
@@ -210,6 +212,7 @@ ROUTE_COLORS = {
 }
 
 REAL_DWELLING_DB = DWELLING_EXPORT_ROOT / "data" / "dwellings.sqlite"
+PREFERRED_SHAFT_INSTALLATION = "Sal"
 REAL_DWELLING_SCENARIOS = [
     ("0002_real_c90", "A_A1_P00_V01"),
     ("0004_real_7e4", "1_1_2_1"),
@@ -2922,6 +2925,25 @@ def draw_geometry_overlay(screen, geometries, color_rgba):
                 pygame.draw.polygon(overlay, color_rgba, coords)
     screen.blit(overlay, (0, 0))
 
+def draw_polygon_hatch(screen, poly, color, spacing=10):
+    if poly is None or poly.is_empty:
+        return
+    for part in _iter_polygons(poly):
+        coords = [to_screen(x, y) for x, y in part.exterior.coords]
+        if len(coords) < 3:
+            continue
+        clip = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        pygame.draw.polygon(clip, (255, 255, 255, 255), coords)
+        hatch = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        min_x = max(0, min(x for x, _ in coords) - 20)
+        max_x = min(WINDOW_WIDTH, max(x for x, _ in coords) + 20)
+        min_y = max(0, min(y for _, y in coords) - 20)
+        max_y = min(WINDOW_HEIGHT, max(y for _, y in coords) + 20)
+        for x in range(min_x - (max_y - min_y), max_x + spacing, spacing):
+            pygame.draw.line(hatch, color, (x, max_y), (x + (max_y - min_y), min_y), 1)
+        hatch.blit(clip, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        screen.blit(hatch, (0, 0))
+
 def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
     if len(points) < 2:
         return
@@ -4775,6 +4797,7 @@ def _load_real_dwelling():
         dwelling_id=dwelling_id,
         scale_to_mm=True,
         frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx % len(ROUTING_FRAME_OPTIONS)],
+        preferred_shaft_installation=PREFERRED_SHAFT_INSTALLATION,
     )
     current_scenario_label = f"{execution} / {dwelling_id}"
     current_scenario_summary = scenario_summary(scenario) if scenario_summary else {}
@@ -6126,7 +6149,12 @@ def main():
         for s_poly in shafts:
             coords = list(s_poly.exterior.coords)
             screen_coords = [to_screen(x, y) for x, y in coords]
-            pygame.draw.polygon(screen, COLOR_SHAFT, screen_coords)
+            is_active_shaft = shaft_extraction is not None and s_poly.equals(shaft_extraction)
+            shaft_color = COLOR_SHAFT if is_active_shaft else COLOR_SHAFT_INACTIVE
+            pygame.draw.polygon(screen, shaft_color, screen_coords)
+            if not is_active_shaft:
+                draw_polygon_hatch(screen, s_poly, COLOR_SHAFT_INACTIVE_HATCH, spacing=9)
+                pygame.draw.polygon(screen, COLOR_WALL, screen_coords, 1)
             
         if show_grid_graph and current_env is not None:
             for u in current_env.adj:
