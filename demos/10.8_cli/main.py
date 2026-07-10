@@ -914,7 +914,7 @@ def _segment_unit_and_normal(p0, p1, room_poly):
     return unit, normals[0], length
 
 def _line_candidate_from_segment(room, p0, p1, segment_idx, distance_along, grille_width, role):
-    unit, normal, length = _segment_unit_and_normal(p0, p1, room.polygon)
+    unit, inward_normal, length = _segment_unit_and_normal(p0, p1, room.polygon)
     if unit is None or length <= 1e-7:
         return None
     p0 = np.array(p0, dtype=np.float64)
@@ -922,10 +922,12 @@ def _line_candidate_from_segment(room, p0, p1, segment_idx, distance_along, gril
     rounded = (round(float(pt[0])), round(float(pt[1])))
     if not _point_allowed_for_grille(room, rounded):
         return None
+    connector_vector = -inward_normal
     return {
         "point": rounded,
         "role": role,
-        "normal": (float(normal[0]), float(normal[1])),
+        "normal": (float(inward_normal[0]), float(inward_normal[1])),
+        "connector_vector": (float(connector_vector[0]), float(connector_vector[1])),
         "segment_idx": segment_idx,
         "segment": (tuple(map(float, p0)), tuple(map(float, np.array(p1, dtype=np.float64)))),
         "segment_length": length,
@@ -1279,12 +1281,14 @@ def build_clima_terminals_from_rooms():
                 "point": supply_pt,
                 "role": "Supply",
                 "normal": None,
+                "connector_vector": None,
                 "width": float(CLIMA_GRILLE_IMPULSION_WIDTH_MM),
             }
             return_spec = {
                 "point": return_pt,
                 "role": "Return",
                 "normal": None,
+                "connector_vector": None,
                 "width": float(CLIMA_GRILLE_RETURN_WIDTH_MM),
             }
         else:
@@ -2301,12 +2305,12 @@ def get_clima_grille_steiner_point(route_name):
     if terminal_pt is None:
         return None
     spec = terminal_connection_specs.get(route_name, {})
-    normal = _normalized_or_none(spec.get("normal"))
-    if normal is None:
+    connector_vector = _normalized_or_none(spec.get("connector_vector"))
+    if connector_vector is None:
         return (round(float(terminal_pt[0])), round(float(terminal_pt[1])))
     return (
-        round(float(terminal_pt[0]) + normal[0] * MIN_DISTANCE_REJA_MM),
-        round(float(terminal_pt[1]) + normal[1] * MIN_DISTANCE_REJA_MM),
+        round(float(terminal_pt[0]) + connector_vector[0] * MIN_DISTANCE_REJA_MM),
+        round(float(terminal_pt[1]) + connector_vector[1] * MIN_DISTANCE_REJA_MM),
     )
 
 def get_clima_supply_routing_points():
@@ -3683,10 +3687,10 @@ def get_clima_grille_start_nodes(route_name):
 
 def get_clima_grille_out_dir(route_name):
     spec = terminal_connection_specs.get(route_name, {})
-    normal = _normalized_or_none(spec.get("normal"))
-    if normal is None:
+    connector_vector = _normalized_or_none(spec.get("connector_vector"))
+    if connector_vector is None:
         return None
-    return _dir_from_axis((float(normal[0]), float(normal[1])))
+    return _dir_from_axis((float(connector_vector[0]), float(connector_vector[1])))
 
 def _terminal_marker_side_px():
     return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
@@ -3835,6 +3839,36 @@ def draw_preferred_terminal_areas(screen, selected_route_name=None):
                 n_rect.center = (sx, sy)
                 pygame.draw.rect(screen, node_color, n_rect, 1)
 
+def draw_grille_direction_indicator(screen, point, spec, muted=False):
+    connector_vector = _normalized_or_none(spec.get("connector_vector"))
+    if connector_vector is None:
+        return
+    p0 = np.array(point, dtype=np.float64)
+    p1 = p0 + connector_vector * 220.0
+    role = str(spec.get("role", "Supply"))
+    if role == "Return":
+        start, end = p1, p0
+        color = (231, 76, 60) if not muted else (86, 74, 74)
+    else:
+        start, end = p0, p1
+        color = (12, 18, 24) if not muted else (74, 78, 82)
+    s0 = to_screen(float(start[0]), float(start[1]))
+    s1 = to_screen(float(end[0]), float(end[1]))
+    pygame.draw.line(screen, color, s0, s1, 2)
+
+    dx = float(s1[0] - s0[0])
+    dy = float(s1[1] - s0[1])
+    length = math.hypot(dx, dy)
+    if length <= 1.0:
+        return
+    ux, uy = dx / length, dy / length
+    px, py = -uy, ux
+    head = 7.0
+    left = (s1[0] - ux * head + px * head * 0.45, s1[1] - uy * head + py * head * 0.45)
+    right = (s1[0] - ux * head - px * head * 0.45, s1[1] - uy * head - py * head * 0.45)
+    pygame.draw.line(screen, color, s1, (int(left[0]), int(left[1])), 2)
+    pygame.draw.line(screen, color, s1, (int(right[0]), int(right[1])), 2)
+
 def draw_auto_grille_candidate_markers(screen, selected_route_name=None):
     if not terminal_candidate_options:
         return
@@ -3850,6 +3884,7 @@ def draw_auto_grille_candidate_markers(screen, selected_route_name=None):
                 rect.center = (sx, sy)
                 color = (255, 255, 255) if not muted else (86, 90, 94)
                 pygame.draw.rect(screen, color, rect, 2)
+                draw_grille_direction_indicator(screen, pt, candidate, muted)
                 continue
             rect = pygame.Rect(0, 0, 5, 5)
             rect.center = (sx, sy)
@@ -5052,17 +5087,12 @@ def _path_to_segments(path):
         segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
     return segs
 
-def append_orthogonal_connector_segments(segs, p1, p2):
+def append_connector_segment(segs, p1, p2):
     p1 = (float(p1[0]), float(p1[1]))
     p2 = (float(p2[0]), float(p2[1]))
     if math.hypot(p2[0] - p1[0], p2[1] - p1[1]) <= 1.0:
         return
-    if abs(p1[0] - p2[0]) <= 1.0 or abs(p1[1] - p2[1]) <= 1.0:
-        segs.append((p1, p2))
-        return
-    corner = (p2[0], p1[1])
-    segs.append((p1, corner))
-    segs.append((corner, p2))
+    segs.append((p1, p2))
 
 def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
     terminal_pt = terminals.get(route_name)
@@ -5074,7 +5104,7 @@ def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
     route_pt = (float(route_pt[0]), float(route_pt[1]))
     terminal_pt = (float(terminal_pt[0]), float(terminal_pt[1]))
     if math.hypot(leaf_pt[0] - route_pt[0], leaf_pt[1] - route_pt[1]) > 1.0:
-        append_orthogonal_connector_segments(segs, leaf_pt, route_pt)
+        append_connector_segment(segs, leaf_pt, route_pt)
 
     distance_total = math.hypot(terminal_pt[0] - route_pt[0], terminal_pt[1] - route_pt[1])
     if distance_total <= 1.0:
@@ -5085,10 +5115,10 @@ def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
             route_pt[0] + (terminal_pt[0] - route_pt[0]) * ratio,
             route_pt[1] + (terminal_pt[1] - route_pt[1]) * ratio,
         )
-        append_orthogonal_connector_segments(segs, route_pt, intermediate)
-        append_orthogonal_connector_segments(segs, intermediate, terminal_pt)
+        append_connector_segment(segs, route_pt, intermediate)
+        append_connector_segment(segs, intermediate, terminal_pt)
     else:
-        append_orthogonal_connector_segments(segs, route_pt, terminal_pt)
+        append_connector_segment(segs, route_pt, terminal_pt)
 
 def run_clima_supply_tree_routing(global_pins, pin_node_map):
     supply_routes = _clima_supply_route_names()
