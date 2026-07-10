@@ -16,6 +16,7 @@ from scipy.spatial import cKDTree
 from vent_router.domain import (
     LARGE_DUCT_ROUTE_NAMES,
     SAL_OZEO_FLAT_MACHINE,
+    local_axis_to_world as _local_axis_to_world,
     machine_pins as _machine_pins,
     outward_vector as _outward_vector,
     port_access_specs as _port_access_specs,

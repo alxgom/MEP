@@ -177,6 +177,11 @@ Manual validation milestones:
 - Added focused test for KD-tree terminal lookup and shaft-node preservation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\search.py demos\10.8.1\tests\test_routing_search.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
+- Manual launch found a startup crash after machine geometry extraction: placement code still referenced `_local_axis_to_world`.
+- Restored `main.py` compatibility import for `local_axis_to_world` and exported it from `vent_router.domain`.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Startup smoke: running Demo 10.8.1 with the 10.7 venv stayed alive until timeout instead of exiting with a traceback.
 
 ## Commit Checklist
 
