@@ -36,21 +36,19 @@ Manual validation milestones:
 - Refactor scope document created and committed.
 - Initial config catalog created and committed.
 - Local workflow and implementation tracking added before further code movement.
+- First import-safe value object extracted: `EnvView` now lives in `vent_router.graphs.env`.
 
 ## Next Steps
 
-1. Commit the workflow/tracking documents.
-2. Reconcile the current config taxonomy with the latest decisions: feasibility/heuristic instead of regulation, millimetre integer policy, English-only keys.
-3. Add import-safe value objects before moving behavior:
-   - graph environment
+1. Continue import-safe value objects before moving behavior:
    - machine specification
    - route/terminal specification
    - app/runtime state shell
-4. Extract pure geometry helpers.
-5. Extract graph builders behind a stable interface.
-6. Extract routing backends and scoring.
-7. Extract placement.
-8. Extract UI drawing and event handling.
+2. Extract pure geometry helpers.
+3. Extract graph builders behind a stable interface.
+4. Extract routing backends and scoring.
+5. Extract placement.
+6. Extract UI drawing and event handling.
 
 ## Step Log
 
@@ -63,6 +61,10 @@ Manual validation milestones:
 - Added local workflow plan and project-local agent instructions.
 - Updated taxonomy decisions from the design discussion: millimetre integers internally, no confirmed regulation values in current demo config, English config keys, and installation-scoped UI.
 - Validation note: `quick_validate.py` could not run because the active Python environment does not have `yaml`/PyYAML. Manual skill-structure checks and Python compile checks were used instead.
+- Extracted `EnvView` to `vent_router.graphs.env` and updated `main.py` to import it.
+- Added focused pytest coverage for `EnvView` reference preservation.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\env.py demos\10.8.1\tests\conftest.py demos\10.8.1\tests\test_graph_env.py`.
+- Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py`.
 
 ## Commit Checklist
 

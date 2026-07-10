@@ -13,6 +13,7 @@ from shapely.ops import unary_union
 from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
+from vent_router.graphs import EnvView
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -586,11 +587,6 @@ def draw_ruler_overlay(screen, font_small, start_mm, end_mm):
     pygame.draw.rect(screen, (22, 22, 30), label_rect, border_radius=4)
     pygame.draw.rect(screen, (52, 152, 219), label_rect, 1, border_radius=4)
     screen.blit(label, (label_rect.x + pad, label_rect.y + pad))
-
-class EnvView:
-    def __init__(self, nodes, adj):
-        self.nodes = nodes
-        self.adj   = adj
 
 def snap_to_integer_grid(geom):
     if geom.is_empty:
