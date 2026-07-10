@@ -66,7 +66,7 @@ Manual validation milestones:
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
 - Heatmap and UI color-map helpers now live in `vent_router.ui.colors`.
-- Graph axis value merging now lives in `vent_router.graphs.axes`.
+- Graph axis collection and value merging helpers now live in `vent_router.graphs.axes`.
 
 ## Next Steps
 
@@ -161,6 +161,11 @@ Manual validation milestones:
 - Extracted Hannan/Epsilon grid axis value merging to `vent_router.graphs.axes.merge_close_values`.
 - Kept `main.py` wrapper for existing grid builder call sites.
 - Added focused tests for threshold merging, preserved axes, priority axes, and empty inputs.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\axes.py demos\10.8.1\tests\test_graph_axes.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted graph axis collection helpers to `vent_router.graphs.axes`: point axes, polygon vertex axes, and bounds axes.
+- Kept `main.py` wrappers for current Hannan/Epsilon grid builder call sites.
+- Added focused tests for rounded point axes, polygon exterior/interior vertices, and buffered bounds.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\axes.py demos\10.8.1\tests\test_graph_axes.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Extracted polygon iteration to `vent_router.geometry.polygons.iter_polygons`.

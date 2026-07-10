@@ -32,7 +32,13 @@ from vent_router.geometry import (
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
-from vent_router.graphs import EnvView, merge_close_values as _merge_close_values_for_axes
+from vent_router.graphs import (
+    EnvView,
+    add_bounds_axes as _add_bounds_axes_to_sets,
+    add_point_axes as _add_point_axes_to_sets,
+    add_polygon_vertex_axes as _add_polygon_vertex_axes_to_sets,
+    merge_close_values as _merge_close_values_for_axes,
+)
 from vent_router.routing import (
     RouteScoreWeights,
     buffered_radius_mm as _buffered_radius_mm,
@@ -1214,26 +1220,13 @@ def _iter_polygons(geom):
     yield from _iter_polygons_from_geom(geom)
 
 def _add_point_axes(xs, ys, point):
-    xs.add(round(float(point[0])))
-    ys.add(round(float(point[1])))
+    return _add_point_axes_to_sets(xs, ys, point)
 
 def _add_polygon_vertex_axes(xs, ys, geom):
-    for poly in _iter_polygons(geom):
-        for x, y in list(poly.exterior.coords)[:-1]:
-            _add_point_axes(xs, ys, (x, y))
-        for interior in poly.interiors:
-            for x, y in list(interior.coords)[:-1]:
-                _add_point_axes(xs, ys, (x, y))
+    return _add_polygon_vertex_axes_to_sets(xs, ys, geom)
 
 def _add_bounds_axes(xs, ys, geom, clearance=0.0):
-    if geom is None or geom.is_empty:
-        return
-    g = geom.buffer(clearance, join_style=2) if clearance else geom
-    if g.is_empty:
-        return
-    minx, miny, maxx, maxy = g.bounds
-    xs.update([round(float(minx)), round(float(maxx))])
-    ys.update([round(float(miny)), round(float(maxy))])
+    return _add_bounds_axes_to_sets(xs, ys, geom, clearance)
 
 def _largest_polygon(geom):
     polys = list(_iter_polygons(geom))
