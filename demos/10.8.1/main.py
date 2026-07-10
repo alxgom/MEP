@@ -13,7 +13,13 @@ from shapely.ops import unary_union
 from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
-from vent_router.domain import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
+from vent_router.domain import (
+    LARGE_DUCT_ROUTE_NAMES,
+    SAL_OZEO_FLAT_MACHINE,
+    machine_pins as _machine_pins,
+    outward_vector as _outward_vector,
+    port_access_specs as _port_access_specs,
+)
 from vent_router.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
@@ -1688,38 +1694,7 @@ def build_grid(machine_pins=None):
 
 # Machine representation helper
 def get_machine_pins(cx, cy, angle_deg):
-    w, h = MACHINE_OVERALL_W, MACHINE_BODY_H
-    small_y = h / 2.0 - MACHINE_SMALL_DUCT_D / 2.0
-    local_pins = {
-        "left_mid": (-w/2, 0.0),
-        "right_mid": (w/2, 0.0),
-        "tl": (-w/2, small_y),
-        "tr": (w/2, small_y),
-        "bl": (-w/2, -small_y),
-        "br": (w/2, -small_y)
-    }
-    
-    rad = math.radians(angle_deg)
-    global_pins = {}
-    for name, (px, py) in local_pins.items():
-        gx = cx + px * math.cos(rad) - py * math.sin(rad)
-        gy = cy + px * math.sin(rad) + py * math.cos(rad)
-        global_pins[name] = (round(gx), round(gy))
-        
-    # Rotate and translate corners
-    corners = {
-        "c_tl": (-w/2,  h/2),
-        "c_tr": ( w/2,  h/2),
-        "c_br": ( w/2, -h/2),
-        "c_bl": (-w/2, -h/2)
-    }
-    global_corners = {}
-    for name, (px, py) in corners.items():
-        gx = cx + px * math.cos(rad) - py * math.sin(rad)
-        gy = cy + px * math.sin(rad) + py * math.cos(rad)
-        global_corners[name] = (round(gx), round(gy))
-        
-    return {**global_pins, **global_corners}
+    return _machine_pins(MACHINE_SPEC, cx, cy, angle_deg)
 
 def snap_pins_to_graph(global_pins):
     if grid_kd is None:
@@ -1735,57 +1710,11 @@ def snap_pins_to_graph(global_pins):
 # ──────────────────────────────────────────────────────────────────────────
 # ROUTING UTILITIES AND CONSTRAINTS
 # ──────────────────────────────────────────────────────────────────────────
-DIR_RIGHT, DIR_LEFT, DIR_UP, DIR_DOWN = "E", "W", "N", "S"
-DIR_REV = {DIR_RIGHT: DIR_LEFT, DIR_LEFT: DIR_RIGHT, DIR_UP: DIR_DOWN, DIR_DOWN: DIR_UP}
-
-def _local_axis_to_world(local_vec, machine_angle):
-    lx, ly = local_vec
-    rad = math.radians(machine_angle)
-    gx = lx * math.cos(rad) - ly * math.sin(rad)
-    gy = lx * math.sin(rad) + ly * math.cos(rad)
-    if abs(gx) >= abs(gy):
-        return (1.0 if gx > 0 else -1.0, 0.0)
-    return (0.0, 1.0 if gy > 0 else -1.0)
-
-def _dir_from_axis(vec):
-    x, y = vec
-    if abs(x) >= abs(y):
-        return DIR_RIGHT if x > 0 else DIR_LEFT
-    return DIR_UP if y > 0 else DIR_DOWN
-
 def get_pin_stub_length(pin_name):
     return MACHINE_SPEC.pin_stub_length_mm(pin_name)
 
 def get_port_access_specs(global_pins, machine_angle):
-    allowed_local_dirs = {
-        "left_mid": [(-1.0, 0.0)],
-        "right_mid": [(1.0, 0.0)],
-        "tl": [(-1.0, 0.0), (0.0, 1.0)],
-        "tr": [(1.0, 0.0), (0.0, 1.0)],
-        "bl": [(-1.0, 0.0), (0.0, -1.0)],
-        "br": [(1.0, 0.0), (0.0, -1.0)],
-    }
-    specs = []
-    for pin_name, local_dirs in allowed_local_dirs.items():
-        if pin_name not in global_pins:
-            continue
-        pin_pt = global_pins[pin_name]
-        stub_length = get_pin_stub_length(pin_name)
-        for local_dir in local_dirs:
-            wx, wy = _local_axis_to_world(local_dir, machine_angle)
-            access_pt = (
-                round(float(pin_pt[0]) + wx * stub_length),
-                round(float(pin_pt[1]) + wy * stub_length),
-            )
-            out_dir = _dir_from_axis((wx, wy))
-            specs.append({
-                "pin": pin_name,
-                "pin_point": (float(pin_pt[0]), float(pin_pt[1])),
-                "access_point": access_pt,
-                "out_dir": out_dir,
-                "in_dir": DIR_REV[out_dir],
-            })
-    return specs
+    return _port_access_specs(MACHINE_SPEC, global_pins, machine_angle)
 
 def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_spec=None):
     if target_node_idx is None or pin_name not in global_pins:
@@ -1802,17 +1731,7 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_s
     segs.append((access_pt, pin_pt))
 
 def get_outward_vector(pin_name, machine_angle):
-    rad = math.radians(machine_angle)
-    is_left = pin_name in ('left_mid', 'tl', 'bl')
-    local_normal = (-1.0, 0.0) if is_left else (1.0, 0.0)
-    
-    gx = local_normal[0] * math.cos(rad) - local_normal[1] * math.sin(rad)
-    gy = local_normal[0] * math.sin(rad) + local_normal[1] * math.cos(rad)
-    
-    if abs(gx) > abs(gy):
-        return DIR_RIGHT if gx > 0 else DIR_LEFT
-    else:
-        return DIR_UP if gy > 0 else DIR_DOWN
+    return _outward_vector(pin_name, machine_angle)
 
 def _route_axis_records(route_name, route_segs):
     diameter = get_route_diameter(route_name)

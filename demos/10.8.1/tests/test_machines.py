@@ -1,4 +1,9 @@
-from vent_router.domain import SAL_OZEO_FLAT_MACHINE
+from vent_router.domain import (
+    SAL_OZEO_FLAT_MACHINE,
+    machine_pins,
+    outward_vector,
+    port_access_specs,
+)
 from vent_router.domain.routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
 
 
@@ -32,3 +37,43 @@ def test_sal_ozeo_flat_pin_stub_policy_matches_baseline():
 
 def test_large_duct_route_names_are_canonical_for_sal_machine():
     assert SAL_OZEO_FLAT_MACHINE.large_route_names is LARGE_DUCT_ROUTE_NAMES
+
+
+def test_machine_pins_match_baseline_unrotated_geometry():
+    pins = machine_pins(SAL_OZEO_FLAT_MACHINE, 0, 0, 0)
+
+    assert pins["left_mid"] == (-256, 0)
+    assert pins["right_mid"] == (256, 0)
+    assert pins["tl"] == (-256, 185)
+    assert pins["br"] == (256, -185)
+    assert pins["c_tl"] == (-256, 230)
+    assert pins["c_br"] == (256, -230)
+
+
+def test_port_access_specs_match_baseline_stub_policy():
+    pins = machine_pins(SAL_OZEO_FLAT_MACHINE, 0, 0, 0)
+    specs = port_access_specs(SAL_OZEO_FLAT_MACHINE, pins, 0)
+    by_pin = {}
+    for spec in specs:
+        by_pin.setdefault(spec["pin"], []).append(spec)
+
+    assert by_pin["left_mid"] == [{
+        "pin": "left_mid",
+        "pin_point": (-256.0, 0.0),
+        "access_point": (-506, 0),
+        "out_dir": "W",
+        "in_dir": "E",
+    }]
+    assert {
+        (spec["access_point"], spec["out_dir"], spec["in_dir"])
+        for spec in by_pin["tl"]
+    } == {
+        ((-356, 185), "W", "E"),
+        ((-256, 285), "N", "S"),
+    }
+
+
+def test_outward_vector_matches_pin_side_and_rotation():
+    assert outward_vector("left_mid", 0) == "W"
+    assert outward_vector("right_mid", 0) == "E"
+    assert outward_vector("left_mid", 90) == "S"
