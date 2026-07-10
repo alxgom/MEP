@@ -35,12 +35,16 @@ from vent_router.routing import (
     count_segment_overlaps as _count_segment_overlaps,
     count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
+    add_edge as _mcf_add_edge,
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
     merged_route_piece_lengths as _merged_route_piece_lengths,
     route_conflict_summary as _route_conflict_summary,
     route_quality_warnings as _route_quality_warnings,
     score_routes as _score_routes,
+    min_cost_flow as _min_cost_flow,
+    positive_flow_edges as _positive_flow_edges,
+    trace_flow_path as _trace_flow_path,
 )
 
 # Add relative paths to sys.path so we can import modules
@@ -3164,102 +3168,6 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         available_small_pins.remove(chosen_small_pin)
         
     return True, routes, "Success", total_nodes
-
-def _mcf_add_edge(graph, u, v, cap, cost, meta=None):
-    fwd = {"to": v, "rev": len(graph[v]), "cap": cap, "orig_cap": cap, "cost": float(cost), "meta": meta}
-    rev = {"to": u, "rev": len(graph[u]), "cap": 0, "orig_cap": 0, "cost": -float(cost), "meta": None}
-    graph[u].append(fwd)
-    graph[v].append(rev)
-
-def _min_cost_flow(graph, source, sink, flow_required):
-    flow = 0
-    cost = 0.0
-    potentials = [0.0] * len(graph)
-
-    while flow < flow_required:
-        dist = [float("inf")] * len(graph)
-        parent = [None] * len(graph)
-        dist[source] = 0.0
-        pq = [(0.0, source)]
-
-        while pq:
-            d, u = heapq.heappop(pq)
-            if d > dist[u] + 1e-9:
-                continue
-            for ei, edge in enumerate(graph[u]):
-                if edge["cap"] <= 0:
-                    continue
-                v = edge["to"]
-                nd = d + edge["cost"] + potentials[u] - potentials[v]
-                if nd + 1e-9 < dist[v]:
-                    dist[v] = nd
-                    parent[v] = (u, ei)
-                    heapq.heappush(pq, (nd, v))
-
-        if parent[sink] is None:
-            break
-
-        for i, d in enumerate(dist):
-            if d < float("inf"):
-                potentials[i] += d
-
-        add = flow_required - flow
-        v = sink
-        while v != source:
-            u, ei = parent[v]
-            add = min(add, graph[u][ei]["cap"])
-            v = u
-
-        v = sink
-        while v != source:
-            u, ei = parent[v]
-            edge = graph[u][ei]
-            edge["cap"] -= add
-            graph[v][edge["rev"]]["cap"] += add
-            cost += add * edge["cost"]
-            v = u
-
-        flow += add
-
-    return flow, cost
-
-def _positive_flow_edges(graph, u):
-    return [
-        edge
-        for edge in graph[u]
-        if edge["orig_cap"] > 0 and edge["orig_cap"] - edge["cap"] > 0
-    ]
-
-def _trace_flow_path(graph, start_node, sink):
-    states = []
-    target = None
-    u = start_node
-    seen = set()
-
-    while u != sink:
-        if u in seen:
-            return None, None
-        seen.add(u)
-
-        candidates = _positive_flow_edges(graph, u)
-        if not candidates:
-            return None, None
-        edge = candidates[0]
-        edge["cap"] += 1
-
-        meta = edge.get("meta")
-        if meta:
-            if meta[0] == "state":
-                states.append((meta[1], meta[2]))
-            elif meta[0] == "target":
-                target = meta[1]
-        u = edge["to"]
-
-    if not states or target is None:
-        return None, None
-    path = [states[0][0]]
-    path.extend(v for _, v in states)
-    return path, target
 
 def _source_start_nodes(source_spec):
     if isinstance(source_spec, (list, tuple, set)):
