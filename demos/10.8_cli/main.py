@@ -877,6 +877,13 @@ def _point_allowed_for_grille(room, pt):
             return False
     return True
 
+def _point_allowed_for_clima_routing(pt):
+    routing_region = _node_routing_region() if "_node_routing_region" in globals() else routing_region_base
+    if routing_region is None:
+        return True
+    point = Point(float(pt[0]), float(pt[1]))
+    return routing_region.contains(point) or routing_region.distance(point) < 1e-7
+
 def _route_base_room_name(route_name):
     for suffix in (" Supply", " Return"):
         if route_name.endswith(suffix):
@@ -923,11 +930,18 @@ def _line_candidate_from_segment(room, p0, p1, segment_idx, distance_along, gril
     if not _point_allowed_for_grille(room, rounded):
         return None
     connector_vector = -inward_normal
+    steiner_point = (
+        float(rounded[0]) + connector_vector[0] * MIN_DISTANCE_REJA_MM,
+        float(rounded[1]) + connector_vector[1] * MIN_DISTANCE_REJA_MM,
+    )
+    if not _point_allowed_for_clima_routing(steiner_point):
+        return None
     return {
         "point": rounded,
         "role": role,
         "normal": (float(inward_normal[0]), float(inward_normal[1])),
         "connector_vector": (float(connector_vector[0]), float(connector_vector[1])),
+        "steiner_point": (round(float(steiner_point[0])), round(float(steiner_point[1]))),
         "segment_idx": segment_idx,
         "segment": (tuple(map(float, p0)), tuple(map(float, np.array(p1, dtype=np.float64)))),
         "segment_length": length,
@@ -1276,21 +1290,7 @@ def build_clima_terminals_from_rooms():
         terminal_candidate_options[room_name] = grille_candidates
         option = _select_clima_grille_option(grille_options)
         if option is None:
-            supply_pt, return_pt = _fallback_terminal_points(room)
-            supply_spec = {
-                "point": supply_pt,
-                "role": "Supply",
-                "normal": None,
-                "connector_vector": None,
-                "width": float(CLIMA_GRILLE_IMPULSION_WIDTH_MM),
-            }
-            return_spec = {
-                "point": return_pt,
-                "role": "Return",
-                "normal": None,
-                "connector_vector": None,
-                "width": float(CLIMA_GRILLE_RETURN_WIDTH_MM),
-            }
+            continue
         else:
             supply_spec = dict(option["supply"])
             return_spec = dict(option["return"])
@@ -2305,6 +2305,9 @@ def get_clima_grille_steiner_point(route_name):
     if terminal_pt is None:
         return None
     spec = terminal_connection_specs.get(route_name, {})
+    steiner_point = spec.get("steiner_point")
+    if steiner_point is not None:
+        return (round(float(steiner_point[0])), round(float(steiner_point[1])))
     connector_vector = _normalized_or_none(spec.get("connector_vector"))
     if connector_vector is None:
         return (round(float(terminal_pt[0])), round(float(terminal_pt[1])))
@@ -3886,10 +3889,6 @@ def draw_auto_grille_candidate_markers(screen, selected_route_name=None):
                 pygame.draw.rect(screen, color, rect, 2)
                 draw_grille_direction_indicator(screen, pt, candidate, muted)
                 continue
-            rect = pygame.Rect(0, 0, 5, 5)
-            rect.center = (sx, sy)
-            color = (52, 152, 219) if not muted else (70, 74, 78)
-            pygame.draw.rect(screen, color, rect)
 
 def draw_preferred_terminal_markers(screen, selected_route_name=None, routes=None):
     if current_env is None:
