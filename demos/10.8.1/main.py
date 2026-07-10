@@ -28,6 +28,12 @@ from vent_router.geometry import (
     snap_to_integer_grid,
 )
 from vent_router.graphs import EnvView
+from vent_router.routing import (
+    merged_axis_segments as _merged_axis_segments,
+    merged_route_axis_segments as _merged_route_axis_segments,
+    metric_route_segments as _metric_route_segments,
+    point_is_segment_endpoint as _point_is_segment_endpoint,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1803,63 +1809,6 @@ def _route_axis_records(route_name, route_segs):
         if seg is not None:
             records.append((seg, diameter))
     return records
-
-def _merged_axis_segments(route_segs, eps=1e-7):
-    by_line = {}
-    for p1, p2 in route_segs:
-        seg = _normalize_axis_segment(p1, p2, eps=eps)
-        if seg is None:
-            continue
-        x1, y1, x2, y2, axis = seg
-        key = (axis, round(y1 if axis == "H" else x1, 6))
-        interval = (x1, x2) if axis == "H" else (y1, y2)
-        by_line.setdefault(key, []).append(interval)
-
-    merged = []
-    for (axis, coord), intervals in by_line.items():
-        intervals.sort()
-        start, end = intervals[0]
-        for curr_start, curr_end in intervals[1:]:
-            if curr_start <= end + eps:
-                end = max(end, curr_end)
-            else:
-                if axis == "H":
-                    merged.append((start, coord, end, coord, "H"))
-                else:
-                    merged.append((coord, start, coord, end, "V"))
-                start, end = curr_start, curr_end
-        if axis == "H":
-            merged.append((start, coord, end, coord, "H"))
-        else:
-            merged.append((coord, start, coord, end, "V"))
-    return merged
-
-def _merged_route_axis_segments(routes):
-    return [
-        (name, seg)
-        for name, route_segs in routes
-        for seg in _merged_axis_segments(route_segs)
-    ]
-
-def _metric_route_segments(routes):
-    segments = [
-        (name, ((seg[0], seg[1]), (seg[2], seg[3])))
-        for name, seg in _merged_route_axis_segments(routes)
-    ]
-    for name, route_segs in routes:
-        for p1, p2 in route_segs:
-            if _normalize_axis_segment(p1, p2) is not None:
-                continue
-            if math.hypot(float(p2[0]) - float(p1[0]), float(p2[1]) - float(p1[1])) < 1e-7:
-                continue
-            segments.append((name, ((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1])))))
-    return segments
-
-def _point_is_segment_endpoint(pt, seg, eps=1e-7):
-    return (
-        math.hypot(pt[0] - seg[0][0], pt[1] - seg[0][1]) < eps
-        or math.hypot(pt[0] - seg[1][0], pt[1] - seg[1][1]) < eps
-    )
 
 def get_route_diameter(route_name):
     return MACHINE_SPEC.route_diameter_mm(route_name)

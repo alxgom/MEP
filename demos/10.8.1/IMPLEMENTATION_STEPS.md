@@ -51,16 +51,18 @@ Manual validation milestones:
 - Boundary and line segment extraction helpers now live in `vent_router.geometry.segments`.
 - Ray casting and ray intersection helpers now live in `vent_router.geometry.rays`.
 - Axis-aligned segment normalization/relation/distance helpers now live in `vent_router.geometry.axis`.
+- Pure route segment merging and metric helpers now live in `vent_router.routing.segments`.
 
 ## Next Steps
 
 1. Continue import-safe value objects before moving behavior:
    - app/runtime state shell
 2. Continue extracting pure geometry helpers.
-3. Extract graph builders behind a stable interface.
-4. Extract routing backends and scoring.
-5. Extract placement.
-6. Extract UI drawing and event handling.
+3. Continue extracting pure routing helpers.
+4. Extract graph builders behind a stable interface.
+5. Extract routing backends and scoring.
+6. Extract placement.
+7. Extract UI drawing and event handling.
 
 ## Step Log
 
@@ -109,6 +111,11 @@ Manual validation milestones:
 - Kept `main.py` compatibility imports under the previous private helper names.
 - Added focused tests for normalization, zero/diagonal rejection, overlap, crossing, endpoint touch, and separated distance.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\axis.py demos\10.8.1\tests\test_axis.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted `merged_axis_segments`, `merged_route_axis_segments`, `metric_route_segments`, and `point_is_segment_endpoint` to `vent_router.routing.segments`.
+- Left `_route_axis_records` in `main.py` for now because it still depends on the active route-diameter policy.
+- Added focused tests for route segment merging, route-name preservation, non-axis metric segments, and endpoint detection.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\segments.py demos\10.8.1\tests\test_routing_segments.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
