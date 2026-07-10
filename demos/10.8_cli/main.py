@@ -814,6 +814,8 @@ current_env     = None
 _bnd_segs       = None
 hannan_static_cache = {}
 show_grid_graph = False
+show_core_debug_overlay = False
+core_steiner_debug = {}
 
 def invalidate_room_start_node_cache():
     global room_start_node_cache
@@ -3980,6 +3982,64 @@ def draw_outlined_text(screen, font, text, pos, color, outline_color=COLOR_PLAN_
         screen.blit(font.render(text, True, outline_color), (x + ox, y + oy))
     screen.blit(font.render(text, True, color), (x, y))
 
+def _draw_debug_segment(screen, p1, p2, color, width=2, dash_px=10):
+    sp1 = np.array(to_screen(p1[0], p1[1]), dtype=np.float64)
+    sp2 = np.array(to_screen(p2[0], p2[1]), dtype=np.float64)
+    delta = sp2 - sp1
+    length = float(np.hypot(delta[0], delta[1]))
+    if length <= 1.0:
+        return
+    direction = delta / length
+    pos = 0.0
+    draw = True
+    while pos < length:
+        end = min(pos + dash_px, length)
+        if draw:
+            a = sp1 + direction * pos
+            b = sp1 + direction * end
+            pygame.draw.line(
+                screen,
+                color,
+                (int(round(a[0])), int(round(a[1]))),
+                (int(round(b[0])), int(round(b[1]))),
+                width,
+            )
+        pos += dash_px
+        draw = not draw
+
+def draw_core_steiner_debug_overlay(screen, font_small):
+    if not show_core_debug_overlay or not core_steiner_debug:
+        return
+
+    for p1, p2 in core_steiner_debug.get("raw_tree_segments", []):
+        pygame.draw.line(screen, (255, 255, 255), to_screen(p1[0], p1[1]), to_screen(p2[0], p2[1]), 5)
+        pygame.draw.line(screen, (30, 144, 255), to_screen(p1[0], p1[1]), to_screen(p2[0], p2[1]), 2)
+
+    for p1, p2 in core_steiner_debug.get("access_segments", []):
+        _draw_debug_segment(screen, p1, p2, (241, 196, 15), width=2, dash_px=8)
+
+    for p1, p2 in core_steiner_debug.get("stub_segments", []):
+        _draw_debug_segment(screen, p1, p2, (46, 204, 113), width=2, dash_px=12)
+
+    for pt in core_steiner_debug.get("bridge_points", []):
+        sp = to_screen(pt[0], pt[1])
+        pygame.draw.circle(screen, (241, 196, 15), sp, 6)
+        pygame.draw.circle(screen, (40, 45, 55), sp, 3)
+
+    role_colors = {
+        "source": (231, 76, 60),
+        "grille": (52, 152, 219),
+    }
+    for terminal in core_steiner_debug.get("terminals", []):
+        pt = terminal["point"]
+        sp = to_screen(pt[0], pt[1])
+        color = role_colors.get(terminal.get("role"), (255, 255, 255))
+        pygame.draw.circle(screen, (255, 255, 255), sp, 8)
+        pygame.draw.circle(screen, color, sp, 5)
+        label = terminal.get("access", "")
+        if label:
+            draw_outlined_text(screen, font_small, label, (sp[0] + 8, sp[1] - 8), color)
+
 def draw_room_labels(screen, font_small, selected_route_name=None):
     selected_base = _route_base_room_name(selected_route_name) if selected_route_name else None
     for room in rooms:
@@ -5377,11 +5437,19 @@ def _orthogonal_bridge_candidates(point, candidate_nodes, max_links=4):
             break
     return result
 
-def _add_core_terminal_node(nodes_list, adj, point, candidate_nodes, label):
+def _add_core_terminal_node(nodes_list, adj, point, candidate_nodes, label, debug=None, role="target"):
     if not _point_allowed_for_core_steiner_terminal(point):
         return None, f"Core allowed region does not include {label}"
     exact_node = _find_exact_graph_node(point)
     if exact_node is not None:
+        if debug is not None:
+            debug["terminals"].append({
+                "label": label,
+                "role": role,
+                "point": (round(float(point[0])), round(float(point[1]))),
+                "node": int(exact_node),
+                "access": "exact",
+            })
         return exact_node, None
 
     links = _axis_link_candidates(point, candidate_nodes)
@@ -5389,8 +5457,19 @@ def _add_core_terminal_node(nodes_list, adj, point, candidate_nodes, label):
     virtual_pt = (round(float(point[0])), round(float(point[1])))
     nodes_list.append(virtual_pt)
     adj[virtual_idx] = []
+    if debug is not None:
+        debug["terminals"].append({
+            "label": label,
+            "role": role,
+            "point": virtual_pt,
+            "node": int(virtual_idx),
+            "access": "axis" if links else "bridge",
+        })
     for node_idx in links:
         _add_augmented_axis_edge(adj, virtual_idx, node_idx, virtual_pt, current_env.nodes[int(node_idx)])
+        if debug is not None:
+            node_pt = current_env.nodes[int(node_idx)]
+            debug["access_segments"].append((virtual_pt, (float(node_pt[0]), float(node_pt[1]))))
     if links:
         return virtual_idx, None
 
@@ -5401,11 +5480,18 @@ def _add_core_terminal_node(nodes_list, adj, point, candidate_nodes, label):
         adj[mid_idx] = []
         _add_augmented_axis_edge(adj, virtual_idx, mid_idx, virtual_pt, mid)
         _add_augmented_axis_edge(adj, mid_idx, node_idx, mid, current_env.nodes[int(node_idx)])
+        if debug is not None:
+            node_pt = current_env.nodes[int(node_idx)]
+            debug["bridge_points"].append(mid)
+            debug["access_segments"].append((virtual_pt, mid))
+            debug["access_segments"].append((mid, (float(node_pt[0]), float(node_pt[1]))))
     if not bridges:
         return None, f"No orthogonal graph access for {label}"
     return virtual_idx, None
 
 def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
+    global core_steiner_debug
+    core_steiner_debug = {}
     supply_routes = _clima_supply_route_names()
     if not supply_routes:
         return None, "No supply grille targets", 0
@@ -5416,6 +5502,15 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
     root_target = air_targets[0]
     nodes_list = [(float(pt[0]), float(pt[1])) for pt in current_env.nodes]
     augmented_adj = _copy_env_adjacency(current_env.adj)
+    debug = {
+        "backend": CLIMA_SUPPLY_BACKENDS[0],
+        "terminals": [],
+        "bridge_points": [],
+        "access_segments": [],
+        "raw_tree_segments": [],
+        "stub_segments": [],
+        "tree_nodes": [],
+    }
     root_candidates = _nearest_connected_graph_nodes(root_target["access_point"], max_nodes=24)
     if int(root_target["node_idx"]) not in root_candidates:
         root_candidates.insert(0, int(root_target["node_idx"]))
@@ -5425,8 +5520,11 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         root_target["access_point"],
         root_candidates,
         "air_out",
+        debug=debug,
+        role="source",
     )
     if root_node is None:
+        core_steiner_debug = debug
         return None, root_error, 0
 
     route_leaf_nodes = {}
@@ -5442,8 +5540,11 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
             route_pt,
             start_nodes,
             route_name,
+            debug=debug,
+            role="grille",
         )
         if leaf_node is None:
+            core_steiner_debug = debug
             return None, leaf_error or f"No start nodes for {route_name}", len(terminal_nodes)
         route_leaf_nodes[route_name] = leaf_node
         terminal_nodes.append(leaf_node)
@@ -5456,12 +5557,18 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         min_value=0.0,
     )
     if result is None:
+        core_steiner_debug = debug
         return None, "Routing-core Steiner port did not connect all terminals", len(terminal_nodes)
 
+    debug["raw_tree_segments"] = list(result.segments)
+    debug["tree_nodes"] = sorted(int(node) for node in result.tree_nodes)
     segs = list(result.segments)
     for route_name, leaf_node in route_leaf_nodes.items():
         if leaf_node in result.tree_nodes:
+            before = len(segs)
             add_clima_grille_stub_segments(segs, route_name, leaf_node, leaf_point=augmented_nodes[int(leaf_node)])
+            debug["stub_segments"].extend(segs[before:])
+    before = len(segs)
     add_port_stub_segment(
         segs,
         "air_out",
@@ -5470,6 +5577,8 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         root_target,
         node_point=augmented_nodes[int(root_node)],
     )
+    debug["stub_segments"].extend(segs[before:])
+    core_steiner_debug = debug
     return [("Supply Air Tree", segs)], "Success", len(result.tree_nodes)
 
 def solve_clima_routing():
@@ -6437,6 +6546,7 @@ HELP_TEXT = {
     "solver": [
         "[Tab] Grid type",
         "[G] Grid mesh",
+        "[J] Core debug overlay",
         "Grille: click preferred node",
         "Grille area: drag rectangle",
         "Ctrl removes preferences",
@@ -6508,7 +6618,7 @@ def draw_transient_message(screen, font_small):
     screen.blit(surf, (rect.left + 10, rect.top + 6))
 
 def main():
-    global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
+    global machine_cx, machine_cy, machine_angle, show_grid_graph, show_core_debug_overlay, graph_type_idx, routing_strategy_idx
     global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
     global real_scenario_idx, routing_frame_idx, dwelling_source_idx, room_start_mode_idx
     global edge_weight_heatmap_enabled, edge_weight_view_mode_idx, route_real_diameter_width_enabled
@@ -6885,6 +6995,9 @@ def main():
                     
                 elif event.key == pygame.K_g:
                     show_grid_graph = not show_grid_graph
+
+                elif event.key == pygame.K_j:
+                    show_core_debug_overlay = not show_core_debug_overlay
                     
                 elif event.key == pygame.K_c:
                     set_transient_message("Sal routing strategies are hidden in the Cli app")
@@ -7122,6 +7235,7 @@ def main():
                     sp2 = to_screen(p2[0], p2[1])
                     pygame.draw.line(screen, c, sp1, sp2, width)
 
+        draw_core_steiner_debug_overlay(screen, font_small)
         draw_preferred_terminal_areas(screen, selected_route_name)
         draw_auto_grille_candidate_markers(screen, selected_route_name)
         draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name)
@@ -7221,6 +7335,9 @@ def main():
         screen.blit(lbl_selected, (25, 330))
         lbl_pending = font_small.render("Pending: return + refrigeration routing", True, COLOR_MUTED)
         screen.blit(lbl_pending, (25, 350))
+        debug_text = "On" if show_core_debug_overlay else "Off"
+        lbl_debug = font_small.render(f"[J] Core debug: {debug_text}", True, COLOR_MUTED)
+        screen.blit(lbl_debug, (25, 365))
         draw_min_piece_slider(screen, font_small, 25, 385, CANVAS_LEFT - 70)
         draw_weight_slider(screen, font_small, 25, 420, CANVAS_LEFT - 70, "Bend weight", C_BEND, C_BEND_MIN, C_BEND_MAX, (155, 89, 182), "bend", integer=True)
         draw_weight_slider(screen, font_small, 25, 452, CANVAS_LEFT - 70, "Cross x bend", crossing_penalty_multiplier, CROSSING_MULTIPLIER_MIN, CROSSING_MULTIPLIER_MAX, (230, 126, 34), "crossing", "x")
