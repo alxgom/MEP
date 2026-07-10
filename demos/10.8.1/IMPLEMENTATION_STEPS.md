@@ -55,6 +55,7 @@ Manual validation milestones:
 - Pure route quality counters now live in `vent_router.routing.metrics`, with Sal-specific diameter and minimum-piece policies injected by `main.py`.
 - Route scoring and quality-summary formatting now live in `vent_router.routing.scoring`, with runtime weights and Sal policies passed in explicitly.
 - Route hit testing now lives in `vent_router.routing.hit_testing`, with the UI zoom-derived hit radius supplied by `main.py`.
+- Selected route pin detection now lives in `vent_router.routing.hit_testing`.
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
@@ -182,6 +183,11 @@ Manual validation milestones:
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Startup smoke: running Demo 10.8.1 with the 10.7 venv stayed alive until timeout instead of exiting with a traceback.
+- Extracted selected route pin detection to `vent_router.routing.hit_testing.selected_pin_names`.
+- Kept `main.py` wrapper unchanged for UI selection code.
+- Added focused tests for selected route endpoint pins, last-three-segment matching, and empty context handling.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\hit_testing.py demos\10.8.1\tests\test_routing_hit_testing.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
 

@@ -21,6 +21,7 @@ from .metrics import (
 from .hit_testing import (
     find_route_at_point,
     find_route_hit_at_point,
+    selected_pin_names,
 )
 from .clearance import (
     buffered_radius_mm,
@@ -79,6 +80,7 @@ __all__ = [
     "route_quality_counts",
     "route_quality_warnings",
     "score_routes",
+    "selected_pin_names",
     "segment_metric_dir",
     "source_start_nodes",
     "target_heuristic",

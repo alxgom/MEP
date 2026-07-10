@@ -54,6 +54,7 @@ from vent_router.routing import (
     route_axis_records as _route_axis_records_for_policy,
     route_quality_warnings as _route_quality_warnings,
     score_routes as _score_routes,
+    selected_pin_names as _selected_pin_names,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     source_start_nodes as _source_start_nodes_for_kd,
@@ -2932,21 +2933,7 @@ def find_room_route_at_point(world_pt, route_names):
     return None
 
 def get_selected_pin_names(selected_route_name, routes, global_pins):
-    if not selected_route_name or not routes or not global_pins:
-        return set()
-    pin_names = [p for p in ("tl", "tr", "bl", "br", "left_mid", "right_mid") if p in global_pins]
-    selected = set()
-    for route_name, segs in routes:
-        if route_name != selected_route_name:
-            continue
-        for p1, p2 in segs[-3:]:
-            for pin_name in pin_names:
-                pin_pt = global_pins[pin_name]
-                if math.hypot(float(p1[0]) - pin_pt[0], float(p1[1]) - pin_pt[1]) < 2.0:
-                    selected.add(pin_name)
-                if math.hypot(float(p2[0]) - pin_pt[0], float(p2[1]) - pin_pt[1]) < 2.0:
-                    selected.add(pin_name)
-    return selected
+    return _selected_pin_names(selected_route_name, routes, global_pins)
 
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
     base_weights = {}
