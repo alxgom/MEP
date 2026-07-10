@@ -43,6 +43,11 @@ from .scoring import (
     score_routes,
     total_route_length,
 )
+from .search import (
+    line_graph_dir_from_points,
+    path_physical_length,
+    target_heuristic,
+)
 
 __all__ = [
     "RouteScoreWeights",
@@ -63,6 +68,8 @@ __all__ = [
     "merged_route_piece_lengths",
     "metric_route_segments",
     "min_cost_flow",
+    "line_graph_dir_from_points",
+    "path_physical_length",
     "point_is_segment_endpoint",
     "positive_flow_edges",
     "route_conflict_summary",
@@ -73,6 +80,7 @@ __all__ = [
     "score_routes",
     "segment_metric_dir",
     "source_start_nodes",
+    "target_heuristic",
     "total_route_length",
     "trace_flow_path",
     "weighted_edge_cost",

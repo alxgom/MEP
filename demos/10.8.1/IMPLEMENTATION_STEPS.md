@@ -60,6 +60,7 @@ Manual validation milestones:
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
+- Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
 
 ## Next Steps
 
@@ -164,6 +165,11 @@ Manual validation milestones:
 - Kept `main.py` wrappers for current Sal buffer ratio and route-diameter policy.
 - Added focused tests for radius rounding, clearance sums, axis-record extraction, and weighted edge-cost fallback behavior.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\clearance.py demos\10.8.1\tests\test_routing_clearance.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted line-graph direction, path physical length, and target heuristic to `vent_router.routing.search`.
+- Kept `main.py` wrappers for active heuristic mode, machine center, and `estimate_turns`.
+- Added focused tests for dominant-axis directions, Euclidean path length, Manhattan heuristic, bend-aware heuristic, machine-ring heuristic, disabled heuristic mode, and invalid nodes.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\search.py demos\10.8.1\tests\test_routing_search.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

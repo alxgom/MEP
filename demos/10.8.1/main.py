@@ -45,7 +45,9 @@ from vent_router.routing import (
     add_edge as _mcf_add_edge,
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
+    line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
     merged_route_piece_lengths as _merged_route_piece_lengths,
+    path_physical_length as _path_physical_length_for_env,
     route_conflict_summary as _route_conflict_summary,
     required_clearance_mm as _required_clearance_mm,
     route_axis_records as _route_axis_records_for_policy,
@@ -54,6 +56,7 @@ from vent_router.routing import (
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     source_start_nodes as _source_start_nodes_for_kd,
+    target_heuristic as _target_heuristic_for_env,
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
@@ -1996,47 +1999,22 @@ def refresh_edge_weight_view_overlay(routes):
     record_edge_weight_overlay(weights, current_env)
 
 def _line_graph_dir_from_points(env, u, v):
-    pu = env.nodes[u]
-    pv = env.nodes[v]
-    dx = float(pv[0] - pu[0])
-    dy = float(pv[1] - pu[1])
-    if abs(dx) >= abs(dy):
-        return "E" if dx > 0 else "W"
-    return "N" if dy > 0 else "S"
+    return _line_graph_dir_from_points_for_env(env, u, v)
 
 def _path_physical_length(env, path):
-    return float(sum(
-        np.hypot(
-            env.nodes[path[i + 1]][0] - env.nodes[path[i]][0],
-            env.nodes[path[i + 1]][1] - env.nodes[path[i]][1],
-        )
-        for i in range(len(path) - 1)
-    ))
+    return _path_physical_length_for_env(env, path)
 
 def _target_heuristic(env, node_idx, incoming_dir, target_specs, C_bend):
-    if node_idx < 0 or node_idx >= len(env.nodes):
-        return 0.0
-    if heuristic_mode_idx == 3:
-        return 0.0
-
-    p = env.nodes[node_idx]
-    if heuristic_mode_idx == 2:
-        cx, cy = float(machine_cx), float(machine_cy)
-        radius = 0.0
-        for target in target_specs:
-            t = env.nodes[int(target["node_idx"])]
-            radius = max(radius, abs(float(t[0] - cx)) + abs(float(t[1] - cy)))
-        return max(0.0, abs(float(p[0] - cx)) + abs(float(p[1] - cy)) - radius)
-
-    best = float("inf")
-    for target in target_specs:
-        t = env.nodes[int(target["node_idx"])]
-        h = abs(float(t[0] - p[0])) + abs(float(t[1] - p[1]))
-        if heuristic_mode_idx == 0:
-            h += C_bend * estimate_turns(p, incoming_dir, t)
-        if h < best:
-            best = h
-    return 0.0 if best == float("inf") else float(best)
+    return _target_heuristic_for_env(
+        env,
+        node_idx,
+        incoming_dir,
+        target_specs,
+        C_bend,
+        heuristic_mode_idx,
+        (machine_cx, machine_cy),
+        estimate_turns,
+    )
 
 def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if isinstance(start_node_indices, (int, np.integer)):
