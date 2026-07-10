@@ -64,6 +64,13 @@ from vent_router.routing import (
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
+from vent_router.ui import (
+    cool_colormap as _cool_colormap_value,
+    heatmap_color as _heatmap_color,
+    score_to_heatmap_t as _score_to_heatmap_t_value,
+    turbo_color as _turbo_color,
+    viridis_color as _viridis_color,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -4471,56 +4478,13 @@ def generate_new_dwelling():
     build_grid(machine_pins=pins)
 
 def get_turbo_color(t):
-    # Clamp t to [0.0, 1.0]
-    t = max(0.0, min(1.0, t))
-    # Control points mapping Turbo color distribution
-    points = [
-        (0.0, (48, 18, 59)),
-        (0.15, (70, 107, 227)),
-        (0.35, (40, 188, 235)),
-        (0.5, (50, 240, 150)),
-        (0.65, (195, 230, 45)),
-        (0.8, (250, 112, 32)),
-        (1.0, (122, 4, 3))
-    ]
-    
-    for i in range(len(points) - 1):
-        t1, c1 = points[i]
-        t2, c2 = points[i+1]
-        if t1 <= t <= t2:
-            factor = (t - t1) / (t2 - t1)
-            r = int(c1[0] + factor * (c2[0] - c1[0]))
-            g = int(c1[1] + factor * (c2[1] - c1[1]))
-            b = int(c1[2] + factor * (c2[2] - c1[2]))
-            return (r, g, b)
-    return (122, 4, 3)
+    return _turbo_color(t)
 
 def get_viridis_color(t):
-    t = max(0.0, min(1.0, t))
-    points = [
-        (0.0, (68, 1, 84)),
-        (0.15, (71, 44, 122)),
-        (0.30, (59, 81, 139)),
-        (0.45, (44, 113, 142)),
-        (0.60, (33, 144, 141)),
-        (0.75, (94, 201, 98)),
-        (1.0, (253, 231, 37)),
-    ]
-    for i in range(len(points) - 1):
-        t1, c1 = points[i]
-        t2, c2 = points[i+1]
-        if t1 <= t <= t2:
-            factor = (t - t1) / (t2 - t1)
-            r = int(c1[0] + factor * (c2[0] - c1[0]))
-            g = int(c1[1] + factor * (c2[1] - c1[1]))
-            b = int(c1[2] + factor * (c2[2] - c1[2]))
-            return (r, g, b)
-    return (253, 231, 37)
+    return _viridis_color(t)
 
 def get_heatmap_color(t):
-    if heatmap_palette_idx == 1:
-        return get_viridis_color(t)
-    return get_turbo_color(t)
+    return _heatmap_color(t, heatmap_palette_idx)
 
 def draw_colorbar(screen, node_scores):
     if not node_scores:
@@ -4559,17 +4523,7 @@ def draw_colorbar(screen, node_scores):
     screen.blit(lbl_title, (cb_x + cb_w // 2 - lbl_title.get_width() // 2, cb_y + cb_h + 24))
 
 def _score_to_heatmap_t(score, min_s, max_s):
-    diff = max_s - min_s if max_s > min_s else 1.0
-    if heatmap_scale_mode == 0:
-        t = (score - min_s) / diff
-        return min(1.0, t / 0.75)
-
-    min_s_safe = max(1.0, min_s)
-    max_ratio = max_s / min_s_safe
-    max_log = math.log(max_ratio) if max_ratio > 1.0 else 1.0
-    s_norm = score / max(1.0, min_s)
-    val_log = math.log(max(1.0, s_norm))
-    return val_log / max_log if max_log > 0 else 0.0
+    return _score_to_heatmap_t_value(score, min_s, max_s, heatmap_scale_mode)
 
 def _interpolate_regular_score(wx, wy, score_grid):
     gx = wx / GRID_SPACING
@@ -4663,8 +4617,7 @@ def draw_distance_heatmap(screen, node_scores):
     screen.blit(heatmap_surface_cache["surface"], (CANVAS_LEFT, CANVAS_TOP))
 
 def _cool_colormap(t):
-    t = max(0.0, min(1.0, float(t)))
-    return (int(255 * t), int(255 * (1.0 - t)), 255)
+    return _cool_colormap_value(t)
 
 def _edge_weight_log_scale():
     finite_values = [v for v in edge_weight_debug_map.values() if v < OVERLAP_BLOCK_WEIGHT]

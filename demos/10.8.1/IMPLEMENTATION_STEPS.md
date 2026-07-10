@@ -64,6 +64,7 @@ Manual validation milestones:
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
+- Heatmap and UI color-map helpers now live in `vent_router.ui.colors`.
 
 ## Next Steps
 
@@ -148,6 +149,12 @@ Manual validation milestones:
 - Kept `main.py` KPI wrapper as an adapter.
 - Added focused test for millimetre-to-metre conversion and empty routes.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\scoring.py demos\10.8.1\tests\test_routing_scoring.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Created `vent_router.ui` for pure UI utilities.
+- Extracted Turbo/Viridis palettes, heatmap palette selection, score-to-heatmap normalization, and cool colormap to `vent_router.ui.colors`.
+- Kept `main.py` wrappers for active heatmap palette and scale mode.
+- Added focused tests for color clamping, interpolation, palette selection, linear/log score scaling, and cool colormap behavior.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\__init__.py demos\10.8.1\vent_router\ui\colors.py demos\10.8.1\tests\test_ui_colors.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Extracted min-cost-flow primitives to `vent_router.routing.flow`: residual edge creation, successive-shortest-path min-cost flow, positive-flow edge lookup, and traced path reconstruction.
 - Kept existing private helper names in `main.py` as imported aliases to avoid touching route-construction call sites.
