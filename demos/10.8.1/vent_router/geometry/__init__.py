@@ -6,7 +6,7 @@ from .distances import (
     edge_segment_min_distances,
     point_segment_min_distances,
 )
-from .polygons import iter_polygons
+from .polygons import iter_polygons, largest_polygon
 from .rays import cast_rays_numpy, ray_ray_intersections_numpy
 from .segments import extract_boundary_segments, extract_line_segments
 from .shapely_utils import snap_to_integer_grid
@@ -20,6 +20,7 @@ __all__ = [
     "extract_boundary_segments",
     "extract_line_segments",
     "iter_polygons",
+    "largest_polygon",
     "normalize_axis_segment",
     "point_segment_min_distances",
     "ray_ray_intersections_numpy",

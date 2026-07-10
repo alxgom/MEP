@@ -28,6 +28,7 @@ from vent_router.geometry import (
     extract_boundary_segments as _extract_bnd_segs,
     extract_line_segments as _extract_line_segs,
     iter_polygons as _iter_polygons_from_geom,
+    largest_polygon as _largest_polygon_from_geom,
     point_segment_min_distances as _point_segment_min_distances,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
@@ -1229,10 +1230,7 @@ def _add_bounds_axes(xs, ys, geom, clearance=0.0):
     return _add_bounds_axes_to_sets(xs, ys, geom, clearance)
 
 def _largest_polygon(geom):
-    polys = list(_iter_polygons(geom))
-    if not polys:
-        return None
-    return max(polys, key=lambda p: p.area)
+    return _largest_polygon_from_geom(geom)
 
 def _extend_allowed_boundary_axes(allowed, inset=100.0, cluster_dist=300.0):
     poly = _largest_polygon(allowed)

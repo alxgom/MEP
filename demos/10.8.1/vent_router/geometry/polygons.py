@@ -10,3 +10,10 @@ def iter_polygons(geom):
         for item in geom.geoms:
             if item.geom_type == "Polygon":
                 yield item
+
+
+def largest_polygon(geom):
+    polygons = list(iter_polygons(geom))
+    if not polygons:
+        return None
+    return max(polygons, key=lambda poly: poly.area)
