@@ -13,7 +13,7 @@ from shapely.ops import unary_union
 from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
-from vent_router.domain import SAL_OZEO_FLAT_MACHINE
+from vent_router.domain import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
 from vent_router.graphs import EnvView
 
 # Add relative paths to sys.path so we can import modules
@@ -5336,7 +5336,7 @@ def draw_edge_weight_colorbar(screen):
 def get_route_draw_width(route_name):
     if route_real_diameter_width_enabled:
         return max(1, int(round(get_route_diameter(route_name) * SCALE_PX_PER_MM)))
-    return 5 if route_name in ("Shaft", "Kitchen") else 3
+    return 5 if route_name in LARGE_DUCT_ROUTE_NAMES else 3
 
 def record_history(routes, crossings_count, elapsed_ms):
     """Append one sample to the history buffers (called after every successful solve)."""

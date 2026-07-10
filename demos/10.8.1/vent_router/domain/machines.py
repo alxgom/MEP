@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .routes import LARGE_DUCT_ROUTE_NAMES
+
 
 @dataclass(frozen=True)
 class MachineSpec:
@@ -15,7 +17,7 @@ class MachineSpec:
     large_duct_diameter_mm: int
     small_pin_stub_length_mm: int
     large_pin_stub_length_mm: int
-    large_route_names: frozenset[str] = field(default_factory=lambda: frozenset({"Shaft", "Kitchen"}))
+    large_route_names: frozenset[str] = field(default_factory=lambda: LARGE_DUCT_ROUTE_NAMES)
 
     def route_diameter_mm(self, route_name: str) -> int:
         if route_name in self.large_route_names:
@@ -38,4 +40,3 @@ SAL_OZEO_FLAT_MACHINE = MachineSpec(
     small_pin_stub_length_mm=100,
     large_pin_stub_length_mm=250,
 )
-

@@ -38,11 +38,11 @@ Manual validation milestones:
 - Local workflow and implementation tracking added before further code movement.
 - First import-safe value object extracted: `EnvView` now lives in `vent_router.graphs.env`.
 - Sal Ozeo Flat machine dimensions and simple policies now live in `vent_router.domain.machines`.
+- Canonical large-duct route names now live in `vent_router.domain.routes`.
 
 ## Next Steps
 
 1. Continue import-safe value objects before moving behavior:
-   - route/terminal specification
    - app/runtime state shell
 2. Extract pure geometry helpers.
 3. Extract graph builders behind a stable interface.
@@ -69,6 +69,10 @@ Manual validation milestones:
 - Kept old `main.py` machine constant names as compatibility aliases assigned from the machine spec.
 - Moved route diameter and pin stub policies to the machine spec while preserving baseline behavior.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py demos\10.8.1\tests\test_machines.py`.
+- Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py demos\10.8.1\tests\test_machines.py`.
+- Added canonical `SHAFT_ROUTE_NAME`, `KITCHEN_ROUTE_NAME`, and `LARGE_DUCT_ROUTE_NAMES` in `vent_router.domain.routes`.
+- Used `LARGE_DUCT_ROUTE_NAMES` for Sal machine large-duct policy and fixed-width route drawing.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py demos\10.8.1\vent_router\domain\routes.py demos\10.8.1\tests\test_machines.py`.
 - Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py demos\10.8.1\tests\test_machines.py`.
 
 ## Commit Checklist
