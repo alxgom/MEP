@@ -36,8 +36,11 @@ from vent_router.geometry import (
 from vent_router.graphs import (
     EnvView,
     add_bounds_axes as _add_bounds_axes_to_sets,
+    add_epsilon_axis_values as _add_epsilon_axis_values_to_sets,
+    add_epsilon_geometry_axes as _add_epsilon_geometry_axes_to_sets,
     add_point_axes as _add_point_axes_to_sets,
     add_polygon_vertex_axes as _add_polygon_vertex_axes_to_sets,
+    extend_allowed_boundary_axes as _extend_allowed_boundary_axes_for_graph,
     merge_close_values as _merge_close_values_for_axes,
 )
 from vent_router.routing import (
@@ -1233,65 +1236,7 @@ def _largest_polygon(geom):
     return _largest_polygon_from_geom(geom)
 
 def _extend_allowed_boundary_axes(allowed, inset=100.0, cluster_dist=300.0):
-    poly = _largest_polygon(allowed)
-    if poly is None:
-        return [], []
-
-    pts = list(poly.exterior.coords)[:-1]
-    if len(pts) < 3:
-        return [], []
-
-    sharp_points = []
-    for i, p2 in enumerate(pts):
-        p1 = np.array(pts[i - 1], dtype=np.float64)
-        p2_arr = np.array(p2, dtype=np.float64)
-        p3 = np.array(pts[(i + 1) % len(pts)], dtype=np.float64)
-        v1 = p1 - p2_arr
-        v2 = p3 - p2_arr
-        n1 = np.linalg.norm(v1)
-        n2 = np.linalg.norm(v2)
-        if n1 < 1e-6 or n2 < 1e-6:
-            continue
-        cos_a = np.dot(v1, v2) / (n1 * n2)
-        angle = np.degrees(np.arccos(np.clip(cos_a, -1.0, 1.0)))
-        if angle < 170.0:
-            sharp_points.append((p2_arr, v1 / n1, v2 / n2))
-
-    centroid = np.array(poly.centroid.coords[0], dtype=np.float64)
-    interior = []
-    for p, v1, v2 in sharp_points:
-        direction = v1 + v2
-        norm = np.linalg.norm(direction)
-        if norm < 1e-6:
-            moved = p
-        else:
-            direction = direction / norm
-            cand = p + direction * inset
-            if poly.contains(Point(float(cand[0]), float(cand[1]))):
-                moved = cand
-            else:
-                cand = p - direction * inset
-                moved = cand if poly.contains(Point(float(cand[0]), float(cand[1]))) else p
-        if poly.buffer(-10.0).contains(Point(float(moved[0]), float(moved[1]))):
-            interior.append(moved)
-
-    if not interior:
-        return [], []
-
-    coords = np.array(interior, dtype=np.float64)
-    used = np.zeros(len(coords), dtype=bool)
-    clusters = []
-    for i in range(len(coords)):
-        if used[i]:
-            continue
-        dist = np.linalg.norm(coords - coords[i], axis=1)
-        idxs = np.where(dist < cluster_dist)[0]
-        used[idxs] = True
-        clusters.append(coords[idxs].mean(axis=0))
-
-    xs = sorted({round(float(p[0])) for p in clusters})
-    ys = sorted({round(float(p[1])) for p in clusters})
-    return xs, ys
+    return _extend_allowed_boundary_axes_for_graph(allowed, inset, cluster_dist)
 
 def _merge_close_values(values, threshold, preserve_values=None, priority_values=None):
     return _merge_close_values_for_axes(values, threshold, preserve_values, priority_values)
@@ -1545,25 +1490,10 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
     )
 
 def _add_epsilon_axis_values(xs, ys, point, epsilon=CORE_EPSILON_GRID_MM):
-    x = round(float(point[0]))
-    y = round(float(point[1]))
-    for dx in (-epsilon, 0.0, epsilon):
-        xs.add(round(x + dx))
-    for dy in (-epsilon, 0.0, epsilon):
-        ys.add(round(y + dy))
+    return _add_epsilon_axis_values_to_sets(xs, ys, point, epsilon)
 
 def _add_epsilon_geometry_axes(xs, ys, geom, epsilon=CORE_EPSILON_GRID_MM):
-    if geom is None or geom.is_empty:
-        return
-    for poly in _iter_polygons(geom):
-        for x, y in list(poly.exterior.coords)[:-1]:
-            _add_epsilon_axis_values(xs, ys, (x, y), epsilon)
-        for interior in poly.interiors:
-            for x, y in list(interior.coords)[:-1]:
-                _add_epsilon_axis_values(xs, ys, (x, y), epsilon)
-        minx, miny, maxx, maxy = poly.bounds
-        for pt in ((minx, miny), (minx, maxy), (maxx, miny), (maxx, maxy)):
-            _add_epsilon_axis_values(xs, ys, pt, epsilon)
+    return _add_epsilon_geometry_axes_to_sets(xs, ys, geom, epsilon)
 
 def build_epsilon_grid(machine_pins=None):
     if routing_region_base is None:

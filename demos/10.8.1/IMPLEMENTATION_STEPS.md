@@ -66,7 +66,7 @@ Manual validation milestones:
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
 - Heatmap and UI color-map helpers now live in `vent_router.ui.colors`.
-- Graph axis collection and value merging helpers now live in `vent_router.graphs.axes`.
+- Graph axis collection, epsilon expansion, boundary extension, and value merging helpers now live in `vent_router.graphs.axes`.
 
 ## Next Steps
 
@@ -222,6 +222,11 @@ Manual validation milestones:
 - Kept `main.py` wrapper unchanged for UI selection code.
 - Added focused tests for selected route endpoint pins, last-three-segment matching, and empty context handling.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\hit_testing.py demos\10.8.1\tests\test_routing_hit_testing.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted graph epsilon axis expansion and allowed-boundary interior axis extension to `vent_router.graphs.axes`.
+- Kept `main.py` wrappers for current Hannan/Epsilon grid builder call sites.
+- Added focused tests for epsilon point expansion, geometry-driven epsilon axes, empty boundary handling, and clustered interior axes.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\axes.py demos\10.8.1\tests\test_graph_axes.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
