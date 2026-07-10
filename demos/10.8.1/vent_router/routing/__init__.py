@@ -43,6 +43,7 @@ from .scoring import (
     route_quality_warnings,
     score_routes,
     total_route_length,
+    total_route_length_m,
 )
 from .search import (
     line_graph_dir_from_points,
@@ -86,6 +87,7 @@ __all__ = [
     "target_heuristic",
     "terminal_node_indices",
     "total_route_length",
+    "total_route_length_m",
     "trace_flow_path",
     "weighted_edge_cost",
 ]

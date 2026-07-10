@@ -54,6 +54,7 @@ Manual validation milestones:
 - Pure route segment merging and metric helpers now live in `vent_router.routing.segments`.
 - Pure route quality counters now live in `vent_router.routing.metrics`, with Sal-specific diameter and minimum-piece policies injected by `main.py`.
 - Route scoring and quality-summary formatting now live in `vent_router.routing.scoring`, with runtime weights and Sal policies passed in explicitly.
+- Route length in metres now lives in `vent_router.routing.scoring`.
 - Route hit testing now lives in `vent_router.routing.hit_testing`, with the UI zoom-derived hit radius supplied by `main.py`.
 - Selected route pin detection now lives in `vent_router.routing.hit_testing`.
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
@@ -142,6 +143,11 @@ Manual validation milestones:
 - Kept `main.py` as the adapter for zoom-dependent hit radius.
 - Added focused tests for nearest-route detection, misses outside radius, and route-name hit lookup.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\hit_testing.py demos\10.8.1\tests\test_routing_hit_testing.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted route length in metres to `vent_router.routing.scoring.total_route_length_m`.
+- Kept `main.py` KPI wrapper as an adapter.
+- Added focused test for millimetre-to-metre conversion and empty routes.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\scoring.py demos\10.8.1\tests\test_routing_scoring.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Extracted min-cost-flow primitives to `vent_router.routing.flow`: residual edge creation, successive-shortest-path min-cost flow, positive-flow edge lookup, and traced path reconstruction.
 - Kept existing private helper names in `main.py` as imported aliases to avoid touching route-construction call sites.

@@ -4,6 +4,7 @@ from vent_router.routing import (
     route_quality_warnings,
     score_routes,
     total_route_length,
+    total_route_length_m,
 )
 
 
@@ -26,6 +27,13 @@ def test_total_route_length_sums_segment_lengths():
     ]
 
     assert total_route_length(routes) == 15.0
+
+
+def test_total_route_length_m_converts_from_millimetres():
+    routes = [("A", [((0, 0), (3000, 4000))])]
+
+    assert total_route_length_m(routes) == 5.0
+    assert total_route_length_m([]) == 0.0
 
 
 def test_score_routes_combines_length_and_quality_penalties():

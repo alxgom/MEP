@@ -31,6 +31,12 @@ def total_route_length(routes):
     return total_len
 
 
+def total_route_length_m(routes):
+    if not routes:
+        return 0.0
+    return total_route_length(routes) / 1000.0
+
+
 def route_quality_counts(
     routes,
     route_diameter,

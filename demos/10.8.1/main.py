@@ -60,6 +60,7 @@ from vent_router.routing import (
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
     target_heuristic as _target_heuristic_for_env,
+    total_route_length_m as _total_route_length_m,
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
@@ -4758,12 +4759,7 @@ def clear_history_buffers():
     hist_sample_count = 0
 
 def _routes_total_length_m(routes):
-    if not routes:
-        return 0.0
-    length_mm = 0.0
-    for _, segs in routes:
-        length_mm += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
-    return length_mm / 1000.0
+    return _total_route_length_m(routes)
 
 def get_current_kpis(routes, elapsed_ms):
     crossings = count_segment_crossings(routes) if routes else 0
