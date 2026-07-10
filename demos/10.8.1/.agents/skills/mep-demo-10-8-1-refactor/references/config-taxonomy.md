@@ -15,6 +15,7 @@ Name values by why they exist, not by the function that consumes them.
 - UI may display metres.
 - Do not use `REGULATION` without an explicit legal/code/project-code source.
 - Current Demo 10.8.1 distances are mostly `FEASIBILITY`, `HEURISTIC`, `SOLVER`, or `PERFORMANCE`.
+- Default values can remain checked in for now. If explicitly requested, parameter values may be sourced from local testing config at `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Config\global_config.json`; that file is mutable and should not be treated as immutable truth.
 
 ## Classification
 
@@ -45,3 +46,12 @@ SALUBRIDAD.SOLVER.HEURISTIC.BOCAS_MIN_DISTANCE_TO_WALL
 SALUBRIDAD.REGULATION.*  # unless sourced
 ```
 
+## Machine Metadata
+
+Machine-family metadata lives at:
+
+```text
+C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Familias
+```
+
+Use this as a future source for machine catalogs by installation type. Sal currently has one machine, but Cli is expected to have multiple machines, so avoid APIs that assume a single global machine per domain.

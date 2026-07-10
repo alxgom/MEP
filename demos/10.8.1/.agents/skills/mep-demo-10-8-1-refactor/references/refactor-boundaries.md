@@ -5,7 +5,7 @@ Keep module ownership stable while extracting from `main.py`.
 ## Boundaries
 
 - `config`: typed defaults, metadata, aliases, loading.
-- `domain`: machine families, terminal families, room categories, shaft semantics, duct families, feasibility defaults, validation concepts.
+- `domain`: machine families/catalogs, terminal families, room categories, shaft semantics, duct families, feasibility defaults, validation concepts.
 - `geometry`: generic transforms and geometric helpers; no Sal/Cli/Coc/San branching.
 - `graphs`: graph structures, graph builders, edge fields.
 - `routing`: A*, line graph search, min-cost flow, strategy orchestration, scoring.
@@ -32,4 +32,10 @@ Keep module ownership stable while extracting from `main.py`.
 - Pass context explicitly when practical.
 - Keep temporary wrappers if they reduce migration risk.
 - Avoid broad style cleanups while moving behavior.
+- Model machine families as catalogs, not singletons. Sal currently has one machine, but Cli is expected to have multiple available machines.
 
+## External References
+
+- Machine metadata by installation type: `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Familias`.
+- Local testing config values: `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Config\global_config.json`.
+- Treat `global_config.json` as mutable. Use it only when a task explicitly asks to source or mimic a value from local testing config.

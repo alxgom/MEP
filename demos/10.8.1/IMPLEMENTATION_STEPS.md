@@ -12,6 +12,13 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - UI ownership: most UI behavior and style is installation-domain scoped; shared tools like ruler, zoom, overlays, and base dwelling geometry styling are global UI.
 - Cli/Coc/San: treat as future unknowns. Do not design by guessing their details; leave extension points and merge concrete behavior later.
 
+## External References
+
+- `C:\Users\ALEXIS GOMEL\Documents\Dwelling-export`: dwelling geometry export source used by real-dwelling loading.
+- `C:\Users\ALEXIS GOMEL\Documents\letsmep-routing-core`: routing-core code that Demo 10.8.1 mimics or selectively ports for Sal behavior.
+- `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Familias`: currently available machine-family metadata by installation type. Sal has one machine now; Cli is expected to use more than one, so the refactor should keep machine catalogs plural.
+- `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Config\global_config.json`: mutable local-testing config used as a reference for parameter values when explicitly requested. Do not silently treat this as immutable truth; use it when the task asks to mimic or source a value from local testing config.
+
 ## Validation Strategy
 
 Use layered validation:
@@ -101,3 +108,5 @@ Before each commit:
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
+- Add a machine-catalog loader only when the refactor needs to consume the `Familias` metadata rather than the current hardcoded Sal machine spec.
+- Add a local-testing config adapter only when a task explicitly asks to source values from `global_config.json`.

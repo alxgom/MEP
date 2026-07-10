@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
 `config`: typed defaults, key metadata, compatibility aliases, and config loading. It must not import Pygame or Shapely-heavy runtime state.
 
-`domain`: names and rules from the installation domain: machine families, terminal families, room categories, shaft semantics, diameter rules, feasibility constraints, heuristic defaults, and route validation. Confirmed regulation values should only be introduced when a legal/code/project-code source is explicit.
+`domain`: names and rules from the installation domain: machine families, terminal families, room categories, shaft semantics, diameter rules, feasibility constraints, heuristic defaults, and route validation. Confirmed regulation values should only be introduced when a legal/code/project-code source is explicit. Machine families should be modeled as catalogs, not singletons, because Cli is expected to have multiple available machines even though Sal currently has one.
 
 `geometry`: generic coordinate transforms and geometry operations. It may use Shapely/NumPy but should not know about Sal/Cli/Coc/San.
 
@@ -261,6 +261,13 @@ ConfigParameter(
 ```
 
 Do not force every value into metadata before extraction. Start with typed defaults and a legacy alias map, then add metadata where migration decisions need traceability.
+
+## External Reference Sources
+
+- `C:\Users\ALEXIS GOMEL\Documents\Dwelling-export`: real-dwelling geometry export source.
+- `C:\Users\ALEXIS GOMEL\Documents\letsmep-routing-core`: routing-core implementation to mimic or selectively port when aligning Sal behavior.
+- `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Familias`: machine-family metadata by installation type. Use this later for machine catalogs; do not assume a domain has only one machine.
+- `C:\Users\ALEXIS GOMEL\Desktop\LETSMEP\AzureFile\Plantillas\Enrutado\Config\global_config.json`: mutable local-testing config. Use as a value source only when explicitly requested, not as an implicit replacement for the checked-in default catalog.
 
 ## Migration Strategy
 
