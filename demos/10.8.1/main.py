@@ -58,6 +58,7 @@ from vent_router.placement import (
 )
 from vent_router.routing import (
     RouteScoreWeights,
+    build_routes_from_paths as _build_routes_from_paths_for_env,
     buffered_radius_mm as _buffered_radius_mm,
     count_ordered_route_turns as _count_ordered_route_turns,
     count_route_short_pieces as _count_route_short_pieces,
@@ -77,6 +78,7 @@ from vent_router.routing import (
     required_clearance_mm as _required_clearance_mm,
     route_axis_records as _route_axis_records_for_policy,
     route_quality_warnings as _route_quality_warnings,
+    route_segments_from_path as _route_segments_from_path_for_env,
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
     min_cost_flow as _min_cost_flow,
@@ -2967,29 +2969,18 @@ def _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=None):
     return _run_pin_min_cost_flow(room_names, target_specs_by_route, terminal_points_by_route, edge_weights=edge_weights)
 
 def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None):
-    segs = []
-    if route_name == "Shaft" and path and shaft_extraction:
-        add_shaft_entry_segments(segs, path[0])
-    for i in range(len(path) - 1):
-        p1 = current_env.nodes[path[i]]
-        p2 = current_env.nodes[path[i + 1]]
-        segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-    if pin_name and global_pins is not None:
-        add_port_stub_segment(segs, pin_name, path[-1], global_pins, target)
-    return segs
+    return _route_segments_from_path_for_env(
+        route_name,
+        path,
+        current_env.nodes,
+        add_shaft_entry_segments if shaft_extraction else None,
+        pin_name,
+        global_pins,
+        target,
+    )
 
 def _build_routes_from_paths(route_order, paths, targets, global_pins):
-    routes = []
-    total_nodes = 0
-    for route_name in route_order:
-        path = paths.get(route_name)
-        target = targets.get(route_name)
-        if path is None or target is None:
-            return None, 0
-        segs = _route_segments_from_path(route_name, path, target["pin"], global_pins, target)
-        routes.append((route_name, segs))
-        total_nodes += len(path)
-    return routes, total_nodes
+    return _build_routes_from_paths_for_env(route_order, paths, targets, global_pins, _route_segments_from_path)
 
 def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights=None):
     target_specs_by_route = {route_name: pin_node_map.get(target_pin, [])}

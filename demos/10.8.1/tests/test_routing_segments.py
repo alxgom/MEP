@@ -1,9 +1,11 @@
 from vent_router.routing import (
     add_port_stub_segment,
+    build_routes_from_paths,
     merged_axis_segments,
     merged_route_axis_segments,
     metric_route_segments,
     point_is_segment_endpoint,
+    route_segments_from_path,
 )
 
 
@@ -86,3 +88,59 @@ def test_add_port_stub_segment_ignores_missing_pin_or_node():
     add_port_stub_segment(segs, "left_mid", None, {"left_mid": (0, 0)}, [(0, 0)])
 
     assert segs == []
+
+
+def test_route_segments_from_path_adds_shaft_entry_path_edges_and_stub():
+    nodes = [(0, 0), (10, 0), (10, 10)]
+    global_pins = {"left_mid": (20, 10)}
+    target = {"access_point": (15, 10), "pin_point": (20, 10)}
+
+    segs = route_segments_from_path(
+        "Shaft",
+        [0, 1, 2],
+        nodes,
+        shaft_entry_segments_fn=lambda out, _first_node: out.append(((-5.0, 0.0), (0.0, 0.0))),
+        pin_name="left_mid",
+        global_pins=global_pins,
+        target=target,
+    )
+
+    assert segs == [
+        ((-5.0, 0.0), (0.0, 0.0)),
+        ((0.0, 0.0), (10.0, 0.0)),
+        ((10.0, 0.0), (10.0, 10.0)),
+        ((10.0, 10.0), (15.0, 10.0)),
+        ((15.0, 10.0), (20.0, 10.0)),
+    ]
+
+
+def test_build_routes_from_paths_returns_routes_and_total_nodes():
+    paths = {"Shaft": [0, 1], "Kitchen": [2, 3, 4]}
+    targets = {"Shaft": {"pin": "left_mid"}, "Kitchen": {"pin": "right_mid"}}
+
+    routes, total_nodes = build_routes_from_paths(
+        ["Shaft", "Kitchen"],
+        paths,
+        targets,
+        {"left_mid": (0, 0), "right_mid": (1, 1)},
+        lambda route_name, path, pin_name, _pins, _target: [(route_name, tuple(path), pin_name)],
+    )
+
+    assert routes == [
+        ("Shaft", [("Shaft", (0, 1), "left_mid")]),
+        ("Kitchen", [("Kitchen", (2, 3, 4), "right_mid")]),
+    ]
+    assert total_nodes == 5
+
+
+def test_build_routes_from_paths_fails_on_missing_path_or_target():
+    routes, total_nodes = build_routes_from_paths(
+        ["Shaft", "Kitchen"],
+        {"Shaft": [0, 1]},
+        {"Shaft": {"pin": "left_mid"}, "Kitchen": {"pin": "right_mid"}},
+        {},
+        lambda *_args: [],
+    )
+
+    assert routes is None
+    assert total_nodes == 0

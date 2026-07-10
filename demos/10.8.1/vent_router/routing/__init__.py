@@ -2,10 +2,12 @@
 
 from .segments import (
     add_port_stub_segment,
+    build_routes_from_paths,
     merged_axis_segments,
     merged_route_axis_segments,
     metric_route_segments,
     point_is_segment_endpoint,
+    route_segments_from_path,
 )
 from .metrics import (
     count_ordered_route_turns,
@@ -58,6 +60,7 @@ __all__ = [
     "add_edge",
     "add_port_stub_segment",
     "buffered_radius_mm",
+    "build_routes_from_paths",
     "count_ordered_route_turns",
     "count_route_short_pieces",
     "count_segment_clearance_conflicts",
@@ -77,6 +80,7 @@ __all__ = [
     "point_is_segment_endpoint",
     "positive_flow_edges",
     "route_conflict_summary",
+    "route_segments_from_path",
     "required_clearance_mm",
     "route_axis_records",
     "route_quality_counts",

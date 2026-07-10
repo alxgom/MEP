@@ -69,6 +69,7 @@ Manual validation milestones:
 - Topological auto-placement node/rotation selection now lives in `vent_router.placement.selection`.
 - Core-like placement candidate selection now lives in `vent_router.placement.selection`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
+- Route reconstruction from graph paths now lives in `vent_router.routing.segments`, with active graph nodes and shaft-entry behavior supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
@@ -278,6 +279,11 @@ Manual validation milestones:
 - Removed dead placement compatibility wrappers from `main.py`.
 - Added focused tests for no feasible core-like candidates and lowest-score feasible candidate selection.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\selection.py demos\10.8.1\tests\test_placement_selection.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted route reconstruction from graph paths to `vent_router.routing.segments`: path-to-segments and route-order assembly.
+- Kept `main.py` responsible for active environment nodes and shaft-entry segment policy.
+- Added focused tests for shaft-entry segments, port stubs, total-node counts, and missing path/target handling.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\segments.py demos\10.8.1\tests\test_routing_segments.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

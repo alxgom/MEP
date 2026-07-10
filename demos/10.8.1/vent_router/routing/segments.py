@@ -83,3 +83,38 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, nodes, t
     if math.hypot(access_pt[0] - node_pt[0], access_pt[1] - node_pt[1]) > 1e-7:
         segs.append((node_pt, access_pt))
     segs.append((access_pt, pin_pt))
+
+
+def route_segments_from_path(
+    route_name,
+    path,
+    nodes,
+    shaft_entry_segments_fn=None,
+    pin_name=None,
+    global_pins=None,
+    target=None,
+):
+    segs = []
+    if route_name == "Shaft" and path and shaft_entry_segments_fn is not None:
+        shaft_entry_segments_fn(segs, path[0])
+    for i in range(len(path) - 1):
+        p1 = nodes[path[i]]
+        p2 = nodes[path[i + 1]]
+        segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    if pin_name and global_pins is not None:
+        add_port_stub_segment(segs, pin_name, path[-1], global_pins, nodes, target)
+    return segs
+
+
+def build_routes_from_paths(route_order, paths, targets, global_pins, route_segments_fn):
+    routes = []
+    total_nodes = 0
+    for route_name in route_order:
+        path = paths.get(route_name)
+        target = targets.get(route_name)
+        if path is None or target is None:
+            return None, 0
+        segs = route_segments_fn(route_name, path, target["pin"], global_pins, target)
+        routes.append((route_name, segs))
+        total_nodes += len(path)
+    return routes, total_nodes
