@@ -65,6 +65,7 @@ Manual validation milestones:
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
 - Heatmap and UI color-map helpers now live in `vent_router.ui.colors`.
+- Graph axis value merging now lives in `vent_router.graphs.axes`.
 
 ## Next Steps
 
@@ -155,6 +156,11 @@ Manual validation milestones:
 - Kept `main.py` wrappers for active heatmap palette and scale mode.
 - Added focused tests for color clamping, interpolation, palette selection, linear/log score scaling, and cool colormap behavior.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\__init__.py demos\10.8.1\vent_router\ui\colors.py demos\10.8.1\tests\test_ui_colors.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted Hannan/Epsilon grid axis value merging to `vent_router.graphs.axes.merge_close_values`.
+- Kept `main.py` wrapper for existing grid builder call sites.
+- Added focused tests for threshold merging, preserved axes, priority axes, and empty inputs.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\axes.py demos\10.8.1\tests\test_graph_axes.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Extracted min-cost-flow primitives to `vent_router.routing.flow`: residual edge creation, successive-shortest-path min-cost flow, positive-flow edge lookup, and traced path reconstruction.
 - Kept existing private helper names in `main.py` as imported aliases to avoid touching route-construction call sites.

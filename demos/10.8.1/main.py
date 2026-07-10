@@ -31,7 +31,7 @@ from vent_router.geometry import (
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
-from vent_router.graphs import EnvView
+from vent_router.graphs import EnvView, merge_close_values as _merge_close_values_for_axes
 from vent_router.routing import (
     RouteScoreWeights,
     buffered_radius_mm as _buffered_radius_mm,
@@ -1309,27 +1309,7 @@ def _extend_allowed_boundary_axes(allowed, inset=100.0, cluster_dist=300.0):
     return xs, ys
 
 def _merge_close_values(values, threshold, preserve_values=None, priority_values=None):
-    preserve_values = {round(float(v)) for v in (preserve_values or [])}
-    priority_values = {round(float(v)) for v in (priority_values or [])}
-    vals = sorted({round(float(v)) for v in values})
-    if not vals:
-        return []
-
-    filtered = [vals[0]]
-    for i in range(1, len(vals)):
-        current = vals[i]
-        if current in preserve_values:
-            filtered.append(current)
-        elif (
-            i + 1 < len(vals)
-            and abs(current - vals[i + 1]) < threshold
-            and (vals[i + 1] in preserve_values or (current not in priority_values and vals[i + 1] in priority_values))
-        ):
-            continue
-        elif abs(current - filtered[-1]) >= threshold:
-            filtered.append(current)
-
-    return filtered
+    return _merge_close_values_for_axes(values, threshold, preserve_values, priority_values)
 
 def _get_hannan_static_template(shift_walls=False):
     global hannan_static_cache
