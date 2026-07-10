@@ -13,6 +13,7 @@ from shapely.ops import unary_union
 from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
+from vent_router.domain import SAL_OZEO_FLAT_MACHINE
 from vent_router.graphs import EnvView
 
 # Add relative paths to sys.path so we can import modules
@@ -39,14 +40,15 @@ WALL_THICKNESS = 150
 GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
 CORE_EPSILON_GRID_MM = 200
-SMALL_PIN_STUB_LENGTH = 100
-LARGE_PIN_STUB_LENGTH = 250
+MACHINE_SPEC = SAL_OZEO_FLAT_MACHINE
+SMALL_PIN_STUB_LENGTH = MACHINE_SPEC.small_pin_stub_length_mm
+LARGE_PIN_STUB_LENGTH = MACHINE_SPEC.large_pin_stub_length_mm
 MACHINE_CLEARANCE = 0
-MACHINE_BODY_W = 410
-MACHINE_BODY_H = 460
-MACHINE_OVERALL_W = 511
-MACHINE_SMALL_DUCT_D = 90
-MACHINE_LARGE_DUCT_D = 125
+MACHINE_BODY_W = MACHINE_SPEC.body_width_mm
+MACHINE_BODY_H = MACHINE_SPEC.body_height_mm
+MACHINE_OVERALL_W = MACHINE_SPEC.overall_width_mm
+MACHINE_SMALL_DUCT_D = MACHINE_SPEC.small_duct_diameter_mm
+MACHINE_LARGE_DUCT_D = MACHINE_SPEC.large_duct_diameter_mm
 DUCT_BUFFER_RATIO = 1.05
 ROUTING_WALL_CLEARANCE_MM = 100
 TERMINAL_REGULATION_CLEARANCE_MM = ROUTING_WALL_CLEARANCE_MM
@@ -1905,7 +1907,7 @@ def _dir_from_axis(vec):
     return DIR_UP if y > 0 else DIR_DOWN
 
 def get_pin_stub_length(pin_name):
-    return LARGE_PIN_STUB_LENGTH if pin_name in ("left_mid", "right_mid") else SMALL_PIN_STUB_LENGTH
+    return MACHINE_SPEC.pin_stub_length_mm(pin_name)
 
 def get_port_access_specs(global_pins, machine_angle):
     allowed_local_dirs = {
@@ -2069,7 +2071,7 @@ def _point_is_segment_endpoint(pt, seg, eps=1e-7):
     )
 
 def get_route_diameter(route_name):
-    return MACHINE_LARGE_DUCT_D if route_name in ("Shaft", "Kitchen") else MACHINE_SMALL_DUCT_D
+    return MACHINE_SPEC.route_diameter_mm(route_name)
 
 def get_buffered_radius_mm(diameter_mm):
     return int(math.ceil(float(diameter_mm) / 2.0 * DUCT_BUFFER_RATIO))

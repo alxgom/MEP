@@ -37,11 +37,11 @@ Manual validation milestones:
 - Initial config catalog created and committed.
 - Local workflow and implementation tracking added before further code movement.
 - First import-safe value object extracted: `EnvView` now lives in `vent_router.graphs.env`.
+- Sal Ozeo Flat machine dimensions and simple policies now live in `vent_router.domain.machines`.
 
 ## Next Steps
 
 1. Continue import-safe value objects before moving behavior:
-   - machine specification
    - route/terminal specification
    - app/runtime state shell
 2. Extract pure geometry helpers.
@@ -65,6 +65,11 @@ Manual validation milestones:
 - Added focused pytest coverage for `EnvView` reference preservation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\env.py demos\10.8.1\tests\conftest.py demos\10.8.1\tests\test_graph_env.py`.
 - Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py`.
+- Extracted `MachineSpec` and `SAL_OZEO_FLAT_MACHINE` to `vent_router.domain.machines`.
+- Kept old `main.py` machine constant names as compatibility aliases assigned from the machine spec.
+- Moved route diameter and pin stub policies to the machine spec while preserving baseline behavior.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py demos\10.8.1\tests\test_machines.py`.
+- Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py demos\10.8.1\tests\test_machines.py`.
 
 ## Commit Checklist
 
