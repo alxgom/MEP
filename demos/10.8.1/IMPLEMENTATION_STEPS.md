@@ -62,6 +62,7 @@ Manual validation milestones:
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
+- Topological placement distance-field and score aggregation helpers now live in `vent_router.placement.fields`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
@@ -237,6 +238,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for cache keys, room geometry accessors, active graph state, and UI drawing.
 - Added focused tests for allowed nodes, clearance-blocked nodes, outside-room nodes, isolated nodes, no-boundary room behavior, and missing routing-region behavior.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\terminal_validity.py demos\10.8.1\tests\test_terminal_validity.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Created `vent_router.placement` and extracted topological auto-placement distance fields, score aggregation, and current weight presets.
+- Kept `main.py` responsible for active KD-tree lookup, mode selection, and machine-position side effects.
+- Added focused tests for Dijkstra fields, multi-source fields, weight presets, and weighted placement score aggregation.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\fields.py demos\10.8.1\tests\test_placement_fields.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

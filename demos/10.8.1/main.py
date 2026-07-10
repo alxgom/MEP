@@ -43,6 +43,11 @@ from vent_router.graphs import (
     extend_allowed_boundary_axes as _extend_allowed_boundary_axes_for_graph,
     merge_close_values as _merge_close_values_for_axes,
 )
+from vent_router.placement import (
+    compute_dijkstra_distance_field as _compute_dijkstra_distance_field,
+    placement_weights as _placement_weights,
+    topological_placement_scores as _topological_placement_scores,
+)
 from vent_router.routing import (
     RouteScoreWeights,
     buffered_radius_mm as _buffered_radius_mm,
@@ -3288,76 +3293,18 @@ def is_machine_placement_valid(cx, cy, angle):
     return True
 
 def compute_dijkstra_distance_field(start_nodes, env):
-    if isinstance(start_nodes, (int, np.integer)):
-        start_nodes = [start_nodes]
-    distances = {n: 1e9 for n in env.adj}
-    pq = []
-    for n in start_nodes:
-        distances[n] = 0.0
-        heapq.heappush(pq, (0.0, n))
-    
-    while pq:
-        dist, u = heapq.heappop(pq)
-        if dist > distances[u]:
-            continue
-        for v, edge_dist, direction in env.adj.get(u, []):
-            new_dist = dist + edge_dist
-            if new_dist < distances[v]:
-                distances[v] = new_dist
-                heapq.heappush(pq, (new_dist, v))
-    return distances
+    return _compute_dijkstra_distance_field(start_nodes, env)
 
 def get_placement_weights():
-    if weight_mode_idx == 1:
-        return {
-            "Shaft": 1.0,
-            "Kitchen": 1.0,
-            "Bathroom": 1.0,
-            "Bathroom 1": 1.0,
-            "Bathroom 2": 1.0,
-            "Toilet": 1.0,
-            "Washroom": 1.0
-        }
-    else:
-        return {
-            "Shaft": 2.5,
-            "Kitchen": 1.5,
-            "Bathroom": 1.0,
-            "Bathroom 1": 1.0,
-            "Bathroom 2": 1.0,
-            "Toilet": 1.0,
-            "Washroom": 1.0
-        }
+    return _placement_weights(weight_mode_idx)
 
 def get_auto_placement_scores(env, shaft_boundary_nodes):
     terminal_nodes = {}
     for name, pt in terminals.items():
         _, node_idx = base_regular_kd.query(pt)
         terminal_nodes[name] = int(node_idx)
-    
-    weights = get_placement_weights()
-    
-    distance_fields = {}
-    distance_fields["Shaft"] = compute_dijkstra_distance_field(shaft_boundary_nodes, env)
-    for name, node_idx in terminal_nodes.items():
-        distance_fields[name] = compute_dijkstra_distance_field(node_idx, env)
-        
-    node_scores = {}
-    for n in range(len(env.nodes)):
-        total_score = 0.0
-        reachable = True
-        for name, field in distance_fields.items():
-            dist = field.get(n, 1e9)
-            if dist >= 1e8:
-                reachable = False
-                break
-            w = weights.get(name, 1.0)
-            total_score += w * dist
-            
-        if reachable:
-            node_scores[n] = total_score
-            
-    return node_scores, distance_fields
+
+    return _topological_placement_scores(env, shaft_boundary_nodes, terminal_nodes, get_placement_weights())
 
 def ensure_placement_heatmap_scores():
     global ap_scores, ap_fields
