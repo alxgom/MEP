@@ -77,6 +77,7 @@ Manual validation milestones:
 - Small-room routing order policy now lives in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
 - Heatmap and UI color-map helpers now live in `vent_router.ui.colors`.
+- Solution log KPI and auto-best comparison helpers now live in `vent_router.ui.solution_logs`.
 - Graph axis collection, epsilon expansion, boundary extension, and value merging helpers now live in `vent_router.graphs.axes`.
 
 ## Next Steps
@@ -297,6 +298,11 @@ Manual validation milestones:
 - Extracted small-room routing order policy to `vent_router.routing.search.ordered_small_room_names`.
 - Added focused tests for edge normalization/blocking and room filtering/sorting by machine distance.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\clearance.py demos\10.8.1\vent_router\routing\search.py demos\10.8.1\tests\test_routing_clearance.py demos\10.8.1\tests\test_routing_search.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted solution log KPI calculation, metric lookup, and auto-best update selection to `vent_router.ui.solution_logs`.
+- Kept `main.py` responsible for snapshotting active app state, mutating log collections, and drawing the log panel.
+- Added focused tests for KPI calculation, empty-route handling, metric lookup, improved best-log updates, and missing-history handling.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\solution_logs.py demos\10.8.1\tests\test_solution_logs.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
