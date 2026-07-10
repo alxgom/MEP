@@ -2,6 +2,7 @@ import numpy as np
 
 from vent_router.graphs import EnvView
 from vent_router.placement import (
+    choose_core_like_machine_placement,
     choose_topological_machine_placement,
     pin_nodes_from_pins,
     rotation_score_from_fields,
@@ -88,3 +89,29 @@ def test_choose_topological_machine_placement_uses_score_order_and_first_valid_r
     )
 
     assert selected == (10.0, 0.0, 90, 35.0)
+
+
+def test_choose_core_like_machine_placement_returns_none_without_feasible_candidates():
+    selected, count = choose_core_like_machine_placement(
+        candidate_rooms=["room"],
+        candidate_points_fn=lambda _room: [(0, 0)],
+        rotations=(0, 90),
+        is_valid_fn=lambda _x, _y, _rot: False,
+        score_fn=lambda _x, _y, _rot, _room: 0.0,
+    )
+
+    assert selected is None
+    assert count == 0
+
+
+def test_choose_core_like_machine_placement_selects_lowest_scored_feasible_candidate():
+    selected, count = choose_core_like_machine_placement(
+        candidate_rooms=["room-a", "room-b"],
+        candidate_points_fn=lambda room: [(0, 0)] if room == "room-a" else [(10, 0)],
+        rotations=(0, 90),
+        is_valid_fn=lambda x, _y, rot: not (x == 0 and rot == 0),
+        score_fn=lambda x, _y, rot, room: (0 if room == "room-b" else 10, x + rot),
+    )
+
+    assert selected == (10, 0, 0, (0, 10))
+    assert count == 3

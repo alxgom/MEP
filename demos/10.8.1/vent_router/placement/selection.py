@@ -101,3 +101,19 @@ def choose_topological_machine_placement(
         if best_rot is not None:
             return float(x), float(y), best_rot, score
     return None
+
+
+def choose_core_like_machine_placement(candidate_rooms, candidate_points_fn, rotations, is_valid_fn, score_fn):
+    candidates = []
+    for room in candidate_rooms:
+        for x, y in candidate_points_fn(room):
+            for rot in rotations:
+                if not is_valid_fn(x, y, rot):
+                    continue
+                candidates.append((score_fn(x, y, rot, room), x, y, rot))
+
+    if not candidates:
+        return None, 0
+
+    score, x, y, rot = min(candidates, key=lambda item: item[0])
+    return (x, y, rot, score), len(candidates)

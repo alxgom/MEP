@@ -44,19 +44,13 @@ from vent_router.graphs import (
     merge_close_values as _merge_close_values_for_axes,
 )
 from vent_router.placement import (
-    area_out_percentage as _area_out_percentage_for_placement,
     candidate_machine_rooms as _candidate_machine_rooms_for_placement,
     candidate_room_points as _candidate_room_points_for_placement,
+    choose_core_like_machine_placement as _choose_core_like_machine_placement,
     choose_topological_machine_placement as _choose_topological_machine_placement,
-    compute_dijkstra_distance_field as _compute_dijkstra_distance_field,
     core_like_machine_candidate_score as _core_like_machine_candidate_score_for_placement,
-    field_alignment_pin_dirs as _field_alignment_pin_dirs_for_placement,
     is_machine_placement_valid as _is_machine_placement_valid_for_placement,
-    machine_polygon_from_pins as _machine_polygon_from_pins,
     placement_weights as _placement_weights,
-    point_angle_to_target as _point_angle_to_target_for_placement,
-    rotation_field_rooms_for_pin as _rotation_field_rooms_for_pin_for_placement,
-    rotation_room_weight as _rotation_room_weight_for_placement,
     routing_frame_axes as _routing_frame_axes_for_placement,
     score_rotation_field_at as _score_rotation_field_at_for_placement,
     select_field_alignment_rotation as _select_field_alignment_rotation,
@@ -3299,9 +3293,6 @@ def is_machine_placement_valid(cx, cy, angle):
         shafts,
     )
 
-def compute_dijkstra_distance_field(start_nodes, env):
-    return _compute_dijkstra_distance_field(start_nodes, env)
-
 def get_placement_weights():
     return _placement_weights(weight_mode_idx)
 
@@ -3320,24 +3311,11 @@ def ensure_placement_heatmap_scores():
     shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
     ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
 
-def _routing_frame_axes():
-    return _routing_frame_axes_for_placement()
-
 def _candidate_machine_rooms():
     return _candidate_machine_rooms_for_placement(rooms, MACHINE_OVERALL_W * MACHINE_BODY_H)
 
 def _candidate_room_points(room):
-    return _candidate_room_points_for_placement(room, _routing_frame_axes())
-
-def _machine_polygon_at(cx, cy, angle):
-    pins = get_machine_pins(cx, cy, angle)
-    return _machine_polygon_from_pins(pins)
-
-def _area_out_percentage(poly, room_poly):
-    return _area_out_percentage_for_placement(poly, room_poly)
-
-def _point_angle_to_target(origin, direction, target):
-    return _point_angle_to_target_for_placement(origin, direction, target)
+    return _candidate_room_points_for_placement(room, _routing_frame_axes_for_placement())
 
 def _distance_to_allowed_boundary(point):
     if routing_region_base is None:
@@ -3370,15 +3348,6 @@ def _room_field_target_point(room_name):
     if room_poly.contains(centroid):
         return (float(centroid.x), float(centroid.y))
     return get_representative_point(room_poly)
-
-def _rotation_field_rooms_for_pin(pin_name):
-    return _rotation_field_rooms_for_pin_for_placement(pin_name, wet_room_names, terminals.keys())
-
-def _rotation_room_weight(room_name):
-    return _rotation_room_weight_for_placement(room_name, weight_mode_idx)
-
-def _field_alignment_pin_dirs(pin_name, angle):
-    return _field_alignment_pin_dirs_for_placement(pin_name, angle, _local_axis_to_world)
 
 def _score_rotation_field_at(cx, cy, angle):
     pins = get_machine_pins(cx, cy, angle)
@@ -3422,25 +3391,24 @@ def apply_rotation_mode_once():
 def run_core_workflow_machine_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
     t0 = time.perf_counter()
-    candidates = []
-    for room in _candidate_machine_rooms():
-        for cx, cy in _candidate_room_points(room):
-            for rot in (0, 90, 180, 270):
-                if not is_machine_placement_valid(cx, cy, rot):
-                    continue
-                candidates.append((_core_like_machine_candidate_score(cx, cy, rot, room), cx, cy, rot))
-
+    selected, candidate_count = _choose_core_like_machine_placement(
+        _candidate_machine_rooms(),
+        _candidate_room_points,
+        (0, 90, 180, 270),
+        is_machine_placement_valid,
+        _core_like_machine_candidate_score,
+    )
     ap_scores = {}
     ap_fields = {}
-    if not candidates:
+    if selected is None:
         return
 
-    _, best_x, best_y, best_rot = min(candidates, key=lambda item: item[0])
+    best_x, best_y, best_rot, _score = selected
     machine_cx, machine_cy, machine_angle = best_x, best_y, best_rot
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
-    print(f"[Core-like Machine Placement] tried {len(candidates)} feasible candidates in {elapsed_ms:.1f}ms")
+    print(f"[Core-like Machine Placement] tried {candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
 
 def run_auto_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields

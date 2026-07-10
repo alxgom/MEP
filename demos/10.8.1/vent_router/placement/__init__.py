@@ -11,6 +11,7 @@ from .rotation import (
 )
 from .selection import (
     best_valid_rotation_for_point,
+    choose_core_like_machine_placement,
     choose_topological_machine_placement,
     pin_nodes_from_pins,
     rotation_score_from_fields,
@@ -29,6 +30,7 @@ __all__ = [
     "best_valid_rotation_for_point",
     "candidate_machine_rooms",
     "candidate_room_points",
+    "choose_core_like_machine_placement",
     "choose_topological_machine_placement",
     "compute_dijkstra_distance_field",
     "core_like_machine_candidate_score",
