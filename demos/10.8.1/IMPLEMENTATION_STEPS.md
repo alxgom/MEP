@@ -40,6 +40,7 @@ Manual validation milestones:
 - Sal Ozeo Flat machine dimensions and simple policies now live in `vent_router.domain.machines`.
 - Canonical large-duct route names now live in `vent_router.domain.routes`.
 - First pure geometry helper extracted: `snap_to_integer_grid` now lives in `vent_router.geometry.shapely_utils`.
+- Pure NumPy segment distance helpers now live in `vent_router.geometry.distances`.
 
 ## Next Steps
 
@@ -78,6 +79,11 @@ Manual validation milestones:
 - Extracted `snap_to_integer_grid` to `vent_router.geometry.shapely_utils`.
 - Added focused tests for polygon, line, and geometry collection snapping.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\shapely_utils.py demos\10.8.1\tests\test_shapely_utils.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted `point_segment_min_distances`, `edge_segment_min_distances`, and `edge_parallel_segment_min_distances` to `vent_router.geometry.distances`.
+- Kept `main.py` compatibility imports under the previous private helper names.
+- Added focused tests for projection, endpoint, empty-segment, sampled-edge, and parallel-overlap distance behavior.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\distances.py demos\10.8.1\tests\test_distances.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
