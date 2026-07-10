@@ -66,6 +66,7 @@ Manual validation milestones:
 - Machine placement feasibility and candidate-room filtering now live in `vent_router.placement.feasibility`.
 - Core-like machine placement scoring primitives now live in `vent_router.placement.scoring`.
 - Machine rotation field scoring helpers now live in `vent_router.placement.rotation`.
+- Topological auto-placement node/rotation selection now lives in `vent_router.placement.selection`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
@@ -261,6 +262,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for active Sal pins, routing region, obstacle collections, and machine dimensions.
 - Added focused tests for covered-room preference, fallback room selection, routing-region containment, and wall/column/shaft obstacle rejection.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\feasibility.py demos\10.8.1\tests\test_placement_feasibility.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted topological auto-placement node/rotation selection to `vent_router.placement.selection`.
+- Kept `main.py` responsible for active KD-tree lookup, machine pin generation, machine-position mutation, and grid rebuild.
+- Added focused tests for pin-node lookup, rotation score policy, and first valid topological placement selection.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\selection.py demos\10.8.1\tests\test_placement_selection.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

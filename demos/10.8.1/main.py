@@ -47,6 +47,7 @@ from vent_router.placement import (
     area_out_percentage as _area_out_percentage_for_placement,
     candidate_machine_rooms as _candidate_machine_rooms_for_placement,
     candidate_room_points as _candidate_room_points_for_placement,
+    choose_topological_machine_placement as _choose_topological_machine_placement,
     compute_dijkstra_distance_field as _compute_dijkstra_distance_field,
     core_like_machine_candidate_score as _core_like_machine_candidate_score_for_placement,
     field_alignment_pin_dirs as _field_alignment_pin_dirs_for_placement,
@@ -3484,73 +3485,24 @@ def run_auto_placement():
         if not node_scores:
             return
             
-        sorted_nodes = sorted(node_scores.keys(), key=lambda n: node_scores[n])
-        
-        for n_idx in sorted_nodes:
-            n_x, n_y = base_regular_env.nodes[n_idx][0], base_regular_env.nodes[n_idx][1]
-            
-            best_rot = None
-            min_rot_score = 1e18
-            
-            for rot in [0, 90, 180, 270]:
-                if is_machine_placement_valid(n_x, n_y, rot):
-                    global_pins = get_machine_pins(n_x, n_y, rot)
-                    pin_nodes = {}
-                    for pin_name, pt in global_pins.items():
-                        if pin_name.startswith("c_"): continue
-                        _, p_idx = base_regular_kd.query(pt)
-                        pin_nodes[pin_name] = int(p_idx)
-                        
-                    d_left = distance_fields["Shaft"].get(pin_nodes["left_mid"], 1e9)
-                    d_right = distance_fields["Shaft"].get(pin_nodes["right_mid"], 1e9)
-                    if d_left < d_right:
-                        chosen_exhaust = "left_mid"
-                        kitchen_pin = "right_mid"
-                        shaft_dist = d_left
-                    else:
-                        chosen_exhaust = "right_mid"
-                        kitchen_pin = "left_mid"
-                        shaft_dist = d_right
-                        
-                    kitchen_dist = 0.0
-                    if "Kitchen" in distance_fields:
-                        kitchen_dist = distance_fields["Kitchen"].get(pin_nodes[kitchen_pin], 1e9)
-                        
-                    small_pins = ["tl", "tr", "bl", "br"]
-                    room_dists = 0.0
-                    remaining_rooms = [r for r in wet_room_names if r != "Kitchen"]
-                    used_pins = set()
-                    
-                    for r_name in remaining_rooms:
-                        best_d = 1e9
-                        best_p = None
-                        for p in small_pins:
-                            if p in used_pins:
-                                continue
-                            d = distance_fields[r_name].get(pin_nodes[p], 1e9)
-                            if d < best_d:
-                                best_d = d
-                                best_p = p
-                        if best_p is not None:
-                            used_pins.add(best_p)
-                            room_dists += best_d
-                        else:
-                            room_dists += 1e9
-                            
-                    w = get_placement_weights()
-                    rot_score = w["Shaft"] * shaft_dist + w["Kitchen"] * kitchen_dist + room_dists
-                    if rot_score < min_rot_score:
-                        min_rot_score = rot_score
-                        best_rot = rot
-                        
-            if best_rot is not None:
-                machine_cx, machine_cy = n_x, n_y
-                machine_angle = best_rot
-                pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-                build_grid(machine_pins=pins)
-                elapsed_ms = (time.perf_counter() - t0) * 1000.0
-                print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
-                return
+        selected = _choose_topological_machine_placement(
+            base_regular_env,
+            node_scores,
+            distance_fields,
+            (0, 90, 180, 270),
+            is_machine_placement_valid,
+            get_machine_pins,
+            lambda pt: int(base_regular_kd.query(pt)[1]),
+            wet_room_names,
+            get_placement_weights(),
+        )
+        if selected is not None:
+            machine_cx, machine_cy, machine_angle, _score = selected
+            pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+            build_grid(machine_pins=pins)
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
+            return
 
     elif auto_placement_mode_idx == 2:
         run_core_workflow_machine_placement()
