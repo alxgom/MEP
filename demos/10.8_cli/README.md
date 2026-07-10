@@ -212,6 +212,8 @@ Sidebar cards show only the main shortcuts. Use each card's `?` button to open a
 
 The Routing-Core Workflow mode mirrors the core placement phase at demo scale: it generates candidates from machine-room centroids, optional +/-100 mm translations along routing-frame axes, and four connector-aligned rotations. Candidates are feasibility-filtered against room/obstacle geometry, then sorted by core-like machine metrics: percentage outside room, connector angular alignment to patinejo/kitchen, connector clearance to allowed boundaries, and distance to main targets. It does not run full routing for each candidate; this keeps the demo interactive while preserving the core placement workflow structure.
 
+Routing-core selects fancoil machine rooms from bathroom/wet optional rooms (`InfoClima.get_optional_rooms_machine`). The demo therefore allows bathroom machine candidates when no exported core metadata overrides the candidate flag.
+
 The inherited Topological Fields placement mode was removed from the Cli demo because it optimizes the machine like a many-to-one hub. That is useful for Sal-style problems, but it is the wrong abstraction for the indoor Cli supply phase: the machine has one active ventilation output and should behave closer to a source/terminal for the supply tree. Placing it between grilles can block or bias the route in ways core routing would not intentionally select.
 
 Cli supply grilles use their generated grille point to find nearby connected graph nodes. This intentionally bypasses the inherited Sal-style interior room-start filter, because Cli grilles are wall-adjacent by construction and can otherwise lose all valid start nodes before routing begins. The rendered supply tree includes short leaf stubs from the grille point to the selected graph node so the route remains visually attached to the terminal.
@@ -264,6 +266,7 @@ Manual solution logs are drawn as diamond markers with `L1`, `L2`, etc. Automati
 
 ## Low-Priority TODO
 
+- Refactor UI option names into provenance groups: Routing-Core Port, Core Approximation, Baseline, and Experimental. Keep the core-port lane available as the default while preserving graph-builder and heuristic knobs for comparison.
 - Add soft preference semantics where non-preferred room starts remain available with a penalty.
 - Add optional export for session logs if visual exploration later needs CSV/JSON output.
 - Revisit routing-core alignment after the demo placement workflow stabilizes.

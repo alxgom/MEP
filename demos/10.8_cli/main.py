@@ -883,6 +883,16 @@ def _route_base_room_name(route_name):
             return route_name[:-len(suffix)]
     return route_name
 
+def _clima_target_room_names():
+    return {
+        _route_base_room_name(route_name)
+        for route_name in terminals.keys()
+        if str(route_name).endswith(" Supply")
+    }
+
+def _is_clima_target_room(room):
+    return str(getattr(room, "name", "") or "") in _clima_target_room_names()
+
 def _room_allowed_region(room):
     if routing_region_base is None:
         return room.polygon
@@ -1299,6 +1309,8 @@ def _is_clima_machine_room(room):
     if not hasattr(room, "polygon") or room.polygon.is_empty:
         return False
     text = _room_text(room)
+    if any(key in text for key in ("bath", "bano", "baño", "toilet", "aseo")):
+        return True
     preferred = ("hall", "pasillo", "living", "salon", "salón", "comedor")
     return any(key in text for key in preferred) or not _is_service_room(room)
 
@@ -3921,6 +3933,28 @@ def draw_outlined_text(screen, font, text, pos, color, outline_color=COLOR_PLAN_
         screen.blit(font.render(text, True, outline_color), (x + ox, y + oy))
     screen.blit(font.render(text, True, color), (x, y))
 
+def draw_room_labels(screen, font_small, selected_route_name=None):
+    selected_base = _route_base_room_name(selected_route_name) if selected_route_name else None
+    for room in rooms:
+        if not hasattr(room, "polygon") or room.polygon.is_empty:
+            continue
+        label = str(getattr(room, "name", "") or "").strip()
+        if not label:
+            continue
+        pt = get_representative_point(room.polygon)
+        s_pt = to_screen(pt[0], pt[1])
+        muted = bool(selected_base and label != selected_base)
+        color = (74, 78, 82) if muted else COLOR_PLAN_LABEL
+        label = label.replace("Bathroom", "Bath").replace("Washroom", "Wash")
+        surf = font_small.render(label, True, color)
+        draw_outlined_text(
+            screen,
+            font_small,
+            label,
+            (s_pt[0] - surf.get_width() // 2, s_pt[1] - surf.get_height() // 2),
+            color,
+        )
+
 def draw_terminal_area_drag(screen, start_world, end_world):
     if start_world is None or end_world is None:
         return
@@ -5018,6 +5052,18 @@ def _path_to_segments(path):
         segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
     return segs
 
+def append_orthogonal_connector_segments(segs, p1, p2):
+    p1 = (float(p1[0]), float(p1[1]))
+    p2 = (float(p2[0]), float(p2[1]))
+    if math.hypot(p2[0] - p1[0], p2[1] - p1[1]) <= 1.0:
+        return
+    if abs(p1[0] - p2[0]) <= 1.0 or abs(p1[1] - p2[1]) <= 1.0:
+        segs.append((p1, p2))
+        return
+    corner = (p2[0], p1[1])
+    segs.append((p1, corner))
+    segs.append((corner, p2))
+
 def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
     terminal_pt = terminals.get(route_name)
     route_pt = get_clima_grille_steiner_point(route_name)
@@ -5028,7 +5074,7 @@ def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
     route_pt = (float(route_pt[0]), float(route_pt[1]))
     terminal_pt = (float(terminal_pt[0]), float(terminal_pt[1]))
     if math.hypot(leaf_pt[0] - route_pt[0], leaf_pt[1] - route_pt[1]) > 1.0:
-        segs.append((leaf_pt, route_pt))
+        append_orthogonal_connector_segments(segs, leaf_pt, route_pt)
 
     distance_total = math.hypot(terminal_pt[0] - route_pt[0], terminal_pt[1] - route_pt[1])
     if distance_total <= 1.0:
@@ -5039,10 +5085,10 @@ def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
             route_pt[0] + (terminal_pt[0] - route_pt[0]) * ratio,
             route_pt[1] + (terminal_pt[1] - route_pt[1]) * ratio,
         )
-        segs.append((route_pt, intermediate))
-        segs.append((intermediate, terminal_pt))
+        append_orthogonal_connector_segments(segs, route_pt, intermediate)
+        append_orthogonal_connector_segments(segs, intermediate, terminal_pt)
     else:
-        segs.append((route_pt, terminal_pt))
+        append_orthogonal_connector_segments(segs, route_pt, terminal_pt)
 
 def run_clima_supply_tree_routing(global_pins, pin_node_map):
     supply_routes = _clima_supply_route_names()
@@ -6722,7 +6768,7 @@ def main():
             if selected_route_name and not is_selected_room:
                 color = COLOR_DESELECTED_ROOM
             else:
-                color = COLOR_ROOM_COVERED if room.has_cover else COLOR_ROOM
+                color = COLOR_ROOM_COVERED if room.has_cover or _is_clima_target_room(room) else COLOR_ROOM
             pygame.draw.polygon(screen, color, screen_coords)
 
         draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY)
@@ -6745,6 +6791,8 @@ def main():
             coords = list(room.polygon.exterior.coords)
             screen_coords = [to_screen(x, y) for x, y in coords]
             pygame.draw.polygon(screen, COLOR_WALL, screen_coords, WALL_DRAW_WIDTH)
+
+        draw_room_labels(screen, font_small, selected_route_name)
             
         for d in doors:
             # Draw door line segment
