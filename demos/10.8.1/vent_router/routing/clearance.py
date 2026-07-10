@@ -27,3 +27,25 @@ def weighted_edge_cost(edge_weights, u, v, dist):
     if edge_weights is None:
         return dist
     return edge_weights.get((min(u, v), max(u, v)), dist)
+
+
+def normalized_edge(u, v):
+    return (min(int(u), int(v)), max(int(u), int(v)))
+
+
+def set_block_weight(edge_weights, u, v, block_weight):
+    edge = normalized_edge(u, v)
+    edge_weights[edge] = block_weight
+    return edge
+
+
+def block_terminal_node_edges(edge_weights, adj, terminal_node_indices, block_weight, skip_names=("Shaft",)):
+    blocked_edges = []
+    for route_name, node_idx in terminal_node_indices.items():
+        if route_name in skip_names:
+            continue
+        if node_idx not in adj:
+            continue
+        for nbr, _, _ in adj[node_idx]:
+            blocked_edges.append(set_block_weight(edge_weights, node_idx, nbr, block_weight))
+    return blocked_edges

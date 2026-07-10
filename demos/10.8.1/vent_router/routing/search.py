@@ -64,3 +64,15 @@ def terminal_node_indices(terminals, shaft_node_idx, kd):
         _, node_idx = kd.query(pt)
         terminal_nodes[name] = int(node_idx)
     return terminal_nodes
+
+
+def ordered_small_room_names(terminals, machine_center, room_keywords=("Bathroom", "Toilet", "Washroom"), excluded=("Kitchen",)):
+    cx, cy = machine_center
+    return sorted(
+        [
+            name
+            for name in terminals.keys()
+            if name not in excluded and any(keyword in name for keyword in room_keywords)
+        ],
+        key=lambda name: math.hypot(terminals[name][0] - cx, terminals[name][1] - cy),
+    )

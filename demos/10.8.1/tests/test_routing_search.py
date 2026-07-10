@@ -2,6 +2,7 @@ import numpy as np
 
 from vent_router.routing import (
     line_graph_dir_from_points,
+    ordered_small_room_names,
     path_physical_length,
     terminal_node_indices,
     target_heuristic,
@@ -90,3 +91,19 @@ def test_terminal_node_indices_queries_kd_and_preserves_shaft_node():
         "Bath": 4,
         "Kitchen": 7,
     }
+
+
+def test_ordered_small_room_names_filters_and_sorts_by_machine_distance():
+    terminals = {
+        "Kitchen": (1.0, 1.0),
+        "Bathroom 2": (100.0, 0.0),
+        "Bedroom": (1.0, 0.0),
+        "Toilet": (10.0, 0.0),
+        "Washroom": (50.0, 0.0),
+    }
+
+    assert ordered_small_room_names(terminals, machine_center=(0.0, 0.0)) == [
+        "Toilet",
+        "Washroom",
+        "Bathroom 2",
+    ]

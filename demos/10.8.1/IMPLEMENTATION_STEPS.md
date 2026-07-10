@@ -73,6 +73,8 @@ Manual validation milestones:
 - Route reconstruction from graph paths now lives in `vent_router.routing.segments`, with active graph nodes and shaft-entry behavior supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
+- Terminal edge blocking policy now lives in `vent_router.routing.clearance`.
+- Small-room routing order policy now lives in `vent_router.routing.search`.
 - Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
 - Heatmap and UI color-map helpers now live in `vent_router.ui.colors`.
 - Graph axis collection, epsilon expansion, boundary extension, and value merging helpers now live in `vent_router.graphs.axes`.
@@ -290,6 +292,11 @@ Manual validation milestones:
 - Reused shared route reconstruction when appending small MCF routes in `run_small_pin_min_cost_flow_routing`.
 - Added focused test for small-pin target collection.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\flow.py demos\10.8.1\tests\test_routing_flow.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted terminal block edge normalization and terminal-node edge blocking to `vent_router.routing.clearance`.
+- Extracted small-room routing order policy to `vent_router.routing.search.ordered_small_room_names`.
+- Added focused tests for edge normalization/blocking and room filtering/sorting by machine distance.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\clearance.py demos\10.8.1\vent_router\routing\search.py demos\10.8.1\tests\test_routing_clearance.py demos\10.8.1\tests\test_routing_search.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

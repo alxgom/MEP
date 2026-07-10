@@ -26,9 +26,12 @@ from .hit_testing import (
     selected_pin_names,
 )
 from .clearance import (
+    block_terminal_node_edges,
     buffered_radius_mm,
+    normalized_edge,
     required_clearance_mm,
     route_axis_records,
+    set_block_weight,
     weighted_edge_cost,
 )
 from .flow import (
@@ -50,6 +53,7 @@ from .scoring import (
 )
 from .search import (
     line_graph_dir_from_points,
+    ordered_small_room_names,
     path_physical_length,
     terminal_node_indices,
     target_heuristic,
@@ -60,6 +64,7 @@ __all__ = [
     "RouteScoreWeights",
     "add_edge",
     "add_port_stub_segment",
+    "block_terminal_node_edges",
     "buffered_radius_mm",
     "build_routes_from_paths",
     "count_ordered_route_turns",
@@ -77,6 +82,8 @@ __all__ = [
     "metric_route_segments",
     "min_cost_flow",
     "line_graph_dir_from_points",
+    "normalized_edge",
+    "ordered_small_room_names",
     "path_physical_length",
     "point_is_segment_endpoint",
     "positive_flow_edges",
@@ -89,6 +96,7 @@ __all__ = [
     "score_routes",
     "selected_pin_names",
     "segment_metric_dir",
+    "set_block_weight",
     "source_start_nodes",
     "small_pin_target_specs",
     "target_heuristic",

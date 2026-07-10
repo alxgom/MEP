@@ -58,6 +58,7 @@ from vent_router.placement import (
 )
 from vent_router.routing import (
     RouteScoreWeights,
+    block_terminal_node_edges as _block_terminal_node_edges,
     build_routes_from_paths as _build_routes_from_paths_for_env,
     buffered_radius_mm as _buffered_radius_mm,
     count_ordered_route_turns as _count_ordered_route_turns,
@@ -73,6 +74,7 @@ from vent_router.routing import (
     find_route_hit_at_point as _find_route_hit_at_point,
     line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
     merged_route_piece_lengths as _merged_route_piece_lengths,
+    ordered_small_room_names as _ordered_small_room_names,
     path_physical_length as _path_physical_length_for_env,
     route_conflict_summary as _route_conflict_summary,
     required_clearance_mm as _required_clearance_mm,
@@ -81,6 +83,7 @@ from vent_router.routing import (
     route_segments_from_path as _route_segments_from_path_for_env,
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
+    set_block_weight as _set_block_weight,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     small_pin_target_specs as _small_pin_target_specs,
@@ -1883,8 +1886,7 @@ def _weighted_edge_cost(edge_weights, u, v, dist):
     return _weighted_edge_cost_for_weights(edge_weights, u, v, dist)
 
 def set_terminal_block_weight(edge_weights, u, v):
-    edge = (min(int(u), int(v)), max(int(u), int(v)))
-    edge_weights[edge] = OVERLAP_BLOCK_WEIGHT
+    edge = _set_block_weight(edge_weights, u, v, OVERLAP_BLOCK_WEIGHT)
     edge_weight_overlay_excluded_edges.add(edge)
 
 def record_edge_weight_overlay(edge_weights, env):
@@ -3470,12 +3472,8 @@ def solve_ventilation_routing():
     
     # Block other terminals for Shaft search
     shaft_weights = {}
-    for r_name, t_node_idx in terminal_nodes.items():
-        if r_name == "Shaft":
-            continue
-        if t_node_idx in current_env.adj:
-                for nbr, _, _ in current_env.adj[t_node_idx]:
-                    set_terminal_block_weight(shaft_weights, t_node_idx, nbr)
+    for edge in _block_terminal_node_edges(shaft_weights, current_env.adj, terminal_nodes, OVERLAP_BLOCK_WEIGHT):
+        edge_weight_overlay_excluded_edges.add(edge)
     add_route_clearance_weights(shaft_weights, "Shaft", current_env)
 
     t_solver = time.perf_counter()
@@ -3498,10 +3496,7 @@ def solve_ventilation_routing():
 
     # 2. Backtracking search over permutations of the small duct rooms
     from itertools import permutations
-    other_rooms = sorted(
-        [name for name in terminals.keys() if name != "Kitchen" and any(w in name for w in ["Bathroom", "Toilet", "Washroom"])],
-        key=lambda name: math.hypot(terminals[name][0] - machine_cx, terminals[name][1] - machine_cy)
-    )
+    other_rooms = _ordered_small_room_names(terminals, (machine_cx, machine_cy))
 
     if routing_strategy_idx == 5:
         success, routes_cand, status_cand, total_nodes_cand = run_small_pin_min_cost_flow_routing(

@@ -1,7 +1,10 @@
 from vent_router.routing import (
+    block_terminal_node_edges,
     buffered_radius_mm,
+    normalized_edge,
     required_clearance_mm,
     route_axis_records,
+    set_block_weight,
     weighted_edge_cost,
 )
 
@@ -38,3 +41,31 @@ def test_weighted_edge_cost_uses_normalized_edge_key_or_distance():
     assert weighted_edge_cost(None, 3, 1, 50.0) == 50.0
     assert weighted_edge_cost(weights, 3, 1, 50.0) == 200.0
     assert weighted_edge_cost(weights, 2, 3, 50.0) == 50.0
+
+
+def test_set_block_weight_normalizes_edge_and_returns_it():
+    weights = {}
+
+    edge = set_block_weight(weights, 5, 2, block_weight=1000.0)
+
+    assert edge == (2, 5)
+    assert weights == {(2, 5): 1000.0}
+    assert normalized_edge(8, 3) == (3, 8)
+
+
+def test_block_terminal_node_edges_skips_shaft_and_missing_nodes():
+    weights = {}
+    adj = {
+        1: [(2, 10.0, "E"), (3, 20.0, "N")],
+        4: [(5, 10.0, "E")],
+    }
+
+    blocked = block_terminal_node_edges(
+        weights,
+        adj,
+        {"Shaft": 4, "Kitchen": 1, "Bath": 99},
+        block_weight=5000.0,
+    )
+
+    assert blocked == [(1, 2), (1, 3)]
+    assert weights == {(1, 2): 5000.0, (1, 3): 5000.0}
