@@ -48,6 +48,7 @@ Manual validation milestones:
 - Canonical large-duct route names now live in `vent_router.domain.routes`.
 - First pure geometry helper extracted: `snap_to_integer_grid` now lives in `vent_router.geometry.shapely_utils`.
 - Pure NumPy segment distance helpers now live in `vent_router.geometry.distances`.
+- Boundary and line segment extraction helpers now live in `vent_router.geometry.segments`.
 
 ## Next Steps
 
@@ -91,6 +92,11 @@ Manual validation milestones:
 - Kept `main.py` compatibility imports under the previous private helper names.
 - Added focused tests for projection, endpoint, empty-segment, sampled-edge, and parallel-overlap distance behavior.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\distances.py demos\10.8.1\tests\test_distances.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted `extract_boundary_segments` and `extract_line_segments` to `vent_router.geometry.segments`.
+- Kept `main.py` compatibility imports under the previous private helper names.
+- Added focused tests for polygon boundaries, geometry collections, line strings, multi-line strings, and empty inputs.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\segments.py demos\10.8.1\tests\test_segments.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

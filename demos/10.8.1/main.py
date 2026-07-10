@@ -17,6 +17,8 @@ from vent_router.domain import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
 from vent_router.geometry import (
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
     edge_segment_min_distances as _edge_segment_min_distances,
+    extract_boundary_segments as _extract_bnd_segs,
+    extract_line_segments as _extract_line_segs,
     point_segment_min_distances as _point_segment_min_distances,
     snap_to_integer_grid,
 )
@@ -884,41 +886,6 @@ def add_shaft_entry_segments(segs, first_node_idx):
         segs.append((rep, entry))
     if math.hypot(node[0] - entry[0], node[1] - entry[1]) > 1.0:
         segs.append((entry, node))
-
-def _extract_bnd_segs(region):
-    segs = []
-    def _add_ring(coords):
-        c = list(coords)
-        for i in range(len(c)-1):
-            segs.append([c[i][0], c[i][1], c[i+1][0], c[i+1][1]])
-    def _add_poly(poly):
-        _add_ring(poly.exterior.coords)
-        for interior in poly.interiors:
-            _add_ring(interior.coords)
-    if region.geom_type == 'Polygon':
-        _add_poly(region)
-    elif region.geom_type in ('MultiPolygon', 'GeometryCollection'):
-        for g in region.geoms:
-            if g.geom_type == 'Polygon':
-                _add_poly(g)
-    return np.array(segs, dtype=np.float64) if segs else np.empty((0,4), dtype=np.float64)
-
-def _extract_line_segs(line_geom):
-    segs = []
-    def _add_coords(coords):
-        c = list(coords)
-        for i in range(len(c) - 1):
-            segs.append([c[i][0], c[i][1], c[i + 1][0], c[i + 1][1]])
-
-    if line_geom is None or line_geom.is_empty:
-        return np.empty((0, 4), dtype=np.float64)
-    if line_geom.geom_type == "LineString":
-        _add_coords(line_geom.coords)
-    elif line_geom.geom_type == "MultiLineString" or hasattr(line_geom, "geoms"):
-        for g in line_geom.geoms:
-            if g.geom_type == "LineString":
-                _add_coords(g.coords)
-    return np.array(segs, dtype=np.float64) if segs else np.empty((0, 4), dtype=np.float64)
 
 def _cast_rays_numpy(interest_pts_arr, bnd, eps=0.5):
     h_segs, v_segs = [], []
