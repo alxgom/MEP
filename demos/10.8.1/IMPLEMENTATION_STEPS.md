@@ -52,6 +52,7 @@ Manual validation milestones:
 - Ray casting and ray intersection helpers now live in `vent_router.geometry.rays`.
 - Axis-aligned segment normalization/relation/distance helpers now live in `vent_router.geometry.axis`.
 - Pure route segment merging and metric helpers now live in `vent_router.routing.segments`.
+- Pure route quality counters now live in `vent_router.routing.metrics`, with Sal-specific diameter and minimum-piece policies injected by `main.py`.
 
 ## Next Steps
 
@@ -60,9 +61,10 @@ Manual validation milestones:
 2. Continue extracting pure geometry helpers.
 3. Continue extracting pure routing helpers.
 4. Extract graph builders behind a stable interface.
-5. Extract routing backends and scoring.
-6. Extract placement.
-7. Extract UI drawing and event handling.
+5. Extract routing scoring and backend-agnostic quality evaluation.
+6. Extract routing backends.
+7. Extract placement.
+8. Extract UI drawing and event handling.
 
 ## Step Log
 
@@ -116,6 +118,11 @@ Manual validation milestones:
 - Left `_route_axis_records` in `main.py` for now because it still depends on the active route-diameter policy.
 - Added focused tests for route segment merging, route-name preservation, non-axis metric segments, and endpoint detection.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\segments.py demos\10.8.1\tests\test_routing_segments.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted route quality counters to `vent_router.routing.metrics`: crossings, overlaps, clearance conflicts, turns, merged piece lengths, and short-piece counts.
+- Kept `main.py` compatibility wrappers where current behavior depends on active Sal policies such as route diameter, clearance, and minimum piece factor.
+- Added focused tests for metric crossing semantics, overlap counting, injected clearance policy, turn counting, and injected short-piece policy.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\metrics.py demos\10.8.1\tests\test_routing_metrics.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
