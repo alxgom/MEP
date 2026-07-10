@@ -9,6 +9,8 @@ import numpy as np
 
 SCORE_PENALIZATION = 1000
 TURN_BIAS = 1
+CORE_HEURISTIC_DIRECTIONS = [(0, 0), (0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+NONNEGATIVE_HEURISTIC_DIRECTIONS = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
 
 @dataclass
@@ -228,8 +230,9 @@ def _steiner_min(
     graph: dict[int, dict[int, float]],
     terminal_nodes: list[int],
     min_value: float = 0.0,
+    heuristic_directions: list[tuple[int, int]] | None = None,
 ) -> tuple[dict[int, dict[int, float]], dict[str, float]] | None:
-    directions = [(0, 0), (0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+    directions = heuristic_directions or CORE_HEURISTIC_DIRECTIONS
     best_total = float("inf")
     best_tree = None
     best_score = {
@@ -315,6 +318,7 @@ def solve_core_steiner_port(
     adj: dict[int, list[tuple[int, float, str]]],
     terminal_node_indices: list[int],
     min_value: float = 0.0,
+    heuristic_directions: list[tuple[int, int]] | None = None,
 ) -> CoreSteinerResult | None:
     global _NODE_POSITIONS
     unique_terminals = list(dict.fromkeys(int(node) for node in terminal_node_indices))
@@ -322,7 +326,12 @@ def solve_core_steiner_port(
         return None
     _NODE_POSITIONS = np.asarray(nodes, dtype=np.float64)
     graph = _build_graph(_NODE_POSITIONS, adj)
-    solved = _steiner_min(graph, unique_terminals, min_value=min_value)
+    solved = _steiner_min(
+        graph,
+        unique_terminals,
+        min_value=min_value,
+        heuristic_directions=heuristic_directions,
+    )
     if solved is None:
         return None
     tree, score = solved

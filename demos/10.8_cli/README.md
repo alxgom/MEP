@@ -38,6 +38,7 @@ Dwelling and routing setup:
 Routing and display:
 
 - `Tab`: cycle routing grid.
+- `K`: cycle Clima supply backend.
 - `G`: toggle grid nodes and edges.
 - `J`: toggle routing-core parity debug overlay. Blue shows the raw Steiner tree with source-rooted direction arrows, yellow shows temporary terminal access links and bridge points, green shows connector stubs.
 - `V`: toggle the placement heatmap.
@@ -66,6 +67,8 @@ This is a routing-core behavior port of the tree algorithm, not a full route-cor
 The core-port adapter now uses exact Steiner terminal points for the machine `air_out` access and grille offset points. If an exact point is not already a graph node, it adds temporary orthogonal graph links, including a validated one-bend bridge when needed. This mirrors core's behavior of rebuilding the grid around Steiner points and avoids misleading diagonal snap segments. The adapter keeps `min_value=0.0` because the current routing-core Clima call does not pass a nonzero `min_value` into `route_steiner`.
 
 Use `[J]` to inspect the core-port layers separately from the final route: exact terminals, temporary access links, bridge points, source-rooted directed tree, and connector stubs. This is a visual parity/debug aid only; it does not change the solver.
+
+`Routing-Core Variant: Kou nonnegative heuristics` keeps the same core-port tree pipeline but removes the negative A* heuristic pairs from the 9-direction sweep, using only `(0,0)`, `(0,1)`, `(1,0)`, and `(1,1)`. It is intentionally labeled as a variant, not the core-parity default.
 
 The previous line-graph metric-closure MST remains in code as `Core Approximation: L(G) MST` for comparison. It solves pairwise group paths on directed edge states `(u, v)` so turns are transition costs in `L(G)`, then unions the selected metric-closure paths into one route named `Supply Air Tree`. It is not the default core-port lane.
 

@@ -24,7 +24,7 @@ if DWELLING_EXPORT_ROOT.exists():
     sys.path.append(str(DWELLING_EXPORT_ROOT))
 
 import generative_layout
-from core_steiner_port import solve_core_steiner_port
+from core_steiner_port import NONNEGATIVE_HEURISTIC_DIRECTIONS, solve_core_steiner_port
 from solver import estimate_turns
 
 try:
@@ -229,6 +229,7 @@ router_backend_idx = 0
 
 CLIMA_SUPPLY_BACKENDS = [
     "Routing-Core Port: Kou Steiner",
+    "Routing-Core Variant: Kou nonnegative heuristics",
     "Core Approximation: L(G) MST",
 ]
 clima_supply_backend_idx = 0
@@ -5511,7 +5512,7 @@ def _add_core_terminal_node(nodes_list, adj, point, candidate_nodes, label, debu
         return None, f"No orthogonal graph access for {label}"
     return virtual_idx, None
 
-def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
+def run_clima_supply_core_steiner_routing(global_pins, pin_node_map, backend_label=None, heuristic_directions=None):
     global core_steiner_debug
     core_steiner_debug = {}
     supply_routes = _clima_supply_route_names()
@@ -5525,7 +5526,7 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
     nodes_list = [(float(pt[0]), float(pt[1])) for pt in current_env.nodes]
     augmented_adj = _copy_env_adjacency(current_env.adj)
     debug = {
-        "backend": CLIMA_SUPPLY_BACKENDS[0],
+        "backend": backend_label or CLIMA_SUPPLY_BACKENDS[0],
         "terminals": [],
         "bridge_points": [],
         "access_segments": [],
@@ -5579,6 +5580,7 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         augmented_adj,
         terminal_nodes,
         min_value=0.0,
+        heuristic_directions=heuristic_directions,
     )
     if result is None:
         core_steiner_debug = debug
@@ -5615,7 +5617,7 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
     return [("Supply Air Tree", segs)], "Success", len(result.tree_nodes)
 
 def solve_clima_routing():
-    global edge_weight_debug_map, edge_weight_overlay_excluded_edges
+    global edge_weight_debug_map, edge_weight_overlay_excluded_edges, core_steiner_debug
     edge_weight_debug_map = {}
     edge_weight_overlay_excluded_edges = set()
     t_solver = time.perf_counter()
@@ -5643,11 +5645,24 @@ def solve_clima_routing():
 
     pin_node_map = snap_pins_to_graph(global_pins)
     if clima_supply_backend_idx == 0:
-        routes, reason, total_nodes = run_clima_supply_core_steiner_routing(global_pins, pin_node_map)
+        routes, reason, total_nodes = run_clima_supply_core_steiner_routing(
+            global_pins,
+            pin_node_map,
+            backend_label=CLIMA_SUPPLY_BACKENDS[0],
+        )
         backend_label = CLIMA_SUPPLY_BACKENDS[0]
-    else:
-        routes, reason, total_nodes = run_clima_supply_steiner_routing(global_pins, pin_node_map)
+    elif clima_supply_backend_idx == 1:
+        routes, reason, total_nodes = run_clima_supply_core_steiner_routing(
+            global_pins,
+            pin_node_map,
+            backend_label=CLIMA_SUPPLY_BACKENDS[1],
+            heuristic_directions=NONNEGATIVE_HEURISTIC_DIRECTIONS,
+        )
         backend_label = CLIMA_SUPPLY_BACKENDS[1]
+    else:
+        core_steiner_debug = {}
+        routes, reason, total_nodes = run_clima_supply_steiner_routing(global_pins, pin_node_map)
+        backend_label = CLIMA_SUPPLY_BACKENDS[2]
     elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
     if routes is None:
         return None, f"Routing Blocked: {reason} in {elapsed_ms:.1f}ms", elapsed_ms, total_nodes
@@ -6578,6 +6593,7 @@ HELP_TEXT = {
     ],
     "solver": [
         "[Tab] Grid type",
+        "[K] Clima backend",
         "[G] Grid mesh",
         "[J] Core debug overlay",
         "Grille: click preferred node",
@@ -6652,6 +6668,7 @@ def draw_transient_message(screen, font_small):
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, show_core_debug_overlay, graph_type_idx, routing_strategy_idx
+    global clima_supply_backend_idx
     global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
     global real_scenario_idx, routing_frame_idx, dwelling_source_idx, room_start_mode_idx
     global edge_weight_heatmap_enabled, edge_weight_view_mode_idx, route_real_diameter_width_enabled
@@ -7031,6 +7048,12 @@ def main():
 
                 elif event.key == pygame.K_j:
                     show_core_debug_overlay = not show_core_debug_overlay
+
+                elif event.key == pygame.K_k:
+                    clima_supply_backend_idx = (clima_supply_backend_idx + 1) % len(CLIMA_SUPPLY_BACKENDS)
+                    routes, status, elapsed_ms, total_nodes = solve_clima_routing()
+                    if routes and not status.startswith("Blocked"):
+                        record_current_solution(routes, elapsed_ms, f"Backend:{clima_supply_backend_idx}", (52, 152, 219))
                     
                 elif event.key == pygame.K_c:
                     set_transient_message("Sal routing strategies are hidden in the Cli app")
@@ -7354,7 +7377,8 @@ def main():
         draw_card_help_button(screen, "solver", solver_card, font_small)
         lbl_phase = font_small.render(f"Phase: {CLI_ROUTE_PHASE}", True, COLOR_TEXT)
         screen.blit(lbl_phase, (25, 250))
-        lbl_method = font_small.render(f"Method: {CLI_ROUTE_METHOD}", True, COLOR_TEXT)
+        active_backend = CLIMA_SUPPLY_BACKENDS[clima_supply_backend_idx]
+        lbl_method = font_small.render(f"Method: {active_backend[:34]}", True, COLOR_TEXT)
         screen.blit(lbl_method, (25, 270))
         lbl_graph = font_small.render(f"Grid: {GRAPH_TYPES[graph_type_idx]}", True, COLOR_TEXT)
         screen.blit(lbl_graph, (25, 290))
