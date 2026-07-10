@@ -22,6 +22,12 @@ from .hit_testing import (
     find_route_at_point,
     find_route_hit_at_point,
 )
+from .clearance import (
+    buffered_radius_mm,
+    required_clearance_mm,
+    route_axis_records,
+    weighted_edge_cost,
+)
 from .flow import (
     add_edge,
     min_cost_flow,
@@ -42,6 +48,7 @@ __all__ = [
     "RouteScoreWeights",
     "add_edge",
     "add_port_stub_segment",
+    "buffered_radius_mm",
     "count_ordered_route_turns",
     "count_route_short_pieces",
     "count_segment_clearance_conflicts",
@@ -59,6 +66,8 @@ __all__ = [
     "point_is_segment_endpoint",
     "positive_flow_edges",
     "route_conflict_summary",
+    "required_clearance_mm",
+    "route_axis_records",
     "route_quality_counts",
     "route_quality_warnings",
     "score_routes",
@@ -66,4 +75,5 @@ __all__ = [
     "source_start_nodes",
     "total_route_length",
     "trace_flow_path",
+    "weighted_edge_cost",
 ]

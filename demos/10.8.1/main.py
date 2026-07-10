@@ -26,7 +26,6 @@ from vent_router.geometry import (
     edge_segment_min_distances as _edge_segment_min_distances,
     extract_boundary_segments as _extract_bnd_segs,
     extract_line_segments as _extract_line_segs,
-    normalize_axis_segment as _normalize_axis_segment,
     point_segment_min_distances as _point_segment_min_distances,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
@@ -34,6 +33,7 @@ from vent_router.geometry import (
 from vent_router.graphs import EnvView
 from vent_router.routing import (
     RouteScoreWeights,
+    buffered_radius_mm as _buffered_radius_mm,
     count_ordered_route_turns as _count_ordered_route_turns,
     count_route_short_pieces as _count_route_short_pieces,
     count_segment_clearance_conflicts as _count_segment_clearance_conflicts,
@@ -47,12 +47,15 @@ from vent_router.routing import (
     find_route_hit_at_point as _find_route_hit_at_point,
     merged_route_piece_lengths as _merged_route_piece_lengths,
     route_conflict_summary as _route_conflict_summary,
+    required_clearance_mm as _required_clearance_mm,
+    route_axis_records as _route_axis_records_for_policy,
     route_quality_warnings as _route_quality_warnings,
     score_routes as _score_routes,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     source_start_nodes as _source_start_nodes_for_kd,
     trace_flow_path as _trace_flow_path,
+    weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
 
 # Add relative paths to sys.path so we can import modules
@@ -1724,22 +1727,16 @@ def get_outward_vector(pin_name, machine_angle):
     return _outward_vector(pin_name, machine_angle)
 
 def _route_axis_records(route_name, route_segs):
-    diameter = get_route_diameter(route_name)
-    records = []
-    for p1, p2 in route_segs:
-        seg = _normalize_axis_segment(p1, p2)
-        if seg is not None:
-            records.append((seg, diameter))
-    return records
+    return _route_axis_records_for_policy(route_name, route_segs, get_route_diameter)
 
 def get_route_diameter(route_name):
     return MACHINE_SPEC.route_diameter_mm(route_name)
 
 def get_buffered_radius_mm(diameter_mm):
-    return int(math.ceil(float(diameter_mm) / 2.0 * DUCT_BUFFER_RATIO))
+    return _buffered_radius_mm(diameter_mm, DUCT_BUFFER_RATIO)
 
 def get_required_clearance_mm(diameter_a, diameter_b):
-    return get_buffered_radius_mm(diameter_a) + get_buffered_radius_mm(diameter_b)
+    return _required_clearance_mm(diameter_a, diameter_b, DUCT_BUFFER_RATIO)
 
 def _machine_edge_clearance_distances():
     if grid_edge_coords is None or len(grid_edge_coords) == 0:
@@ -1951,9 +1948,7 @@ def add_route_interaction_weights(prior_axis_records, current_diameter, accumula
         )
 
 def _weighted_edge_cost(edge_weights, u, v, dist):
-    if edge_weights is None:
-        return dist
-    return edge_weights.get((min(u, v), max(u, v)), dist)
+    return _weighted_edge_cost_for_weights(edge_weights, u, v, dist)
 
 def set_terminal_block_weight(edge_weights, u, v):
     edge = (min(int(u), int(v)), max(int(u), int(v)))
