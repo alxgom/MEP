@@ -65,7 +65,7 @@ Manual validation milestones:
 - Topological placement distance-field and score aggregation helpers now live in `vent_router.placement.fields`.
 - Machine placement feasibility and candidate-room filtering now live in `vent_router.placement.feasibility`.
 - Core-like machine placement scoring primitives now live in `vent_router.placement.scoring`.
-- Machine rotation field scoring helpers now live in `vent_router.placement.rotation`.
+- Machine rotation field scoring and field-alignment angle selection helpers now live in `vent_router.placement.rotation`.
 - Topological auto-placement node/rotation selection now lives in `vent_router.placement.selection`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
@@ -267,6 +267,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for active KD-tree lookup, machine pin generation, machine-position mutation, and grid rebuild.
 - Added focused tests for pin-node lookup, rotation score policy, and first valid topological placement selection.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\selection.py demos\10.8.1\tests\test_placement_selection.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted field-alignment rotation angle selection to `vent_router.placement.rotation.select_field_alignment_rotation`.
+- Kept `main.py` responsible for applying the selected angle and updating UI-visible rotation scores.
+- Added focused tests for retaining the current orientation and switching orientation when the score exceeds epsilon.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\rotation.py demos\10.8.1\tests\test_placement_rotation.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

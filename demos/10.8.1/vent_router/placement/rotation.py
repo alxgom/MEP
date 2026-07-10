@@ -73,3 +73,42 @@ def score_rotation_field_at(
             best_pin_alignment = max(best_pin_alignment, dir_x * field_x + dir_y * field_y)
         total_score += max(0.0, best_pin_alignment) * field_mag
     return total_score
+
+
+def select_field_alignment_rotation(current_angle, is_valid_rotation_fn, score_rotation_fn, eps):
+    current_class = "H" if int(current_angle) % 180 == 0 else "V"
+    candidate_angles = {
+        "H": [int(current_angle)] if current_class == "H" else [],
+        "V": [int(current_angle)] if current_class == "V" else [],
+    }
+    candidate_angles["H"].extend([0, 180])
+    candidate_angles["V"].extend([90, 270])
+
+    scores = {}
+    selected_angles = {}
+    for orient, angles in candidate_angles.items():
+        best_score = None
+        best_angle = None
+        seen = set()
+        for angle in angles:
+            angle = int(angle) % 360
+            if angle in seen:
+                continue
+            seen.add(angle)
+            if not is_valid_rotation_fn(angle):
+                continue
+            score = score_rotation_fn(angle)
+            if best_score is None or score > best_score:
+                best_score = score
+                best_angle = angle
+        scores[orient] = float(best_score) if best_score is not None else float("-inf")
+        selected_angles[orient] = best_angle
+
+    best_orient = max(scores, key=lambda key: scores[key])
+    selected = current_class
+    new_angle = int(current_angle) % 360
+    current_score = scores.get(current_class, float("-inf"))
+    if selected_angles.get(best_orient) is not None and scores[best_orient] > current_score + eps:
+        selected = best_orient
+        new_angle = selected_angles[best_orient]
+    return new_angle, selected, scores

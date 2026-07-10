@@ -7,6 +7,7 @@ from .rotation import (
     rotation_field_rooms_for_pin,
     rotation_room_weight,
     score_rotation_field_at,
+    select_field_alignment_rotation,
 )
 from .selection import (
     best_valid_rotation_for_point,
@@ -42,5 +43,6 @@ __all__ = [
     "rotation_score_from_fields",
     "routing_frame_axes",
     "score_rotation_field_at",
+    "select_field_alignment_rotation",
     "topological_placement_scores",
 ]

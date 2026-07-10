@@ -59,6 +59,7 @@ from vent_router.placement import (
     rotation_room_weight as _rotation_room_weight_for_placement,
     routing_frame_axes as _routing_frame_axes_for_placement,
     score_rotation_field_at as _score_rotation_field_at_for_placement,
+    select_field_alignment_rotation as _select_field_alignment_rotation,
     topological_placement_scores as _topological_placement_scores,
 )
 from vent_router.routing import (
@@ -3395,38 +3396,12 @@ def _score_rotation_field_at(cx, cy, angle):
 
 def apply_field_alignment_rotation():
     global machine_angle, rotation_field_scores
-    current_class = "H" if int(machine_angle) % 180 == 0 else "V"
-    candidate_angles = {
-        "H": [int(machine_angle)] if current_class == "H" else [],
-        "V": [int(machine_angle)] if current_class == "V" else [],
-    }
-    candidate_angles["H"].extend([0, 180])
-    candidate_angles["V"].extend([90, 270])
-    scores = {}
-    selected_angles = {}
-    for orient, angles in candidate_angles.items():
-        best_score = None
-        best_angle = None
-        seen = set()
-        for angle in angles:
-            angle = int(angle) % 360
-            if angle in seen:
-                continue
-            seen.add(angle)
-            if not is_machine_placement_valid(machine_cx, machine_cy, angle):
-                continue
-            score = _score_rotation_field_at(machine_cx, machine_cy, angle)
-            if best_score is None or score > best_score:
-                best_score = score
-                best_angle = angle
-        scores[orient] = float(best_score) if best_score is not None else float("-inf")
-        selected_angles[orient] = best_angle
-    best_orient = max(scores, key=lambda key: scores[key])
-    selected = current_class
-    current_score = scores.get(current_class, float("-inf"))
-    if selected_angles.get(best_orient) is not None and scores[best_orient] > current_score + ROTATION_FIELD_EPS:
-        selected = best_orient
-        machine_angle = selected_angles[best_orient]
+    machine_angle, selected, scores = _select_field_alignment_rotation(
+        machine_angle,
+        lambda angle: is_machine_placement_valid(machine_cx, machine_cy, angle),
+        lambda angle: _score_rotation_field_at(machine_cx, machine_cy, angle),
+        ROTATION_FIELD_EPS,
+    )
     rotation_field_scores = {
         "H": 0.0 if not math.isfinite(scores.get("H", 0.0)) else float(scores.get("H", 0.0)),
         "V": 0.0 if not math.isfinite(scores.get("V", 0.0)) else float(scores.get("V", 0.0)),
