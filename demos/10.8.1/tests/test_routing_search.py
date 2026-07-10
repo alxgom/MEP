@@ -3,6 +3,7 @@ import numpy as np
 from vent_router.routing import (
     line_graph_dir_from_points,
     path_physical_length,
+    terminal_node_indices,
     target_heuristic,
 )
 
@@ -77,3 +78,15 @@ def test_target_heuristic_disabled_mode_and_invalid_node_return_zero():
 
     assert target_heuristic(env, -1, None, [{"node_idx": 1}], 100, 1, (0, 0), lambda *_: 1) == 0.0
     assert target_heuristic(env, 0, None, [{"node_idx": 1}], 100, 3, (0, 0), lambda *_: 1) == 0.0
+
+
+def test_terminal_node_indices_queries_kd_and_preserves_shaft_node():
+    class FakeKd:
+        def query(self, point):
+            return 0.0, {"Bath": 4, "Kitchen": 7}[point]
+
+    assert terminal_node_indices({"Bath": "Bath", "Kitchen": "Kitchen"}, 2, FakeKd()) == {
+        "Shaft": 2,
+        "Bath": 4,
+        "Kitchen": 7,
+    }

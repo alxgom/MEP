@@ -56,3 +56,11 @@ def target_heuristic(
         if h < best:
             best = h
     return 0.0 if best == float("inf") else float(best)
+
+
+def terminal_node_indices(terminals, shaft_node_idx, kd):
+    terminal_nodes = {"Shaft": shaft_node_idx}
+    for name, pt in terminals.items():
+        _, node_idx = kd.query(pt)
+        terminal_nodes[name] = int(node_idx)
+    return terminal_nodes

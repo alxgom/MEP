@@ -56,6 +56,7 @@ from vent_router.routing import (
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     source_start_nodes as _source_start_nodes_for_kd,
+    terminal_node_indices as _terminal_node_indices_for_kd,
     target_heuristic as _target_heuristic_for_env,
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
@@ -2230,12 +2231,7 @@ def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map
     )
 
 def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
-    terminal_nodes = {}
-    terminal_nodes["Shaft"] = shaft_node_idx
-    for name, pt in terminals.items():
-        _, node_idx = grid_kd.query(pt)
-        terminal_nodes[name] = int(node_idx)
-    return terminal_nodes
+    return _terminal_node_indices_for_kd(terminals, shaft_node_idx, grid_kd)
 
 def _room_polygon_by_name(room_name):
     for room in rooms:

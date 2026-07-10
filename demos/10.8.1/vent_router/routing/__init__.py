@@ -46,6 +46,7 @@ from .scoring import (
 from .search import (
     line_graph_dir_from_points,
     path_physical_length,
+    terminal_node_indices,
     target_heuristic,
 )
 
@@ -81,6 +82,7 @@ __all__ = [
     "segment_metric_dir",
     "source_start_nodes",
     "target_heuristic",
+    "terminal_node_indices",
     "total_route_length",
     "trace_flow_path",
     "weighted_edge_cost",

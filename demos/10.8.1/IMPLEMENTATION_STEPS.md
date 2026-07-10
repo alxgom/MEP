@@ -61,6 +61,7 @@ Manual validation milestones:
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
+- Terminal node index collection now lives in `vent_router.routing.search`, with terminals and KD-tree supplied by `main.py`.
 
 ## Next Steps
 
@@ -169,6 +170,11 @@ Manual validation milestones:
 - Extracted line-graph direction, path physical length, and target heuristic to `vent_router.routing.search`.
 - Kept `main.py` wrappers for active heuristic mode, machine center, and `estimate_turns`.
 - Added focused tests for dominant-axis directions, Euclidean path length, Manhattan heuristic, bend-aware heuristic, machine-ring heuristic, disabled heuristic mode, and invalid nodes.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\search.py demos\10.8.1\tests\test_routing_search.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted terminal-node index collection to `vent_router.routing.search.terminal_node_indices`.
+- Kept `main.py` wrapper signature unchanged even though the old helper does not use `pin_node_map`.
+- Added focused test for KD-tree terminal lookup and shaft-node preservation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\search.py demos\10.8.1\tests\test_routing_search.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
