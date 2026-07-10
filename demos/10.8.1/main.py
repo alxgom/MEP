@@ -27,6 +27,7 @@ from vent_router.geometry import (
 )
 from vent_router.graphs import EnvView
 from vent_router.routing import (
+    RouteScoreWeights,
     count_ordered_route_turns as _count_ordered_route_turns,
     count_route_short_pieces as _count_route_short_pieces,
     count_segment_clearance_conflicts as _count_segment_clearance_conflicts,
@@ -35,6 +36,9 @@ from vent_router.routing import (
     count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
     merged_route_piece_lengths as _merged_route_piece_lengths,
+    route_conflict_summary as _route_conflict_summary,
+    route_quality_warnings as _route_quality_warnings,
+    score_routes as _score_routes,
 )
 
 # Add relative paths to sys.path so we can import modules
@@ -3648,39 +3652,31 @@ def run_two_stage_min_cost_flow_routing(room_names, pin_node_map, global_pins, s
     return True, best_routes, best_status, best_total_nodes
 
 def get_solution_score(routes, crossings):
-    total_len = 0.0
-    for name, segs in routes:
-        total_len += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
-    total_turns = count_solution_turns(routes)
-    overlaps = count_segment_overlaps(routes)
-    clearance_conflicts = count_segment_clearance_conflicts(routes)
-    short_pieces = count_solution_short_pieces(routes)
-    score = (
-        int(total_len)
-        + int(C_BEND) * total_turns
-        + int(CROSSING_PENALTY) * crossings
-        + int(OVERLAP_SCORE_PENALTY) * overlaps
-        + int(CLEARANCE_PENALTY) * clearance_conflicts
-        + int(SHORT_PIECE_SCORE_PENALTY) * short_pieces
+    weights = RouteScoreWeights(
+        bend=C_BEND,
+        crossing=CROSSING_PENALTY,
+        overlap=OVERLAP_SCORE_PENALTY,
+        clearance=CLEARANCE_PENALTY,
+        short_piece=SHORT_PIECE_SCORE_PENALTY,
     )
-    return score
+    return _score_routes(
+        routes,
+        weights,
+        get_route_diameter,
+        get_required_clearance_mm,
+        get_min_piece_length,
+        crossings=crossings,
+    )
 
 def get_route_validation_warnings(routes):
     if not routes:
         return []
-    warnings = []
-    crossings = count_segment_crossings(routes)
-    if crossings:
-        warnings.append(f"{crossings} crossing(s)")
-    overlaps = count_segment_overlaps(routes)
-    if overlaps:
-        warnings.append(f"{overlaps} overlap(s)")
-    clearance_conflicts = count_segment_clearance_conflicts(routes)
-    if clearance_conflicts:
-        warnings.append(f"{clearance_conflicts} clearance conflict(s)")
-    short_pieces = count_solution_short_pieces(routes)
-    if short_pieces:
-        warnings.append(f"{short_pieces} short piece(s)")
+    warnings = _route_quality_warnings(
+        routes,
+        get_route_diameter,
+        get_required_clearance_mm,
+        get_min_piece_length,
+    )
     if routing_region_base is not None:
         out_count = 0
         for name, segs in routes:
@@ -3697,17 +3693,12 @@ def get_route_validation_warnings(routes):
     return warnings
 
 def get_route_conflict_summary(routes):
-    if not routes:
-        return "no routes"
-    crossings = count_segment_crossings(routes)
-    overlaps = count_segment_overlaps(routes)
-    clearance_conflicts = count_segment_clearance_conflicts(routes)
-    parts = [f"{crossings} crossings"]
-    if overlaps:
-        parts.append(f"{overlaps} overlaps")
-    if clearance_conflicts:
-        parts.append(f"{clearance_conflicts} clearance")
-    return ", ".join(parts)
+    return _route_conflict_summary(
+        routes,
+        get_route_diameter,
+        get_required_clearance_mm,
+        get_min_piece_length,
+    )
 
 # ──────────────────────────────────────────────────────────────────────────
 # TOPOLOGICAL DISTANCE FIELDS AUTO-PLACEMENT ALGORITHMS
