@@ -49,6 +49,7 @@ Manual validation milestones:
 - First pure geometry helper extracted: `snap_to_integer_grid` now lives in `vent_router.geometry.shapely_utils`.
 - Pure NumPy segment distance helpers now live in `vent_router.geometry.distances`.
 - Boundary and line segment extraction helpers now live in `vent_router.geometry.segments`.
+- Polygon iteration helper now lives in `vent_router.geometry.polygons`.
 - Ray casting and ray intersection helpers now live in `vent_router.geometry.rays`.
 - Axis-aligned segment normalization/relation/distance helpers now live in `vent_router.geometry.axis`.
 - Pure route segment merging and metric helpers now live in `vent_router.routing.segments`.
@@ -161,6 +162,11 @@ Manual validation milestones:
 - Kept `main.py` wrapper for existing grid builder call sites.
 - Added focused tests for threshold merging, preserved axes, priority axes, and empty inputs.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\axes.py demos\10.8.1\tests\test_graph_axes.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted polygon iteration to `vent_router.geometry.polygons.iter_polygons`.
+- Kept `main.py` wrapper for existing grid and drawing call sites.
+- Added focused tests for polygons, multi-polygons, mixed geometry collections, `None`, and empty geometries.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\polygons.py demos\10.8.1\tests\test_polygons.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Extracted min-cost-flow primitives to `vent_router.routing.flow`: residual edge creation, successive-shortest-path min-cost flow, positive-flow edge lookup, and traced path reconstruction.
 - Kept existing private helper names in `main.py` as imported aliases to avoid touching route-construction call sites.

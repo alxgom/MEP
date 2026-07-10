@@ -27,6 +27,7 @@ from vent_router.geometry import (
     edge_segment_min_distances as _edge_segment_min_distances,
     extract_boundary_segments as _extract_bnd_segs,
     extract_line_segments as _extract_line_segs,
+    iter_polygons as _iter_polygons_from_geom,
     point_segment_min_distances as _point_segment_min_distances,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
@@ -1210,14 +1211,7 @@ def update_dynamic_env(machine_poly):
     print(f"Grid update: {ms:.1f} ms  (blocked nodes={len(blocked_nodes)}, edges={len(blocked_edges)})")
 
 def _iter_polygons(geom):
-    if geom is None or geom.is_empty:
-        return
-    if geom.geom_type == 'Polygon':
-        yield geom
-    elif geom.geom_type in ('MultiPolygon', 'GeometryCollection'):
-        for g in geom.geoms:
-            if g.geom_type == 'Polygon':
-                yield g
+    yield from _iter_polygons_from_geom(geom)
 
 def _add_point_axes(xs, ys, point):
     xs.add(round(float(point[0])))
