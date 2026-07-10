@@ -15,6 +15,9 @@ TURN_BIAS = 1
 class CoreSteinerResult:
     segments: list[tuple[tuple[float, float], tuple[float, float]]]
     tree_nodes: set[int]
+    tree_edges: list[tuple[int, int]]
+    directed_edges: list[tuple[int, int]]
+    directed_segments: list[tuple[tuple[float, float], tuple[float, float]]]
     score: dict[str, float]
 
 
@@ -273,6 +276,40 @@ def _build_graph(nodes: np.ndarray, adj: dict[int, list[tuple[int, float, str]]]
     return graph
 
 
+def _directed_dfs_edges(tree: dict[int, dict[int, float]], root: int) -> list[tuple[int, int]]:
+    root = int(root)
+    if root not in tree:
+        return []
+    directed = []
+    visited = {root}
+    stack = [(root, iter(sorted(int(n) for n in tree[root])))]
+    while stack:
+        parent, children = stack[-1]
+        try:
+            child = int(next(children))
+        except StopIteration:
+            stack.pop()
+            continue
+        if child in visited:
+            continue
+        visited.add(child)
+        directed.append((parent, child))
+        stack.append((child, iter(sorted(int(n) for n in tree.get(child, {})))))
+    return directed
+
+
+def _segments_from_edges(
+    nodes: np.ndarray,
+    edges: list[tuple[int, int]],
+) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    segments = []
+    for u, v in edges:
+        p1 = nodes[int(u)]
+        p2 = nodes[int(v)]
+        segments.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
+    return segments
+
+
 def solve_core_steiner_port(
     nodes: np.ndarray,
     adj: dict[int, list[tuple[int, float, str]]],
@@ -289,9 +326,13 @@ def solve_core_steiner_port(
     if solved is None:
         return None
     tree, score = solved
-    segments = []
-    for u, v, _weight in _edge_items(tree):
-        p1 = _NODE_POSITIONS[int(u)]
-        p2 = _NODE_POSITIONS[int(v)]
-        segments.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-    return CoreSteinerResult(segments=segments, tree_nodes={int(node) for node in tree}, score=score)
+    tree_edges = [(int(u), int(v)) for u, v, _weight in _edge_items(tree)]
+    directed_edges = _directed_dfs_edges(tree, unique_terminals[0])
+    return CoreSteinerResult(
+        segments=_segments_from_edges(_NODE_POSITIONS, tree_edges),
+        tree_nodes={int(node) for node in tree},
+        tree_edges=tree_edges,
+        directed_edges=directed_edges,
+        directed_segments=_segments_from_edges(_NODE_POSITIONS, directed_edges),
+        score=score,
+    )

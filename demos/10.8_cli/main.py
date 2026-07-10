@@ -4007,6 +4007,24 @@ def _draw_debug_segment(screen, p1, p2, color, width=2, dash_px=10):
         pos += dash_px
         draw = not draw
 
+def _draw_debug_arrow(screen, p1, p2, color):
+    s1 = to_screen(p1[0], p1[1])
+    s2 = to_screen(p2[0], p2[1])
+    dx = float(s2[0] - s1[0])
+    dy = float(s2[1] - s1[1])
+    length = math.hypot(dx, dy)
+    if length <= 1.0:
+        return
+    ux, uy = dx / length, dy / length
+    px, py = -uy, ux
+    mx = s1[0] + dx * 0.55
+    my = s1[1] + dy * 0.55
+    head = 8.0
+    tip = (int(round(mx + ux * head)), int(round(my + uy * head)))
+    left = (int(round(mx - ux * head * 0.55 + px * head * 0.5)), int(round(my - uy * head * 0.55 + py * head * 0.5)))
+    right = (int(round(mx - ux * head * 0.55 - px * head * 0.5)), int(round(my - uy * head * 0.55 - py * head * 0.5)))
+    pygame.draw.polygon(screen, color, [tip, left, right])
+
 def draw_core_steiner_debug_overlay(screen, font_small):
     if not show_core_debug_overlay or not core_steiner_debug:
         return
@@ -4014,6 +4032,10 @@ def draw_core_steiner_debug_overlay(screen, font_small):
     for p1, p2 in core_steiner_debug.get("raw_tree_segments", []):
         pygame.draw.line(screen, (255, 255, 255), to_screen(p1[0], p1[1]), to_screen(p2[0], p2[1]), 5)
         pygame.draw.line(screen, (30, 144, 255), to_screen(p1[0], p1[1]), to_screen(p2[0], p2[1]), 2)
+
+    for p1, p2 in core_steiner_debug.get("directed_tree_segments", []):
+        _draw_debug_arrow(screen, p1, p2, (255, 255, 255))
+        _draw_debug_arrow(screen, p1, p2, (30, 144, 255))
 
     for p1, p2 in core_steiner_debug.get("access_segments", []):
         _draw_debug_segment(screen, p1, p2, (241, 196, 15), width=2, dash_px=8)
@@ -5508,8 +5530,10 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         "bridge_points": [],
         "access_segments": [],
         "raw_tree_segments": [],
+        "directed_tree_segments": [],
         "stub_segments": [],
         "tree_nodes": [],
+        "terminal_infos": {},
     }
     root_candidates = _nearest_connected_graph_nodes(root_target["access_point"], max_nodes=24)
     if int(root_target["node_idx"]) not in root_candidates:
@@ -5561,7 +5585,16 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         return None, "Routing-core Steiner port did not connect all terminals", len(terminal_nodes)
 
     debug["raw_tree_segments"] = list(result.segments)
+    debug["directed_tree_segments"] = list(result.directed_segments)
     debug["tree_nodes"] = sorted(int(node) for node in result.tree_nodes)
+    debug["terminal_infos"] = {
+        str(item["label"]): {
+            "node": int(item["node"]),
+            "role": item["role"],
+            "access": item["access"],
+        }
+        for item in debug["terminals"]
+    }
     segs = list(result.segments)
     for route_name, leaf_node in route_leaf_nodes.items():
         if leaf_node in result.tree_nodes:
