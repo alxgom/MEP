@@ -63,6 +63,7 @@ Manual validation milestones:
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
 - Topological placement distance-field and score aggregation helpers now live in `vent_router.placement.fields`.
+- Machine placement feasibility and candidate-room filtering now live in `vent_router.placement.feasibility`.
 - Core-like machine placement scoring primitives now live in `vent_router.placement.scoring`.
 - Machine rotation field scoring helpers now live in `vent_router.placement.rotation`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
@@ -255,6 +256,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for active machine pins, shaft target lookup, room target lookup, and final angle mutation.
 - Added focused tests for large/small pin room ownership, weight modes, direction transform injection, and deterministic shaft alignment score.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\rotation.py demos\10.8.1\tests\test_placement_rotation.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted machine placement feasibility and candidate-room filtering to `vent_router.placement.feasibility`.
+- Kept `main.py` responsible for active Sal pins, routing region, obstacle collections, and machine dimensions.
+- Added focused tests for covered-room preference, fallback room selection, routing-region containment, and wall/column/shaft obstacle rejection.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\feasibility.py demos\10.8.1\tests\test_placement_feasibility.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

@@ -45,10 +45,12 @@ from vent_router.graphs import (
 )
 from vent_router.placement import (
     area_out_percentage as _area_out_percentage_for_placement,
+    candidate_machine_rooms as _candidate_machine_rooms_for_placement,
     candidate_room_points as _candidate_room_points_for_placement,
     compute_dijkstra_distance_field as _compute_dijkstra_distance_field,
     core_like_machine_candidate_score as _core_like_machine_candidate_score_for_placement,
     field_alignment_pin_dirs as _field_alignment_pin_dirs_for_placement,
+    is_machine_placement_valid as _is_machine_placement_valid_for_placement,
     machine_polygon_from_pins as _machine_polygon_from_pins,
     placement_weights as _placement_weights,
     point_angle_to_target as _point_angle_to_target_for_placement,
@@ -3285,22 +3287,15 @@ def get_route_conflict_summary(routes):
 # ──────────────────────────────────────────────────────────────────────────
 def is_machine_placement_valid(cx, cy, angle):
     global_pins = get_machine_pins(cx, cy, angle)
-    machine_poly = Polygon([
-        global_pins["c_tl"], global_pins["c_tr"], global_pins["c_br"], global_pins["c_bl"]
-    ])
-    
-    if not routing_region_base or not routing_region_base.contains(Point(cx, cy)):
-        return False
-    # Must not intersect wall lines
-    if any(machine_poly.intersects(w) for w in walls):
-        return False
-    # Must not intersect columns
-    if any(machine_poly.intersects(col) for col in columns):
-        return False
-    # Must not intersect shafts
-    if any(machine_poly.intersects(s) for s in shafts):
-        return False
-    return True
+    return _is_machine_placement_valid_for_placement(
+        cx,
+        cy,
+        global_pins,
+        routing_region_base,
+        walls,
+        columns,
+        shafts,
+    )
 
 def compute_dijkstra_distance_field(start_nodes, env):
     return _compute_dijkstra_distance_field(start_nodes, env)
@@ -3327,17 +3322,7 @@ def _routing_frame_axes():
     return _routing_frame_axes_for_placement()
 
 def _candidate_machine_rooms():
-    candidates = [
-        room for room in rooms
-        if getattr(room, "has_cover", False)
-        and hasattr(room, "polygon")
-        and not room.polygon.is_empty
-        and room.polygon.area >= MACHINE_OVERALL_W * MACHINE_BODY_H
-    ]
-    return candidates or [
-        room for room in rooms
-        if hasattr(room, "polygon") and not room.polygon.is_empty
-    ]
+    return _candidate_machine_rooms_for_placement(rooms, MACHINE_OVERALL_W * MACHINE_BODY_H)
 
 def _candidate_room_points(room):
     return _candidate_room_points_for_placement(room, _routing_frame_axes())
