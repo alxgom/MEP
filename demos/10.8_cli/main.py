@@ -891,6 +891,12 @@ def _point_allowed_for_clima_routing(pt):
     point = Point(float(pt[0]), float(pt[1]))
     return routing_region.contains(point) or routing_region.distance(point) < 1e-7
 
+def _point_allowed_for_core_steiner_terminal(pt):
+    if routing_region_base is None:
+        return True
+    point = Point(float(pt[0]), float(pt[1]))
+    return routing_region_base.contains(point) or routing_region_base.distance(point) < 1e-7
+
 def _route_base_room_name(route_name):
     for suffix in (" Supply", " Return"):
         if route_name.endswith(suffix):
@@ -2684,10 +2690,10 @@ def get_port_access_specs(global_pins, machine_angle):
             })
     return specs
 
-def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_spec=None):
+def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_spec=None, node_point=None):
     if target_node_idx is None or pin_name not in global_pins:
         return
-    node_pt = current_env.nodes[target_node_idx]
+    node_pt = node_point if node_point is not None else current_env.nodes[target_node_idx]
     access_pt = target_spec["access_point"] if target_spec else node_pt
     pin_pt = target_spec["pin_point"] if target_spec else global_pins[pin_name]
 
@@ -4874,6 +4880,9 @@ def is_machine_placement_valid(cx, cy, angle):
     # Must not intersect shafts
     if any(machine_poly.intersects(s) for s in shafts):
         return False
+    for spec in get_port_access_specs(global_pins, angle):
+        if spec["pin"] == "air_out" and not _point_allowed_for_core_steiner_terminal(spec["access_point"]):
+            return False
     return True
 
 def compute_dijkstra_distance_field(start_nodes, env):
@@ -5100,12 +5109,12 @@ def append_connector_segment(segs, p1, p2):
         return
     segs.append((p1, p2))
 
-def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx):
+def add_clima_grille_stub_segments(segs, route_name, leaf_node_idx, leaf_point=None):
     terminal_pt = terminals.get(route_name)
     route_pt = get_clima_grille_steiner_point(route_name)
     if terminal_pt is None or route_pt is None or leaf_node_idx is None:
         return
-    leaf_pt = current_env.nodes[int(leaf_node_idx)]
+    leaf_pt = leaf_point if leaf_point is not None else current_env.nodes[int(leaf_node_idx)]
     leaf_pt = (float(leaf_pt[0]), float(leaf_pt[1]))
     route_pt = (float(route_pt[0]), float(route_pt[1]))
     terminal_pt = (float(terminal_pt[0]), float(terminal_pt[1]))
@@ -5269,6 +5278,133 @@ def _nearest_route_node(route_name, candidate_nodes):
         key=lambda node: float(np.hypot(current_env.nodes[node][0] - route_pt[0], current_env.nodes[node][1] - route_pt[1])),
     )
 
+def _dir_between_points(p1, p2):
+    dx = float(p2[0]) - float(p1[0])
+    dy = float(p2[1]) - float(p1[1])
+    if abs(dx) >= abs(dy):
+        return DIR_RIGHT if dx > 0 else DIR_LEFT
+    return DIR_UP if dy > 0 else DIR_DOWN
+
+def _copy_env_adjacency(adj):
+    return {
+        int(u): [(int(v), float(weight), direction) for v, weight, direction in edges]
+        for u, edges in adj.items()
+    }
+
+def _add_augmented_axis_edge(adj, u, v, p1, p2):
+    weight = float(np.hypot(float(p2[0]) - float(p1[0]), float(p2[1]) - float(p1[1])))
+    if weight <= 1.0:
+        return
+    direction = _dir_between_points(p1, p2)
+    adj.setdefault(int(u), []).append((int(v), weight, direction))
+    adj.setdefault(int(v), []).append((int(u), weight, DIR_REV[direction]))
+
+def _axis_link_allowed(p1, p2):
+    if abs(float(p1[0]) - float(p2[0])) > 1.0 and abs(float(p1[1]) - float(p2[1])) > 1.0:
+        return False
+    line = LineString([(float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))])
+    if line.length <= 1.0:
+        return False
+    return _edge_allowed(line, [wp.bounds for wp in wall_polys])
+
+def _find_exact_graph_node(point, tolerance=1.0):
+    if current_env is None or len(current_env.nodes) == 0:
+        return None
+    px, py = round(float(point[0])), round(float(point[1]))
+    matches = np.where(
+        (np.abs(current_env.nodes[:, 0] - px) <= tolerance)
+        & (np.abs(current_env.nodes[:, 1] - py) <= tolerance)
+    )[0]
+    for node_idx in matches:
+        node_idx = int(node_idx)
+        if current_env.adj.get(node_idx):
+            return node_idx
+    return None
+
+def _axis_link_candidates(point, candidate_nodes, max_links=6):
+    if current_env is None:
+        return []
+    px, py = round(float(point[0])), round(float(point[1]))
+    candidates = []
+    for node_idx in candidate_nodes:
+        node_idx = int(node_idx)
+        if not current_env.adj.get(node_idx):
+            continue
+        node_pt = current_env.nodes[node_idx]
+        same_axis = abs(float(node_pt[0]) - px) <= 1.0 or abs(float(node_pt[1]) - py) <= 1.0
+        if not same_axis:
+            continue
+        if not _axis_link_allowed((px, py), node_pt):
+            continue
+        distance = float(np.hypot(float(node_pt[0]) - px, float(node_pt[1]) - py))
+        candidates.append((distance, node_idx))
+    candidates.sort()
+    return [node_idx for _, node_idx in candidates[:max_links]]
+
+def _orthogonal_bridge_candidates(point, candidate_nodes, max_links=4):
+    if current_env is None:
+        return []
+    px, py = round(float(point[0])), round(float(point[1]))
+    candidates = []
+    for node_idx in candidate_nodes:
+        node_idx = int(node_idx)
+        if not current_env.adj.get(node_idx):
+            continue
+        node_pt = current_env.nodes[node_idx]
+        nx, ny = round(float(node_pt[0])), round(float(node_pt[1]))
+        mids = [(px, ny), (nx, py)]
+        for mid in mids:
+            if mid == (px, py) or mid == (nx, ny):
+                continue
+            if not _point_allowed_for_core_steiner_terminal(mid):
+                continue
+            if not _axis_link_allowed((px, py), mid):
+                continue
+            if not _axis_link_allowed(mid, (nx, ny)):
+                continue
+            distance = abs(float(px - nx)) + abs(float(py - ny))
+            candidates.append((distance, node_idx, mid))
+    candidates.sort()
+    result = []
+    seen = set()
+    for _distance, node_idx, mid in candidates:
+        key = (node_idx, mid)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append((node_idx, mid))
+        if len(result) >= max_links:
+            break
+    return result
+
+def _add_core_terminal_node(nodes_list, adj, point, candidate_nodes, label):
+    if not _point_allowed_for_core_steiner_terminal(point):
+        return None, f"Core allowed region does not include {label}"
+    exact_node = _find_exact_graph_node(point)
+    if exact_node is not None:
+        return exact_node, None
+
+    links = _axis_link_candidates(point, candidate_nodes)
+    virtual_idx = len(nodes_list)
+    virtual_pt = (round(float(point[0])), round(float(point[1])))
+    nodes_list.append(virtual_pt)
+    adj[virtual_idx] = []
+    for node_idx in links:
+        _add_augmented_axis_edge(adj, virtual_idx, node_idx, virtual_pt, current_env.nodes[int(node_idx)])
+    if links:
+        return virtual_idx, None
+
+    bridges = _orthogonal_bridge_candidates(point, candidate_nodes)
+    for node_idx, mid in bridges:
+        mid_idx = len(nodes_list)
+        nodes_list.append(mid)
+        adj[mid_idx] = []
+        _add_augmented_axis_edge(adj, virtual_idx, mid_idx, virtual_pt, mid)
+        _add_augmented_axis_edge(adj, mid_idx, node_idx, mid, current_env.nodes[int(node_idx)])
+    if not bridges:
+        return None, f"No orthogonal graph access for {label}"
+    return virtual_idx, None
+
 def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
     supply_routes = _clima_supply_route_names()
     if not supply_routes:
@@ -5278,26 +5414,62 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
         return None, "Missing air_out graph access", 0
 
     root_target = air_targets[0]
-    root_node = int(root_target["node_idx"])
+    nodes_list = [(float(pt[0]), float(pt[1])) for pt in current_env.nodes]
+    augmented_adj = _copy_env_adjacency(current_env.adj)
+    root_candidates = _nearest_connected_graph_nodes(root_target["access_point"], max_nodes=24)
+    if int(root_target["node_idx"]) not in root_candidates:
+        root_candidates.insert(0, int(root_target["node_idx"]))
+    root_node, root_error = _add_core_terminal_node(
+        nodes_list,
+        augmented_adj,
+        root_target["access_point"],
+        root_candidates,
+        "air_out",
+    )
+    if root_node is None:
+        return None, root_error, 0
+
     route_leaf_nodes = {}
     terminal_nodes = [root_node]
     for route_name in supply_routes:
+        route_pt = get_clima_grille_steiner_point(route_name)
+        if route_pt is None:
+            return None, f"Missing Steiner point for {route_name}", len(terminal_nodes)
         start_nodes = get_clima_grille_start_nodes(route_name)
-        leaf_node = _nearest_route_node(route_name, start_nodes)
+        leaf_node, leaf_error = _add_core_terminal_node(
+            nodes_list,
+            augmented_adj,
+            route_pt,
+            start_nodes,
+            route_name,
+        )
         if leaf_node is None:
-            return None, f"No start nodes for {route_name}", len(terminal_nodes)
+            return None, leaf_error or f"No start nodes for {route_name}", len(terminal_nodes)
         route_leaf_nodes[route_name] = leaf_node
         terminal_nodes.append(leaf_node)
 
-    result = solve_core_steiner_port(current_env.nodes, current_env.adj, terminal_nodes)
+    augmented_nodes = np.array(nodes_list, dtype=np.float64)
+    result = solve_core_steiner_port(
+        augmented_nodes,
+        augmented_adj,
+        terminal_nodes,
+        min_value=0.0,
+    )
     if result is None:
         return None, "Routing-core Steiner port did not connect all terminals", len(terminal_nodes)
 
     segs = list(result.segments)
     for route_name, leaf_node in route_leaf_nodes.items():
         if leaf_node in result.tree_nodes:
-            add_clima_grille_stub_segments(segs, route_name, leaf_node)
-    add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
+            add_clima_grille_stub_segments(segs, route_name, leaf_node, leaf_point=augmented_nodes[int(leaf_node)])
+    add_port_stub_segment(
+        segs,
+        "air_out",
+        root_node,
+        global_pins,
+        root_target,
+        node_point=augmented_nodes[int(root_node)],
+    )
     return [("Supply Air Tree", segs)], "Success", len(result.tree_nodes)
 
 def solve_clima_routing():
