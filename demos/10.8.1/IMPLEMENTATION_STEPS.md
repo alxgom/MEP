@@ -64,6 +64,7 @@ Manual validation milestones:
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
 - Topological placement distance-field and score aggregation helpers now live in `vent_router.placement.fields`.
 - Core-like machine placement scoring primitives now live in `vent_router.placement.scoring`.
+- Machine rotation field scoring helpers now live in `vent_router.placement.rotation`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
@@ -249,6 +250,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for Sal machine pins, active room/shaft/kitchen state, allowed-boundary distance, and final machine-position mutation.
 - Added focused tests for candidate points, polygon/area scoring, signed target angle, and the core-like score tuple.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\scoring.py demos\10.8.1\tests\test_placement_scoring.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted rotation field room selection, weight presets, pin direction mapping, and rotation field score aggregation to `vent_router.placement.rotation`.
+- Kept `main.py` responsible for active machine pins, shaft target lookup, room target lookup, and final angle mutation.
+- Added focused tests for large/small pin room ownership, weight modes, direction transform injection, and deterministic shaft alignment score.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\rotation.py demos\10.8.1\tests\test_placement_rotation.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

@@ -48,10 +48,14 @@ from vent_router.placement import (
     candidate_room_points as _candidate_room_points_for_placement,
     compute_dijkstra_distance_field as _compute_dijkstra_distance_field,
     core_like_machine_candidate_score as _core_like_machine_candidate_score_for_placement,
+    field_alignment_pin_dirs as _field_alignment_pin_dirs_for_placement,
     machine_polygon_from_pins as _machine_polygon_from_pins,
     placement_weights as _placement_weights,
     point_angle_to_target as _point_angle_to_target_for_placement,
+    rotation_field_rooms_for_pin as _rotation_field_rooms_for_pin_for_placement,
+    rotation_room_weight as _rotation_room_weight_for_placement,
     routing_frame_axes as _routing_frame_axes_for_placement,
+    score_rotation_field_at as _score_rotation_field_at_for_placement,
     topological_placement_scores as _topological_placement_scores,
 )
 from vent_router.routing import (
@@ -3381,66 +3385,27 @@ def _room_field_target_point(room_name):
     return get_representative_point(room_poly)
 
 def _rotation_field_rooms_for_pin(pin_name):
-    if pin_name in ("left_mid", "right_mid"):
-        return [name for name in ("Shaft", "Kitchen") if name in terminals or name == "Shaft"]
-    return [name for name in wet_room_names if name not in ("Shaft", "Kitchen")]
+    return _rotation_field_rooms_for_pin_for_placement(pin_name, wet_room_names, terminals.keys())
 
 def _rotation_room_weight(room_name):
-    if weight_mode_idx == 1:
-        return 1.0
-    if room_name == "Shaft":
-        return 2.0
-    if room_name == "Kitchen":
-        return 1.5
-    return 1.0
+    return _rotation_room_weight_for_placement(room_name, weight_mode_idx)
 
 def _field_alignment_pin_dirs(pin_name, angle):
-    local_dirs = {
-        "left_mid": [(-1.0, 0.0)],
-        "right_mid": [(1.0, 0.0)],
-        "tl": [(-1.0, 0.0), (0.0, 1.0)],
-        "tr": [(1.0, 0.0), (0.0, 1.0)],
-        "bl": [(-1.0, 0.0), (0.0, -1.0)],
-        "br": [(1.0, 0.0), (0.0, -1.0)],
-    }.get(pin_name, [])
-    return [_local_axis_to_world(local_dir, angle) for local_dir in local_dirs]
+    return _field_alignment_pin_dirs_for_placement(pin_name, angle, _local_axis_to_world)
 
 def _score_rotation_field_at(cx, cy, angle):
     pins = get_machine_pins(cx, cy, angle)
-    total_score = 0.0
-    for pin_name in ("left_mid", "right_mid", "tl", "tr", "bl", "br"):
-        pin_pt = pins[pin_name]
-        fx = 0.0
-        fy = 0.0
-        for room_name in _rotation_field_rooms_for_pin(pin_name):
-            if room_name == "Shaft":
-                if not shaft_extraction:
-                    continue
-                target = get_representative_point(shaft_extraction)
-            else:
-                target = _room_field_target_point(room_name)
-            if target is None:
-                continue
-            dx = float(target[0]) - float(pin_pt[0])
-            dy = float(target[1]) - float(pin_pt[1])
-            dist = math.hypot(dx, dy)
-            if dist <= 1e-7:
-                continue
-            # Inverse-distance falloff keeps nearby rooms influential without
-            # making far rooms numerically disappear in large apartments.
-            w = _rotation_room_weight(room_name) / max(250.0, dist)
-            fx += w * dx / dist
-            fy += w * dy / dist
-        field_mag = math.hypot(fx, fy)
-        if field_mag <= 1e-12:
-            continue
-        field_x = fx / field_mag
-        field_y = fy / field_mag
-        best_pin_alignment = 0.0
-        for dir_x, dir_y in _field_alignment_pin_dirs(pin_name, angle):
-            best_pin_alignment = max(best_pin_alignment, dir_x * field_x + dir_y * field_y)
-        total_score += max(0.0, best_pin_alignment) * field_mag
-    return total_score
+    shaft_point = get_representative_point(shaft_extraction) if shaft_extraction else None
+    return _score_rotation_field_at_for_placement(
+        pins,
+        angle,
+        wet_room_names,
+        terminals.keys(),
+        shaft_point,
+        _room_field_target_point,
+        weight_mode_idx,
+        _local_axis_to_world,
+    )
 
 def apply_field_alignment_rotation():
     global machine_angle, rotation_field_scores
