@@ -15,11 +15,13 @@ from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
 from vent_router.domain import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
 from vent_router.geometry import (
+    cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
     edge_segment_min_distances as _edge_segment_min_distances,
     extract_boundary_segments as _extract_bnd_segs,
     extract_line_segments as _extract_line_segs,
     point_segment_min_distances as _point_segment_min_distances,
+    ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
 from vent_router.graphs import EnvView
@@ -886,57 +888,6 @@ def add_shaft_entry_segments(segs, first_node_idx):
         segs.append((rep, entry))
     if math.hypot(node[0] - entry[0], node[1] - entry[1]) > 1.0:
         segs.append((entry, node))
-
-def _cast_rays_numpy(interest_pts_arr, bnd, eps=0.5):
-    h_segs, v_segs = [], []
-    dx_s = bnd[:, 2] - bnd[:, 0]
-    dy_s = bnd[:, 3] - bnd[:, 1]
-
-    for x0, y0 in interest_pts_arr:
-        nh = np.abs(dy_s) > eps
-        if np.any(nh):
-            t_h  = (y0 - bnd[nh, 1]) / dy_s[nh]
-            ok_h = (t_h >= -eps) & (t_h <= 1.0 + eps)
-            x_i  = bnd[nh, 0] + t_h * dx_s[nh]
-
-            east = x_i[ok_h & (x_i > x0 + eps)]
-            if len(east): h_segs.append((y0, x0, float(east.min())))
-
-            west = x_i[ok_h & (x_i < x0 - eps)]
-            if len(west): h_segs.append((y0, float(west.max()), x0))
-
-        nv = np.abs(dx_s) > eps
-        if np.any(nv):
-            t_v  = (x0 - bnd[nv, 0]) / dx_s[nv]
-            ok_v = (t_v >= -eps) & (t_v <= 1.0 + eps)
-            y_i  = bnd[nv, 1] + t_v * dy_s[nv]
-
-            north = y_i[ok_v & (y_i > y0 + eps)]
-            if len(north): v_segs.append((x0, y0, float(north.min())))
-
-            south = y_i[ok_v & (y_i < y0 - eps)]
-            if len(south): v_segs.append((x0, float(south.max()), y0))
-
-    return h_segs, v_segs
-
-def _ray_ray_intersections_numpy(h_segs, v_segs, eps=0.5):
-    if not h_segs or not v_segs:
-        return []
-    h = np.array(h_segs, dtype=np.float64)
-    v = np.array(v_segs, dtype=np.float64)
-
-    y_h  = h[:, 0:1]
-    x1_h = h[:, 1:2]
-    x2_h = h[:, 2:3]
-    x_v  = v[:, 0:1].T
-    y1_v = v[:, 1:2].T
-    y2_v = v[:, 2:3].T
-
-    cross = ((x_v >= x1_h - eps) & (x_v <= x2_h + eps) &
-             (y_h >= y1_v - eps) & (y_h <= y2_v + eps))
-
-    hi, vi = np.where(cross)
-    return [(float(v[j, 0]), float(h[i, 0])) for i, j in zip(hi, vi)]
 
 def _commit_grid(nodes_arr, valid_edges):
     global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache, geometry_distance_cache
