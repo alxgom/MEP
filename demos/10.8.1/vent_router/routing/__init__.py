@@ -17,6 +17,10 @@ from .metrics import (
     merged_route_piece_lengths,
     segment_metric_dir,
 )
+from .hit_testing import (
+    find_route_at_point,
+    find_route_hit_at_point,
+)
 from .scoring import (
     RouteScoreWeights,
     route_conflict_summary,
@@ -35,6 +39,8 @@ __all__ = [
     "count_segment_overlaps",
     "count_solution_short_pieces",
     "count_solution_turns",
+    "find_route_at_point",
+    "find_route_hit_at_point",
     "merged_axis_segments",
     "merged_route_axis_segments",
     "merged_route_piece_lengths",

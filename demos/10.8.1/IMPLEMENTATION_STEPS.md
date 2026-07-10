@@ -54,6 +54,7 @@ Manual validation milestones:
 - Pure route segment merging and metric helpers now live in `vent_router.routing.segments`.
 - Pure route quality counters now live in `vent_router.routing.metrics`, with Sal-specific diameter and minimum-piece policies injected by `main.py`.
 - Route scoring and quality-summary formatting now live in `vent_router.routing.scoring`, with runtime weights and Sal policies passed in explicitly.
+- Route hit testing now lives in `vent_router.routing.hit_testing`, with the UI zoom-derived hit radius supplied by `main.py`.
 
 ## Next Steps
 
@@ -128,6 +129,11 @@ Manual validation milestones:
 - Kept `main.py` as a compatibility adapter for active slider weights and Sal-specific policies.
 - Added focused tests for length totals, score composition, warning formatting, and baseline conflict-summary text.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\scoring.py demos\10.8.1\tests\test_routing_scoring.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted route hit testing to `vent_router.routing.hit_testing`.
+- Kept `main.py` as the adapter for zoom-dependent hit radius.
+- Added focused tests for nearest-route detection, misses outside radius, and route-name hit lookup.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\hit_testing.py demos\10.8.1\tests\test_routing_hit_testing.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

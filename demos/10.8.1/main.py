@@ -35,6 +35,8 @@ from vent_router.routing import (
     count_segment_overlaps as _count_segment_overlaps,
     count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
+    find_route_at_point as _find_route_at_point,
+    find_route_hit_at_point as _find_route_hit_at_point,
     merged_route_piece_lengths as _merged_route_piece_lengths,
     route_conflict_summary as _route_conflict_summary,
     route_quality_warnings as _route_quality_warnings,
@@ -3001,23 +3003,10 @@ def count_solution_short_pieces(routes):
     return _count_solution_short_pieces(routes, get_min_piece_length)
 
 def find_route_at_point(routes, world_pt):
-    hit = find_route_hit_at_point(routes, world_pt)
-    return hit[0] if hit else None
+    return _find_route_at_point(routes, world_pt, max(40.0, 8.0 / SCALE_PX_PER_MM))
 
 def find_route_hit_at_point(routes, world_pt):
-    if not routes:
-        return None
-    hit_radius_mm = max(40.0, 8.0 / SCALE_PX_PER_MM)
-    click_pt = Point(float(world_pt[0]), float(world_pt[1]))
-    best_name = None
-    best_dist = hit_radius_mm
-    for name, segs in routes:
-        for p1, p2 in segs:
-            dist = LineString([p1, p2]).distance(click_pt)
-            if dist <= best_dist:
-                best_dist = dist
-                best_name = name
-    return (best_name, best_dist) if best_name else None
+    return _find_route_hit_at_point(routes, world_pt, max(40.0, 8.0 / SCALE_PX_PER_MM))
 
 def get_route_room_polygon(route_name):
     terminal_pt = terminals.get(route_name)
