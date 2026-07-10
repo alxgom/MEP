@@ -1,4 +1,5 @@
 from vent_router.routing import (
+    add_port_stub_segment,
     merged_axis_segments,
     merged_route_axis_segments,
     metric_route_segments,
@@ -50,3 +51,38 @@ def test_point_is_segment_endpoint_matches_either_endpoint():
     assert point_is_segment_endpoint((10.0, 0.0), segment)
     assert not point_is_segment_endpoint((5.0, 0.0), segment)
 
+
+def test_add_port_stub_segment_adds_direct_segment_without_target_spec():
+    segs = []
+    nodes = [(0, 0)]
+    global_pins = {"left_mid": (-10, 0)}
+
+    add_port_stub_segment(segs, "left_mid", 0, global_pins, nodes)
+
+    assert segs == [((0.0, 0.0), (-10.0, 0.0))]
+
+
+def test_add_port_stub_segment_adds_access_bridge_when_needed():
+    segs = []
+    nodes = [(0, 0)]
+    global_pins = {"left_mid": (-10, 0)}
+    target_spec = {
+        "access_point": (-5, 0),
+        "pin_point": (-10, 0),
+    }
+
+    add_port_stub_segment(segs, "left_mid", 0, global_pins, nodes, target_spec)
+
+    assert segs == [
+        ((0.0, 0.0), (-5.0, 0.0)),
+        ((-5.0, 0.0), (-10.0, 0.0)),
+    ]
+
+
+def test_add_port_stub_segment_ignores_missing_pin_or_node():
+    segs = []
+
+    add_port_stub_segment(segs, "missing", 0, {}, [(0, 0)])
+    add_port_stub_segment(segs, "left_mid", None, {"left_mid": (0, 0)}, [(0, 0)])
+
+    assert segs == []

@@ -69,3 +69,17 @@ def point_is_segment_endpoint(pt, seg, eps=1e-7):
         or math.hypot(pt[0] - seg[1][0], pt[1] - seg[1][1]) < eps
     )
 
+
+def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, nodes, target_spec=None):
+    if target_node_idx is None or pin_name not in global_pins:
+        return
+    node_pt = nodes[target_node_idx]
+    access_pt = target_spec["access_point"] if target_spec else node_pt
+    pin_pt = target_spec["pin_point"] if target_spec else global_pins[pin_name]
+
+    node_pt = (float(node_pt[0]), float(node_pt[1]))
+    access_pt = (float(access_pt[0]), float(access_pt[1]))
+    pin_pt = (float(pin_pt[0]), float(pin_pt[1]))
+    if math.hypot(access_pt[0] - node_pt[0], access_pt[1] - node_pt[1]) > 1e-7:
+        segs.append((node_pt, access_pt))
+    segs.append((access_pt, pin_pt))

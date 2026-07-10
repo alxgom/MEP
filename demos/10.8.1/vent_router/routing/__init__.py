@@ -1,6 +1,7 @@
 """Routing helpers and algorithms for the interactive workbench."""
 
 from .segments import (
+    add_port_stub_segment,
     merged_axis_segments,
     merged_route_axis_segments,
     metric_route_segments,
@@ -40,6 +41,7 @@ from .scoring import (
 __all__ = [
     "RouteScoreWeights",
     "add_edge",
+    "add_port_stub_segment",
     "count_ordered_route_turns",
     "count_route_short_pieces",
     "count_segment_clearance_conflicts",

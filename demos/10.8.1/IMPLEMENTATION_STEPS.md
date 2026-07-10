@@ -58,6 +58,7 @@ Manual validation milestones:
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
+- Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 
 ## Next Steps
 
@@ -152,6 +153,11 @@ Manual validation milestones:
 - Kept `main.py` wrappers for `get_machine_pins`, `get_port_access_specs`, and `get_outward_vector`.
 - Added focused tests for unrotated Sal pin geometry, port access stubs, and outward direction by side/rotation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py demos\10.8.1\tests\test_machines.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted port stub segment construction to `vent_router.routing.segments.add_port_stub_segment`.
+- Kept `main.py` as the adapter for active `current_env.nodes`.
+- Added focused tests for direct pin stubs, access-point bridge stubs, and no-op handling for missing pins or nodes.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\segments.py demos\10.8.1\tests\test_routing_segments.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

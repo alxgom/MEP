@@ -41,6 +41,7 @@ from vent_router.routing import (
     count_segment_overlaps as _count_segment_overlaps,
     count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
+    add_port_stub_segment as _add_port_stub_segment,
     add_edge as _mcf_add_edge,
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
@@ -1717,18 +1718,7 @@ def get_port_access_specs(global_pins, machine_angle):
     return _port_access_specs(MACHINE_SPEC, global_pins, machine_angle)
 
 def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_spec=None):
-    if target_node_idx is None or pin_name not in global_pins:
-        return
-    node_pt = current_env.nodes[target_node_idx]
-    access_pt = target_spec["access_point"] if target_spec else node_pt
-    pin_pt = target_spec["pin_point"] if target_spec else global_pins[pin_name]
-
-    node_pt = (float(node_pt[0]), float(node_pt[1]))
-    access_pt = (float(access_pt[0]), float(access_pt[1]))
-    pin_pt = (float(pin_pt[0]), float(pin_pt[1]))
-    if math.hypot(access_pt[0] - node_pt[0], access_pt[1] - node_pt[1]) > 1e-7:
-        segs.append((node_pt, access_pt))
-    segs.append((access_pt, pin_pt))
+    return _add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, current_env.nodes, target_spec)
 
 def get_outward_vector(pin_name, machine_angle):
     return _outward_vector(pin_name, machine_angle)
