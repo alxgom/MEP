@@ -61,6 +61,7 @@ Manual validation milestones:
 - Terminal validity classification now lives in `vent_router.routing.terminal_validity`, with room geometry accessors and clearances supplied by `main.py`.
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
+- Small-pin min-cost-flow target-spec assembly now lives in `vent_router.routing.flow`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
 - Topological placement distance-field and score aggregation helpers now live in `vent_router.placement.fields`.
 - Machine placement feasibility and candidate-room filtering now live in `vent_router.placement.feasibility`.
@@ -284,6 +285,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for active environment nodes and shaft-entry segment policy.
 - Added focused tests for shaft-entry segments, port stubs, total-node counts, and missing path/target handling.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\segments.py demos\10.8.1\tests\test_routing_segments.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted small-pin min-cost-flow target-spec assembly to `vent_router.routing.flow.small_pin_target_specs`.
+- Reused shared route reconstruction when appending small MCF routes in `run_small_pin_min_cost_flow_routing`.
+- Added focused test for small-pin target collection.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\flow.py demos\10.8.1\tests\test_routing_flow.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

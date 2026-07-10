@@ -4,6 +4,7 @@ from vent_router.routing import (
     add_edge,
     min_cost_flow,
     positive_flow_edges,
+    small_pin_target_specs,
     source_start_nodes,
     trace_flow_path,
 )
@@ -71,3 +72,18 @@ def test_source_start_nodes_queries_kd_for_coordinate_source():
             return 5.0, 7
 
     assert source_start_nodes((10.0, 20.0), FakeKd()) == [7]
+
+
+def test_small_pin_target_specs_collects_targets_for_each_room():
+    pin_node_map = {
+        "tl": [{"pin": "tl", "node_idx": 1}],
+        "tr": [{"pin": "tr", "node_idx": 2}],
+        "left_mid": [{"pin": "left_mid", "node_idx": 99}],
+    }
+
+    specs = small_pin_target_specs(["Bath", "Toilet"], pin_node_map)
+
+    assert specs == {
+        "Bath": [{"pin": "tl", "node_idx": 1}, {"pin": "tr", "node_idx": 2}],
+        "Toilet": [{"pin": "tl", "node_idx": 1}, {"pin": "tr", "node_idx": 2}],
+    }

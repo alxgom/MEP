@@ -35,6 +35,7 @@ from .flow import (
     add_edge,
     min_cost_flow,
     positive_flow_edges,
+    small_pin_target_specs,
     source_start_nodes,
     trace_flow_path,
 )
@@ -89,6 +90,7 @@ __all__ = [
     "selected_pin_names",
     "segment_metric_dir",
     "source_start_nodes",
+    "small_pin_target_specs",
     "target_heuristic",
     "terminal_node_indices",
     "terminal_validity_entries",

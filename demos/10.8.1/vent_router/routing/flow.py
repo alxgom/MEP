@@ -113,3 +113,14 @@ def source_start_nodes(source_spec, kd):
             return [int(v) for v in values]
     _, start_idx = kd.query(source_spec)
     return [int(start_idx)]
+
+
+def small_pin_target_specs(room_names, pin_node_map, small_pins=("tl", "tr", "bl", "br")):
+    return {
+        room_name: [
+            target
+            for pin_name in small_pins
+            for target in pin_node_map.get(pin_name, [])
+        ]
+        for room_name in room_names
+    }

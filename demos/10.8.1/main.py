@@ -83,6 +83,7 @@ from vent_router.routing import (
     selected_pin_names as _selected_pin_names,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
+    small_pin_target_specs as _small_pin_target_specs,
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
     terminal_validity_entries as _terminal_validity_entries,
@@ -2957,14 +2958,7 @@ def _run_pin_min_cost_flow(route_names, target_specs_by_route, terminal_points_b
     return paths, targets, cost, flow
 
 def _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=None):
-    target_specs_by_route = {
-        room_name: [
-            target
-            for pin_name in ("tl", "tr", "bl", "br")
-            for target in pin_node_map.get(pin_name, [])
-        ]
-        for room_name in room_names
-    }
+    target_specs_by_route = _small_pin_target_specs(room_names, pin_node_map)
     terminal_points_by_route = {room_name: get_route_start_nodes(room_name) for room_name in room_names}
     return _run_pin_min_cost_flow(room_names, target_specs_by_route, terminal_points_by_route, edge_weights=edge_weights)
 
@@ -3126,17 +3120,11 @@ def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, s
     if paths is None:
         return False, None, f"Min-cost flow routed {flow}/{len(room_names)} small ducts", 0
 
-    for room_name in room_names:
-        path = paths[room_name]
-        target = targets[room_name]
-        room_segs = []
-        for i in range(len(path) - 1):
-            p1 = current_env.nodes[path[i]]
-            p2 = current_env.nodes[path[i + 1]]
-            room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-        add_port_stub_segment(room_segs, target["pin"], path[-1], global_pins, target)
-        routes.append((room_name, room_segs))
-        total_nodes += len(path)
+    small_routes, small_nodes = _build_routes_from_paths(room_names, paths, targets, global_pins)
+    if small_routes is None:
+        return False, None, "Could not build small duct routes", 0
+    routes.extend(small_routes)
+    total_nodes += small_nodes
 
     return True, routes, "Success", total_nodes
 
