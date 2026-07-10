@@ -56,6 +56,7 @@ Manual validation milestones:
 - Route scoring and quality-summary formatting now live in `vent_router.routing.scoring`, with runtime weights and Sal policies passed in explicitly.
 - Route hit testing now lives in `vent_router.routing.hit_testing`, with the UI zoom-derived hit radius supplied by `main.py`.
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
+- Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 
 ## Next Steps
 
@@ -139,6 +140,11 @@ Manual validation milestones:
 - Extracted min-cost-flow primitives to `vent_router.routing.flow`: residual edge creation, successive-shortest-path min-cost flow, positive-flow edge lookup, and traced path reconstruction.
 - Kept existing private helper names in `main.py` as imported aliases to avoid touching route-construction call sites.
 - Added focused tests for lower-cost path choice, partial-flow behavior, traced state/target reconstruction, and incomplete trace handling.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\flow.py demos\10.8.1\tests\test_routing_flow.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted min-cost-flow source normalization to `vent_router.routing.flow.source_start_nodes`.
+- Kept `main.py` as the adapter for the active `grid_kd`.
+- Added focused tests for explicit node indices, empty sources, and KD-tree coordinate lookup.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\flow.py demos\10.8.1\tests\test_routing_flow.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 

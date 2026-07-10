@@ -25,6 +25,7 @@ from .flow import (
     add_edge,
     min_cost_flow,
     positive_flow_edges,
+    source_start_nodes,
     trace_flow_path,
 )
 from .scoring import (
@@ -60,6 +61,7 @@ __all__ = [
     "route_quality_warnings",
     "score_routes",
     "segment_metric_dir",
+    "source_start_nodes",
     "total_route_length",
     "trace_flow_path",
 ]

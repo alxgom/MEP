@@ -1,4 +1,12 @@
-from vent_router.routing import add_edge, min_cost_flow, positive_flow_edges, trace_flow_path
+import numpy as np
+
+from vent_router.routing import (
+    add_edge,
+    min_cost_flow,
+    positive_flow_edges,
+    source_start_nodes,
+    trace_flow_path,
+)
 
 
 def test_min_cost_flow_chooses_lower_cost_path():
@@ -48,3 +56,18 @@ def test_trace_flow_path_returns_none_when_path_is_incomplete():
     min_cost_flow(graph, source=0, sink=1, flow_required=1)
 
     assert trace_flow_path(graph, 0, 1) == (None, None)
+
+
+def test_source_start_nodes_returns_explicit_node_indices():
+    assert source_start_nodes([1, 2, 3], kd=None) == [1, 2, 3]
+    assert source_start_nodes([np.int64(4)], kd=None) == [4]
+    assert source_start_nodes((), kd=None) == []
+
+
+def test_source_start_nodes_queries_kd_for_coordinate_source():
+    class FakeKd:
+        def query(self, point):
+            assert point == (10.0, 20.0)
+            return 5.0, 7
+
+    assert source_start_nodes((10.0, 20.0), FakeKd()) == [7]

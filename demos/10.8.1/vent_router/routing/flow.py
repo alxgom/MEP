@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import heapq
+from numbers import Integral
 
 
 def add_edge(graph, u, v, cap, cost, meta=None):
@@ -101,3 +102,14 @@ def trace_flow_path(graph, start_node, sink):
     path = [states[0][0]]
     path.extend(v for _, v in states)
     return path, target
+
+
+def source_start_nodes(source_spec, kd):
+    if isinstance(source_spec, (list, tuple, set)):
+        values = list(source_spec)
+        if not values:
+            return []
+        if isinstance(values[0], Integral):
+            return [int(v) for v in values]
+    _, start_idx = kd.query(source_spec)
+    return [int(start_idx)]

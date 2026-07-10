@@ -44,6 +44,7 @@ from vent_router.routing import (
     score_routes as _score_routes,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
+    source_start_nodes as _source_start_nodes_for_kd,
     trace_flow_path as _trace_flow_path,
 )
 
@@ -3170,14 +3171,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
     return True, routes, "Success", total_nodes
 
 def _source_start_nodes(source_spec):
-    if isinstance(source_spec, (list, tuple, set)):
-        values = list(source_spec)
-        if not values:
-            return []
-        if isinstance(values[0], (int, np.integer)):
-            return [int(v) for v in values]
-    _, start_idx = grid_kd.query(source_spec)
-    return [int(start_idx)]
+    return _source_start_nodes_for_kd(source_spec, grid_kd)
 
 def _run_pin_min_cost_flow(route_names, target_specs_by_route, terminal_points_by_route, edge_weights=None):
     if not route_names:
