@@ -39,12 +39,13 @@ Manual validation milestones:
 - First import-safe value object extracted: `EnvView` now lives in `vent_router.graphs.env`.
 - Sal Ozeo Flat machine dimensions and simple policies now live in `vent_router.domain.machines`.
 - Canonical large-duct route names now live in `vent_router.domain.routes`.
+- First pure geometry helper extracted: `snap_to_integer_grid` now lives in `vent_router.geometry.shapely_utils`.
 
 ## Next Steps
 
 1. Continue import-safe value objects before moving behavior:
    - app/runtime state shell
-2. Extract pure geometry helpers.
+2. Continue extracting pure geometry helpers.
 3. Extract graph builders behind a stable interface.
 4. Extract routing backends and scoring.
 5. Extract placement.
@@ -74,6 +75,10 @@ Manual validation milestones:
 - Used `LARGE_DUCT_ROUTE_NAMES` for Sal machine large-duct policy and fixed-width route drawing.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\domain\__init__.py demos\10.8.1\vent_router\domain\machines.py demos\10.8.1\vent_router\domain\routes.py demos\10.8.1\tests\test_machines.py`.
 - Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py demos\10.8.1\tests\test_machines.py`.
+- Extracted `snap_to_integer_grid` to `vent_router.geometry.shapely_utils`.
+- Added focused tests for polygon, line, and geometry collection snapping.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\shapely_utils.py demos\10.8.1\tests\test_shapely_utils.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
 

@@ -14,6 +14,7 @@ from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
 from vent_router.domain import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
+from vent_router.geometry import snap_to_integer_grid
 from vent_router.graphs import EnvView
 
 # Add relative paths to sys.path so we can import modules
@@ -589,20 +590,6 @@ def draw_ruler_overlay(screen, font_small, start_mm, end_mm):
     pygame.draw.rect(screen, (22, 22, 30), label_rect, border_radius=4)
     pygame.draw.rect(screen, (52, 152, 219), label_rect, 1, border_radius=4)
     screen.blit(label, (label_rect.x + pad, label_rect.y + pad))
-
-def snap_to_integer_grid(geom):
-    if geom.is_empty:
-        return geom
-    if geom.geom_type == 'Polygon':
-        ext = [(round(x), round(y)) for x, y in geom.exterior.coords]
-        ints = [[(round(x), round(y)) for x, y in interior.coords]
-                for interior in geom.interiors]
-        return Polygon(ext, ints)
-    elif geom.geom_type == 'LineString':
-        return LineString([(round(x), round(y)) for x, y in geom.coords])
-    elif geom.geom_type in ('MultiLineString', 'MultiPolygon', 'GeometryCollection'):
-        return unary_union([snap_to_integer_grid(g) for g in geom.geoms])
-    return geom
 
 # Global layout variables
 rooms = []
