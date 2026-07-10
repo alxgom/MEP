@@ -228,6 +228,10 @@ Manual validation milestones:
 - Added focused tests for epsilon point expansion, geometry-driven epsilon axes, empty boundary handling, and clustered interior axes.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\vent_router\graphs\axes.py demos\10.8.1\tests\test_graph_axes.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted reusable Pygame drawing primitives to `vent_router.ui.drawing`: geometry overlays, polygon hatch fill, dashed polylines, and outlined text.
+- Kept `main.py` wrappers to inject current screen size, world-to-screen transform, and label halo color.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\drawing.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
 

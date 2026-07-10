@@ -82,6 +82,12 @@ from vent_router.ui import (
     turbo_color as _turbo_color,
     viridis_color as _viridis_color,
 )
+from vent_router.ui.drawing import (
+    draw_dashed_polyline as _draw_dashed_polyline,
+    draw_geometry_overlay as _draw_geometry_overlay,
+    draw_outlined_text as _draw_outlined_text,
+    draw_polygon_hatch as _draw_polygon_hatch,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2521,57 +2527,13 @@ def draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name=No
         pygame.draw.rect(screen, border, rect, 2)
 
 def draw_geometry_overlay(screen, geometries, color_rgba):
-    if not geometries:
-        return
-    overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-    for geom in geometries:
-        if geom is None or geom.is_empty:
-            continue
-        for poly in _iter_polygons(geom):
-            coords = [to_screen(x, y) for x, y in poly.exterior.coords]
-            if len(coords) >= 3:
-                pygame.draw.polygon(overlay, color_rgba, coords)
-    screen.blit(overlay, (0, 0))
+    return _draw_geometry_overlay(screen, geometries, color_rgba, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
 def draw_polygon_hatch(screen, poly, color, spacing=10):
-    if poly is None or poly.is_empty:
-        return
-    for part in _iter_polygons(poly):
-        coords = [to_screen(x, y) for x, y in part.exterior.coords]
-        if len(coords) < 3:
-            continue
-        clip = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-        pygame.draw.polygon(clip, (255, 255, 255, 255), coords)
-        hatch = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-        min_x = max(0, min(x for x, _ in coords) - 20)
-        max_x = min(WINDOW_WIDTH, max(x for x, _ in coords) + 20)
-        min_y = max(0, min(y for _, y in coords) - 20)
-        max_y = min(WINDOW_HEIGHT, max(y for _, y in coords) + 20)
-        for x in range(min_x - (max_y - min_y), max_x + spacing, spacing):
-            pygame.draw.line(hatch, color, (x, max_y), (x + (max_y - min_y), min_y), 1)
-        hatch.blit(clip, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-        screen.blit(hatch, (0, 0))
+    return _draw_polygon_hatch(screen, poly, color, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), spacing)
 
 def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
-    if len(points) < 2:
-        return
-    for p1, p2 in zip(points, points[1:]):
-        x1, y1 = p1
-        x2, y2 = p2
-        dx = x2 - x1
-        dy = y2 - y1
-        length = math.hypot(dx, dy)
-        if length <= 1e-6:
-            continue
-        ux = dx / length
-        uy = dy / length
-        travelled = 0.0
-        while travelled < length:
-            seg_end = min(travelled + dash_len, length)
-            start = (int(round(x1 + ux * travelled)), int(round(y1 + uy * travelled)))
-            end = (int(round(x1 + ux * seg_end)), int(round(y1 + uy * seg_end)))
-            pygame.draw.line(screen, color, start, end, width)
-            travelled += dash_len + gap_len
+    return _draw_dashed_polyline(screen, points, color, width, dash_len, gap_len)
 
 def _terminal_validity_cache_key():
     return (
@@ -2743,10 +2705,7 @@ def draw_wet_room_outer_accents(screen):
             pygame.draw.lines(screen, COLOR_WET_ROOM_ACCENT, True, coords, 3)
 
 def draw_outlined_text(screen, font, text, pos, color, outline_color=COLOR_PLAN_LABEL_HALO):
-    x, y = pos
-    for ox, oy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-        screen.blit(font.render(text, True, outline_color), (x + ox, y + oy))
-    screen.blit(font.render(text, True, color), (x, y))
+    return _draw_outlined_text(screen, font, text, pos, color, outline_color)
 
 def draw_terminal_area_drag(screen, start_world, end_world):
     if start_world is None or end_world is None:
