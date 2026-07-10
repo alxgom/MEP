@@ -42,21 +42,20 @@ SALUBRIDAD_PARAMETERS = (
         legacy_names=("WALL_THICKNESS",),
     ),
     ConfigParameter(
-        key="SALUBRIDAD.REGULATION.ROUTING.MIN_DISTANCE_TO_WALL_MM",
+        key="SALUBRIDAD.FEASIBILITY.ROUTING.MIN_DISTANCE_TO_WALL_MM",
         default=100,
-        reason="regulation",
+        reason="feasibility",
         unit="mm",
         description="Minimum routing-node and edge clearance from walls and allowed boundaries.",
-        also_affects=("feasibility", "solver"),
+        also_affects=("solver",),
         legacy_names=("ROUTING_WALL_CLEARANCE_MM",),
     ),
     ConfigParameter(
-        key="SALUBRIDAD.REGULATION.TERMINALS.MIN_DISTANCE_TO_WALL_MM",
+        key="SALUBRIDAD.FEASIBILITY.TERMINALS.MIN_DISTANCE_TO_WALL_MM",
         default=100,
-        reason="regulation",
+        reason="feasibility",
         unit="mm",
         description="Minimum terminal candidate clearance from room boundaries.",
-        also_affects=("feasibility",),
         legacy_names=("TERMINAL_REGULATION_CLEARANCE_MM",),
     ),
     ConfigParameter(
@@ -218,12 +217,12 @@ SALUBRIDAD_PARAMETERS = (
         legacy_names=("OVERLAP_BLOCK_WEIGHT",),
     ),
     ConfigParameter(
-        key="SALUBRIDAD.REGULATION.DUCTS.MIN_PIECE_FACTOR_DEFAULT",
+        key="SALUBRIDAD.HEURISTIC.DUCTS.MIN_PIECE_FACTOR_DEFAULT",
         default=1.05,
-        reason="regulation",
-        description="Default factor used to validate minimum physical duct piece length.",
+        reason="heuristic",
+        description="Default factor used to warn and score minimum physical duct piece length.",
         also_affects=("solver",),
-        legacy_names=("MIN_PIECE_FACTOR_DEFAULT", "FACTOR_CONDUCTO_MINIMA_LONGITUD"),
+        legacy_names=("MIN_PIECE_FACTOR_DEFAULT",),
     ),
     ConfigParameter(
         key="SALUBRIDAD.UI.CONTROLS.MIN_PIECE_FACTOR_MIN",
@@ -275,4 +274,3 @@ def build_sal_catalog() -> ConfigCatalog:
 
 
 SALUBRIDAD_DEFAULTS = build_sal_catalog()
-

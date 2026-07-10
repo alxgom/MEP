@@ -32,6 +32,7 @@ The main risk is not only file length. The stronger issue is that domain rules, 
 - Keep pure computation independent from Pygame and filesystem access.
 - Keep adapters thin: Pygame, dwelling DB loading, and future CLI/export integrations should call domain services rather than contain domain logic.
 - Use configuration keys that describe domain meaning first. A solver may consume a regulation value, but it should not own the value semantically.
+- Normalize internal geometry and routing units to integer millimetres as much as possible. UI can expose metres where useful, but internal millimetre integers reduce floating-point tie-break ambiguity and may improve memory/performance later.
 
 ## Target Package Shape
 
@@ -113,7 +114,7 @@ if __name__ == "__main__":
 
 `config`: typed defaults, key metadata, compatibility aliases, and config loading. It must not import Pygame or Shapely-heavy runtime state.
 
-`domain`: names and rules from the installation domain: machine families, terminal families, room categories, shaft semantics, diameter rules, regulation distances, feasibility constraints, and route validation.
+`domain`: names and rules from the installation domain: machine families, terminal families, room categories, shaft semantics, diameter rules, feasibility constraints, heuristic defaults, and route validation. Confirmed regulation values should only be introduced when a legal/code/project-code source is explicit.
 
 `geometry`: generic coordinate transforms and geometry operations. It may use Shapely/NumPy but should not know about Sal/Cli/Coc/San.
 
@@ -142,7 +143,7 @@ Names should state why the parameter exists, not which function currently consum
 Good:
 
 ```text
-SALUBRIDAD.REGULATION.BOCAS.MIN_DISTANCE_TO_WALL
+SALUBRIDAD.FEASIBILITY.BOCAS.MIN_DISTANCE_TO_WALL_MM
 SALUBRIDAD.SOLVER.GRAPH.GRID_EPSILON
 DOMAIN.GEOMETRY.WALL_THICKNESS
 EXPORT.IMAGES.ENABLED
@@ -154,7 +155,7 @@ Avoid:
 SALUBRIDAD.SOLVER.HEURISTIC.BOCAS_MIN_DISTANCE_TO_WALL
 ```
 
-unless the value is truly only a heuristic preference.
+unless the value is truly only a solver heuristic. Do not use `REGULATION` for Demo 10.8.1 values unless we have an explicit legal/code/project-code source.
 
 ## Proposed Top-Level Scopes
 
@@ -181,7 +182,7 @@ unless the value is truly only a heuristic preference.
 - `DOMAIN`: building, spaces, families, room categories.
 - `SOLVER`: graph epsilon, graph kind, MST/Steiner mode, search backend, routing strategy.
 - `FEASIBILITY`: hard geometric validity and allowed placement limits.
-- `REGULATION`: legal/code/project-code constraints.
+- `REGULATION`: legal/code/project-code constraints. Demo 10.8.1 should treat this area as reserved until a source is explicit.
 - `HEURISTIC`: preference weights and professional judgement that are not validity rules.
 - `MAINTENANCE`: access clearances and serviceability distances.
 - `EXECUTION`: workers, phases, max solutions, backtracking, retry limits.
@@ -217,8 +218,8 @@ Current constant | Proposed key | Reason
 `HANNAN_SCAFFOLD_SPACING` | `SALUBRIDAD.SOLVER.GRAPH.HANNAN_SCAFFOLD_SPACING_MM` | Solver graph connectivity scaffold.
 `CORE_EPSILON_GRID_MM` | `SALUBRIDAD.SOLVER.GRAPH.GRID_EPSILON_MM` | Solver graph axis offset.
 `WALL_THICKNESS` | `DOMAIN.GEOMETRY.WALL_THICKNESS_MM` | Shared building geometry.
-`ROUTING_WALL_CLEARANCE_MM` | `SALUBRIDAD.REGULATION.ROUTING.MIN_DISTANCE_TO_WALL_MM` | Current wall clearance behaves as a hard rule.
-`TERMINAL_REGULATION_CLEARANCE_MM` | `SALUBRIDAD.REGULATION.TERMINALS.MIN_DISTANCE_TO_WALL_MM` | Terminal rule, not solver-owned.
+`ROUTING_WALL_CLEARANCE_MM` | `SALUBRIDAD.FEASIBILITY.ROUTING.MIN_DISTANCE_TO_WALL_MM` | Current wall clearance behaves as a hard geometric feasibility rule.
+`TERMINAL_REGULATION_CLEARANCE_MM` | `SALUBRIDAD.FEASIBILITY.TERMINALS.MIN_DISTANCE_TO_WALL_MM` | Terminal feasibility rule, not solver-owned.
 `BUFFER_ROOM_TERMINALES_AIRE_MM` | `SALUBRIDAD.FEASIBILITY.TERMINALS.ROOM_BOUNDARY_BUFFER_MM` | Hard terminal candidate feasibility.
 `PATINEJO_CLEARANCE_MM` | `PATINEJOS.FEASIBILITY.CLEARANCE.NON_SHAFT_DUCT_MM` | Shaft clearance for non-shaft ducts.
 `SHAFT_ENTRY_SEARCH_MM` | `PATINEJOS.SOLVER.ENTRY.SEARCH_RADIUS_MM` | Search envelope for shaft entry candidate discovery.
@@ -237,7 +238,7 @@ Current constant | Proposed key | Reason
 `C_BEND_MAX` | `SALUBRIDAD.UI.CONTROLS.BEND_PENALTY_MAX_MM` | UI slider range.
 `CROSSING_MULTIPLIER_DEFAULT` | `SALUBRIDAD.SOLVER.COST.CROSSING_PENALTY_MULTIPLIER_DEFAULT` | Search cost behavior.
 `OVERLAP_BLOCK_WEIGHT` | `COLLISIONS.SOLVER.OVERLAP_BLOCK_WEIGHT` | Cross-domain collision solver policy.
-`MIN_PIECE_FACTOR_DEFAULT` | `SALUBRIDAD.REGULATION.DUCTS.MIN_PIECE_FACTOR_DEFAULT` | Validation threshold matching routing-core config.
+`MIN_PIECE_FACTOR_DEFAULT` | `SALUBRIDAD.HEURISTIC.DUCTS.MIN_PIECE_FACTOR_DEFAULT` | Current warning/scoring threshold matching routing-core config; not confirmed as regulation.
 `SHORT_PIECE_SCORE_PENALTY` | `SALUBRIDAD.SOLVER.COST.SHORT_PIECE_SCORE_PENALTY_MM` | Score consequence, not the regulation itself.
 `REAL_DWELLING_DB` | `IO.PATHS.DWELLING_EXPORT_DB` | External local data source.
 `REAL_DWELLING_SCENARIOS` | `PROJECT.INPUT.REAL_DWELLING_SCENARIOS` | Scenario selection for demo/project.
@@ -250,12 +251,12 @@ Flat keys are enough for the first pass, but the schema should allow metadata la
 
 ```python
 ConfigParameter(
-    key="SALUBRIDAD.REGULATION.BOCAS.MIN_DISTANCE_TO_WALL_MM",
-    reason="regulation",
+    key="SALUBRIDAD.FEASIBILITY.BOCAS.MIN_DISTANCE_TO_WALL_MM",
+    reason="feasibility",
     default=100,
     unit="mm",
     also_affects=("feasibility", "solver"),
-    legacy_keys=("SALUBRIDAD.SOLVER.HEURISTIC.BOCAS_MIN_DISTANCE_TO_WALL",),
+    legacy_names=("BOCAS_MIN_DISTANCE_TO_WALL",),
 )
 ```
 
@@ -282,6 +283,7 @@ During the refactor, preserve:
 
 - the existing keyboard/mouse controls
 - the default Sal behavior
+- English semantic config keys for Demo 10.8.1
 - current graph mode names
 - current strategy names
 - current score formula unless a commit explicitly says otherwise
@@ -293,10 +295,13 @@ Expected temporary compromises:
 - Some functions may move before their signatures are ideal.
 - The first config layer can expose both old constant names and new semantic keys to reduce migration risk.
 
+## Decisions
+
+- Internal units: use integer millimetres as much as possible. Expose metres in UI where useful, but keep routing, graph, and geometry calculations in millimetres to reduce floating-point tie-break ambiguity and leave a path toward memory/performance gains.
+- Regulation: Demo 10.8.1 does not currently include confirmed regulation values. Existing distances should be classified as `FEASIBILITY`, `HEURISTIC`, `SOLVER`, or related areas until a legal/code/project-code source is explicit.
+- UI scope: most UI behavior and style can be installation-domain scoped, for example `SALUBRIDAD.UI`. Global controls such as ruler, zoom, weight overlays, and common dwelling-geometry styling should remain under `SYSTEM.UI` or shared UI modules.
+- Language: Demo 10.8.1 semantic config keys and new compatibility aliases should stay in English.
+
 ## Open Questions
 
-- Should units be normalized to millimetres inside the demo and metres only at routing-core boundaries?
-- Which current clearance values are true regulation versus feasibility copied from routing-core defaults?
-- Should `COLLISIONS` be top-level, or should collision policy live under `DOMAIN.COLLISIONS` until multi-domain coordination is implemented?
-- Should UI style be scoped by installation domain, by app mode, or both, for example `SALUBRIDAD.UI.STYLE` and `SYSTEM.UI.THEME`?
-- Should routing-core compatibility aliases use Spanish legacy names, new English semantic keys, or both during migration?
+- Should route-route/route-obstacle collision policy be a top-level cross-domain scope (`COLLISIONS`) or live under a shared domain area until multi-installation coordination is implemented?
