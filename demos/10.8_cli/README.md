@@ -58,9 +58,11 @@ Routing and display:
 
 ## Current Solvers
 
-The active Clima solver now handles a first indoor supply-air routing approximation. `solve_clima_routing()` connects the PEAD `air_out` connector to every `* Supply` grille target by building a line-graph metric closure over terminal groups and taking a minimum spanning tree over those shortest paths. Return grilles remain visible metadata and refrigeration/common-area routing remains pending.
+The default Clima supply solver is `Routing-Core Port: Kou Steiner`. `solve_clima_routing()` connects the PEAD `air_out` connector to every `* Supply` grille target, then sends those graph terminal nodes through a lightweight port of the routing-core Steiner tree step: metric closure, Kou-style MST expansion, redundant-leaf pruning, collinear degree-2 simplification, and best-direction scoring. Return grilles remain visible metadata and refrigeration/common-area routing remains pending.
 
-This is intentionally not yet a byte-for-byte port of core `route_steiner`, and it is still an approximation to the Steiner problem. Pairwise group paths are solved on directed edge states `(u, v)` so turns are transition costs in `L(G)`, then the selected metric-closure paths are unioned into one route named `Supply Air Tree`. This keeps the app dependency-light and interactive while giving us a more relevant baseline than the previous greedy preview scaffold. The next routing milestone should compare this against the core behavior and tighten differences in grid construction, connector stubs, and validation.
+This is a routing-core behavior port of the tree algorithm, not a full route-core runtime clone. The app still uses its interactive NumPy graph builders and Shapely-free graph solve surface instead of routing-core's full dynamic grid/`Tramo`/`Conducto` pipeline. That split is intentional for this branch: the default lane should track core behavior where it has been explicitly ported, while keeping the visualizer responsive enough to test graph construction and placement changes.
+
+The previous line-graph metric-closure MST remains in code as `Core Approximation: L(G) MST` for comparison. It solves pairwise group paths on directed edge states `(u, v)` so turns are transition costs in `L(G)`, then unions the selected metric-closure paths into one route named `Supply Air Tree`. It is not the default core-port lane.
 
 The visible app surface is now Cli-only. Inherited Sal strategy/backend/heuristic controls are hidden because they describe many-to-one Sal experiments, not the current supply-air tree problem. The first refactor keeps the old code internally while the Cli app stabilizes; later cleanup should move or delete those inactive Sal branches instead of maintaining them in this file.
 

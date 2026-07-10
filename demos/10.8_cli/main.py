@@ -24,6 +24,7 @@ if DWELLING_EXPORT_ROOT.exists():
     sys.path.append(str(DWELLING_EXPORT_ROOT))
 
 import generative_layout
+from core_steiner_port import solve_core_steiner_port
 from solver import estimate_turns
 
 try:
@@ -34,7 +35,7 @@ except ImportError:
 
 DEMO_DOMAIN = "Clima"
 CLI_ROUTE_PHASE = "Supply Air"
-CLI_ROUTE_METHOD = "L(G) Steiner MST"
+CLI_ROUTE_METHOD = "Routing-Core Port: Kou Steiner"
 DEMO_SHAFT_INSTALLATION = "Cli"
 
 # Constants
@@ -225,6 +226,12 @@ ROUTER_BACKENDS = [
     "Line graph L(G) GBFS"
 ]
 router_backend_idx = 0
+
+CLIMA_SUPPLY_BACKENDS = [
+    "Routing-Core Port: Kou Steiner",
+    "Core Approximation: L(G) MST",
+]
+clima_supply_backend_idx = 0
 
 HEURISTIC_MODES = [
     "Pin + bends",
@@ -5253,6 +5260,46 @@ def run_clima_supply_steiner_routing(global_pins, pin_node_map):
     add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
     return [("Supply Air Tree", segs)], "Success", len(tree_nodes)
 
+def _nearest_route_node(route_name, candidate_nodes):
+    route_pt = get_clima_grille_steiner_point(route_name) or terminals.get(route_name)
+    if route_pt is None or not candidate_nodes:
+        return None
+    return min(
+        [int(node) for node in candidate_nodes],
+        key=lambda node: float(np.hypot(current_env.nodes[node][0] - route_pt[0], current_env.nodes[node][1] - route_pt[1])),
+    )
+
+def run_clima_supply_core_steiner_routing(global_pins, pin_node_map):
+    supply_routes = _clima_supply_route_names()
+    if not supply_routes:
+        return None, "No supply grille targets", 0
+    air_targets = pin_node_map.get("air_out", [])
+    if not air_targets:
+        return None, "Missing air_out graph access", 0
+
+    root_target = air_targets[0]
+    root_node = int(root_target["node_idx"])
+    route_leaf_nodes = {}
+    terminal_nodes = [root_node]
+    for route_name in supply_routes:
+        start_nodes = get_clima_grille_start_nodes(route_name)
+        leaf_node = _nearest_route_node(route_name, start_nodes)
+        if leaf_node is None:
+            return None, f"No start nodes for {route_name}", len(terminal_nodes)
+        route_leaf_nodes[route_name] = leaf_node
+        terminal_nodes.append(leaf_node)
+
+    result = solve_core_steiner_port(current_env.nodes, current_env.adj, terminal_nodes)
+    if result is None:
+        return None, "Routing-core Steiner port did not connect all terminals", len(terminal_nodes)
+
+    segs = list(result.segments)
+    for route_name, leaf_node in route_leaf_nodes.items():
+        if leaf_node in result.tree_nodes:
+            add_clima_grille_stub_segments(segs, route_name, leaf_node)
+    add_port_stub_segment(segs, "air_out", root_node, global_pins, root_target)
+    return [("Supply Air Tree", segs)], "Success", len(result.tree_nodes)
+
 def solve_clima_routing():
     global edge_weight_debug_map, edge_weight_overlay_excluded_edges
     edge_weight_debug_map = {}
@@ -5281,12 +5328,17 @@ def solve_clima_routing():
         update_dynamic_env(machine_poly)
 
     pin_node_map = snap_pins_to_graph(global_pins)
-    routes, reason, total_nodes = run_clima_supply_steiner_routing(global_pins, pin_node_map)
+    if clima_supply_backend_idx == 0:
+        routes, reason, total_nodes = run_clima_supply_core_steiner_routing(global_pins, pin_node_map)
+        backend_label = CLIMA_SUPPLY_BACKENDS[0]
+    else:
+        routes, reason, total_nodes = run_clima_supply_steiner_routing(global_pins, pin_node_map)
+        backend_label = CLIMA_SUPPLY_BACKENDS[1]
     elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
     if routes is None:
         return None, f"Routing Blocked: {reason} in {elapsed_ms:.1f}ms", elapsed_ms, total_nodes
     status = (
-        f"Success: L(G) Steiner MST supply route for {len(_clima_supply_route_names())} impulsion grille(s); "
+        f"Success: {backend_label} supply route for {len(_clima_supply_route_names())} impulsion grille(s); "
         f"return/refrigeration pending in {elapsed_ms:.1f}ms"
     )
     return routes, status, elapsed_ms, total_nodes
@@ -5891,6 +5943,7 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
         "graph_type_idx": graph_type_idx,
         "routing_strategy_idx": routing_strategy_idx,
         "router_backend_idx": router_backend_idx,
+        "clima_supply_backend_idx": int(clima_supply_backend_idx),
         "heuristic_mode_idx": heuristic_mode_idx,
         "room_start_mode_idx": room_start_mode_idx,
         "weight_mode_idx": weight_mode_idx,
@@ -5976,6 +6029,7 @@ def restore_solution_log(log_entry):
     global machine_cx, machine_cy, machine_angle
     global selected_machine_idx
     global graph_type_idx, routing_strategy_idx, router_backend_idx, heuristic_mode_idx, room_start_mode_idx
+    global clima_supply_backend_idx
     global weight_mode_idx, edge_weight_view_mode_idx, route_real_diameter_width_enabled, min_piece_factor
     global C_BEND, crossing_penalty_multiplier
     global preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id
@@ -5986,6 +6040,7 @@ def restore_solution_log(log_entry):
     graph_type_idx = log_entry["graph_type_idx"]
     routing_strategy_idx = log_entry["routing_strategy_idx"]
     router_backend_idx = log_entry["router_backend_idx"]
+    clima_supply_backend_idx = int(log_entry.get("clima_supply_backend_idx", 0))
     heuristic_mode_idx = log_entry["heuristic_mode_idx"]
     room_start_mode_idx = log_entry["room_start_mode_idx"]
     weight_mode_idx = log_entry["weight_mode_idx"]
