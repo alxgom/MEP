@@ -63,6 +63,7 @@ Manual validation milestones:
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
 - Topological placement distance-field and score aggregation helpers now live in `vent_router.placement.fields`.
+- Core-like machine placement scoring primitives now live in `vent_router.placement.scoring`.
 - Port stub segment construction now lives in `vent_router.routing.segments`, with active graph nodes supplied by `main.py`.
 - Route clearance math, route axis records, and weighted edge-cost lookup now live in `vent_router.routing.clearance`.
 - Line-graph direction, path length, and target heuristic helpers now live in `vent_router.routing.search`.
@@ -243,6 +244,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for active KD-tree lookup, mode selection, and machine-position side effects.
 - Added focused tests for Dijkstra fields, multi-source fields, weight presets, and weighted placement score aggregation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\fields.py demos\10.8.1\tests\test_placement_fields.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted core-like placement scoring primitives to `vent_router.placement.scoring`: candidate room points, machine polygon construction, room area-out percentage, target angle, and candidate score tuple.
+- Kept `main.py` responsible for Sal machine pins, active room/shaft/kitchen state, allowed-boundary distance, and final machine-position mutation.
+- Added focused tests for candidate points, polygon/area scoring, signed target angle, and the core-like score tuple.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\placement\__init__.py demos\10.8.1\vent_router\placement\scoring.py demos\10.8.1\tests\test_placement_scoring.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist

@@ -44,8 +44,14 @@ from vent_router.graphs import (
     merge_close_values as _merge_close_values_for_axes,
 )
 from vent_router.placement import (
+    area_out_percentage as _area_out_percentage_for_placement,
+    candidate_room_points as _candidate_room_points_for_placement,
     compute_dijkstra_distance_field as _compute_dijkstra_distance_field,
+    core_like_machine_candidate_score as _core_like_machine_candidate_score_for_placement,
+    machine_polygon_from_pins as _machine_polygon_from_pins,
     placement_weights as _placement_weights,
+    point_angle_to_target as _point_angle_to_target_for_placement,
+    routing_frame_axes as _routing_frame_axes_for_placement,
     topological_placement_scores as _topological_placement_scores,
 )
 from vent_router.routing import (
@@ -3314,7 +3320,7 @@ def ensure_placement_heatmap_scores():
     ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
 
 def _routing_frame_axes():
-    return ((1.0, 0.0), (0.0, 1.0))
+    return _routing_frame_axes_for_placement()
 
 def _candidate_machine_rooms():
     candidates = [
@@ -3330,48 +3336,17 @@ def _candidate_machine_rooms():
     ]
 
 def _candidate_room_points(room):
-    point = room.polygon.representative_point()
-    centroid = room.polygon.centroid
-    if room.polygon.contains(centroid):
-        point = centroid
-    base = (round(point.x), round(point.y))
-    points = [base]
-    translation = 100.0
-    for ax, ay in _routing_frame_axes():
-        points.append((round(base[0] + ax * translation), round(base[1] + ay * translation)))
-        points.append((round(base[0] - ax * translation), round(base[1] - ay * translation)))
-    seen = set()
-    result = []
-    for pt in points:
-        if pt in seen:
-            continue
-        seen.add(pt)
-        result.append(pt)
-    return result
+    return _candidate_room_points_for_placement(room, _routing_frame_axes())
 
 def _machine_polygon_at(cx, cy, angle):
     pins = get_machine_pins(cx, cy, angle)
-    return Polygon([pins["c_tl"], pins["c_tr"], pins["c_br"], pins["c_bl"]])
+    return _machine_polygon_from_pins(pins)
 
 def _area_out_percentage(poly, room_poly):
-    if poly.is_empty or room_poly.is_empty:
-        return 100.0
-    inside = poly.intersection(room_poly).area
-    if poly.area <= 1e-7:
-        return 100.0
-    return max(0.0, (1.0 - inside / poly.area) * 100.0)
+    return _area_out_percentage_for_placement(poly, room_poly)
 
 def _point_angle_to_target(origin, direction, target):
-    vx = float(target[0] - origin[0])
-    vy = float(target[1] - origin[1])
-    norm = math.hypot(vx, vy)
-    if norm <= 1e-7:
-        return 0.0
-    tx, ty = vx / norm, vy / norm
-    dx, dy = direction
-    dot = max(-1.0, min(1.0, dx * tx + dy * ty))
-    cross = dx * ty - dy * tx
-    return math.degrees(math.atan2(cross, dot))
+    return _point_angle_to_target_for_placement(origin, direction, target)
 
 def _distance_to_allowed_boundary(point):
     if routing_region_base is None:
@@ -3379,36 +3354,21 @@ def _distance_to_allowed_boundary(point):
     return Point(float(point[0]), float(point[1])).distance(routing_region_base.boundary)
 
 def _core_like_machine_candidate_score(cx, cy, angle, room):
-    machine_poly = _machine_polygon_at(cx, cy, angle)
     pins = get_machine_pins(cx, cy, angle)
 
     shaft_pt = get_representative_point(shaft_extraction) if shaft_extraction else (cx, cy)
     kitchen_pt = terminals.get("Kitchen", (cx, cy))
-
-    large_pin_options = []
-    for shaft_pin, kitchen_pin in (("left_mid", "right_mid"), ("right_mid", "left_mid")):
-        shaft_dir = _local_axis_to_world((-1.0, 0.0) if shaft_pin == "left_mid" else (1.0, 0.0), angle)
-        kitchen_dir = _local_axis_to_world((-1.0, 0.0) if kitchen_pin == "left_mid" else (1.0, 0.0), angle)
-        shaft_angle = abs(_point_angle_to_target(pins[shaft_pin], shaft_dir, shaft_pt))
-        kitchen_angle = abs(_point_angle_to_target(pins[kitchen_pin], kitchen_dir, kitchen_pt))
-        large_pin_options.append((shaft_angle + kitchen_angle, shaft_angle, kitchen_angle, shaft_pin, kitchen_pin))
-    _, shaft_angle, kitchen_angle, shaft_pin, kitchen_pin = min(large_pin_options, key=lambda item: item[0])
-
-    out_pct = _area_out_percentage(machine_poly, room.polygon)
-    shaft_clear = _distance_to_allowed_boundary(pins[shaft_pin])
-    kitchen_clear = _distance_to_allowed_boundary(pins[kitchen_pin])
-    distance_to_targets = math.hypot(cx - shaft_pt[0], cy - shaft_pt[1])
-    if "Kitchen" in terminals:
-        distance_to_targets += 0.35 * math.hypot(cx - kitchen_pt[0], cy - kitchen_pt[1])
-
-    return (
-        out_pct,
-        shaft_angle + kitchen_angle,
-        shaft_angle,
-        kitchen_angle,
-        -shaft_clear,
-        -kitchen_clear,
-        distance_to_targets,
+    return _core_like_machine_candidate_score_for_placement(
+        cx,
+        cy,
+        angle,
+        room.polygon,
+        pins,
+        shaft_pt,
+        kitchen_pt,
+        "Kitchen" in terminals,
+        _distance_to_allowed_boundary,
+        _local_axis_to_world,
     )
 
 def _room_field_target_point(room_name):
