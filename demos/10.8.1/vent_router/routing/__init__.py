@@ -51,6 +51,7 @@ from .search import (
     terminal_node_indices,
     target_heuristic,
 )
+from .terminal_validity import terminal_validity_entries
 
 __all__ = [
     "RouteScoreWeights",
@@ -86,6 +87,7 @@ __all__ = [
     "source_start_nodes",
     "target_heuristic",
     "terminal_node_indices",
+    "terminal_validity_entries",
     "total_route_length",
     "total_route_length_m",
     "trace_flow_path",

@@ -70,6 +70,7 @@ from vent_router.routing import (
     positive_flow_edges as _positive_flow_edges,
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
+    terminal_validity_entries as _terminal_validity_entries,
     target_heuristic as _target_heuristic_for_env,
     total_route_length_m as _total_route_length_m,
     trace_flow_path as _trace_flow_path,
@@ -2555,72 +2556,17 @@ def get_terminal_validity_entries():
     if terminal_validity_cache.get("key") == key:
         return terminal_validity_cache["entries"], terminal_validity_cache["reasons_by_node"]
 
-    node_count = len(current_env.nodes)
-    allowed_nodes = set()
-    blocked_reasons = {}
-    terminal_room_nodes = set()
-
-    if routing_region_base is not None:
-        for room_name in terminals.keys():
-            room_poly = _room_polygon_by_name(room_name)
-            if room_poly is None or room_poly.is_empty:
-                continue
-
-            valid_region = _room_terminal_valid_region(room_name)
-            if valid_region is None or valid_region.is_empty:
-                continue
-
-            prepared = shapely_prep(valid_region)
-            room_node_indices = [
-                int(i)
-                for i, pt in enumerate(current_env.nodes)
-                if current_env.adj.get(int(i)) and prepared.contains(Point(float(pt[0]), float(pt[1])))
-            ]
-            terminal_room_nodes.update(room_node_indices)
-            if not room_node_indices:
-                continue
-
-            segments = _room_terminal_boundary_segments(room_name)
-            if len(segments) == 0:
-                allowed_nodes.update(room_node_indices)
-                continue
-
-            pts = current_env.nodes[np.array(room_node_indices, dtype=np.int64)]
-            distances = _point_segment_min_distances(pts, segments)
-            required_clearance = max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM)
-            for node_idx, distance in zip(room_node_indices, distances):
-                if float(distance) >= float(required_clearance) - 1e-7:
-                    allowed_nodes.add(int(node_idx))
-                    continue
-
-                reasons = []
-                if float(distance) < float(TERMINAL_REGULATION_CLEARANCE_MM) - 1e-7:
-                    reasons.append(f"inside {int(TERMINAL_REGULATION_CLEARANCE_MM)} mm regulation clearance")
-                if float(distance) < float(BUFFER_ROOM_TERMINALES_AIRE_MM) - 1e-7:
-                    reasons.append(f"inside {int(BUFFER_ROOM_TERMINALES_AIRE_MM)} mm terminal buffer")
-                if not reasons:
-                    reasons.append(f"clearance below {int(required_clearance)} mm")
-                blocked_reasons[int(node_idx)] = reasons
-
-    entries = []
-    reasons_by_node = {}
-    for node_idx in range(node_count):
-        pt = current_env.nodes[int(node_idx)]
-        if int(node_idx) in allowed_nodes:
-            allowed = True
-            reasons = ["allowed terminal placement"]
-        else:
-            allowed = False
-            if not current_env.adj.get(int(node_idx)):
-                reasons = ["isolated graph node"]
-            elif int(node_idx) in blocked_reasons:
-                reasons = blocked_reasons[int(node_idx)]
-            elif int(node_idx) not in terminal_room_nodes:
-                reasons = ["outside terminal room"]
-            else:
-                reasons = ["blocked terminal placement"]
-        entries.append((float(pt[0]), float(pt[1]), int(node_idx), allowed))
-        reasons_by_node[int(node_idx)] = reasons
+    entries, reasons_by_node = _terminal_validity_entries(
+        current_env.nodes,
+        current_env.adj,
+        terminals.keys(),
+        routing_region_base,
+        _room_polygon_by_name,
+        _room_terminal_valid_region,
+        _room_terminal_boundary_segments,
+        TERMINAL_REGULATION_CLEARANCE_MM,
+        BUFFER_ROOM_TERMINALES_AIRE_MM,
+    )
 
     terminal_validity_cache["key"] = key
     terminal_validity_cache["entries"] = entries

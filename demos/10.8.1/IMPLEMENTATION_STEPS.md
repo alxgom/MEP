@@ -58,6 +58,7 @@ Manual validation milestones:
 - Route length in metres now lives in `vent_router.routing.scoring`.
 - Route hit testing now lives in `vent_router.routing.hit_testing`, with the UI zoom-derived hit radius supplied by `main.py`.
 - Selected route pin detection now lives in `vent_router.routing.hit_testing`.
+- Terminal validity classification now lives in `vent_router.routing.terminal_validity`, with room geometry accessors and clearances supplied by `main.py`.
 - Min-cost-flow graph primitives now live in `vent_router.routing.flow`; higher-level Sal route construction remains in `main.py`.
 - Min-cost-flow source normalization now lives in `vent_router.routing.flow`, with `grid_kd` supplied by `main.py`.
 - Sal machine pin geometry, port access specs, and outward direction helpers now live in `vent_router.domain.machines`.
@@ -231,6 +232,11 @@ Manual validation milestones:
 - Extracted reusable Pygame drawing primitives to `vent_router.ui.drawing`: geometry overlays, polygon hatch fill, dashed polylines, and outlined text.
 - Kept `main.py` wrappers to inject current screen size, world-to-screen transform, and label halo color.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\drawing.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted terminal validity entry/reason classification to `vent_router.routing.terminal_validity`.
+- Kept `main.py` responsible for cache keys, room geometry accessors, active graph state, and UI drawing.
+- Added focused tests for allowed nodes, clearance-blocked nodes, outside-room nodes, isolated nodes, no-boundary room behavior, and missing routing-region behavior.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\vent_router\routing\terminal_validity.py demos\10.8.1\tests\test_terminal_validity.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
