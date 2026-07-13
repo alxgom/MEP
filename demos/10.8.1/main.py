@@ -99,6 +99,8 @@ from mep_routing.routing import (
     route_axis_records as _route_axis_records_for_policy,
     route_quality_warnings as _route_quality_warnings,
     route_segments_from_path as _route_segments_from_path_for_env,
+    run_super_sink_line_graph_search as _run_super_sink_line_graph_search_for_env,
+    run_super_sink_state_astar as _run_super_sink_state_astar_for_env,
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
     set_block_weight as _set_block_weight,
@@ -1483,193 +1485,31 @@ def _target_heuristic(env, node_idx, incoming_dir, target_specs, C_bend):
     )
 
 def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
-    if isinstance(start_node_indices, (int, np.integer)):
-        start_node_indices = [start_node_indices]
-    if not target_pin_names or not start_node_indices:
-        return None, 0.0, None, None
-        
-    num_nodes = len(env.nodes)
-    super_source_idx = num_nodes
-    super_sink_idx = num_nodes + 1
-    
-    search_nodes = np.zeros((num_nodes + 2, 2), dtype=np.float32)
-    search_nodes[:num_nodes] = env.nodes
-    search_nodes[super_source_idx] = env.nodes[start_node_indices[0]]
-    search_nodes[super_sink_idx] = (machine_cx, machine_cy)
-    
-    search_adj = {i: list(env.adj[i]) for i in env.adj}
-    search_adj[super_source_idx] = []
-    search_adj[super_sink_idx] = []
-    
-    for start_node in start_node_indices:
-        search_adj[super_source_idx].append((int(start_node), 0.0, None))
-        
-    target_specs = [
-        target
-        for pin_name in target_pin_names
-        for target in pin_node_map.get(pin_name, [])
-    ]
-    if not target_specs:
-        return None, 0.0, None, None
-
-    pin_target_by_entry = {}
-    for target in target_specs:
-        pin_idx = int(target["node_idx"])
-        pin_target_by_entry[(pin_idx, target["in_dir"])] = target
-        search_adj[pin_idx].append((super_sink_idx, 0.0, target["in_dir"]))
-        search_adj[super_sink_idx].append((pin_idx, 0.0, target["out_dir"]))
-        
-    search_env = EnvView(search_nodes, search_adj)
-    pq = []
-    counter = 0
-    g_scores = {(super_source_idx, None): 0.0}
-    came_from = {}
-    visited = set()
-    heapq.heappush(pq, (0.0, 0.0, counter, super_source_idx, None))
-    best_target_state = None
-
-    while pq:
-        _, g, _, u, u_dir = heapq.heappop(pq)
-        state = (u, u_dir)
-        if state in visited:
-            continue
-        visited.add(state)
-        if u == super_sink_idx:
-            best_target_state = state
-            break
-
-        for v, dist, edge_dir in search_env.adj.get(u, []):
-            v = int(v)
-            edge_cost = _weighted_edge_cost(edge_weights, u, v, dist)
-            turn_penalty = 0.0
-            if u_dir is not None and edge_dir is not None and u_dir != edge_dir:
-                turn_penalty = C_bend
-            next_g = g + edge_cost + turn_penalty
-            next_state = (v, edge_dir)
-            if next_g < g_scores.get(next_state, float("inf")):
-                g_scores[next_state] = next_g
-                came_from[next_state] = state
-                h = 0.0 if v >= num_nodes else _target_heuristic(env, v, edge_dir, target_specs, C_bend)
-                counter += 1
-                heapq.heappush(pq, (next_g + h, next_g, counter, v, edge_dir))
-                
-    if best_target_state is None:
-        return None, 0.0, None, None
-
-    states = []
-    curr = best_target_state
-    while curr in came_from:
-        states.append(curr)
-        curr = came_from[curr]
-    states.append(curr)
-    states.reverse()
-
-    path = [state[0] for state in states]
-    if len(path) < 3:
-        return None, 0.0, None, None
-
-    chosen_pin_idx = path[-2]
-    chosen_target = pin_target_by_entry.get((chosen_pin_idx, best_target_state[1]))
-    chosen_pin_name = chosen_target["pin"] if chosen_target else target_pin_names[0]
-    path_without_virtual = path[1:-1]
-    
-    return path_without_virtual, _path_physical_length(env, path_without_virtual), chosen_pin_name, chosen_target
+    return _run_super_sink_state_astar_for_env(
+        env,
+        start_node_indices,
+        target_pin_names,
+        pin_node_map,
+        C_bend,
+        edge_weights=edge_weights,
+        heuristic_mode=heuristic_mode_idx,
+        machine_center=(machine_cx, machine_cy),
+        estimate_turns_fn=estimate_turns,
+    )
 
 def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, greedy=False):
-    if isinstance(start_node_indices, (int, np.integer)):
-        start_node_indices = [start_node_indices]
-    if not target_pin_names or not start_node_indices:
-        return None, 0.0, None, None
-
-    target_specs = [
-        target
-        for pin_name in target_pin_names
-        for target in pin_node_map.get(pin_name, [])
-    ]
-    if not target_specs:
-        return None, 0.0, None, None
-
-    targets_by_node = {}
-    for target in target_specs:
-        node_idx = int(target["node_idx"])
-        targets_by_node.setdefault(node_idx, []).append(target)
-
-    pq = []
-    counter = 0
-    g_scores = {}
-    came_from = {}
-    state_dirs = {}
-
-    for start_node in start_node_indices:
-        for v, dist, edge_dir in env.adj.get(int(start_node), []):
-            cost = _weighted_edge_cost(edge_weights, int(start_node), int(v), dist)
-            state = (int(start_node), int(v))
-            if cost < g_scores.get(state, float("inf")):
-                g_scores[state] = cost
-                state_dir = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, int(start_node), int(v))
-                state_dirs[state] = state_dir
-                h = _target_heuristic(env, int(v), state_dir, target_specs, C_bend)
-                priority = h if greedy else cost + h
-                heapq.heappush(pq, (priority, cost, counter, state))
-                counter += 1
-
-    best_final_cost = float("inf")
-    best_final_state = None
-    best_target = None
-    visited = set()
-
-    while pq:
-        f_score, g, _, state = heapq.heappop(pq)
-        if not greedy and f_score >= best_final_cost:
-            break
-        if state in visited:
-            continue
-        visited.add(state)
-
-        u, v = state
-        curr_dir = state_dirs[state]
-
-        for target in targets_by_node.get(v, []):
-            final_penalty = C_bend if curr_dir != target["in_dir"] else 0.0
-            final_cost = g + final_penalty
-            if final_cost < best_final_cost:
-                best_final_cost = final_cost
-                best_final_state = state
-                best_target = target
-        if greedy and best_final_state is not None:
-            break
-
-        for w, dist, next_dir in env.adj.get(v, []):
-            w = int(w)
-            if w == u:
-                continue
-            edge_cost = _weighted_edge_cost(edge_weights, v, w, dist)
-            turn_penalty = C_bend if curr_dir != next_dir else 0.0
-            next_state = (v, w)
-            next_g = g + edge_cost + turn_penalty
-            if next_g < g_scores.get(next_state, float("inf")):
-                g_scores[next_state] = next_g
-                came_from[next_state] = state
-                state_dirs[next_state] = next_dir
-                h = _target_heuristic(env, w, next_dir, target_specs, C_bend)
-                priority = h if greedy else next_g + h
-                heapq.heappush(pq, (priority, next_g, counter, next_state))
-                counter += 1
-
-    if best_final_state is None or best_target is None:
-        return None, 0.0, None, None
-
-    states = []
-    curr = best_final_state
-    while curr in came_from:
-        states.append(curr)
-        curr = came_from[curr]
-    states.append(curr)
-    states.reverse()
-
-    path = [states[0][0]]
-    path.extend(state[1] for state in states)
-    return path, _path_physical_length(env, path), best_target["pin"], best_target
+    return _run_super_sink_line_graph_search_for_env(
+        env,
+        start_node_indices,
+        target_pin_names,
+        pin_node_map,
+        C_bend,
+        edge_weights=edge_weights,
+        greedy=greedy,
+        heuristic_mode=heuristic_mode_idx,
+        machine_center=(machine_cx, machine_cy),
+        estimate_turns_fn=estimate_turns,
+    )
 
 def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     return _run_super_sink_line_graph_search(

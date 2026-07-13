@@ -61,6 +61,8 @@ from .search import (
     line_graph_dir_from_points,
     ordered_small_room_names,
     path_physical_length,
+    run_super_sink_line_graph_search,
+    run_super_sink_state_astar,
     terminal_node_indices,
     target_heuristic,
 )
@@ -103,6 +105,8 @@ __all__ = [
     "positive_flow_edges",
     "route_conflict_summary",
     "route_segments_from_path",
+    "run_super_sink_line_graph_search",
+    "run_super_sink_state_astar",
     "required_clearance_mm",
     "route_axis_records",
     "route_quality_counts",

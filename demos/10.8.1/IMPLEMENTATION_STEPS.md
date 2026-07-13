@@ -363,6 +363,12 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\clearance.py tests\\test_routing_clearance.py`.
 - Validation: `python -m pytest tests\\test_routing_clearance.py`.
 
+- Extracted state-expanded A* and line-graph A*/GBFS super-sink searches to `mep_routing.routing.search`.
+- Kept `main.py` responsible for backend selection, active heuristic mode, machine center, and the legacy routing-call signatures.
+- Added focused route-selection tests proving both backends choose the lower-turn-cost directed pin path.
+- Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\search.py tests\\test_routing_search.py`.
+- Validation: `python -m pytest tests\\test_routing_search.py`.
+
 ## Commit Checklist
 
 Before each commit:

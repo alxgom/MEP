@@ -4,14 +4,17 @@ from mep_routing.routing import (
     line_graph_dir_from_points,
     ordered_small_room_names,
     path_physical_length,
+    run_super_sink_line_graph_search,
+    run_super_sink_state_astar,
     terminal_node_indices,
     target_heuristic,
 )
 
 
 class Env:
-    def __init__(self, nodes):
+    def __init__(self, nodes, adj=None):
         self.nodes = np.array(nodes, dtype=float)
+        self.adj = adj or {}
 
 
 def test_line_graph_dir_from_points_uses_dominant_axis():
@@ -107,3 +110,55 @@ def test_ordered_small_room_names_filters_and_sorts_by_machine_distance():
         "Washroom",
         "Bathroom 2",
     ]
+
+
+def _search_env():
+    return Env(
+        [(0, 0), (10, 0), (20, 0), (0, 1)],
+        {
+            0: [(1, 10.0, "E"), (3, 1.0, "N")],
+            1: [(0, 10.0, "W"), (2, 10.0, "E")],
+            2: [(1, 10.0, "W"), (3, 21.0, "S")],
+            3: [(0, 1.0, "S"), (2, 21.0, "E")],
+        },
+    )
+
+
+def _target_specs():
+    return {
+        "large": [{"node_idx": 2, "in_dir": "E", "out_dir": "W", "pin": "large"}],
+    }
+
+
+def test_state_expanded_astar_selects_the_lower_turn_cost_path_to_a_directed_pin():
+    path, length, pin_name, target = run_super_sink_state_astar(
+        _search_env(),
+        start_node_indices=0,
+        target_pin_names=["large"],
+        pin_node_map=_target_specs(),
+        bend_cost=20.0,
+        heuristic_mode=1,
+        estimate_turns_fn=lambda *_: 0,
+    )
+
+    assert path == [0, 1, 2]
+    assert length == 20.0
+    assert pin_name == "large"
+    assert target == _target_specs()["large"][0]
+
+
+def test_line_graph_astar_selects_the_lower_turn_cost_path_to_a_directed_pin():
+    path, length, pin_name, target = run_super_sink_line_graph_search(
+        _search_env(),
+        start_node_indices=[0],
+        target_pin_names=["large"],
+        pin_node_map=_target_specs(),
+        bend_cost=20.0,
+        heuristic_mode=1,
+        estimate_turns_fn=lambda *_: 0,
+    )
+
+    assert path == [0, 1, 2]
+    assert length == 20.0
+    assert pin_name == "large"
+    assert target == _target_specs()["large"][0]
