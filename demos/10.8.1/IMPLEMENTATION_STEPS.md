@@ -491,6 +491,10 @@ Manual validation milestones:
 - Preserved the original slider priority, control-panel priority, and no-history auto-placement behavior.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\events.py tests\\test_ui_events.py`; six focused UI event contracts invoked directly because pytest is unavailable in the active Python environment.
 
+- Integrated prepared synthetic and real dwelling state through `mep_routing.data_sources.scenario`.
+- `main.py` now owns source selection, fallback messaging, cache resets, graph rebuild, and auto-placement while the data-source module owns scenario normalization, accent generation, and real-scenario preparation.
+- Validation: Python 3.11 `-m py_compile main.py mep_routing\\data_sources\\scenario.py mep_routing\\data_sources\\__init__.py tests\\test_scenario_preparation.py`; Python 3.11 `-m pytest tests\\test_scenario_preparation.py tests\\test_synthetic_data_source.py tests\\test_dwelling_data_sources.py`.
+
 ## Commit Checklist
 
 Before each commit:
