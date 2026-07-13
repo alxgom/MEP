@@ -48,6 +48,7 @@ from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
     edge_segment_min_distances as _edge_segment_min_distances,
+    iter_polygons as _iter_polygons,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
@@ -302,6 +303,7 @@ GRAPH_TYPES = [
     "Hannan Grid (numpy)",
     "Epsilon Grid (core-like numpy)",
 ]
+graph_type_idx = 1
 
 ROUTING_STRATEGIES = [
     "Greedy (Dual-Sort)",
@@ -342,6 +344,7 @@ ROTATION_MODES = [
 rotation_mode_idx = 0
 ROTATION_FIELD_EPS = 1e-6
 rotation_field_scores = {"H": 0.0, "V": 0.0, "selected": None}
+show_grid_graph = False
 show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
@@ -648,29 +651,21 @@ def draw_terminal_tool_buttons(screen, font_bold, font_small):
     terminal_tool_button_rects = _draw_terminal_tool_buttons(screen, font_bold, font_small, get_terminal_tool_buttons(), preferred_terminal_tool_mode, terminal_validity_overlay_enabled, text_color=COLOR_TEXT, muted_color=COLOR_MUTED, allowed_color=COLOR_TERMINAL_ALLOWED)
 
 def draw_canvas_tool_controls(screen, font_small, ruler_mode):
-    for action, rect, label in get_canvas_tool_buttons():
-        active = (
-            (action == "ruler" and ruler_mode)
-            or (action == "weights" and edge_weight_heatmap_enabled)
-            or (action == "diameter" and route_real_diameter_width_enabled)
-        )
-        fill = (58, 80, 94) if active else (38, 44, 54)
-        border = (52, 152, 219) if active else (170, 180, 190)
-        pygame.draw.rect(screen, fill, rect, border_radius=4)
-        pygame.draw.rect(screen, border, rect, 1, border_radius=4)
-        lbl = font_small.render(label, True, COLOR_TEXT)
-        screen.blit(lbl, (rect.centerx - lbl.get_width() // 2, rect.centery - lbl.get_height() // 2))
-    draw_weight_view_switch(screen, font_small)
-    zoom_lbl = font_small.render(f"{zoom_level:.2f}x", True, COLOR_TEXT)
-    screen.blit(zoom_lbl, (CANVAS_LEFT + 12, CANVAS_TOP + 46))
-    if edge_weight_heatmap_enabled:
-        weight_view = "small pipe" if edge_weight_view_mode_idx == 0 else "big pipe"
-        wgt_lbl = font_small.render(f"modified edge weights: {weight_view}", True, COLOR_TEXT)
-        screen.blit(wgt_lbl, (CANVAS_LEFT + 86, CANVAS_TOP + 46))
-    if preferred_terminal_tool_mode:
-        hint = "click add, Ctrl+click erase" if preferred_terminal_tool_mode == "point" else "drag area, Ctrl+drag erase"
-        term_lbl = font_small.render(f"terminal {preferred_terminal_tool_mode}: {hint}", True, COLOR_TEXT)
-        screen.blit(term_lbl, (CANVAS_LEFT + 86, CANVAS_TOP + 64))
+    return _draw_canvas_tool_controls(
+        screen,
+        font_small,
+        get_canvas_tool_buttons(),
+        get_weight_view_switch_rect(),
+        ruler_enabled=ruler_mode,
+        edge_weights_enabled=edge_weight_heatmap_enabled,
+        diameter_width_enabled=route_real_diameter_width_enabled,
+        small_weight_view=edge_weight_view_mode_idx == 0,
+        zoom_level=zoom_level,
+        canvas_left=CANVAS_LEFT,
+        canvas_top=CANVAS_TOP,
+        active_terminal_mode=preferred_terminal_tool_mode,
+        text_color=COLOR_TEXT,
+    )
 
 def set_ruler_cursor(enabled):
     try:

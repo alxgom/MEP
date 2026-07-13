@@ -522,6 +522,9 @@ Manual validation milestones:
 - Kept `main.py` responsible for live graph assignment, weight-runtime cache resets, terminal-runtime updates, and status output; the graph module now owns graph-mode construction, pin/shaft runtime assembly, and Hannan-template caching.
 - Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\graphs\\__init__.py mep_routing\\graphs\\lifecycle.py` plus 24 direct focused graph contracts from `test_graph_runtime.py`, `test_graph_variants.py`, `test_graph_env.py`, `test_graph_axes.py`, and `test_graph_lifecycle.py`.
 
+- Restored missing startup defaults for the selected graph and grid visibility, restored the shared polygon iterator adapter, and routed canvas toolbar drawing through `mep_routing.ui.canvas_tools`.
+- Validation: Demo 10.7 Python 3.12 virtual environment kept the interactive application running through a 19-second startup smoke without an exception.
+
 ## Commit Checklist
 
 Before each commit:
