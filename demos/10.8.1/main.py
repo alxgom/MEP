@@ -36,6 +36,7 @@ from vent_router.geometry import (
 from vent_router.graphs import (
     EnvView,
     build_axis_grid as _build_axis_grid_for_context,
+    build_hannan_static_axes as _build_hannan_static_axes_for_context,
     add_bounds_axes as _add_bounds_axes_to_sets,
     add_epsilon_axis_values as _add_epsilon_axis_values_to_sets,
     add_epsilon_geometry_axes as _add_epsilon_geometry_axes_to_sets,
@@ -1163,97 +1164,20 @@ def _get_hannan_static_template(shift_walls=False):
     cache_key = bool(shift_walls)
     if cache_key in hannan_static_cache:
         return hannan_static_cache[cache_key]
-
-    xs, ys = set(), set()
-    preserve_x, preserve_y = set(), set()
-    priority_x, priority_y = set(), set()
-
-    def add_required(point):
-        _add_point_axes(xs, ys, point)
-        _add_point_axes(preserve_x, preserve_y, point)
-        x, y = round(float(point[0])), round(float(point[1]))
-        for delta in (-GRID_SPACING, GRID_SPACING):
-            xs.add(x + delta)
-            ys.add(y + delta)
-
-    if routing_region_base is not None:
-        _add_bounds_axes(xs, ys, routing_region_base)
-        minx, miny, maxx, maxy = routing_region_base.bounds
-        scaffold_xs = np.arange(
-            math.floor(minx / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING,
-            math.ceil(maxx / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING + 1,
-            HANNAN_SCAFFOLD_SPACING,
-        )
-        scaffold_ys = np.arange(
-            math.floor(miny / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING,
-            math.ceil(maxy / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING + 1,
-            HANNAN_SCAFFOLD_SPACING,
-        )
-        xs.update(round(float(x)) for x in scaffold_xs)
-        ys.update(round(float(y)) for y in scaffold_ys)
-        bx, by = _extend_allowed_boundary_axes(routing_region_base)
-        xs.update(bx)
-        ys.update(by)
-        priority_x.update(bx)
-        priority_y.update(by)
-
-    for pt in terminals.values():
-        add_required(pt)
-
-    if shaft_extraction is not None:
-        rep_pt = shaft_extraction.representative_point()
-        add_required((rep_pt.x, rep_pt.y))
-        minx_s, miny_s, maxx_s, maxy_s = shaft_extraction.bounds
-        cx_s = (minx_s + maxx_s) / 2
-        cy_s = (miny_s + maxy_s) / 2
-        offset_val = ROUTING_WALL_CLEARANCE_MM
-        for pt in [
-            (maxx_s + offset_val, cy_s),
-            (minx_s - offset_val, cy_s),
-            (cx_s, maxy_s + offset_val),
-            (cx_s, miny_s - offset_val),
-        ]:
-            add_required(pt)
-
-    for cover in covers:
-        inset = cover.buffer(-ROUTING_WALL_CLEARANCE_MM, join_style=2)
-        if not inset.is_empty:
-            _add_bounds_axes(xs, ys, inset)
-            _add_polygon_vertex_axes(xs, ys, inset)
-
-    for col in columns:
-        _add_bounds_axes(xs, ys, col, clearance=ROUTING_WALL_CLEARANCE_MM)
-
-    for shaft in shafts:
-        _add_bounds_axes(xs, ys, shaft, clearance=ROUTING_WALL_CLEARANCE_MM)
-
-    for wp in wall_polys:
-        _add_bounds_axes(xs, ys, wp, clearance=25)
-
-    if shift_walls:
-        shift = ROUTING_WALL_CLEARANCE_MM
-        for wall in walls:
-            coords = list(wall.coords)
-            for i in range(len(coords) - 1):
-                x1, y1 = float(coords[i][0]), float(coords[i][1])
-                x2, y2 = float(coords[i + 1][0]), float(coords[i + 1][1])
-                length = math.hypot(x2 - x1, y2 - y1)
-                if length < 1.0:
-                    continue
-                nx, ny = -(y2 - y1) / length, (x2 - x1) / length
-                mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-                for pt in [(mx + nx * shift, my + ny * shift), (mx - nx * shift, my - ny * shift)]:
-                    _add_point_axes(xs, ys, pt)
-                    _add_point_axes(priority_x, priority_y, pt)
-
-    template = {
-        "xs": xs,
-        "ys": ys,
-        "preserve_x": preserve_x,
-        "preserve_y": preserve_y,
-        "priority_x": priority_x,
-        "priority_y": priority_y,
-    }
+    template = _build_hannan_static_axes_for_context(
+        allowed_region=routing_region_base,
+        terminals=terminals,
+        shaft_extraction=shaft_extraction,
+        covers=covers,
+        columns=columns,
+        shafts=shafts,
+        wall_polys=wall_polys,
+        walls=walls,
+        grid_spacing_mm=GRID_SPACING,
+        scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
+        wall_clearance_mm=ROUTING_WALL_CLEARANCE_MM,
+        shift_walls=shift_walls,
+    )
     hannan_static_cache[cache_key] = template
     return template
 
