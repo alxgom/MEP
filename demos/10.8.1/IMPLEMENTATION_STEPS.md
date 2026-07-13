@@ -395,6 +395,12 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\ui\\__init__.py mep_routing\\ui\\colors.py tests\\test_ui_colors.py`.
 - Validation: `python -m pytest tests\\test_ui_colors.py`.
 
+- Extracted preferred-terminal node mapping and point/area selection mutations to `mep_routing.ui.terminal_selection`.
+- Kept `main.py` responsible for room geometry, active graph state, and Pygame drawing.
+- Added focused tests for deduplicated preference mapping and point/area selection transitions.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\terminal_selection.py tests\\test_ui_terminal_selection.py`.
+- Validation: `python -m pytest tests\\test_ui_terminal_selection.py`.
+
 ## Commit Checklist
 
 Before each commit:

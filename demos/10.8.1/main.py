@@ -152,6 +152,12 @@ from mep_routing.ui.solution_logs import (
     solution_log_action as _solution_log_action,
     solution_kpis as _solution_kpis,
 )
+from mep_routing.ui.terminal_selection import (
+    apply_preferred_terminal_area as _apply_preferred_terminal_area,
+    apply_preferred_terminal_point as _apply_preferred_terminal_point,
+    find_room_candidate_node as _find_room_candidate_node,
+    map_preferred_points_to_nodes as _map_preferred_points_to_nodes,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1694,20 +1700,9 @@ def _map_preferred_points_to_nodes(route_name, candidate_nodes):
     if not prefs or not candidate_nodes or current_env is None:
         return [], {}
 
-    mapped_nodes = []
-    mapped_pref_indices = {}
-    candidate_arr = current_env.nodes[candidate_nodes]
-    for pref_idx, pref_pt in enumerate(prefs):
-        deltas = candidate_arr - np.array(pref_pt, dtype=np.float32)
-        distances = np.hypot(deltas[:, 0], deltas[:, 1])
-        nearest_pos = int(np.argmin(distances))
-        if float(distances[nearest_pos]) > PREFERRED_TERMINAL_REMAP_TOLERANCE_MM:
-            continue
-        node_idx = int(candidate_nodes[nearest_pos])
-        if node_idx not in mapped_pref_indices:
-            mapped_nodes.append(node_idx)
-            mapped_pref_indices[node_idx] = pref_idx
-    return mapped_nodes, mapped_pref_indices
+    return _map_preferred_points_to_nodes(
+        prefs, candidate_nodes, current_env.nodes, PREFERRED_TERMINAL_REMAP_TOLERANCE_MM
+    )
 
 def get_route_start_nodes(route_name):
     if grid_kd is None or current_env is None:
@@ -1732,110 +1727,38 @@ def find_room_candidate_node_at_world(world_pt):
     if current_env is None:
         return None
     point = Point(float(world_pt[0]), float(world_pt[1]))
-    best = None
-    best_dist = float("inf")
-    for room_name in terminals.keys():
-        room_poly = _room_polygon_by_name(room_name)
-        if room_poly is None or not (room_poly.contains(point) or room_poly.distance(point) < 1e-7):
-            continue
-        for node_idx in get_room_candidate_start_nodes(room_name):
-            pt = current_env.nodes[int(node_idx)]
-            dist = math.hypot(float(pt[0]) - world_pt[0], float(pt[1]) - world_pt[1])
-            if dist < best_dist:
-                best_dist = dist
-                best = (room_name, int(node_idx))
-    return best
+    return _find_room_candidate_node(
+        world_pt, terminals.keys(),
+        lambda room_name, _world_pt: (
+            (room_poly := _room_polygon_by_name(room_name)) is not None
+            and (room_poly.contains(point) or room_poly.distance(point) < 1e-7)
+        ),
+        get_room_candidate_start_nodes, current_env.nodes,
+    )
 
 def apply_preferred_terminal_point(world_pt, remove=False):
     global preferred_terminal_points_by_room
-    hit = find_room_candidate_node_at_world(world_pt)
-    if hit is None:
+    if current_env is None:
         return False, None
-
-    room_name, node_idx = hit
-    candidate_nodes = get_room_candidate_start_nodes(room_name)
-    _, mapped_pref_indices = _map_preferred_points_to_nodes(room_name, candidate_nodes)
-    prefs = list(preferred_terminal_points_by_room.get(room_name, []))
-
-    if remove:
-        pref_idx = mapped_pref_indices.get(node_idx)
-        if pref_idx is None:
-            return False, room_name
-        del prefs[pref_idx]
-        if prefs:
-            preferred_terminal_points_by_room[room_name] = prefs
-        else:
-            preferred_terminal_points_by_room.pop(room_name, None)
-        return True, room_name
-
-    if node_idx in mapped_pref_indices:
-        return False, room_name
-
-    node_pt = current_env.nodes[node_idx]
-    prefs.append((float(node_pt[0]), float(node_pt[1])))
-    preferred_terminal_points_by_room[room_name] = prefs
-    return True, room_name
+    point = Point(float(world_pt[0]), float(world_pt[1]))
+    return _apply_preferred_terminal_point(
+        preferred_terminal_points_by_room, world_pt, remove, terminals.keys(),
+        lambda room_name, _world_pt: (
+            (room_poly := _room_polygon_by_name(room_name)) is not None
+            and (room_poly.contains(point) or room_poly.distance(point) < 1e-7)
+        ),
+        get_room_candidate_start_nodes, current_env.nodes, PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    )
 
 def apply_preferred_terminal_area(start_world, end_world, remove=False):
     global preferred_terminal_points_by_room, preferred_terminal_areas
-    if start_world is None or end_world is None or current_env is None:
+    if current_env is None:
         return False, None
-    minx = min(float(start_world[0]), float(end_world[0]))
-    maxx = max(float(start_world[0]), float(end_world[0]))
-    miny = min(float(start_world[1]), float(end_world[1]))
-    maxy = max(float(start_world[1]), float(end_world[1]))
-    if maxx - minx < 1.0 or maxy - miny < 1.0:
-        return False, None
-
-    changed = False
-    last_room = None
-    for room_name in terminals.keys():
-        candidate_nodes = get_room_candidate_start_nodes(room_name)
-        if not candidate_nodes:
-            continue
-        prefs = list(preferred_terminal_points_by_room.get(room_name, []))
-        if remove:
-            kept = [
-                pt for pt in prefs
-                if not (minx <= pt[0] <= maxx and miny <= pt[1] <= maxy)
-            ]
-            if len(kept) != len(prefs):
-                changed = True
-                last_room = room_name
-                if kept:
-                    preferred_terminal_points_by_room[room_name] = kept
-                else:
-                    preferred_terminal_points_by_room.pop(room_name, None)
-                preferred_terminal_areas = [
-                    area for area in preferred_terminal_areas
-                    if not (
-                        area["room"] == room_name
-                        and not (
-                            area["bounds"][2] < minx or area["bounds"][0] > maxx
-                            or area["bounds"][3] < miny or area["bounds"][1] > maxy
-                        )
-                    )
-                ]
-            continue
-
-        _, mapped_pref_indices = _map_preferred_points_to_nodes(room_name, candidate_nodes)
-        existing_nodes = set(mapped_pref_indices.keys())
-        added_for_room = False
-        for node_idx in candidate_nodes:
-            if int(node_idx) in existing_nodes:
-                continue
-            pt = current_env.nodes[int(node_idx)]
-            if minx <= float(pt[0]) <= maxx and miny <= float(pt[1]) <= maxy:
-                prefs.append((float(pt[0]), float(pt[1])))
-                existing_nodes.add(int(node_idx))
-                changed = True
-                added_for_room = True
-                last_room = room_name
-        if prefs:
-            preferred_terminal_points_by_room[room_name] = prefs
-        if added_for_room:
-            preferred_terminal_areas.append({"room": room_name, "bounds": (minx, miny, maxx, maxy)})
-    return changed, last_room
+    return _apply_preferred_terminal_area(
+        preferred_terminal_points_by_room, preferred_terminal_areas, start_world, end_world, remove,
+        terminals.keys(), get_room_candidate_start_nodes, current_env.nodes,
+        PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    )
 
 def draw_preferred_terminal_areas(screen, selected_route_name=None):
     if current_env is None:
