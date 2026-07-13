@@ -8,7 +8,7 @@ from pathlib import Path
 from collections import deque
 import numpy as np
 import pygame
-from shapely.geometry import Polygon, LineString, Point, box, MultiLineString
+from shapely.geometry import Polygon, LineString, Point, box
 from shapely.ops import unary_union
 from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
@@ -18,6 +18,11 @@ from mep_routing.domain import (
     machine_pins as _machine_pins,
     outward_vector as _outward_vector,
     port_access_specs as _port_access_specs,
+)
+from mep_routing.data_sources import (
+    build_wall_polygons as _build_wall_polygons_for_dwelling,
+    choose_initial_machine_position as _choose_initial_machine_position_for_dwelling,
+    derive_room_boundary_walls as _derive_room_boundary_walls_for_dwelling,
 )
 from mep_routing.installations.sal import (
     LARGE_DUCT_ROUTE_NAMES,
@@ -2935,62 +2940,6 @@ def generate_synthetic_dwelling():
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
 
-def _iter_lines(geom):
-    if geom.is_empty:
-        return
-    if isinstance(geom, LineString):
-        yield geom
-    elif isinstance(geom, MultiLineString):
-        for line in geom.geoms:
-            yield line
-    elif hasattr(geom, "geoms"):
-        for part in geom.geoms:
-            yield from _iter_lines(part)
-
-def _cut_line_obstacles(line):
-    cut = line
-    for col in columns:
-        cut = cut.difference(col)
-    for shaft in shafts:
-        cut = cut.difference(shaft)
-    return list(_iter_lines(cut))
-
-def _derive_real_walls():
-    derived = []
-    for i in range(len(rooms)):
-        for j in range(i + 1, len(rooms)):
-            shared = rooms[i].polygon.boundary.intersection(rooms[j].polygon.boundary)
-            for line in _iter_lines(shared):
-                if line.length > 50:
-                    derived.extend(_cut_line_obstacles(line))
-    return [line for line in derived if line.length > 50]
-
-def _build_wall_polys():
-    polys = []
-    for w in walls:
-        wp = w.buffer(WALL_THICKNESS / 2 - 0.1)
-        for col in columns:
-            wp = wp.difference(col)
-        for s in shafts:
-            wp = wp.difference(s)
-        if not wp.is_empty:
-            polys.append(wp)
-    return polys
-
-def _choose_initial_machine_position():
-    if not terminals:
-        return (7500.0, 5500.0)
-    if not shaft_extraction:
-        return next(iter(terminals.values()))
-
-    sx, sy = get_representative_point(shaft_extraction)
-    candidates = []
-    for name, pt in terminals.items():
-        priority = 0 if any(key in name for key in ["Bathroom", "Washroom", "Toilet"]) else 1
-        candidates.append((priority, abs(sx - pt[0]) + abs(sy - pt[1]), pt))
-    candidates.sort(key=lambda item: (item[0], item[1]))
-    return candidates[0][2]
-
 def rebuild_wet_room_outer_accents():
     global wet_room_outer_accents
     wet_names = set(wet_room_names)
@@ -3056,12 +3005,16 @@ def generate_new_dwelling():
     wet_room_names = list(terminals.keys())
     rebuild_wet_room_outer_accents()
     doors = []
-    walls = _derive_real_walls()
-    wall_polys = _build_wall_polys()
+    walls = _derive_room_boundary_walls_for_dwelling(rooms, columns, shafts)
+    wall_polys = _build_wall_polygons_for_dwelling(walls, columns, shafts, WALL_THICKNESS)
     shaft_core_entry_specs = _build_core_shaft_entry_specs(scenario)
     shaft_entry_geometry_by_node = {}
 
-    machine_cx, machine_cy = _choose_initial_machine_position()
+    machine_cx, machine_cy = _choose_initial_machine_position_for_dwelling(
+        terminals,
+        shaft_extraction,
+        get_representative_point,
+    )
     machine_angle = 0
     _bnd_segs = None
     hannan_static_cache = {}

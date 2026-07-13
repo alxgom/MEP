@@ -369,6 +369,12 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\search.py tests\\test_routing_search.py`.
 - Validation: `python -m pytest tests\\test_routing_search.py`.
 
+- Created `mep_routing.data_sources` and extracted real-dwelling wall derivation, obstacle subtraction, wall polygon construction, and initial machine-position selection.
+- Kept `main.py` responsible for loading the external scenario, mutating active app state, and rebuilding the graph.
+- Added focused tests for shared-boundary wall derivation, structural-obstacle subtraction, and wet-room-preferred initial machine selection.
+- Validation: `python -m py_compile main.py mep_routing\\data_sources\\__init__.py mep_routing\\data_sources\\dwelling.py tests\\test_dwelling_data_sources.py`.
+- Validation: `python -m pytest tests\\test_dwelling_data_sources.py`.
+
 ## Commit Checklist
 
 Before each commit:
