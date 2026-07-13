@@ -5426,70 +5426,65 @@ def _candidate_room_points(room):
         result.append(pt)
     return result
 
-def _machine_polygon_at(cx, cy, angle):
+def _distance_inside_room_polygon(origin, direction, room_polygon, max_distance=10000.0):
+    """NumPy equivalent of Routing-Core's forward connector clearance metric."""
+    direction = np.asarray(direction, dtype=np.float64)
+    length = float(np.linalg.norm(direction))
+    if length <= 1e-9 or room_polygon is None or room_polygon.is_empty:
+        return None
+    direction /= length
+    origin = np.asarray(origin, dtype=np.float64)
+    coords = np.asarray(room_polygon.exterior.coords, dtype=np.float64)
+    if len(coords) < 2:
+        return None
+
+    starts = coords[:-1]
+    segments = coords[1:] - starts
+    cross = direction[0] * segments[:, 1] - direction[1] * segments[:, 0]
+    rel = starts - origin
+    valid = np.abs(cross) > 1e-9
+    if not np.any(valid):
+        return None
+
+    t_numerator = rel[:, 0] * segments[:, 1] - rel[:, 1] * segments[:, 0]
+    u_numerator = rel[:, 0] * direction[1] - rel[:, 1] * direction[0]
+    t = np.full(len(segments), np.inf, dtype=np.float64)
+    u = np.full(len(segments), np.inf, dtype=np.float64)
+    np.divide(t_numerator, cross, out=t, where=valid)
+    np.divide(u_numerator, cross, out=u, where=valid)
+    valid &= t >= -1e-7
+    valid &= t <= max_distance + 1e-7
+    valid &= u >= -1e-7
+    valid &= u <= 1.0 + 1e-7
+    if not np.any(valid):
+        return None
+    return float(np.min(t[valid]))
+
+def _core_machine_candidate_sort_key(cx, cy, angle, room):
+    """Port of RouteClimaLivingMachine._sort_solutions_machine's metric order."""
     pins = get_machine_pins(cx, cy, angle)
-    return Polygon([pins["c_tl"], pins["c_tr"], pins["c_br"], pins["c_bl"]])
-
-def _area_out_percentage(poly, room_poly):
-    if poly.is_empty or room_poly.is_empty:
-        return 100.0
-    inside = poly.intersection(room_poly).area
-    if poly.area <= 1e-7:
-        return 100.0
-    return max(0.0, (1.0 - inside / poly.area) * 100.0)
-
-def _point_angle_to_target(origin, direction, target):
-    vx = float(target[0] - origin[0])
-    vy = float(target[1] - origin[1])
-    norm = math.hypot(vx, vy)
-    if norm <= 1e-7:
-        return 0.0
-    tx, ty = vx / norm, vy / norm
-    dx, dy = direction
-    dot = max(-1.0, min(1.0, dx * tx + dy * ty))
-    cross = dx * ty - dy * tx
-    return math.degrees(math.atan2(cross, dot))
-
-def _distance_to_allowed_boundary(point):
-    if routing_region_base is None:
-        return 1e9
-    return Point(float(point[0]), float(point[1])).distance(routing_region_base.boundary)
-
-def _core_like_machine_candidate_score(cx, cy, angle, room):
-    machine_poly = _machine_polygon_at(cx, cy, angle)
-    pins = get_machine_pins(cx, cy, angle)
-
-    shaft_pt = get_representative_point(shaft_extraction) if shaft_extraction else (cx, cy)
-    terminal_points = list(terminals.values())
-    target_centroid = (
-        tuple(np.mean(np.array(terminal_points, dtype=np.float64), axis=0))
-        if terminal_points else (cx, cy)
+    machine = get_current_machine()
+    target_rooms = [candidate for candidate in rooms if _is_clima_target_room(candidate)]
+    distance_to_centroids = sum(
+        math.hypot(pins["air_out"][0] - target.polygon.centroid.x,
+                   pins["air_out"][1] - target.polygon.centroid.y)
+        for target in target_rooms
     )
 
-    supply_pin = "air_out"
-    frigo_pin = "freon2" if "freon2" in pins else "freon1"
-    supply_dir = _local_axis_to_world(get_current_machine()["connectors"]["air_out"]["normal"], angle)
-    frigo_dir = _local_axis_to_world(get_current_machine()["connectors"][frigo_pin]["normal"], angle)
-    supply_angle = abs(_point_angle_to_target(pins[supply_pin], supply_dir, target_centroid))
-    frigo_angle = abs(_point_angle_to_target(pins[frigo_pin], frigo_dir, shaft_pt))
-
-    out_pct = _area_out_percentage(machine_poly, room.polygon)
-    supply_clear = _distance_to_allowed_boundary(pins[supply_pin])
-    frigo_clear = _distance_to_allowed_boundary(pins[frigo_pin])
-    distance_to_targets = 0.0
-    if terminal_points:
-        distance_to_targets = sum(math.hypot(cx - pt[0], cy - pt[1]) for pt in terminal_points) / len(terminal_points)
-    if shaft_extraction is not None:
-        distance_to_targets += 0.35 * math.hypot(cx - shaft_pt[0], cy - shaft_pt[1])
+    supply_direction = _local_axis_to_world(machine["connectors"]["air_out"]["normal"], angle)
+    supply_clearance = _distance_inside_room_polygon(
+        pins["air_out"], supply_direction, room.polygon
+    )
+    frigo_name = "freon1" if "freon1" in pins else "freon2"
+    frigo_direction = _local_axis_to_world(machine["connectors"][frigo_name]["normal"], angle)
+    frigo_clearance = _distance_inside_room_polygon(
+        pins[frigo_name], frigo_direction, room.polygon
+    )
 
     return (
-        out_pct,
-        supply_angle + frigo_angle,
-        supply_angle,
-        frigo_angle,
-        -supply_clear,
-        -frigo_clear,
-        distance_to_targets,
+        distance_to_centroids,
+        -(supply_clearance if supply_clearance is not None else 0.0),
+        -(frigo_clearance if frigo_clearance is not None else 0.0),
     )
 
 def run_core_workflow_machine_placement():
@@ -5501,7 +5496,7 @@ def run_core_workflow_machine_placement():
             for rot in (0, 90, 180, 270):
                 if not is_machine_placement_valid(cx, cy, rot):
                     continue
-                candidates.append((_core_like_machine_candidate_score(cx, cy, rot, room), cx, cy, rot))
+                candidates.append((_core_machine_candidate_sort_key(cx, cy, rot, room), cx, cy, rot))
 
     ap_scores = {}
     ap_fields = {}
