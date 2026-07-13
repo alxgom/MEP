@@ -436,7 +436,7 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\ui\\help.py`.
 
 - Created `mep_routing.observability.history` for reusable history samples and buffer resets.
-- Wired the buffer reset through the new module; the sample contract is ready for subsequent app-state extraction.
+- Wired both buffer reset and route-history sampling through the new module.
 - Added focused observability coverage.
 - Validation: `python -m py_compile main.py mep_routing\\observability\\__init__.py mep_routing\\observability\\history.py tests\\test_history.py`.
 - Validation: `python -m pytest tests\\test_history.py`.
