@@ -22,6 +22,8 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - Made `MachineSpec` installation-neutral: its default large-route classification is empty and each installation supplies its own route policy.
 - Validation: Python 3.11 `-m py_compile` for affected package, application, and test modules.
 - Validation: Python 3.11 `-m pytest demos\10.8.1\tests\test_machines.py`.
+- Moved Sal's sequential Shaft/Kitchen/small-duct orchestration into `mep_routing.installations.sal.strategies`.
+- Kept `main.py` as an adapter for live graph state, solver callbacks, and UI-driven selection.
 - Extracted dynamic machine-obstacle graph filtering to `mep_routing.graphs.dynamic`; `main.py` now only resolves protected terminal/access nodes and invalidates app caches.
 - Added a contract test for blocked graph edges and protected machine access-node preservation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\graphs\dynamic.py demos\10.8.1\mep_routing\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.

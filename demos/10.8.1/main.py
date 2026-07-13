@@ -19,7 +19,11 @@ from mep_routing.domain import (
     outward_vector as _outward_vector,
     port_access_specs as _port_access_specs,
 )
-from mep_routing.installations.sal import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
+from mep_routing.installations.sal import (
+    LARGE_DUCT_ROUTE_NAMES,
+    SAL_OZEO_FLAT_MACHINE,
+    run_sequential_routing as _run_sal_sequential_routing,
+)
 from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
@@ -2372,104 +2376,27 @@ def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
-    base_weights = {}
-    prior_axis_records = []
-
-    kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
-    routes = []
-    
-    shaft_segs = _route_segments_from_path(
-        "Shaft",
-        shaft_path,
-        chosen_exhaust_pin,
+    return _run_sal_sequential_routing(
+        perm,
+        pin_node_map,
         global_pins,
+        shaft_node_idx,
+        chosen_exhaust_pin,
         chosen_exhaust_target,
+        shaft_path,
+        env=current_env,
+        machine_angle=machine_angle,
+        bend_cost=C_BEND,
+        route_start_nodes=get_route_start_nodes,
+        route_segments_from_path=_route_segments_from_path,
+        run_search=run_super_sink_astar,
+        terminal_node_indices=get_all_terminal_node_indices,
+        set_terminal_block_weight=set_terminal_block_weight,
+        add_route_clearance_weights=add_route_clearance_weights,
+        add_route_interaction_weights=add_route_interaction_weights,
+        route_diameter=get_route_diameter,
+        route_axis_records=_route_axis_records,
     )
-    routes.append(("Shaft", shaft_segs))
-    prior_axis_records.extend(_route_axis_records("Shaft", shaft_segs))
-    
-    total_nodes = len(shaft_path)
-    
-    # Pre-calculate terminal node indices
-    terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
-
-    def get_weights_for_route(curr_room, base_weights):
-        w = base_weights.copy()
-        for r_name, t_node_idx in terminal_nodes.items():
-            if r_name == curr_room:
-                continue
-            if t_node_idx in current_env.adj:
-                for nbr, _, _ in current_env.adj[t_node_idx]:
-                    set_terminal_block_weight(w, t_node_idx, nbr)
-        add_route_clearance_weights(w, curr_room, current_env)
-        add_route_interaction_weights(prior_axis_records, get_route_diameter(curr_room), w, current_env)
-        return w
-
-    # 1. Route Kitchen (Fixed position right after Shaft)
-    kitchen_start_nodes = get_route_start_nodes("Kitchen")
-    if kitchen_start_nodes:
-        current_weights = get_weights_for_route("Kitchen", base_weights)
-        kitchen_path, _, _, kitchen_target = run_super_sink_astar(
-            current_env,
-            kitchen_start_nodes,
-            [kitchen_pin_name],
-            pin_node_map,
-            global_pins,
-            machine_angle,
-            C_BEND,
-            edge_weights=current_weights,
-        )
-        if kitchen_path is None:
-            return False, None, "No path to Kitchen", 0
-            
-        kitchen_segs = _route_segments_from_path(
-            "Kitchen",
-            kitchen_path,
-            kitchen_pin_name,
-            global_pins,
-            kitchen_target,
-        )
-        routes.append(("Kitchen", kitchen_segs))
-        prior_axis_records.extend(_route_axis_records("Kitchen", kitchen_segs))
-        total_nodes += len(kitchen_path)
-        
-    # 2. Route small duct rooms in perm order
-    available_small_pins = ["tl", "tr", "bl", "br"]
-    for room_name in perm:
-        if not available_small_pins:
-            return False, None, f"No port for {room_name}", 0
-        room_start_nodes = get_route_start_nodes(room_name)
-        if not room_start_nodes:
-            return False, None, f"No start nodes for {room_name}", 0
-        
-        current_weights = get_weights_for_route(room_name, base_weights)
-        room_path, _, chosen_small_pin, room_target = run_super_sink_astar(
-            current_env,
-            room_start_nodes,
-            available_small_pins,
-            pin_node_map,
-            global_pins,
-            machine_angle,
-            C_BEND,
-            edge_weights=current_weights,
-        )
-        if room_path is None:
-            return False, None, f"No path to {room_name}", 0
-            
-        room_segs = _route_segments_from_path(
-            room_name,
-            room_path,
-            chosen_small_pin,
-            global_pins,
-            room_target,
-        )
-        routes.append((room_name, room_segs))
-        prior_axis_records.extend(_route_axis_records(room_name, room_segs))
-        total_nodes += len(room_path)
-        
-        available_small_pins.remove(chosen_small_pin)
-        
-    return True, routes, "Success", total_nodes
 
 def _source_start_nodes(source_spec):
     return _source_start_nodes_for_kd(source_spec, grid_kd)
