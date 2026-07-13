@@ -405,6 +405,10 @@ Manual validation milestones:
 - Kept `main.py` responsible for active state, theme values, and world-to-screen transformation injection.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\terminal_selection.py`.
 
+- Created `mep_routing.ui.terminal_validity` for terminal validity markers, overlays, and tooltips.
+- Kept `main.py` responsible for cache lookup, KD-tree access, Pygame input, and viewport state.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\terminal_validity.py`.
+
 ## Commit Checklist
 
 Before each commit:

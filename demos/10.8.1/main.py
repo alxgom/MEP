@@ -161,6 +161,11 @@ from mep_routing.ui.terminal_selection import (
     find_room_candidate_node as _find_room_candidate_node,
     map_preferred_points_to_nodes as _map_preferred_points_to_nodes,
 )
+from mep_routing.ui.terminal_validity import (
+    draw_terminal_validity_overlay as _draw_terminal_validity_overlay,
+    draw_terminal_validity_square as _draw_terminal_validity_square,
+    draw_terminal_validity_tooltip as _draw_terminal_validity_tooltip,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1834,75 +1839,31 @@ def get_terminal_validity_entries():
     return entries, reasons_by_node
 
 def draw_terminal_validity_square(screen, center, side, allowed):
-    x, y = center
-    half = max(2, side // 2)
-    rect = pygame.Rect(int(x - half), int(y - half), half * 2, half * 2)
-    if allowed:
-        draw_dashed_polyline(
-            screen,
-            [rect.topleft, rect.topright, rect.bottomright, rect.bottomleft, rect.topleft],
-            COLOR_TERMINAL_ALLOWED,
-            1,
-            dash_len=4,
-            gap_len=3,
-        )
-        return
-
-    pygame.draw.rect(screen, COLOR_TERMINAL_BLOCKED, rect, 2)
-    previous_clip = screen.get_clip()
-    screen.set_clip(rect)
-    for offset in range(-rect.height, rect.width + rect.height, 6):
-        start = (rect.left + offset, rect.bottom)
-        end = (rect.left + offset + rect.height, rect.top)
-        pygame.draw.line(screen, COLOR_TERMINAL_BLOCKED_HATCH, start, end, 1)
-    screen.set_clip(previous_clip)
+    return _draw_terminal_validity_square(
+        screen, center, side, allowed, COLOR_TERMINAL_ALLOWED, COLOR_TERMINAL_BLOCKED,
+        COLOR_TERMINAL_BLOCKED_HATCH, draw_dashed_polyline,
+    )
 
 def draw_terminal_validity_overlay(screen):
     if not terminal_validity_overlay_enabled:
         return
     entries, _ = get_terminal_validity_entries()
     marker_side = max(4, min(13, int(round(70 * SCALE_PX_PER_MM))))
-    for x, y, _node_idx, allowed in entries:
-        sx, sy = to_screen(x, y)
-        if sx < CANVAS_LEFT - marker_side or sx > CANVAS_LEFT + CANVAS_W + marker_side:
-            continue
-        if sy < CANVAS_TOP - marker_side or sy > CANVAS_TOP + CANVAS_H + marker_side:
-            continue
-        draw_terminal_validity_square(screen, (sx, sy), marker_side, allowed)
+    return _draw_terminal_validity_overlay(
+        screen, entries, to_screen, (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), marker_side,
+        COLOR_TERMINAL_ALLOWED, COLOR_TERMINAL_BLOCKED, COLOR_TERMINAL_BLOCKED_HATCH,
+        draw_dashed_polyline,
+    )
 
 def draw_terminal_validity_tooltip(screen, font_small):
     if not terminal_validity_overlay_enabled or grid_kd is None or current_env is None:
         return
-    mx, my = pygame.mouse.get_pos()
-    if not (CANVAS_LEFT <= mx <= CANVAS_LEFT + CANVAS_W and CANVAS_TOP <= my <= CANVAS_TOP + CANVAS_H):
-        return
-
-    world_pt = to_mm(mx, my)
-    _, node_idx = grid_kd.query(world_pt)
-    node_idx = int(node_idx)
-    if node_idx < 0 or node_idx >= len(current_env.nodes):
-        return
-
-    node_pt = current_env.nodes[node_idx]
-    sx, sy = to_screen(float(node_pt[0]), float(node_pt[1]))
-    if math.hypot(mx - sx, my - sy) > 14:
-        return
-
     _entries, reasons_by_node = get_terminal_validity_entries()
-    reasons = reasons_by_node.get(node_idx, ["terminal status unknown"])
-    lines = [f"node {node_idx}"] + reasons[:3]
-    surfaces = [font_small.render(line, True, COLOR_TEXT) for line in lines]
-    width = max(s.get_width() for s in surfaces) + 18
-    height = len(surfaces) * 18 + 12
-    rect = pygame.Rect(mx + 14, my + 14, width, height)
-    if rect.right > WINDOW_WIDTH - 8:
-        rect.right = mx - 14
-    if rect.bottom > WINDOW_HEIGHT - 8:
-        rect.bottom = my - 14
-    pygame.draw.rect(screen, (32, 34, 38), rect, border_radius=5)
-    pygame.draw.rect(screen, (130, 138, 146), rect, 1, border_radius=5)
-    for i, surf in enumerate(surfaces):
-        screen.blit(surf, (rect.x + 9, rect.y + 7 + i * 18))
+    return _draw_terminal_validity_tooltip(
+        screen, font_small, pygame.mouse.get_pos(), (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H),
+        to_mm, lambda world_pt: int(grid_kd.query(world_pt)[1]), current_env.nodes,
+        reasons_by_node, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), COLOR_TEXT,
+    )
 
 def draw_wet_room_outer_accents(screen):
     for geom in wet_room_outer_accents:
