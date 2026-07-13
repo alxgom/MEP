@@ -7,6 +7,32 @@ from shapely.prepared import prep as shapely_prep
 from mep_routing.geometry import point_segment_min_distances
 
 
+def terminal_candidate_node_indices(nodes, adj, valid_region, terminal_point, boundary_segments, clearance_mm):
+    """Return connected valid-region nodes, nearest first, outside terminal clearance."""
+    if valid_region is None or valid_region.is_empty:
+        return []
+    prepared = shapely_prep(valid_region)
+    candidate_indices = [
+        int(index)
+        for index, point in enumerate(nodes)
+        if adj.get(int(index)) and prepared.contains(Point(float(point[0]), float(point[1])))
+    ]
+    if boundary_segments is not None and len(boundary_segments):
+        node_indices = np.asarray(candidate_indices, dtype=np.int64)
+        distances = point_segment_min_distances(nodes[node_indices], boundary_segments)
+        candidate_indices = [
+            int(index)
+            for index, distance in zip(node_indices, distances)
+            if float(distance) >= float(clearance_mm) - 1e-7
+        ]
+    candidate_indices.sort(
+        key=lambda index: float(
+            np.hypot(nodes[index][0] - terminal_point[0], nodes[index][1] - terminal_point[1])
+        )
+    )
+    return candidate_indices
+
+
 def terminal_validity_entries(
     nodes,
     adj,

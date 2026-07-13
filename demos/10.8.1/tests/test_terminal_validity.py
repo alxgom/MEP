@@ -1,7 +1,18 @@
 import numpy as np
 from shapely.geometry import Polygon
 
-from mep_routing.routing import terminal_validity_entries
+from mep_routing.routing import terminal_candidate_node_indices, terminal_validity_entries
+
+
+def test_terminal_candidate_nodes_filter_clearance_and_order_by_terminal_distance():
+    nodes = np.array([[50.0, 200.0], [250.0, 200.0], [300.0, 200.0], [350.0, 200.0]])
+    room = Polygon([(0, 0), (400, 0), (400, 400), (0, 400)])
+    candidates = terminal_candidate_node_indices(
+        nodes, {0: [1], 1: [0], 2: [1], 3: []}, room, (290.0, 200.0),
+        np.array([[0.0, 0.0, 0.0, 400.0]]), 100,
+    )
+
+    assert candidates == [2, 1]
 
 
 def test_terminal_validity_entries_classifies_room_clearance_and_isolation():

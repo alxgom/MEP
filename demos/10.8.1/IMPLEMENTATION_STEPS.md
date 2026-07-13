@@ -409,6 +409,12 @@ Manual validation milestones:
 - Kept `main.py` responsible for cache lookup, KD-tree access, Pygame input, and viewport state.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\terminal_validity.py`.
 
+- Extracted terminal candidate-node filtering, clearance, and nearest-first ordering to `mep_routing.routing.terminal_validity`.
+- Kept `main.py` responsible for the active room/cover boundary collection and candidate cache.
+- Added a focused candidate-node contract test.
+- Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\terminal_validity.py tests\\test_terminal_validity.py`.
+- Validation: `python -m pytest tests\\test_terminal_validity.py`.
+
 ## Commit Checklist
 
 Before each commit:

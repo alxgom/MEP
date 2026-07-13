@@ -66,7 +66,7 @@ from .search import (
     terminal_node_indices,
     target_heuristic,
 )
-from .terminal_validity import terminal_validity_entries
+from .terminal_validity import terminal_candidate_node_indices, terminal_validity_entries
 from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
 
 __all__ = [
@@ -120,6 +120,7 @@ __all__ = [
     "small_pin_target_specs",
     "target_heuristic",
     "terminal_node_indices",
+    "terminal_candidate_node_indices",
     "terminal_validity_entries",
     "total_route_length",
     "total_route_length_m",

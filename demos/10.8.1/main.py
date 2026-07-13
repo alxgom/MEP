@@ -10,7 +10,6 @@ import numpy as np
 import pygame
 from shapely.geometry import Polygon, LineString, Point, box
 from shapely.ops import unary_union
-from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
@@ -43,7 +42,6 @@ from mep_routing.geometry import (
     extract_line_segments as _extract_line_segs,
     iter_polygons as _iter_polygons_from_geom,
     largest_polygon as _largest_polygon_from_geom,
-    point_segment_min_distances as _point_segment_min_distances,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
@@ -116,6 +114,7 @@ from mep_routing.routing import (
     small_pin_target_specs as _small_pin_target_specs,
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
+    terminal_candidate_node_indices as _terminal_candidate_node_indices,
     terminal_validity_entries as _terminal_validity_entries,
     target_heuristic as _target_heuristic_for_env,
     total_route_length_m as _total_route_length_m,
@@ -1644,20 +1643,6 @@ def _room_terminal_boundary_segments(room_name):
     geometry_distance_cache[cache_key] = result
     return result
 
-def _filter_terminal_candidate_nodes_by_wall_distance(room_name, candidate_nodes):
-    if current_env is None or not candidate_nodes:
-        return []
-    segments = _room_terminal_boundary_segments(room_name)
-    if len(segments) == 0:
-        return list(candidate_nodes)
-
-    node_indices = np.array(candidate_nodes, dtype=np.int64)
-    pts = current_env.nodes[node_indices]
-    distances = _point_segment_min_distances(pts, segments)
-    min_clearance = max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM)
-    keep = distances >= float(min_clearance) - 1e-7
-    return [int(i) for i in node_indices[keep]]
-
 def get_room_candidate_start_nodes(route_name):
     if grid_kd is None or current_env is None:
         return []
@@ -1680,19 +1665,12 @@ def get_room_candidate_start_nodes(route_name):
         room_start_node_cache[route_name] = []
         return []
 
-    prepared = shapely_prep(valid_region)
-    nodes = [
-        int(i)
-        for i, pt in enumerate(current_env.nodes)
-        if current_env.adj.get(int(i)) and prepared.contains(Point(float(pt[0]), float(pt[1])))
-    ]
-    nodes = _filter_terminal_candidate_nodes_by_wall_distance(route_name, nodes)
+    nodes = _terminal_candidate_node_indices(
+        current_env.nodes, current_env.adj, valid_region, terminal_pt,
+        _room_terminal_boundary_segments(route_name),
+        max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM),
+    )
     if nodes:
-        nodes.sort(
-            key=lambda i: float(
-                np.hypot(current_env.nodes[i][0] - terminal_pt[0], current_env.nodes[i][1] - terminal_pt[1])
-            )
-        )
         room_start_node_cache[route_name] = nodes
         return list(nodes)
 
