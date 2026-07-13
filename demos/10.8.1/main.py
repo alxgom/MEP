@@ -153,6 +153,8 @@ from mep_routing.ui.solution_logs import (
     metric_value_for_log as _metric_value_for_log_entry,
     solution_log_action as _solution_log_action,
     solution_kpis as _solution_kpis,
+    manual_log_entry as _manual_log_entry,
+    replace_history_marker as _replace_history_marker,
 )
 from mep_routing.ui.terminal_selection import (
     apply_preferred_terminal_area as _apply_preferred_terminal_area,
@@ -2800,10 +2802,7 @@ def log_current_solution(routes, status, elapsed_ms, total_nodes):
         return False
     record_history(routes, count_segment_crossings(routes), elapsed_ms)
     log_id = len(solution_logs) + 1
-    entry = snapshot_current_state(routes, status, elapsed_ms, total_nodes)
-    entry["id"] = log_id
-    entry["hist_idx"] = hist_sample_count - 1 if hist_length else None
-    entry["kind"] = "manual"
+    entry = _manual_log_entry(snapshot_current_state(routes, status, elapsed_ms, total_nodes), log_id, hist_sample_count - 1 if hist_length else None)
     solution_logs.append(entry)
     selected_log_id = log_id
     if hist_length:
@@ -2815,8 +2814,7 @@ def _metric_value_for_log(entry, metric):
 
 def _replace_hist_marker(label, idx, color):
     global hist_event_markers
-    hist_event_markers = [marker for marker in hist_event_markers if marker[1] != label]
-    hist_event_markers.append((idx, label, color))
+    hist_event_markers = _replace_history_marker(hist_event_markers, label, idx, color)
 
 def update_auto_best_logs(routes, status, elapsed_ms, total_nodes):
     if not routes:

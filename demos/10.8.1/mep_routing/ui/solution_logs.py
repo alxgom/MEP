@@ -59,6 +59,16 @@ def best_log_updates(entry_base, hist_idx, auto_best_logs, metric_defs=DEFAULT_B
     return updates
 
 
+def manual_log_entry(snapshot, log_id, hist_idx):
+    entry = dict(snapshot)
+    entry.update(id=log_id, hist_idx=hist_idx, kind="manual")
+    return entry
+
+
+def replace_history_marker(markers, label, index, color):
+    return [marker for marker in markers if marker[1] != label] + [(index, label, color)]
+
+
 def manual_best_values(solution_logs, metrics=SOLUTION_LOG_METRICS):
     if not solution_logs:
         return {}
