@@ -14,13 +14,12 @@ from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
 from mep_routing.domain import (
-    LARGE_DUCT_ROUTE_NAMES,
-    SAL_OZEO_FLAT_MACHINE,
     local_axis_to_world as _local_axis_to_world,
     machine_pins as _machine_pins,
     outward_vector as _outward_vector,
     port_access_specs as _port_access_specs,
 )
+from mep_routing.installations.sal import LARGE_DUCT_ROUTE_NAMES, SAL_OZEO_FLAT_MACHINE
 from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,

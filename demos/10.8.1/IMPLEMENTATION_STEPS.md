@@ -18,6 +18,10 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - Added one graph-builder contract test for integer-grid nodes and wall-crossing edge removal.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\graphs\regular.py demos\10.8.1\mep_routing\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.
 - Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
+- Moved Sal machine catalog and named route classifications from shared `mep_routing.domain` to `mep_routing.installations.sal`.
+- Made `MachineSpec` installation-neutral: its default large-route classification is empty and each installation supplies its own route policy.
+- Validation: Python 3.11 `-m py_compile` for affected package, application, and test modules.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests\test_machines.py`.
 - Extracted dynamic machine-obstacle graph filtering to `mep_routing.graphs.dynamic`; `main.py` now only resolves protected terminal/access nodes and invalidates app caches.
 - Added a contract test for blocked graph edges and protected machine access-node preservation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\graphs\dynamic.py demos\10.8.1\mep_routing\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.
@@ -68,8 +72,7 @@ Manual validation milestones:
 - Initial config catalog created and committed.
 - Local workflow and implementation tracking added before further code movement.
 - First import-safe value object extracted: `EnvView` now lives in `mep_routing.graphs.env`.
-- Sal Ozeo Flat machine dimensions and simple policies now live in `mep_routing.domain.machines`.
-- Canonical large-duct route names now live in `mep_routing.domain.routes`.
+- Sal Ozeo Flat machine dimensions and route policies now live in `mep_routing.installations.sal`.
 - First pure geometry helper extracted: `snap_to_integer_grid` now lives in `mep_routing.geometry.shapely_utils`.
 - Pure NumPy segment distance helpers now live in `mep_routing.geometry.distances`.
 - Boundary and line segment extraction helpers now live in `mep_routing.geometry.segments`.
@@ -130,12 +133,12 @@ Manual validation milestones:
 - Added focused pytest coverage for `EnvView` reference preservation.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\graphs\__init__.py demos\10.8.1\mep_routing\graphs\env.py demos\10.8.1\tests\conftest.py demos\10.8.1\tests\test_graph_env.py`.
 - Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py`.
-- Extracted `MachineSpec` and `SAL_OZEO_FLAT_MACHINE` to `mep_routing.domain.machines`.
+- Extracted `MachineSpec` to `mep_routing.domain.machines` and initially colocated the Sal Ozeo Flat catalog entry there.
 - Kept old `main.py` machine constant names as compatibility aliases assigned from the machine spec.
 - Moved route diameter and pin stub policies to the machine spec while preserving baseline behavior.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\domain\__init__.py demos\10.8.1\mep_routing\domain\machines.py demos\10.8.1\tests\test_machines.py`.
 - Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py demos\10.8.1\tests\test_machines.py`.
-- Added canonical `SHAFT_ROUTE_NAME`, `KITCHEN_ROUTE_NAME`, and `LARGE_DUCT_ROUTE_NAMES` in `mep_routing.domain.routes`.
+- Initially added canonical `SHAFT_ROUTE_NAME`, `KITCHEN_ROUTE_NAME`, and `LARGE_DUCT_ROUTE_NAMES` in `mep_routing.domain.routes`.
 - Used `LARGE_DUCT_ROUTE_NAMES` for Sal machine large-duct policy and fixed-width route drawing.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\domain\__init__.py demos\10.8.1\mep_routing\domain\machines.py demos\10.8.1\mep_routing\domain\routes.py demos\10.8.1\tests\test_machines.py`.
 - Validation: `python -m pytest demos\10.8.1\tests\test_graph_env.py demos\10.8.1\tests\test_machines.py`.
