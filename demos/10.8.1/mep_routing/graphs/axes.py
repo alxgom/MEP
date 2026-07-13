@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from shapely.geometry import Point
 
-from vent_router.geometry import iter_polygons, largest_polygon
+from mep_routing.geometry import iter_polygons, largest_polygon
 
 
 def add_point_axes(xs, ys, point):

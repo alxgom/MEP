@@ -1,6 +1,6 @@
 import numpy as np
 
-from vent_router.routing import (
+from mep_routing.routing import (
     add_edge,
     build_pin_min_cost_flow_network,
     min_cost_flow,

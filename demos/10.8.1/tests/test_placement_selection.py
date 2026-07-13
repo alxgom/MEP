@@ -1,7 +1,7 @@
 import numpy as np
 
-from vent_router.graphs import EnvView
-from vent_router.placement import (
+from mep_routing.graphs import EnvView
+from mep_routing.placement import (
     choose_core_like_machine_placement,
     choose_topological_machine_placement,
     pin_nodes_from_pins,

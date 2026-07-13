@@ -1,6 +1,6 @@
 from shapely.geometry import LineString, Polygon
 
-from vent_router.placement import candidate_machine_rooms, is_machine_placement_valid
+from mep_routing.placement import candidate_machine_rooms, is_machine_placement_valid
 
 
 class Room:

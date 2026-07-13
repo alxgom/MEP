@@ -1,6 +1,6 @@
 # Demo 10.8.1 Refactor Scope
 
-Demo 10.8.1 starts as a behavior-preserving copy of Demo 10.8. The refactor goal is to turn the current single-file Pygame prototype into a modular routing workbench that can support Sal now and later add Cli, Coc, and San with their own parameters, graphs, strategies, UI affordances, machine families, terminal families, and validation rules.
+Demo 10.8.1 starts as a behavior-preserving copy of Demo 10.8. The refactor goal is to turn the current single-file Pygame prototype into a modular MEP routing workbench that can support Sal now and later add Cli, Coc, and San with their own parameters, graphs, strategies, UI affordances, machine families, terminal families, and validation rules.
 
 This document is the working contract for the first refactor pass. It should be updated when a boundary proves wrong in code.
 
@@ -40,7 +40,7 @@ Initial target under `demos/10.8.1/`:
 
 ```text
 main.py
-vent_router/
+mep_routing/
   __init__.py
   app.py
   state.py
@@ -104,11 +104,13 @@ vent_router/
 `main.py` should become only an entrypoint:
 
 ```python
-from vent_router.app import run
+from mep_routing.app import run
 
 if __name__ == "__main__":
     run()
 ```
+
+The shared package is `mep_routing`, not an installation-specific package. Ventilation-specific behavior belongs in explicit Sal adapters/configuration and must not own shared graph, geometry, routing, placement, or UI abstractions.
 
 ## Boundary Semantics
 
@@ -273,7 +275,7 @@ Do not force every value into metadata before extraction. Start with typed defau
 
 1. Commit the untouched baseline copy.
 2. Add this scope document and keep it current.
-3. Introduce `vent_router.config` with typed defaults and legacy constant compatibility.
+3. Introduce `mep_routing.config` with typed defaults and legacy constant compatibility.
 4. Extract pure value objects: units, env graph, machine spec, route spec, config object.
 5. Extract geometry helpers that have no Pygame dependency.
 6. Extract graph builders behind a common `build_graph(kind, context, config)` interface.

@@ -1,7 +1,7 @@
 import numpy as np
 from shapely.geometry import Polygon
 
-from vent_router.routing import terminal_validity_entries
+from mep_routing.routing import terminal_validity_entries
 
 
 def test_terminal_validity_entries_classifies_room_clearance_and_isolation():

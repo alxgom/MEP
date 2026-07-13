@@ -1,7 +1,7 @@
 import numpy as np
 
-from vent_router.graphs import EnvView
-from vent_router.placement import compute_dijkstra_distance_field, placement_weights, topological_placement_scores
+from mep_routing.graphs import EnvView
+from mep_routing.placement import compute_dijkstra_distance_field, placement_weights, topological_placement_scores
 
 
 def _line_env():

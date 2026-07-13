@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from vent_router.geometry import normalize_axis_segment
+from mep_routing.geometry import normalize_axis_segment
 
 
 def merged_axis_segments(route_segs, eps=1e-7):

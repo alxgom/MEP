@@ -1,7 +1,7 @@
 import numpy as np
 from shapely.geometry import GeometryCollection, LineString, MultiLineString, Polygon
 
-from vent_router.geometry import extract_boundary_segments, extract_line_segments
+from mep_routing.geometry import extract_boundary_segments, extract_line_segments
 
 
 def test_extract_boundary_segments_from_polygon_exterior_and_hole():

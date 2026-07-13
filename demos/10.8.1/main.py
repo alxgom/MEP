@@ -13,7 +13,7 @@ from shapely.ops import unary_union
 from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
-from vent_router.domain import (
+from mep_routing.domain import (
     LARGE_DUCT_ROUTE_NAMES,
     SAL_OZEO_FLAT_MACHINE,
     local_axis_to_world as _local_axis_to_world,
@@ -21,7 +21,7 @@ from vent_router.domain import (
     outward_vector as _outward_vector,
     port_access_specs as _port_access_specs,
 )
-from vent_router.geometry import (
+from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
     edge_segment_min_distances as _edge_segment_min_distances,
@@ -33,7 +33,7 @@ from vent_router.geometry import (
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
-from vent_router.graphs import (
+from mep_routing.graphs import (
     EnvView,
     build_axis_grid as _build_axis_grid_for_context,
     build_hannan_static_axes as _build_hannan_static_axes_for_context,
@@ -48,7 +48,7 @@ from vent_router.graphs import (
     merge_close_values as _merge_close_values_for_axes,
     build_regular_grid as _build_regular_grid_for_context,
 )
-from vent_router.placement import (
+from mep_routing.placement import (
     candidate_machine_rooms as _candidate_machine_rooms_for_placement,
     candidate_room_points as _candidate_room_points_for_placement,
     choose_core_like_machine_placement as _choose_core_like_machine_placement,
@@ -61,7 +61,7 @@ from vent_router.placement import (
     select_field_alignment_rotation as _select_field_alignment_rotation,
     topological_placement_scores as _topological_placement_scores,
 )
-from vent_router.routing import (
+from mep_routing.routing import (
     RouteScoreWeights,
     block_terminal_node_edges as _block_terminal_node_edges,
     build_routes_from_paths as _build_routes_from_paths_for_env,
@@ -101,20 +101,20 @@ from vent_router.routing import (
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
-from vent_router.ui import (
+from mep_routing.ui import (
     cool_colormap as _cool_colormap_value,
     heatmap_color as _heatmap_color,
     score_to_heatmap_t as _score_to_heatmap_t_value,
     turbo_color as _turbo_color,
     viridis_color as _viridis_color,
 )
-from vent_router.ui.drawing import (
+from mep_routing.ui.drawing import (
     draw_dashed_polyline as _draw_dashed_polyline,
     draw_geometry_overlay as _draw_geometry_overlay,
     draw_outlined_text as _draw_outlined_text,
     draw_polygon_hatch as _draw_polygon_hatch,
 )
-from vent_router.ui.controls import (
+from mep_routing.ui.controls import (
     canvas_tool_button_bounds as _canvas_tool_button_bounds,
     draw_min_piece_slider as _draw_min_piece_slider_widget,
     draw_weight_slider as _draw_weight_slider_widget,
@@ -122,7 +122,7 @@ from vent_router.ui.controls import (
     slider_value_from_x as _slider_value_from_x,
     weight_view_switch_bounds as _weight_view_switch_bounds,
 )
-from vent_router.ui.solution_logs import (
+from mep_routing.ui.solution_logs import (
     best_log_updates as _best_log_updates,
     draw_solution_logs_panel as _draw_solution_logs_panel_widget,
     metric_value_for_log as _metric_value_for_log_entry,

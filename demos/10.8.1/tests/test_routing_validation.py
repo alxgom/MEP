@@ -1,6 +1,6 @@
 from shapely.geometry import Polygon, box
 
-from vent_router.routing import append_allowed_region_warning, count_segments_outside_allowed_region
+from mep_routing.routing import append_allowed_region_warning, count_segments_outside_allowed_region
 
 
 def test_count_segments_outside_allowed_region_ignores_shaft_entry_segments():

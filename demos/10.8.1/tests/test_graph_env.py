@@ -2,7 +2,7 @@ from shapely.geometry import box
 
 import numpy as np
 
-from vent_router.graphs import EnvView, build_axis_grid, build_regular_grid, filter_dynamic_machine_obstacle
+from mep_routing.graphs import EnvView, build_axis_grid, build_regular_grid, filter_dynamic_machine_obstacle
 
 
 def test_env_view_preserves_nodes_and_adjacency_references():

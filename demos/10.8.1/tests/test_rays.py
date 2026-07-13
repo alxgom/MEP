@@ -1,6 +1,6 @@
 import numpy as np
 
-from vent_router.geometry import cast_rays_numpy, ray_ray_intersections_numpy
+from mep_routing.geometry import cast_rays_numpy, ray_ray_intersections_numpy
 
 
 def test_cast_rays_numpy_casts_to_rectangle_boundaries():

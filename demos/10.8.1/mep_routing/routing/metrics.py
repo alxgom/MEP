@@ -4,8 +4,8 @@ import math
 
 from shapely.geometry import LineString, Point
 
-from vent_router.geometry import axis_segment_distance, axis_segment_relation
-from vent_router.routing.segments import (
+from mep_routing.geometry import axis_segment_distance, axis_segment_relation
+from mep_routing.routing.segments import (
     merged_route_axis_segments,
     metric_route_segments,
     point_is_segment_endpoint,

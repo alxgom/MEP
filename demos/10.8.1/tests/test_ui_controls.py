@@ -1,4 +1,4 @@
-from vent_router.ui.controls import (
+from mep_routing.ui.controls import (
     canvas_tool_button_bounds,
     slider_fraction,
     slider_value_from_x,

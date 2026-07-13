@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from vent_router.routing.metrics import (
+from mep_routing.routing.metrics import (
     count_segment_clearance_conflicts,
     count_segment_crossings,
     count_segment_overlaps,

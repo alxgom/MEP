@@ -1,6 +1,6 @@
 from shapely.geometry import GeometryCollection, LineString, Point, Polygon
 
-from vent_router.geometry import snap_to_integer_grid
+from mep_routing.geometry import snap_to_integer_grid
 
 
 def test_snap_to_integer_grid_rounds_polygon_exterior_and_interiors():

@@ -1,4 +1,4 @@
-from vent_router.ui.solution_logs import (
+from mep_routing.ui.solution_logs import (
     best_log_updates,
     manual_best_values,
     metric_value_for_log,

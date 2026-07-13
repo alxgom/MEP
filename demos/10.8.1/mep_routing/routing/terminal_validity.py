@@ -4,7 +4,7 @@ import numpy as np
 from shapely.geometry import Point
 from shapely.prepared import prep as shapely_prep
 
-from vent_router.geometry import point_segment_min_distances
+from mep_routing.geometry import point_segment_min_distances
 
 
 def terminal_validity_entries(

@@ -1,6 +1,6 @@
 import pytest
 
-from vent_router.placement import (
+from mep_routing.placement import (
     field_alignment_pin_dirs,
     rotation_field_rooms_for_pin,
     rotation_room_weight,

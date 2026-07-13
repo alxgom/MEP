@@ -1,4 +1,4 @@
-from vent_router.routing import find_route_at_point, find_route_hit_at_point, selected_pin_names
+from mep_routing.routing import find_route_at_point, find_route_hit_at_point, selected_pin_names
 
 
 def test_find_route_hit_at_point_returns_nearest_route_with_distance():

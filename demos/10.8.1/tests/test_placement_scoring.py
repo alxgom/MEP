@@ -1,7 +1,7 @@
 import pytest
 from shapely.geometry import Polygon
 
-from vent_router.placement import (
+from mep_routing.placement import (
     area_out_percentage,
     candidate_room_points,
     core_like_machine_candidate_score,

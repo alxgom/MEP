@@ -1,6 +1,6 @@
 from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon
 
-from vent_router.geometry import iter_polygons, largest_polygon
+from mep_routing.geometry import iter_polygons, largest_polygon
 
 
 def test_iter_polygons_yields_single_polygon():

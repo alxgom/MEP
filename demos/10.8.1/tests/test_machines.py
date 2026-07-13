@@ -1,10 +1,10 @@
-from vent_router.domain import (
+from mep_routing.domain import (
     SAL_OZEO_FLAT_MACHINE,
     machine_pins,
     outward_vector,
     port_access_specs,
 )
-from vent_router.domain.routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
+from mep_routing.domain.routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
 
 
 def test_sal_ozeo_flat_machine_dimensions_match_demo_baseline():
