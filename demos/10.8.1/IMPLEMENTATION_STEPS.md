@@ -449,7 +449,7 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\ui\\help.py`.
 
 - Created `mep_routing.ui.plots` and switched the live routing-history panel to its rendering adapter.
-- Kept the previous plot body temporarily as a private fallback pending visual cleanup.
+- Removed the previous plot body after compiling the live adapter; `ui.plots` is now the sole renderer.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\plots.py`.
 
 ## Commit Checklist

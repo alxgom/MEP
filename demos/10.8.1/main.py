@@ -209,7 +209,7 @@ except ImportError:
 # Constants
 SCALE_TO_MM    = 1000
 WALL_THICKNESS = _SALUBRIDAD_DEFAULTS.get_default("WALL_THICKNESS")
-GRID_SPACING   = 200    # mm — regular routing grid resolution
+GRID_SPACING   = 200    # mm â€” regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
 CORE_EPSILON_GRID_MM = _SALUBRIDAD_DEFAULTS.get_default("CORE_EPSILON_GRID_MM")
 GRID_SPACING = _SALUBRIDAD_DEFAULTS.get_default("GRID_SPACING")
@@ -1317,9 +1317,9 @@ def snap_pins_to_graph(global_pins):
         targets.setdefault(spec["pin"], []).append(item)
     return targets
 
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # ROUTING UTILITIES AND CONSTRAINTS
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def get_pin_stub_length(pin_name):
     return MACHINE_SPEC.pin_stub_length_mm(pin_name)
 
@@ -2071,9 +2071,9 @@ def get_route_conflict_summary(routes):
         get_min_piece_length,
     )
 
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # TOPOLOGICAL DISTANCE FIELDS AUTO-PLACEMENT ALGORITHMS
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def is_machine_placement_valid(cx, cy, angle):
     global_pins = get_machine_pins(cx, cy, angle)
     return _is_machine_placement_valid_for_placement(
@@ -2244,9 +2244,9 @@ def run_auto_placement():
         run_core_workflow_machine_placement()
         return
 
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # MAIN SOLVER WRAPPER
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def solve_ventilation_routing():
     global edge_weight_debug_map, edge_weight_overlay_excluded_edges
     edge_weight_debug_map = {}
@@ -2265,7 +2265,7 @@ def solve_ventilation_routing():
         return None, "Blocked: Machine collides with column", 0.0, 0
 
     if grid_nodes is None:
-        return None, "Building grid… press Space to retry", 0.0, 0
+        return None, "Building gridâ€¦ press Space to retry", 0.0, 0
 
     if graph_type_idx == 0:
         update_dynamic_env(machine_poly)
@@ -2353,7 +2353,7 @@ def solve_ventilation_routing():
     perm_attempts = 0
 
     if routing_strategy_idx in (3, 4):
-        # ── Strategy 3 & 4: Negotiated Congestion ──
+        # â”€â”€ Strategy 3 & 4: Negotiated Congestion â”€â”€
         nets_list = ["Shaft", "Kitchen"] + other_rooms
         current_paths = {}
         current_pins = {}
@@ -2542,9 +2542,9 @@ def solve_ventilation_routing():
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         return None, f"Routing Blocked (tried {perm_attempts} perms) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # DWELLING AND ROOM GENERATORS
-# ──────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def generate_synthetic_dwelling():
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
@@ -2748,7 +2748,7 @@ def record_history(routes, crossings_count, elapsed_ms):
         for _, segs in routes:
             length_m += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
         turns = count_solution_turns(routes)
-    length_m /= 1000.0  # mm → m
+    length_m /= 1000.0  # mm â†’ m
     score = get_solution_score(routes, crossings_count) if routes else 0
     turns_per_m = turns / length_m if length_m > 0 else 0.0
     
@@ -2902,111 +2902,6 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
         text_color=COLOR_TEXT,
         muted_color=COLOR_MUTED,
     )
-
-def _draw_plots_legacy(screen, font_small, font_bold):
-    """Draw routing metrics and solve-time sparklines in the right panel."""
-    px = WINDOW_WIDTH - PANEL_W + 8
-    pw = PANEL_W - 24
-    ph = 104   # height of each chart area
-    gap = 8   # gap between the plots
-    titles   = ["DUCT LENGTH  (m)", "COST SCORE", "TURNS", "TURNS / METRE", "SOLVER TIME (ms)"]
-    buffers  = [hist_length, hist_score, hist_turns, hist_turns_per_len, hist_exec_ms]
-    colors   = [(46, 204, 113), (241, 196, 15), (155, 89, 182), (26, 188, 156), (52, 152, 219)]
-    y_starts = [50 + i * (ph + gap) for i in range(len(buffers))]
-
-    for title, buf, col, py in zip(titles, buffers, colors, y_starts):
-        # Background
-        pygame.draw.rect(screen, COLOR_PLOT_BG, (px - 4, py, pw + 8, ph), border_radius=6)
-        pygame.draw.rect(screen, (55, 55, 70),  (px - 4, py, pw + 8, ph), 1, border_radius=6)
-
-        # Title
-        lbl = font_bold.render(title, True, col)
-        screen.blit(lbl, (px, py + 6))
-
-        chart_y  = py + 26
-        chart_h  = ph - 42
-        chart_w  = pw
-        n = len(buf)
-
-        if n < 2:
-            lbl_wait = font_small.render("Move machine to trace…", True, COLOR_MUTED)
-            screen.blit(lbl_wait, (px, chart_y + chart_h // 2 - 8))
-            continue
-
-        vals  = list(buf)
-        # Zero-based scaling
-        lo    = 0.0
-        hi    = max(vals)
-        span  = hi - lo if hi > lo else 1.0
-
-        def sx(i):  return px + int(i / (n - 1) * chart_w)
-        def sy(v):  return chart_y + chart_h - int((v - lo) / span * chart_h)
-
-        # Highlight minimum values reached
-        min_val = min(vals)
-        min_idx = vals.index(min_val)
-        min_y = sy(min_val)
-        
-        # Draw horizontal dotted line at minimum
-        for dash_x in range(px, px + chart_w, 6):
-            pygame.draw.line(screen, (231, 76, 60),
-                             (dash_x, min_y), (min(dash_x + 3, px + chart_w), min_y))
-
-        log_markers_to_draw = []
-        visible_start_idx = hist_sample_count - n
-        # Draw vertical event markers (strategy changes, weight mode changes, etc.)
-        for idx, label, m_col in hist_event_markers:
-            rel = idx - visible_start_idx
-            if 0 <= rel < n:
-                mx_px = sx(rel)
-                lbl_ev = font_small.render(label, True, m_col)
-                is_log_marker = label.startswith("L") or label.startswith("Best")
-                if is_log_marker:
-                    value_idx = max(0, min(len(vals) - 1, rel))
-                    my_px = sy(vals[value_idx])
-                    log_markers_to_draw.append((mx_px, my_px, label, m_col))
-                else:
-                    for dash_y in range(chart_y, chart_y + chart_h, 8):
-                        pygame.draw.line(screen, m_col, (mx_px, dash_y), (mx_px, min(dash_y + 4, chart_y + chart_h)), 1)
-                    screen.blit(lbl_ev, (mx_px - lbl_ev.get_width() // 2, py + 16))
-
-        # Sparkline
-        pts = [(sx(i), sy(v)) for i, v in enumerate(vals)]
-        if len(pts) >= 2:
-            pygame.draw.lines(screen, col, False, pts, 2)
-
-        # Draw minimum dot
-        pygame.draw.circle(screen, (231, 76, 60), (sx(min_idx), min_y), 4)
-
-        # Current value dot
-        pygame.draw.circle(screen, (255, 255, 255), pts[-1], 4)
-        pygame.draw.circle(screen, col, pts[-1], 3)
-
-        for mx_px, my_px, label, m_col in log_markers_to_draw:
-            diamond = [
-                (mx_px, my_px - 6),
-                (mx_px + 6, my_px),
-                (mx_px, my_px + 6),
-                (mx_px - 6, my_px),
-            ]
-            pygame.draw.polygon(screen, m_col, diamond)
-            pygame.draw.polygon(screen, (255, 255, 255), diamond, 1)
-            lbl_ev = font_small.render(label, True, m_col)
-            screen.blit(lbl_ev, (mx_px + 8, max(chart_y, my_px - 8)))
-
-        # Percentages compare the current value to the best observed value.
-        def get_worse_than_min_str(v):
-            if abs(min_val) < 1e-5:
-                return "0.0%"
-            pct = ((v - min_val) / min_val) * 100.0
-            return f"+{max(0.0, pct):.1f}%"
-
-        cur_val = vals[-1]
-        lbl_cur = font_small.render(f"Cur: {cur_val:.1f} ({get_worse_than_min_str(cur_val)})", True, (255, 255, 255))
-        lbl_min = font_small.render(f"Min: {min_val:.1f}", True, (231, 76, 60))
-
-        screen.blit(lbl_cur, (px, chart_y + chart_h + 2))
-        screen.blit(lbl_min, (px + chart_w - lbl_min.get_width(), chart_y + chart_h + 2))
 
 def draw_plots(screen, font_small, font_bold):
     return _draw_routing_plots(
@@ -3550,7 +3445,7 @@ def main():
                         record_history(routes, crossings_c, elapsed_ms)
                         hist_event_markers.append((hist_sample_count - 1, f"W:{'Eq' if weight_mode_idx==1 else 'Def'}", (241, 196, 15)))
                     
-        # ── RENDERING ────────────────────────────────────────────────────────
+        # â”€â”€ RENDERING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         screen.fill(COLOR_BG)
         active_selection = bool(selected_route_name and routes and any(name == selected_route_name for name, _ in routes))
         if not active_selection:
@@ -3747,7 +3642,7 @@ def main():
                     port_pt = g_pins[best_p]
                     pygame.draw.line(screen, ROUTE_COLORS.get(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
 
-        # ── SIDEBAR PANEL ──
+        # â”€â”€ SIDEBAR PANEL â”€â”€
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
         draw_canvas_tool_controls(screen, font_small, ruler_mode)
         draw_terminal_tool_buttons(screen, font_bold, font_small)
@@ -3837,9 +3732,9 @@ def main():
             h_score = rotation_field_scores.get("H", 0.0)
             v_score = rotation_field_scores.get("V", 0.0)
             selected = rotation_field_scores.get("selected") or "-"
-            rot_text = f"Rot: {machine_angle}° {rot_mode_short} {selected} H{h_score:.3f}/V{v_score:.3f}"
+            rot_text = f"Rot: {machine_angle}Â° {rot_mode_short} {selected} H{h_score:.3f}/V{v_score:.3f}"
         else:
-            rot_text = f"Rotation: {machine_angle}° / {rot_mode_short}"
+            rot_text = f"Rotation: {machine_angle}Â° / {rot_mode_short}"
         lbl_rot = font_small.render(rot_text[:38], True, COLOR_TEXT)
         screen.blit(lbl_rot, (25, 570))
         
@@ -3910,7 +3805,7 @@ def main():
         lbl_fps = font_small.render(f"Render engine: Pygame ({clock.get_fps():.0f} FPS)", True, COLOR_MUTED)
         screen.blit(lbl_fps, (25, 905))
         
-        # ── RIGHT PANEL: plots ──────────────────────────────────────────────
+        # â”€â”€ RIGHT PANEL: plots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         draw_viewer_legend(screen, font_small)
 
         panel_x = WINDOW_WIDTH - PANEL_W
