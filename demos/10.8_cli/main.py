@@ -45,6 +45,8 @@ GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
 CORE_EPSILON_GRID_MM = 200
 CORE_SIMPLE_GRID_PIPE_DIAMETER_MM = 100
+CORE_CLIMA_BUFFER_ALLOWED_ROUTING_MM = 200
+CORE_CLIMA_BUFFER_RATIO = 0.6
 SMALL_PIN_STUB_LENGTH = 100
 LARGE_PIN_STUB_LENGTH = 250
 SIZE_FIRST_TRAMO_REJA_MM = 100
@@ -2178,6 +2180,22 @@ def _core_simple_steiner_points(machine_pins):
     points.extend(get_clima_supply_routing_points())
     return [(round(float(point[0])), round(float(point[1]))) for point in points]
 
+def _core_simple_allowed_region():
+    if routing_region_base is None:
+        return None
+    inset = routing_region_base.buffer(-CORE_CLIMA_BUFFER_ALLOWED_ROUTING_MM, cap_style=3, join_style=2)
+    return routing_region_base if inset.is_empty else inset
+
+def _core_simple_fixed_obstacles():
+    """Port the fixed-obstacle buffer used by RouteClimaLivingRouting."""
+    air_width = float(get_current_machine()["connectors"]["air_out"]["size"][1])
+    buffer_to_apply = air_width / 2.0 * CORE_CLIMA_BUFFER_RATIO
+    return [
+        obstacle.buffer(buffer_to_apply, cap_style=3, join_style=2)
+        for obstacle in [*columns, *shafts]
+        if obstacle is not None and not obstacle.is_empty
+    ]
+
 def build_core_simple_grid(machine_pins=None):
     """NumPy adjacency port of routing-core `_create_grid_dynamic_simple`.
 
@@ -2188,6 +2206,10 @@ def build_core_simple_grid(machine_pins=None):
     if routing_region_base is None:
         return
     t0 = time.perf_counter()
+    allowed = _core_simple_allowed_region()
+    if allowed is None or allowed.is_empty:
+        _commit_grid(np.empty((0, 2), dtype=np.float32), [])
+        return
     pipe_diameter = CORE_SIMPLE_GRID_PIPE_DIAMETER_MM
     terminal_points = _core_simple_steiner_points(machine_pins)
     if not terminal_points:
@@ -2196,10 +2218,10 @@ def build_core_simple_grid(machine_pins=None):
 
     xs = {point[0] for point in terminal_points}
     ys = {point[1] for point in terminal_points}
-    boundary_x, boundary_y = _core_simple_allowed_boundary_axes(routing_region_base)
+    boundary_x, boundary_y = _core_simple_allowed_boundary_axes(allowed)
     xs.update(boundary_x)
     ys.update(boundary_y)
-    obstacles = [geom for geom in [*columns, *shafts] if geom is not None and not geom.is_empty]
+    obstacles = _core_simple_fixed_obstacles()
     for obstacle in obstacles:
         minx, miny, maxx, maxy = obstacle.buffer(pipe_diameter, join_style=2).bounds
         xs.update((round(float(minx)), round(float(maxx))))
@@ -2219,7 +2241,7 @@ def build_core_simple_grid(machine_pins=None):
             point = (x, y)
             shapely_point = Point(float(x), float(y))
             if point not in terminal_set:
-                if not routing_region_base.contains(shapely_point):
+                if not allowed.contains(shapely_point):
                     continue
                 if any(obstacle.contains(shapely_point) for obstacle in obstacles):
                     continue
@@ -2239,7 +2261,7 @@ def build_core_simple_grid(machine_pins=None):
             if u is None or v is None:
                 continue
             line = LineString([(float(x1), float(y)), (float(x2), float(y))])
-            blocked = not line.covered_by(routing_region_base) or any(line.intersects(obstacle) for obstacle in obstacles)
+            blocked = not line.covered_by(allowed) or any(line.intersects(obstacle) for obstacle in obstacles)
             weight = 1e6 if blocked else float(abs(x2 - x1))
             raw_edges.append((u, v, weight, "E"))
     for x in xs:
@@ -2249,7 +2271,7 @@ def build_core_simple_grid(machine_pins=None):
             if u is None or v is None:
                 continue
             line = LineString([(float(x), float(y1)), (float(x), float(y2))])
-            blocked = not line.covered_by(routing_region_base) or any(line.intersects(obstacle) for obstacle in obstacles)
+            blocked = not line.covered_by(allowed) or any(line.intersects(obstacle) for obstacle in obstacles)
             weight = 1e6 if blocked else float(abs(y2 - y1))
             raw_edges.append((u, v, weight, "N"))
 
