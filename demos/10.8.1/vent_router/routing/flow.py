@@ -124,3 +124,91 @@ def small_pin_target_specs(room_names, pin_node_map, small_pins=("tl", "tr", "bl
         ]
         for room_name in room_names
     }
+
+
+def build_pin_min_cost_flow_network(
+    route_names,
+    target_specs_by_route,
+    start_nodes_by_route,
+    adjacency,
+    edge_cost_fn,
+    direction_fn,
+    bend_penalty,
+    overlap_block_weight,
+):
+    """Build the shared line-graph residual network used by pin-routing flow."""
+    all_targets = [
+        target
+        for route_name in route_names
+        for target in target_specs_by_route.get(route_name, [])
+    ]
+    if not all_targets:
+        return None
+
+    source = 0
+    sink = 1
+    graph = [[] for _ in range(2)]
+
+    def new_node():
+        graph.append([])
+        return len(graph) - 1
+
+    route_flow_nodes = {}
+    for route_name in route_names:
+        route_flow_nodes[route_name] = new_node()
+        add_edge(graph, source, route_flow_nodes[route_name], 1, 0.0)
+
+    state_nodes = {}
+    for u, edges in adjacency.items():
+        for v, _dist, _direction in edges:
+            state_nodes[(int(u), int(v))] = (new_node(), new_node())
+
+    extra_state_capacity = max(len(route_names) - 1, 0)
+    for (u, v), (state_in, state_out) in state_nodes.items():
+        add_edge(graph, state_in, state_out, 1, 0.0, ("state", u, v))
+        if extra_state_capacity:
+            add_edge(graph, state_in, state_out, extra_state_capacity, overlap_block_weight, ("state", u, v))
+
+    for route_name in route_names:
+        for start_idx in start_nodes_by_route.get(route_name, []):
+            for v, dist, _direction in adjacency.get(start_idx, []):
+                v = int(v)
+                if (start_idx, v) not in state_nodes:
+                    continue
+                edge_cost = edge_cost_fn(start_idx, v, dist)
+                state_in, _ = state_nodes[(start_idx, v)]
+                add_edge(graph, route_flow_nodes[route_name], state_in, 1, edge_cost)
+
+    for (u, v), (_state_in, state_out) in state_nodes.items():
+        current_direction = direction_fn(u, v)
+        for w, dist, next_direction in adjacency.get(v, []):
+            w = int(w)
+            if w == u or (v, w) not in state_nodes:
+                continue
+            next_in, _ = state_nodes[(v, w)]
+            edge_cost = edge_cost_fn(v, w, dist)
+            turn_penalty = bend_penalty if current_direction != next_direction else 0.0
+            add_edge(graph, state_out, next_in, len(route_names), edge_cost + turn_penalty)
+
+    pin_nodes = {}
+    for target in all_targets:
+        pin_nodes.setdefault(target["pin"], new_node())
+    for pin_node in pin_nodes.values():
+        add_edge(graph, pin_node, sink, 1, 0.0)
+
+    for route_name in route_names:
+        for target in target_specs_by_route.get(route_name, []):
+            target_node = int(target["node_idx"])
+            spec_node = new_node()
+            add_edge(graph, spec_node, pin_nodes[target["pin"]], 1, 0.0, ("target", target))
+
+            for u in adjacency:
+                u = int(u)
+                if (u, target_node) not in state_nodes:
+                    continue
+                _, state_out = state_nodes[(u, target_node)]
+                current_direction = direction_fn(u, target_node)
+                final_penalty = bend_penalty if current_direction != target["in_dir"] else 0.0
+                add_edge(graph, state_out, spec_node, 1, final_penalty)
+
+    return graph, source, sink, route_flow_nodes

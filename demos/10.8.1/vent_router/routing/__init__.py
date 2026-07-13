@@ -36,6 +36,7 @@ from .clearance import (
 )
 from .flow import (
     add_edge,
+    build_pin_min_cost_flow_network,
     min_cost_flow,
     positive_flow_edges,
     small_pin_target_specs,
@@ -63,6 +64,7 @@ from .terminal_validity import terminal_validity_entries
 __all__ = [
     "RouteScoreWeights",
     "add_edge",
+    "build_pin_min_cost_flow_network",
     "add_port_stub_segment",
     "block_terminal_node_edges",
     "buffered_radius_mm",

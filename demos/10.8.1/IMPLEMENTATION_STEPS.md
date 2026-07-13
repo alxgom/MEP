@@ -124,6 +124,11 @@ Manual validation milestones:
 - Added focused tests for toolbar bounds, switch bounds, slider clamping, and slider fractions.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\controls.py demos\10.8.1\tests\test_ui_controls.py`.
 - Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
+- Extracted the pin min-cost-flow residual-network builder to `vent_router.routing.flow`.
+- Kept `main.py` responsible for active graph/KD-tree access, edge-weight overlays, runtime cost callbacks, and consuming solved flow paths.
+- Added focused tests for a direct start-to-pin network and no-target handling.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\flow.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\tests\test_routing_flow.py`.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
 - Extracted `point_segment_min_distances`, `edge_segment_min_distances`, and `edge_parallel_segment_min_distances` to `vent_router.geometry.distances`.
 - Kept `main.py` compatibility imports under the previous private helper names.
 - Added focused tests for projection, endpoint, empty-segment, sampled-edge, and parallel-overlap distance behavior.

@@ -2,6 +2,7 @@ import numpy as np
 
 from vent_router.routing import (
     add_edge,
+    build_pin_min_cost_flow_network,
     min_cost_flow,
     positive_flow_edges,
     small_pin_target_specs,
@@ -87,3 +88,39 @@ def test_small_pin_target_specs_collects_targets_for_each_room():
         "Bath": [{"pin": "tl", "node_idx": 1}, {"pin": "tr", "node_idx": 2}],
         "Toilet": [{"pin": "tl", "node_idx": 1}, {"pin": "tr", "node_idx": 2}],
     }
+
+
+def test_pin_min_cost_flow_network_routes_start_to_matching_pin_target():
+    target = {"pin": "left_mid", "node_idx": 1, "in_dir": "H"}
+    network = build_pin_min_cost_flow_network(
+        ["Shaft"],
+        {"Shaft": [target]},
+        {"Shaft": [0]},
+        {0: [(1, 10.0, "H")], 1: [(0, 10.0, "H")]},
+        edge_cost_fn=lambda _u, _v, distance: distance,
+        direction_fn=lambda _u, _v: "H",
+        bend_penalty=50.0,
+        overlap_block_weight=1e9,
+    )
+
+    graph, source, sink, route_flow_nodes = network
+    flow, cost = min_cost_flow(graph, source, sink, flow_required=1)
+    path, selected_target = trace_flow_path(graph, route_flow_nodes["Shaft"], sink)
+
+    assert flow == 1
+    assert cost == 10.0
+    assert path == [0, 1]
+    assert selected_target == target
+
+
+def test_pin_min_cost_flow_network_returns_none_without_targets():
+    assert build_pin_min_cost_flow_network(
+        ["Shaft"],
+        {"Shaft": []},
+        {"Shaft": [0]},
+        {0: []},
+        edge_cost_fn=lambda _u, _v, distance: distance,
+        direction_fn=lambda _u, _v: "H",
+        bend_penalty=0.0,
+        overlap_block_weight=1e9,
+    ) is None

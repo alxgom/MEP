@@ -69,7 +69,7 @@ from vent_router.routing import (
     count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
     add_port_stub_segment as _add_port_stub_segment,
-    add_edge as _mcf_add_edge,
+    build_pin_min_cost_flow_network as _build_pin_min_cost_flow_network,
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
     line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
@@ -2828,79 +2828,23 @@ def _run_pin_min_cost_flow(route_names, target_specs_by_route, terminal_points_b
         return {}, {}, 0.0, 0
     record_edge_weight_overlay(edge_weights, current_env)
 
-    all_targets = [
-        target
+    start_nodes_by_route = {
+        route_name: _source_start_nodes(terminal_points_by_route[route_name])
         for route_name in route_names
-        for target in target_specs_by_route.get(route_name, [])
-    ]
-    if not all_targets:
+    }
+    network = _build_pin_min_cost_flow_network(
+        route_names,
+        target_specs_by_route,
+        start_nodes_by_route,
+        current_env.adj,
+        lambda u, v, dist: _weighted_edge_cost(edge_weights, u, v, dist),
+        lambda u, v: _line_graph_dir_from_points(current_env, u, v),
+        C_BEND,
+        OVERLAP_BLOCK_WEIGHT,
+    )
+    if network is None:
         return None, None, float("inf"), 0
-
-    source = 0
-    sink = 1
-    graph = [[] for _ in range(2)]
-
-    def new_node():
-        graph.append([])
-        return len(graph) - 1
-
-    route_flow_nodes = {}
-    for route_name in route_names:
-        route_flow_nodes[route_name] = new_node()
-        _mcf_add_edge(graph, source, route_flow_nodes[route_name], 1, 0.0)
-
-    state_nodes = {}
-    for u, edges in current_env.adj.items():
-        for v, _, _ in edges:
-            state_nodes[(int(u), int(v))] = (new_node(), new_node())
-
-    extra_state_capacity = max(len(route_names) - 1, 0)
-    for (u, v), (state_in, state_out) in state_nodes.items():
-        _mcf_add_edge(graph, state_in, state_out, 1, 0.0, ("state", u, v))
-        if extra_state_capacity:
-            _mcf_add_edge(graph, state_in, state_out, extra_state_capacity, OVERLAP_BLOCK_WEIGHT, ("state", u, v))
-
-    for route_name in route_names:
-        for start_idx in _source_start_nodes(terminal_points_by_route[route_name]):
-            for v, dist, _ in current_env.adj.get(start_idx, []):
-                v = int(v)
-                if (start_idx, v) not in state_nodes:
-                    continue
-                edge_cost = _weighted_edge_cost(edge_weights, start_idx, v, dist)
-                state_in, _ = state_nodes[(start_idx, v)]
-                _mcf_add_edge(graph, route_flow_nodes[route_name], state_in, 1, edge_cost)
-
-    for (u, v), (_, state_out) in state_nodes.items():
-        curr_dir = _line_graph_dir_from_points(current_env, u, v)
-        for w, dist, next_dir in current_env.adj.get(v, []):
-            w = int(w)
-            if w == u or (v, w) not in state_nodes:
-                continue
-            next_in, _ = state_nodes[(v, w)]
-            edge_cost = _weighted_edge_cost(edge_weights, v, w, dist)
-            turn_penalty = C_BEND if curr_dir != next_dir else 0.0
-            _mcf_add_edge(graph, state_out, next_in, len(route_names), edge_cost + turn_penalty)
-
-    pin_nodes = {}
-    for target in all_targets:
-        pin_nodes.setdefault(target["pin"], new_node())
-    for pin_name, pin_node in pin_nodes.items():
-        _mcf_add_edge(graph, pin_node, sink, 1, 0.0)
-
-    for route_name in route_names:
-        for target in target_specs_by_route.get(route_name, []):
-            target_node = int(target["node_idx"])
-            spec_node = new_node()
-            _mcf_add_edge(graph, spec_node, pin_nodes[target["pin"]], 1, 0.0, ("target", target))
-
-            for u, edges in current_env.adj.items():
-                u = int(u)
-                if (u, target_node) not in state_nodes:
-                    continue
-                _, state_out = state_nodes[(u, target_node)]
-                curr_dir = _line_graph_dir_from_points(current_env, u, target_node)
-                final_penalty = C_BEND if curr_dir != target["in_dir"] else 0.0
-                _mcf_add_edge(graph, state_out, spec_node, 1, final_penalty)
+    graph, source, sink, route_flow_nodes = network
 
     flow, cost = _min_cost_flow(graph, source, sink, len(route_names))
     if flow < len(route_names):
