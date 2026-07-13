@@ -510,6 +510,10 @@ Manual validation milestones:
 - Kept `main.py` responsible for live graph/geometry context, the existing display globals, and terminal-block exclusions; the routing runtime now owns static distance caching, clearance and interaction composition, and overlay calculation.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\routing\\weight_runtime.py mep_routing\\routing\\__init__.py tests\\test_weight_runtime.py`; Python 3.11 `-m pytest tests\\test_weight_runtime.py tests\\test_routing_clearance.py` (14 passed).
 
+- Integrated the five-card dashboard sidebar through `mep_routing.ui.sidebar`.
+- Kept `main.py` responsible for current display-value derivation, help-button state, and slider callbacks; the UI module now owns the fixed Pygame card layout and text rendering.
+- Validation: Python 3.11 `-m py_compile main.py mep_routing\\ui\\sidebar.py tests\\test_ui_sidebar.py`; Python 3.11 `-m pytest tests\\test_ui_sidebar.py` (2 passed).
+
 ## Commit Checklist
 
 Before each commit:

@@ -202,6 +202,17 @@ from mep_routing.ui.overlays import (
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
 from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
+from mep_routing.ui.sidebar import (
+    AutoPlacementCard,
+    ExecutionStatusCard,
+    KpiCard,
+    MachineCard,
+    SidebarColors,
+    SidebarFonts,
+    SidebarView,
+    SolverCard,
+    draw_sidebar as _draw_sidebar,
+)
 from mep_routing.ui.events import (
     CanvasGestureState as _CanvasGestureState,
     CanvasHit as _CanvasHit,
@@ -2880,168 +2891,103 @@ def main():
         draw_canvas_tool_controls(screen, font_small, ruler_mode)
         draw_terminal_tool_buttons(screen, font_bold, font_small)
 
-        pygame.draw.rect(screen, COLOR_PANEL, (0, 0, CANVAS_LEFT - 10, WINDOW_HEIGHT))
-        pygame.draw.line(screen, COLOR_WALL, (CANVAS_LEFT - 10, 0), (CANVAS_LEFT - 10, WINDOW_HEIGHT), 2)
-        
-        title_surf = font_title.render("Auto-Placement visualizer", True, COLOR_TEXT)
-        screen.blit(title_surf, (20, 20))
-        sub_surf = font_small.render("Vents & Extraction Router Dashboard", True, COLOR_MUTED)
-        screen.blit(sub_surf, (20, 42))
-        
-        # 1. Auto-placement State Card
-        auto_card = pygame.Rect(15, 75, CANVAS_LEFT - 40, 135)
-        pygame.draw.rect(screen, (40, 45, 55), auto_card, border_radius=6)
-        lbl_ap_title = font_bold.render("AUTO-PLACEMENT STATE", True, COLOR_TEXT)
-        screen.blit(lbl_ap_title, (25, 85))
-        draw_card_help_button(screen, "auto", auto_card, font_small)
-        mode_text = AUTO_PLACEMENT_MODES[auto_placement_mode_idx]
-        lbl_ap_mode = font_bold.render(f"Mode: {mode_text}", True, COLOR_TEXT)
-        screen.blit(lbl_ap_mode, (25, 105))
-        lbl_ap_keys = font_small.render("[P] Mode | [V] Heatmap", True, COLOR_MUTED)
-        screen.blit(lbl_ap_keys, (25, 125))
-        h_text = "Disabled"
+        heatmap_text = "Disabled"
         if show_heatmap:
             scale_text = "Linear" if heatmap_scale_mode == 0 else "Log"
             palette_text = "Viridis" if heatmap_palette_idx == 1 else "Turbo"
-            h_text = f"{palette_text} / {scale_text}"
-        lbl_ap_heatmap = font_small.render(f"[V] Heatmap: {h_text}", True, COLOR_MUTED)
-        screen.blit(lbl_ap_heatmap, (25, 145))
-        lbl_ap_scale = font_small.render("[A] Auto | [?] More", True, COLOR_MUTED)
-        screen.blit(lbl_ap_scale, (25, 160))
-        w_text = "Default" if weight_mode_idx == 0 else "Equal (1.0)"
-        lbl_ap_weights = font_small.render(f"[W] Placement Weights: {w_text}", True, COLOR_MUTED)
-        screen.blit(lbl_ap_weights, (25, 180))
-        rot_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
-        lbl_ap_rot = font_small.render(f"[U] Rotation: {rot_mode_short}", True, COLOR_MUTED)
-        screen.blit(lbl_ap_rot, (25, 195))
-        
-        # 2. Solver Config Card
-        solver_card = pygame.Rect(15, 220, CANVAS_LEFT - 40, 250)
-        pygame.draw.rect(screen, (40, 45, 55), solver_card, border_radius=6)
-        lbl_solv_title = font_bold.render("ROUTING PATH SOLVER", True, COLOR_TEXT)
-        screen.blit(lbl_solv_title, (25, 230))
-        draw_card_help_button(screen, "solver", solver_card, font_small)
-        lbl_strat = font_small.render(f"Strategy: {ROUTING_STRATEGIES[routing_strategy_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_strat, (25, 250))
-        lbl_router = font_small.render(f"Router: {ROUTER_BACKENDS[router_backend_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_router, (25, 270))
-        lbl_heur = font_small.render(f"Heuristic: {HEURISTIC_MODES[heuristic_mode_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_heur, (25, 290))
-        lbl_graph = font_small.render(f"Grid type: {GRAPH_TYPES[graph_type_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_graph, (25, 310))
-        lbl_start = font_small.render(f"Starts: {ROOM_START_MODES[room_start_mode_idx]}", True, COLOR_TEXT)
-        screen.blit(lbl_start, (25, 330))
-        mw_mode = "On" if edge_weight_heatmap_enabled else "Off"
+            heatmap_text = f"{palette_text} / {scale_text}"
+        placement_weights_text = "Default" if weight_mode_idx == 0 else "Equal (1.0)"
+        rotation_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
+        edge_weight_mode = "On" if edge_weight_heatmap_enabled else "Off"
         diameter_mode = "Real" if route_real_diameter_width_enabled else "Fixed"
-        weight_view = "Small" if edge_weight_view_mode_idx == 0 else "Big"
-        lbl_mw = font_small.render(f"Edge weights: {mw_mode}/{weight_view} | Pipes: {diameter_mode}", True, COLOR_TEXT)
-        screen.blit(lbl_mw, (25, 350))
-        selected_text = selected_route_name if selected_route_name else "None"
+        edge_weight_text = (
+            f"{edge_weight_mode}/{'Small' if edge_weight_view_mode_idx == 0 else 'Big'} "
+            f"| Pipes: {diameter_mode}"
+        )
         preferred_count = sum(
             len(points)
             for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values())
         )
-        lbl_selected = font_small.render(f"Selected: {selected_text[:14]} | Prefs: {preferred_count}", True, COLOR_TEXT)
-        screen.blit(lbl_selected, (25, 365))
-        draw_min_piece_slider(screen, font_small, 25, 385, CANVAS_LEFT - 70)
-        draw_weight_slider(screen, font_small, 25, 420, CANVAS_LEFT - 70, "Bend weight", C_BEND, C_BEND_MIN, C_BEND_MAX, (155, 89, 182), "bend", integer=True)
-        draw_weight_slider(screen, font_small, 25, 452, CANVAS_LEFT - 70, "Cross x bend", crossing_penalty_multiplier, CROSSING_MULTIPLIER_MIN, CROSSING_MULTIPLIER_MAX, (230, 126, 34), "crossing", "x")
-        
-        # 3. Placement Info Card
-        machine_card = pygame.Rect(15, 480, CANVAS_LEFT - 40, 105)
-        pygame.draw.rect(screen, (40, 45, 55), machine_card, border_radius=6)
-        lbl_pos_title = font_bold.render("MACHINE PLACEMENT", True, COLOR_TEXT)
-        screen.blit(lbl_pos_title, (25, 490))
-        draw_card_help_button(screen, "machine", machine_card, font_small)
-        source_label = DWELLING_SOURCE_MODES[dwelling_source_idx]
-        scenario_short = current_scenario_label[-22:]
-        lbl_scenario = font_small.render(f"Source: {source_label[:10]} / {scenario_short}", True, COLOR_TEXT)
-        screen.blit(lbl_scenario, (25, 510))
         frame = current_scenario_summary.get("routing_frame") or {}
         frame_name = str(frame.get("name") or ROUTING_FRAME_OPTIONS[routing_frame_idx]).replace("_", " ")
-        lbl_frame = font_small.render(f"Frame: {frame_name[:24]}", True, COLOR_MUTED)
-        screen.blit(lbl_frame, (25, 530))
-        lbl_coord = font_small.render(f"Position: ({int(machine_cx)}, {int(machine_cy)}) mm", True, COLOR_TEXT)
-        screen.blit(lbl_coord, (25, 550))
-        rot_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
         if rotation_mode_idx == 1:
             h_score = rotation_field_scores.get("H", 0.0)
             v_score = rotation_field_scores.get("V", 0.0)
             selected = rotation_field_scores.get("selected") or "-"
-            rot_text = f"Rot: {machine_angle}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° {rot_mode_short} {selected} H{h_score:.3f}/V{v_score:.3f}"
+            rotation_text = f"Rot: {machine_angle}° {rotation_mode_short} {selected} H{h_score:.3f}/V{v_score:.3f}"
         else:
-            rot_text = f"Rotation: {machine_angle}ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° / {rot_mode_short}"
-        lbl_rot = font_small.render(rot_text[:38], True, COLOR_TEXT)
-        screen.blit(lbl_rot, (25, 570))
-        
-        # 4. KPI Metrics Card
-        kpi_card = pygame.Rect(15, 595, CANVAS_LEFT - 40, 135)
-        pygame.draw.rect(screen, (40, 45, 55), kpi_card, border_radius=6)
-        lbl_kpi_title = font_bold.render("ROUTING RUNTIME KPIs", True, COLOR_TEXT)
-        screen.blit(lbl_kpi_title, (25, 605))
-        draw_card_help_button(screen, "kpi", kpi_card, font_small)
-        
-        total_len_mm = 0.0
-        total_turns_count = 0
-        if routes:
-            for name, segs in routes:
-                total_len_mm += sum(np.hypot(p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in segs)
-            total_turns_count = count_solution_turns(routes)
-                
-        lbl_len = font_small.render(f"Total Duct Length: {total_len_mm/1000.0:.2f} m", True, COLOR_TEXT)
-        screen.blit(lbl_len, (25, 625))
-        lbl_turns = font_small.render(f"Total Turns: {total_turns_count}", True, COLOR_TEXT)
-        screen.blit(lbl_turns, (25, 645))
-        crossings_count = count_segment_crossings(routes) if routes else 0
-        lbl_cross = font_small.render(f"Duct Crossings: {crossings_count}", True, COLOR_TEXT)
-        screen.blit(lbl_cross, (25, 665))
-        short_pieces_count = count_solution_short_pieces(routes) if routes else 0
-        lbl_short = font_small.render(f"Short Pieces: {short_pieces_count}", True, COLOR_TEXT)
-        screen.blit(lbl_short, (25, 685))
-        lbl_score = font_small.render(f"Total Cost Score: {get_solution_score(routes, crossings_count) if routes else 0}", True, COLOR_TEXT)
-        screen.blit(lbl_score, (25, 705))
-        
-        # 5. Status Box
-        status_card = pygame.Rect(15, 740, CANVAS_LEFT - 40, 170)
-        pygame.draw.rect(screen, (40, 45, 55), status_card, border_radius=6)
-        lbl_status_title = font_bold.render("SOLVER EXECUTION STATUS", True, COLOR_TEXT)
-        screen.blit(lbl_status_title, (25, 750))
-        draw_card_help_button(screen, "status", status_card, font_small)
-        
-        words = status.split()
-        lines = []
-        curr_line = ""
-        for w in words:
-            if len(curr_line + " " + w) > 28:
-                lines.append(curr_line)
-                curr_line = w
-            else:
-                curr_line = (curr_line + " " + w).strip()
-        if curr_line:
-            lines.append(curr_line)
-            
-        y_off = 770
-        for ln in lines:
-            lbl_line = font_small.render(ln, True, COLOR_TEXT)
-            screen.blit(lbl_line, (25, y_off))
-            y_off += 18
+            rotation_text = f"Rotation: {machine_angle}° / {rotation_mode_short}"
 
+        total_len_mm = sum(
+            np.hypot(p2[0] - p1[0], p2[1] - p1[1])
+            for _route_name, segments in (routes or ())
+            for p1, p2 in segments
+        )
+        total_turns_count = count_solution_turns(routes) if routes else 0
+        crossings_count = count_segment_crossings(routes) if routes else 0
+        short_pieces_count = count_solution_short_pieces(routes) if routes else 0
         validation_warnings = get_route_validation_warnings(routes)
-        warn_text = "Warnings: none" if not validation_warnings else "Warnings: " + ", ".join(validation_warnings[:2])
-        if len(validation_warnings) > 2:
-            warn_text += f" +{len(validation_warnings) - 2}"
-        warn_color = COLOR_MUTED if not validation_warnings else (241, 196, 15)
-        lbl_warn = font_small.render(warn_text[:42], True, warn_color)
-        screen.blit(lbl_warn, (25, 835))
-            
-        lbl_runtime = font_small.render(f"Pathfinder time: {elapsed_ms:.1f} ms", True, COLOR_TEXT)
-        screen.blit(lbl_runtime, (25, 865))
-        lbl_nodes = font_small.render(f"Total routed nodes: {total_nodes}", True, COLOR_MUTED)
-        screen.blit(lbl_nodes, (25, 885))
-        lbl_fps = font_small.render(f"Render engine: Pygame ({clock.get_fps():.0f} FPS)", True, COLOR_MUTED)
-        screen.blit(lbl_fps, (25, 905))
-        
-        # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ RIGHT PANEL: plots ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
+        sidebar_view = SidebarView(
+            auto_placement=AutoPlacementCard(
+                mode=AUTO_PLACEMENT_MODES[auto_placement_mode_idx],
+                heatmap=heatmap_text,
+                placement_weights=placement_weights_text,
+                rotation_mode=rotation_mode_short,
+            ),
+            solver=SolverCard(
+                strategy=ROUTING_STRATEGIES[routing_strategy_idx],
+                router=ROUTER_BACKENDS[router_backend_idx],
+                heuristic=HEURISTIC_MODES[heuristic_mode_idx],
+                grid_type=GRAPH_TYPES[graph_type_idx],
+                starts=ROOM_START_MODES[room_start_mode_idx],
+                edge_weights=edge_weight_text,
+                selected_route=selected_route_name,
+                preferred_terminal_count=preferred_count,
+                bend_value=C_BEND,
+                bend_min=C_BEND_MIN,
+                bend_max=C_BEND_MAX,
+                crossing_value=crossing_penalty_multiplier,
+                crossing_min=CROSSING_MULTIPLIER_MIN,
+                crossing_max=CROSSING_MULTIPLIER_MAX,
+            ),
+            machine=MachineCard(
+                source=DWELLING_SOURCE_MODES[dwelling_source_idx],
+                scenario=current_scenario_label,
+                frame=frame_name,
+                position_mm=(machine_cx, machine_cy),
+                rotation=rotation_text,
+            ),
+            kpis=KpiCard(
+                total_length_mm=total_len_mm,
+                total_turns=total_turns_count,
+                crossings=crossings_count,
+                short_pieces=short_pieces_count,
+                total_cost=get_solution_score(routes, crossings_count) if routes else 0,
+            ),
+            execution=ExecutionStatusCard(
+                message=status,
+                validation_warnings=validation_warnings,
+                elapsed_ms=elapsed_ms,
+                total_nodes=total_nodes,
+                fps=clock.get_fps(),
+            ),
+        )
+        _draw_sidebar(
+            screen,
+            canvas_left=CANVAS_LEFT,
+            window_height=WINDOW_HEIGHT,
+            fonts=SidebarFonts(title=font_title, bold=font_bold, small=font_small),
+            colors=SidebarColors(
+                panel=COLOR_PANEL,
+                wall=COLOR_WALL,
+                text=COLOR_TEXT,
+                muted=COLOR_MUTED,
+            ),
+            view=sidebar_view,
+            draw_help_button=lambda card_id, rect, font: draw_card_help_button(screen, card_id, rect, font),
+            draw_min_piece_slider=draw_min_piece_slider,
+            draw_weight_slider=draw_weight_slider,
+        )
         draw_viewer_legend(screen, font_small)
 
         panel_x = WINDOW_WIDTH - PANEL_W
