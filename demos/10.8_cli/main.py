@@ -55,6 +55,7 @@ SIZE_FIRST_TRAMO_MAQUINA_AIRE_MM = 200
 MIN_DISTANCE_REJA_MM = 400
 MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM = 700
 MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM = 25
+MIN_SIZE_CONDUCTO_AIRE_MM = 150
 MACHINE_CLEARANCE = 0
 CLIMA_MACHINES = [
     {
@@ -3012,7 +3013,11 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_s
     canonical = CLIMA_CONNECTOR_ALIASES.get(pin_name, pin_name)
     first_tramo = SIZE_FIRST_TRAMO_MAQUINA_AIRE_MM if canonical == "air_out" else get_pin_stub_length(pin_name)
     distance_total = math.hypot(pin_pt[0] - access_pt[0], pin_pt[1] - access_pt[1])
-    if distance_total > first_tramo and first_tramo > 1.0:
+    if (
+        distance_total > first_tramo
+        and distance_total - first_tramo > MIN_SIZE_CONDUCTO_AIRE_MM
+        and first_tramo > 1.0
+    ):
         ratio = (distance_total - first_tramo) / distance_total
         intermediate = (
             access_pt[0] + (pin_pt[0] - access_pt[0]) * ratio,
