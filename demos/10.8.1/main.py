@@ -174,6 +174,12 @@ from mep_routing.ui.heatmaps import (
     draw_edge_weight_colorbar as _draw_edge_weight_colorbar,
     draw_edge_weight_heatmap as _draw_edge_weight_heatmap,
 )
+from mep_routing.ui.help import (
+    draw_card_help_button as _draw_card_help_button,
+    draw_help_popup as _draw_help_popup,
+    draw_transient_message as _draw_transient_message,
+    draw_viewer_legend as _draw_viewer_legend,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -3064,28 +3070,10 @@ HELP_TEXT = {
 
 def draw_card_help_button(screen, card_id, rect, font_small):
     global help_button_rects
-    btn = pygame.Rect(rect.right - 26, rect.y + 8, 18, 18)
-    help_button_rects[card_id] = btn
-    active = help_popup_card == card_id
-    fill = (58, 80, 94) if active else (50, 55, 66)
-    pygame.draw.rect(screen, fill, btn, border_radius=9)
-    pygame.draw.rect(screen, COLOR_MUTED, btn, 1, border_radius=9)
-    lbl = font_small.render("?", True, COLOR_TEXT)
-    screen.blit(lbl, (btn.centerx - lbl.get_width() // 2, btn.centery - lbl.get_height() // 2))
+    help_button_rects[card_id] = _draw_card_help_button(screen, card_id, rect, font_small, help_popup_card == card_id, COLOR_MUTED, COLOR_TEXT)
 
 def draw_help_popup(screen, font_small):
-    if not help_popup_card or help_popup_card not in HELP_TEXT:
-        return
-    lines = HELP_TEXT[help_popup_card]
-    width = 235
-    line_h = 18
-    height = 18 + len(lines) * line_h
-    rect = pygame.Rect(CANVAS_LEFT + 16, CANVAS_TOP + 58, width, height)
-    pygame.draw.rect(screen, (22, 22, 30), rect, border_radius=6)
-    pygame.draw.rect(screen, (120, 130, 145), rect, 1, border_radius=6)
-    for i, line in enumerate(lines):
-        lbl = font_small.render(line, True, COLOR_TEXT)
-        screen.blit(lbl, (rect.x + 10, rect.y + 10 + i * line_h))
+    return _draw_help_popup(screen, font_small, HELP_TEXT.get(help_popup_card), (CANVAS_LEFT + 16, CANVAS_TOP + 58), COLOR_TEXT)
 
 def set_transient_message(text, duration_ms=2400):
     global transient_message, transient_message_until_ms
@@ -3095,37 +3083,13 @@ def set_transient_message(text, duration_ms=2400):
 def draw_transient_message(screen, font_small):
     if not transient_message or pygame.time.get_ticks() > transient_message_until_ms:
         return
-    surf = font_small.render(transient_message, True, COLOR_TEXT)
-    rect = pygame.Rect(CANVAS_LEFT + 16, CANVAS_TOP + 16, surf.get_width() + 20, surf.get_height() + 12)
-    pygame.draw.rect(screen, (55, 45, 35), rect, border_radius=5)
-    pygame.draw.rect(screen, (241, 196, 15), rect, 1, border_radius=5)
-    screen.blit(surf, (rect.left + 10, rect.top + 6))
+    return _draw_transient_message(screen, font_small, transient_message, (CANVAS_LEFT, CANVAS_TOP), COLOR_TEXT)
 
 def draw_viewer_legend(screen, font_small):
-    x = CANVAS_LEFT + 18
-    y = CANVAS_TOP + CANVAS_H - 34
-
-    if terminal_validity_overlay_enabled:
-        allowed_label = font_small.render("allowed", True, COLOR_PLAN_LABEL)
-        blocked_label = font_small.render("blocked", True, COLOR_PLAN_LABEL)
-        width = 34 + allowed_label.get_width() + 28 + blocked_label.get_width() + 18
-        rect = pygame.Rect(x, y - 30, width, 24)
-        pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
-        pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
-        draw_terminal_validity_square(screen, (rect.x + 15, rect.centery), 12, True)
-        screen.blit(allowed_label, (rect.x + 28, rect.centery - allowed_label.get_height() // 2))
-        blocked_x = rect.x + 34 + allowed_label.get_width() + 22
-        draw_terminal_validity_square(screen, (blocked_x, rect.centery), 12, False)
-        screen.blit(blocked_label, (blocked_x + 14, rect.centery - blocked_label.get_height() // 2))
-
-    label = font_small.render("wet rooms", True, COLOR_PLAN_LABEL)
-    rect = pygame.Rect(x, y, label.get_width() + 58, 24)
-    pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
-    pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
-    line_y = rect.centery
-    pygame.draw.line(screen, COLOR_WET_ROOM_ACCENT, (rect.x + 10, line_y), (rect.x + 36, line_y), 3)
-    pygame.draw.line(screen, COLOR_WALL, (rect.x + 10, line_y + 3), (rect.x + 36, line_y + 3), 1)
-    screen.blit(label, (rect.x + 44, rect.centery - label.get_height() // 2))
+    return _draw_viewer_legend(
+        screen, font_small, (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), terminal_validity_overlay_enabled,
+        COLOR_PLAN_LABEL, COLOR_WET_ROOM_ACCENT, COLOR_WALL, draw_terminal_validity_square,
+    )
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx

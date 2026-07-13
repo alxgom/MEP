@@ -431,6 +431,10 @@ Manual validation milestones:
 - Kept `main.py` responsible for visualization toggles, cache ownership, and coordinate/color adapters.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\heatmaps.py`.
 
+- Created `mep_routing.ui.help` for contextual-help buttons/popups, transient messages, and the viewer legend.
+- Kept `main.py` responsible for active help/status state and current theme/layout values.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\help.py`.
+
 ## Commit Checklist
 
 Before each commit:
