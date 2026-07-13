@@ -1,14 +1,16 @@
 # Validation Reference
 
-Use the cheapest validation that can catch likely regressions for the current step.
+Use the cheapest validation that can catch likely regressions for the current step. Scale validation to behavioral risk, not the number of functions moved.
 
 ## Always
 
 Run `python -m py_compile` on changed Python files.
 
-## Pure Modules
+## Contract Tests
 
-Add or run focused tests when functions are extracted and can be imported without launching Pygame.
+Add or run focused tests only when an extraction introduces or changes a reusable public contract, solver invariant, geometry rule, or configuration behavior.
+
+Do not add tests solely for forwarding wrappers, unchanged formatting, or Pygame drawing relocation. Compile those changes and validate them at the applicable manual milestone.
 
 Good targets:
 
@@ -18,6 +20,7 @@ Good targets:
 - route scoring
 - clearance classification
 - graph builder invariants
+- routing strategy outcomes for representative scenarios
 
 ## Manual Milestones
 
@@ -41,4 +44,3 @@ Manual checks:
 - terminal point/area tools still work
 - route selection still works
 - plots/logging still update
-

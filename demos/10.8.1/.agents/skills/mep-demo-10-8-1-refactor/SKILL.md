@@ -19,7 +19,7 @@ Follow this workflow before changing code in `demos/10.8.1`.
 
 - Keep the work scoped to Demo 10.8.1.
 - Preserve `python main.py` as the app entrypoint until a deliberate migration changes it.
-- Move behavior in small, reviewable steps.
+- Move behavior in coherent, reviewable subsystem steps; do not split work into helper-only commits when a stable boundary can move together.
 - Keep pure computation independent from Pygame and filesystem adapters.
 - Use integer millimetres internally wherever practical.
 - Use English semantic config keys.
@@ -36,9 +36,8 @@ Follow this workflow before changing code in `demos/10.8.1`.
 
 ## Finish
 
-1. Run appropriate validation.
+1. Run risk-proportionate validation from `references/validation.md`.
 2. Update `IMPLEMENTATION_STEPS.md` with completed work, validation, and next step changes.
 3. Stage only related files.
 4. Commit with a focused message.
 5. Report commit hash and any remaining risks.
-

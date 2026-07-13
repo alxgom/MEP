@@ -11,6 +11,7 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - Regulation: do not classify existing values as regulation unless a legal/code/project-code source is explicit.
 - UI ownership: most UI behavior and style is installation-domain scoped; shared tools like ruler, zoom, overlays, and base dwelling geometry styling are global UI.
 - Cli/Coc/San: treat as future unknowns. Do not design by guessing their details; leave extension points and merge concrete behavior later.
+- Validation pacing: use contract tests for public behavior and solver/geometry invariants. Do not add tests for simple forwarding wrappers or unchanged drawing moves; use compilation and the relevant manual milestone instead.
 
 ## External References
 
