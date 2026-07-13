@@ -47,24 +47,15 @@ from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
     edge_segment_min_distances as _edge_segment_min_distances,
-    iter_polygons as _iter_polygons_from_geom,
-    largest_polygon as _largest_polygon_from_geom,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
     snap_to_integer_grid,
 )
 from mep_routing.graphs import (
     append_shaft_runtime_node as _append_shaft_runtime_node,
-    build_axis_grid as _build_axis_grid_for_context,
     build_hannan_static_axes as _build_hannan_static_axes_for_context,
-    build_epsilon_axes as _build_epsilon_axes_for_context,
+    build_hannan_variant as _build_hannan_variant,
+    build_epsilon_variant as _build_epsilon_variant,
     filter_dynamic_machine_obstacle as _filter_dynamic_machine_obstacle,
-    add_bounds_axes as _add_bounds_axes_to_sets,
-    add_epsilon_axis_values as _add_epsilon_axis_values_to_sets,
-    add_epsilon_geometry_axes as _add_epsilon_geometry_axes_to_sets,
-    add_point_axes as _add_point_axes_to_sets,
-    add_polygon_vertex_axes as _add_polygon_vertex_axes_to_sets,
-    extend_allowed_boundary_axes as _extend_allowed_boundary_axes_for_graph,
-    merge_close_values as _merge_close_values_for_axes,
     build_regular_grid as _build_regular_grid_for_context,
     create_runtime_graph as _create_runtime_graph,
     restrict_pin_access_edges as _restrict_pin_access_edges,
@@ -875,27 +866,6 @@ def update_dynamic_env(machine_poly):
     ms = (time.perf_counter() - t0) * 1000.0
     print(f"Grid update: {ms:.1f} ms  (blocked nodes={blocked_node_count}, edges={blocked_edge_count})")
 
-def _iter_polygons(geom):
-    yield from _iter_polygons_from_geom(geom)
-
-def _add_point_axes(xs, ys, point):
-    return _add_point_axes_to_sets(xs, ys, point)
-
-def _add_polygon_vertex_axes(xs, ys, geom):
-    return _add_polygon_vertex_axes_to_sets(xs, ys, geom)
-
-def _add_bounds_axes(xs, ys, geom, clearance=0.0):
-    return _add_bounds_axes_to_sets(xs, ys, geom, clearance)
-
-def _largest_polygon(geom):
-    return _largest_polygon_from_geom(geom)
-
-def _extend_allowed_boundary_axes(allowed, inset=100.0, cluster_dist=300.0):
-    return _extend_allowed_boundary_axes_for_graph(allowed, inset, cluster_dist)
-
-def _merge_close_values(values, threshold, preserve_values=None, priority_values=None):
-    return _merge_close_values_for_axes(values, threshold, preserve_values, priority_values)
-
 def _get_hannan_static_template(shift_walls=False):
     global hannan_static_cache
     cache_key = bool(shift_walls)
@@ -922,70 +892,45 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
     if routing_region_base is None:
         return
     t0 = time.perf_counter()
-
-    template = _get_hannan_static_template(shift_walls=shift_walls)
-    xs = set(template["xs"])
-    ys = set(template["ys"])
-    preserve_x = set(template["preserve_x"])
-    preserve_y = set(template["preserve_y"])
-    required_points = []
-
-    for pt in terminals.values():
-        required_points.append((round(float(pt[0])), round(float(pt[1]))))
-    if shaft_extraction is not None:
-        rep_pt = shaft_extraction.representative_point()
-        required_points.append((round(float(rep_pt.x)), round(float(rep_pt.y))))
-
-    if machine_pins:
-        for spec in get_port_access_specs(machine_pins, machine_angle):
-            x, y = spec["access_point"]
-            xs.add(x)
-            ys.add(y)
-            preserve_x.add(x)
-            preserve_y.add(y)
-            required_points.append((x, y))
-
-    xs = _merge_close_values(xs, threshold=120.0, preserve_values=preserve_x, priority_values=template["priority_x"])
-    ys = _merge_close_values(ys, threshold=120.0, preserve_values=preserve_y, priority_values=template["priority_y"])
-    t1 = time.perf_counter()
-
-    nodes_arr, raw_edges, (node_build_ms, edge_build_ms) = _build_axis_grid_for_context(
-        xs, ys, routing_region_base, _node_routing_region(), wall_polys, WALL_THICKNESS, required_points,
+    machine_access_points = [] if not machine_pins else [
+        spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle)
+    ]
+    result = _build_hannan_variant(
+        template=_get_hannan_static_template(shift_walls=shift_walls),
+        allowed_region=routing_region_base,
+        node_region=_node_routing_region(),
+        wall_polys=wall_polys,
+        wall_thickness_mm=WALL_THICKNESS,
+        terminals=terminals,
+        shaft_extraction=shaft_extraction,
+        machine_access_points=machine_access_points,
     )
-    if not len(nodes_arr):
-        _commit_grid(nodes_arr, [])
+    if not len(result.nodes):
+        _commit_grid(result.nodes, [])
         return
-
-    _commit_grid(nodes_arr, raw_edges)
+    _commit_grid(result.nodes, result.edges)
     ms_total = (time.perf_counter() - t0) * 1000.0
-    ms_axes = (t1 - t0) * 1000.0
-    ms_nodes = node_build_ms
-    ms_edges = edge_build_ms
     print(
-        f"[Hannan Simple] axes={len(xs)}x{len(ys)} nodes={len(nodes_arr)} edges={len(raw_edges)} "
-        f"in {ms_total:.1f}ms (axes {ms_axes:.1f}, nodes {ms_nodes:.1f}, edges {ms_edges:.1f})"
+        f"[Hannan Simple] axes={len(result.axes_x)}x{len(result.axes_y)} nodes={len(result.nodes)} edges={len(result.edges)} "
+        f"in {ms_total:.1f}ms (axes {result.axes_ms:.1f}, nodes {result.nodes_ms:.1f}, edges {result.edges_ms:.1f})"
     )
-
-def _add_epsilon_axis_values(xs, ys, point, epsilon=CORE_EPSILON_GRID_MM):
-    return _add_epsilon_axis_values_to_sets(xs, ys, point, epsilon)
-
-def _add_epsilon_geometry_axes(xs, ys, geom, epsilon=CORE_EPSILON_GRID_MM):
-    return _add_epsilon_geometry_axes_to_sets(xs, ys, geom, epsilon)
 
 def build_epsilon_grid(machine_pins=None):
     if routing_region_base is None:
         return
     t0 = time.perf_counter()
     eps = CORE_EPSILON_GRID_MM
-    machine_access_points = []
-    if machine_pins:
-        machine_access_points = [spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle)]
-    xs, ys, required_points = _build_epsilon_axes_for_context(
+    machine_access_points = [] if not machine_pins else [
+        spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle)
+    ]
+    result = _build_epsilon_variant(
         allowed_region=routing_region_base,
+        node_region=_node_routing_region(),
         covers=covers,
         columns=columns,
         shafts=shafts,
         wall_polys=wall_polys,
+        wall_thickness_mm=WALL_THICKNESS,
         terminals=terminals,
         shaft_core_entry_specs=shaft_core_entry_specs,
         shaft_extraction=shaft_extraction,
@@ -993,21 +938,15 @@ def build_epsilon_grid(machine_pins=None):
         epsilon_mm=eps,
         scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
     )
-    t1 = time.perf_counter()
-
-    nodes_arr, raw_edges, (node_build_ms, edge_build_ms) = _build_axis_grid_for_context(
-        xs, ys, routing_region_base, _node_routing_region(), wall_polys, WALL_THICKNESS, required_points,
-    )
-    if not len(nodes_arr):
-        _commit_grid(nodes_arr, [])
+    if not len(result.nodes):
+        _commit_grid(result.nodes, [])
         return
-
-    _commit_grid(nodes_arr, raw_edges)
+    _commit_grid(result.nodes, result.edges)
     ms_total = (time.perf_counter() - t0) * 1000.0
     print(
-        f"[Epsilon Core-like] eps={eps:.0f} axes={len(xs)}x{len(ys)} nodes={len(nodes_arr)} "
-        f"edges={len(raw_edges)} in {ms_total:.1f}ms "
-        f"(axes {(t1-t0)*1000:.1f}, nodes {node_build_ms:.1f}, edges {edge_build_ms:.1f})"
+        f"[Epsilon Core-like] eps={eps:.0f} axes={len(result.axes_x)}x{len(result.axes_y)} nodes={len(result.nodes)} "
+        f"edges={len(result.edges)} in {ms_total:.1f}ms "
+        f"(axes {result.axes_ms:.1f}, nodes {result.nodes_ms:.1f}, edges {result.edges_ms:.1f})"
     )
 
 def build_grid(machine_pins=None):

@@ -15,6 +15,7 @@ from .regular import build_regular_grid, filter_edges_against_walls
 from .hannan import build_static_axes as build_hannan_static_axes
 from .epsilon import build_axes as build_epsilon_axes
 from .dynamic import filter_dynamic_machine_obstacle
+from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant
 from .runtime import (
     RuntimeGraph,
     append_shaft_runtime_node,
@@ -29,6 +30,9 @@ __all__ = [
     "build_hannan_static_axes",
     "build_epsilon_axes",
     "filter_dynamic_machine_obstacle",
+    "GraphVariantResult",
+    "build_epsilon_variant",
+    "build_hannan_variant",
     "RuntimeGraph",
     "append_shaft_runtime_node",
     "create_runtime_graph",

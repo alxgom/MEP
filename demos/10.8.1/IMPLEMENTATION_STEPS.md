@@ -479,6 +479,10 @@ Manual validation milestones:
 - Preserved the prior no-history behavior for auto-placement mode controls.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\events.py tests\\test_ui_events.py`; ran both UI event contracts directly because the available default Python environment does not include pytest.
 
+- Integrated Hannan and epsilon variant assembly through `mep_routing.graphs.variants`, including live machine access points, required-node preservation, and variant timing diagnostics.
+- Removed unused graph-axis forwarding wrappers from `main.py`; it now owns cache/state selection and graph-runtime commit only.
+- Validation: Python 3.11 `-m py_compile main.py mep_routing\\graphs\\variants.py mep_routing\\graphs\\__init__.py tests\\test_graph_variants.py`; Python 3.11 `-m pytest tests\\test_graph_variants.py tests\\test_graph_axes.py tests\\test_graph_env.py`.
+
 ## Commit Checklist
 
 Before each commit:
