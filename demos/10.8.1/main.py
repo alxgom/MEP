@@ -2769,20 +2769,17 @@ def get_selected_pin_names(selected_route_name, routes, global_pins):
 def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
     base_weights = {}
     prior_axis_records = []
-    exhaust_node_idx = shaft_path[-1] if shaft_path else None
 
     kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
     routes = []
     
-    # Shaft segments
-    shaft_segs = []
-    if shaft_path and shaft_extraction:
-        add_shaft_entry_segments(shaft_segs, shaft_path[0])
-    for i in range(len(shaft_path) - 1):
-        p1 = current_env.nodes[shaft_path[i]]
-        p2 = current_env.nodes[shaft_path[i+1]]
-        shaft_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-    add_port_stub_segment(shaft_segs, chosen_exhaust_pin, exhaust_node_idx, global_pins, chosen_exhaust_target)
+    shaft_segs = _route_segments_from_path(
+        "Shaft",
+        shaft_path,
+        chosen_exhaust_pin,
+        global_pins,
+        chosen_exhaust_target,
+    )
     routes.append(("Shaft", shaft_segs))
     prior_axis_records.extend(_route_axis_records("Shaft", shaft_segs))
     
@@ -2820,12 +2817,13 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         if kitchen_path is None:
             return False, None, "No path to Kitchen", 0
             
-        kitchen_segs = []
-        for i in range(len(kitchen_path) - 1):
-            p1 = current_env.nodes[kitchen_path[i]]
-            p2 = current_env.nodes[kitchen_path[i+1]]
-            kitchen_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-        add_port_stub_segment(kitchen_segs, kitchen_pin_name, kitchen_path[-1], global_pins, kitchen_target)
+        kitchen_segs = _route_segments_from_path(
+            "Kitchen",
+            kitchen_path,
+            kitchen_pin_name,
+            global_pins,
+            kitchen_target,
+        )
         routes.append(("Kitchen", kitchen_segs))
         prior_axis_records.extend(_route_axis_records("Kitchen", kitchen_segs))
         total_nodes += len(kitchen_path)
@@ -2853,12 +2851,13 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         if room_path is None:
             return False, None, f"No path to {room_name}", 0
             
-        room_segs = []
-        for i in range(len(room_path) - 1):
-            p1 = current_env.nodes[room_path[i]]
-            p2 = current_env.nodes[room_path[i+1]]
-            room_segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-        add_port_stub_segment(room_segs, chosen_small_pin, room_path[-1], global_pins, room_target)
+        room_segs = _route_segments_from_path(
+            room_name,
+            room_path,
+            chosen_small_pin,
+            global_pins,
+            room_target,
+        )
         routes.append((room_name, room_segs))
         prior_axis_records.extend(_route_axis_records(room_name, room_segs))
         total_nodes += len(room_path)

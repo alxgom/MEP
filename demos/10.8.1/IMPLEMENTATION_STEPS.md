@@ -304,6 +304,8 @@ Manual validation milestones:
 - Added focused tests for KPI calculation, empty-route handling, metric lookup, improved best-log updates, and missing-history handling.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\solution_logs.py demos\10.8.1\tests\test_solution_logs.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
+- Reused the shared route reconstruction adapter in sequential routing for shaft, kitchen, and small-duct routes.
+- This removes three local path-to-segment implementations while preserving sequential-routing order, weights, and terminal selection in `main.py`.
 
 ## Commit Checklist
 
