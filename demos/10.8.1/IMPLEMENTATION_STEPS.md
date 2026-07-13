@@ -17,6 +17,11 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - Added one graph-builder contract test for integer-grid nodes and wall-crossing edge removal.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\regular.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.
 - Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
+- Extracted shared axis-grid node construction, visibility filtering, wall checks, required-node reconnection, and timing breakdowns to `vent_router.graphs.axis_grid`.
+- Hannan and epsilon builders now retain only their axis-generation policy and active app adapters.
+- Added a contract test covering axis-grid visibility filtering and timing output.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\axis_grid.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
 
 ## External References
 

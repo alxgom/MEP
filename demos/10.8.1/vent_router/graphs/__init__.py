@@ -10,10 +10,12 @@ from .axes import (
     merge_close_values,
 )
 from .env import EnvView
+from .axis_grid import build_axis_grid
 from .regular import build_regular_grid, filter_edges_against_walls
 
 __all__ = [
     "EnvView",
+    "build_axis_grid",
     "build_regular_grid",
     "filter_edges_against_walls",
     "add_bounds_axes",

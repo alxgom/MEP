@@ -35,6 +35,7 @@ from vent_router.geometry import (
 )
 from vent_router.graphs import (
     EnvView,
+    build_axis_grid as _build_axis_grid_for_context,
     add_bounds_axes as _add_bounds_axes_to_sets,
     add_epsilon_axis_values as _add_epsilon_axis_values_to_sets,
     add_epsilon_geometry_axes as _add_epsilon_geometry_axes_to_sets,
@@ -1256,76 +1257,6 @@ def _get_hannan_static_template(shift_walls=False):
     hannan_static_cache[cache_key] = template
     return template
 
-def _edge_allowed(line, wall_bounds):
-    if routing_region_base is None or not line.covered_by(routing_region_base):
-        return False
-    ex1, ey1, ex2, ey2 = line.bounds
-    for idx, wp in enumerate(wall_polys):
-        wx1, wy1, wx2, wy2 = wall_bounds[idx]
-        if not (ex2 >= wx1 - 1.0 and ex1 <= wx2 + 1.0 and ey2 >= wy1 - 1.0 and ey1 <= wy2 + 1.0):
-            continue
-        if line.intersects(wp):
-            inter = line.intersection(wp)
-            if not inter.is_empty and inter.length > WALL_THICKNESS + 1:
-                return False
-    return True
-
-def _connect_isolated_required_nodes(nodes_arr, raw_edges, required_points, wall_bounds):
-    if len(nodes_arr) == 0:
-        return raw_edges
-
-    existing = set()
-    degree = {}
-    for u, v, _, _ in raw_edges:
-        existing.add((min(u, v), max(u, v)))
-        degree[u] = degree.get(u, 0) + 1
-        degree[v] = degree.get(v, 0) + 1
-
-    by_x = {}
-    by_y = {}
-    for idx, (x, y) in enumerate(nodes_arr):
-        by_x.setdefault(round(float(x)), []).append(idx)
-        by_y.setdefault(round(float(y)), []).append(idx)
-
-    for px, py in required_points:
-        matches = np.where((np.abs(nodes_arr[:, 0] - px) < 1.0) & (np.abs(nodes_arr[:, 1] - py) < 1.0))[0]
-        if len(matches) == 0:
-            continue
-        u = int(matches[0])
-        if degree.get(u, 0) > 0:
-            continue
-
-        candidates = []
-        for v in by_x.get(round(float(px)), []):
-            if v != u:
-                candidates.append(v)
-        for v in by_y.get(round(float(py)), []):
-            if v != u:
-                candidates.append(v)
-
-        candidates = sorted(set(candidates), key=lambda v: float(np.hypot(nodes_arr[v, 0] - px, nodes_arr[v, 1] - py)))
-        for v in candidates[:12]:
-            key = (min(u, v), max(u, v))
-            if key in existing:
-                continue
-            line = LineString([(float(nodes_arr[u, 0]), float(nodes_arr[u, 1])), (float(nodes_arr[v, 0]), float(nodes_arr[v, 1]))])
-            if not (routing_region_base is not None and line.covered_by(routing_region_base)):
-                continue
-            w = float(np.hypot(nodes_arr[v, 0] - nodes_arr[u, 0], nodes_arr[v, 1] - nodes_arr[u, 1]))
-            if w < 1.0:
-                continue
-            if abs(nodes_arr[v, 0] - nodes_arr[u, 0]) > abs(nodes_arr[v, 1] - nodes_arr[u, 1]):
-                d = 'E' if nodes_arr[v, 0] > nodes_arr[u, 0] else 'W'
-            else:
-                d = 'N' if nodes_arr[v, 1] > nodes_arr[u, 1] else 'S'
-            raw_edges.append((u, v, w, d))
-            existing.add(key)
-            degree[u] = degree.get(u, 0) + 1
-            degree[v] = degree.get(v, 0) + 1
-            break
-
-    return raw_edges
-
 def build_hannan_grid(machine_pins=None, shift_walls=False):
     if routing_region_base is None:
         return
@@ -1357,49 +1288,18 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
     ys = _merge_close_values(ys, threshold=120.0, preserve_values=preserve_y, priority_values=template["priority_y"])
     t1 = time.perf_counter()
 
-    preg = shapely_prep(_node_routing_region())
-    node_map = {}
-    nodes = []
-    for y in ys:
-        for x in xs:
-            if preg.contains(Point(float(x), float(y))):
-                node_map[(x, y)] = len(nodes)
-                nodes.append((x, y))
-
-    if not nodes:
-        grid_nodes = np.empty((0, 2), dtype=np.float32)
-        _commit_grid(grid_nodes, [])
+    nodes_arr, raw_edges, (node_build_ms, edge_build_ms) = _build_axis_grid_for_context(
+        xs, ys, routing_region_base, _node_routing_region(), wall_polys, WALL_THICKNESS, required_points,
+    )
+    if not len(nodes_arr):
+        _commit_grid(nodes_arr, [])
         return
-
-    nodes_arr = np.array(nodes, dtype=np.float32)
-    t2 = time.perf_counter()
-
-    raw_edges = []
-    wall_bounds = [wp.bounds for wp in wall_polys]
-
-    for y in ys:
-        row = [x for x in xs if (x, y) in node_map]
-        for x1, x2 in zip(row, row[1:]):
-            line = LineString([(float(x1), float(y)), (float(x2), float(y))])
-            if _edge_allowed(line, wall_bounds):
-                raw_edges.append((node_map[(x1, y)], node_map[(x2, y)], float(abs(x2 - x1)), 'E'))
-
-    for x in xs:
-        col = [y for y in ys if (x, y) in node_map]
-        for y1, y2 in zip(col, col[1:]):
-            line = LineString([(float(x), float(y1)), (float(x), float(y2))])
-            if _edge_allowed(line, wall_bounds):
-                raw_edges.append((node_map[(x, y1)], node_map[(x, y2)], float(abs(y2 - y1)), 'N'))
-
-    raw_edges = _connect_isolated_required_nodes(nodes_arr, raw_edges, required_points, wall_bounds)
-
-    t3 = time.perf_counter()
 
     _commit_grid(nodes_arr, raw_edges)
     ms_total = (time.perf_counter() - t0) * 1000.0
     ms_axes = (t1 - t0) * 1000.0
-    ms_nodes = (t2 - t1) * 1000.0
-    ms_edges = (t3 - t2) * 1000.0
+    ms_nodes = node_build_ms
+    ms_edges = edge_build_ms
     print(
         f"[Hannan Simple] axes={len(xs)}x{len(ys)} nodes={len(nodes_arr)} edges={len(raw_edges)} "
         f"in {ms_total:.1f}ms (axes {ms_axes:.1f}, nodes {ms_nodes:.1f}, edges {ms_edges:.1f})"
@@ -1470,46 +1370,19 @@ def build_epsilon_grid(machine_pins=None):
     ys = _merge_close_values(ys, threshold=80.0, preserve_values=preserve_y)
     t1 = time.perf_counter()
 
-    preg = shapely_prep(_node_routing_region())
-    node_map = {}
-    nodes = []
-    for y in ys:
-        for x in xs:
-            if preg.contains(Point(float(x), float(y))):
-                node_map[(x, y)] = len(nodes)
-                nodes.append((x, y))
-
-    if not nodes:
-        _commit_grid(np.empty((0, 2), dtype=np.float32), [])
+    nodes_arr, raw_edges, (node_build_ms, edge_build_ms) = _build_axis_grid_for_context(
+        xs, ys, routing_region_base, _node_routing_region(), wall_polys, WALL_THICKNESS, required_points,
+    )
+    if not len(nodes_arr):
+        _commit_grid(nodes_arr, [])
         return
-
-    nodes_arr = np.array(nodes, dtype=np.float32)
-    t2 = time.perf_counter()
-
-    raw_edges = []
-    wall_bounds = [wp.bounds for wp in wall_polys]
-    for y in ys:
-        row = [x for x in xs if (x, y) in node_map]
-        for x1, x2 in zip(row, row[1:]):
-            line = LineString([(float(x1), float(y)), (float(x2), float(y))])
-            if _edge_allowed(line, wall_bounds):
-                raw_edges.append((node_map[(x1, y)], node_map[(x2, y)], float(abs(x2 - x1)), 'E'))
-    for x in xs:
-        col = [y for y in ys if (x, y) in node_map]
-        for y1, y2 in zip(col, col[1:]):
-            line = LineString([(float(x), float(y1)), (float(x), float(y2))])
-            if _edge_allowed(line, wall_bounds):
-                raw_edges.append((node_map[(x, y1)], node_map[(x, y2)], float(abs(y2 - y1)), 'N'))
-
-    raw_edges = _connect_isolated_required_nodes(nodes_arr, raw_edges, required_points, wall_bounds)
-    t3 = time.perf_counter()
 
     _commit_grid(nodes_arr, raw_edges)
     ms_total = (time.perf_counter() - t0) * 1000.0
     print(
         f"[Epsilon Core-like] eps={eps:.0f} axes={len(xs)}x{len(ys)} nodes={len(nodes_arr)} "
         f"edges={len(raw_edges)} in {ms_total:.1f}ms "
-        f"(axes {(t1-t0)*1000:.1f}, nodes {(t2-t1)*1000:.1f}, edges {(t3-t2)*1000:.1f})"
+        f"(axes {(t1-t0)*1000:.1f}, nodes {node_build_ms:.1f}, edges {edge_build_ms:.1f})"
     )
 
 def build_grid(machine_pins=None):
