@@ -47,6 +47,7 @@ CORE_EPSILON_GRID_MM = 200
 CORE_SIMPLE_GRID_PIPE_DIAMETER_MM = 100
 CORE_CLIMA_BUFFER_ALLOWED_ROUTING_MM = 200
 CORE_CLIMA_BUFFER_RATIO = 0.6
+CORE_STEINER_ADJUST_EPSILON_MM = 300
 SMALL_PIN_STUB_LENGTH = 100
 LARGE_PIN_STUB_LENGTH = 250
 SIZE_FIRST_TRAMO_REJA_MM = 100
@@ -2174,9 +2175,15 @@ def _core_simple_allowed_boundary_axes(allowed):
     return spaced_axes(point[0] for point in clustered), spaced_axes(point[1] for point in clustered)
 
 def _core_simple_steiner_points(machine_pins):
+    if clima_supply_backend_idx in (0, 1):
+        return list(get_core_adjusted_steiner_terminals(machine_pins).values())
     points = []
     if machine_pins:
-        points.extend(spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle) if spec["pin"] == "air_out")
+        points.extend(
+            spec["access_point"]
+            for spec in get_port_access_specs(machine_pins, machine_angle)
+            if spec["pin"] == "air_out"
+        )
     points.extend(get_clima_supply_routing_points())
     return [(round(float(point[0])), round(float(point[1]))) for point in points]
 
@@ -2538,6 +2545,68 @@ def _normalized_or_none(vec):
     if norm <= 1e-7:
         return None
     return arr / norm
+
+def _core_steiner_movable_axes(vector):
+    """Port of routing-core ``calcula_moves`` for an axis-aligned connector vector."""
+    direction = _normalized_or_none(vector)
+    if direction is None:
+        return (False, False)
+    if np.allclose(direction, (1.0, 0.0), atol=0.1) or np.allclose(direction, (-1.0, 0.0), atol=0.1):
+        return (True, False)
+    if np.allclose(direction, (0.0, 1.0), atol=0.1) or np.allclose(direction, (0.0, -1.0), atol=0.1):
+        return (False, True)
+    return (True, True)
+
+def _core_steiner_coordinate_clusters(values, epsilon=CORE_STEINER_ADJUST_EPSILON_MM):
+    """One-dimensional DBSCAN(eps, min_samples=2) used by the core terminal adjustment."""
+    order = np.argsort(values)
+    clusters = []
+    cluster = [int(order[0])] if len(order) else []
+    for index in order[1:]:
+        index = int(index)
+        if float(values[index] - values[cluster[-1]]) <= epsilon:
+            cluster.append(index)
+        else:
+            if len(cluster) >= 2:
+                clusters.append(cluster)
+            cluster = [index]
+    if len(cluster) >= 2:
+        clusters.append(cluster)
+    return clusters
+
+def get_core_adjusted_steiner_terminals(machine_pins):
+    """Port routing-core's direction-aware ``adjust_points_extended`` for Cli terminals."""
+    if not machine_pins:
+        return {}
+    port_specs = {spec["pin"]: spec for spec in get_port_access_specs(machine_pins, machine_angle)}
+    source_spec = port_specs.get("air_out")
+    if source_spec is None:
+        return {}
+
+    terminal_data = [("air_out", source_spec["access_point"], get_current_machine()["connectors"]["air_out"]["normal"])]
+    for route_name in _clima_supply_route_names():
+        point = get_clima_grille_steiner_point(route_name)
+        if point is not None:
+            vector = terminal_connection_specs.get(route_name, {}).get("connector_vector")
+            terminal_data.append((route_name, point, vector))
+
+    points = np.array([item[1] for item in terminal_data], dtype=np.float64)
+    moves = [_core_steiner_movable_axes(item[2]) for item in terminal_data]
+    adjusted = points.copy()
+    for axis in range(2):
+        for cluster in _core_steiner_coordinate_clusters(points[:, axis]):
+            if all(moves[index][axis] for index in cluster):
+                target = float(np.mean(points[cluster, axis]))
+            else:
+                target = float(np.max([points[index, axis] for index in cluster if not moves[index][axis]]))
+            for index in cluster:
+                if moves[index][axis]:
+                    adjusted[index, axis] = target
+
+    return {
+        label: (round(float(point[0])), round(float(point[1])))
+        for (label, _, _), point in zip(terminal_data, adjusted)
+    }
 
 def get_clima_grille_steiner_point(route_name):
     terminal_pt = terminals.get(route_name)
@@ -5791,11 +5860,16 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map, backend_lab
     supply_routes = _clima_supply_route_names()
     if not supply_routes:
         return None, "No supply grille targets", 0
-    air_targets = pin_node_map.get("air_out", [])
-    if not air_targets:
+    adjusted_terminals = get_core_adjusted_steiner_terminals(global_pins)
+    source_point = adjusted_terminals.get("air_out")
+    if source_point is None:
         return None, "Missing air_out graph access", 0
-
-    root_target = air_targets[0]
+    source_spec = next(
+        (spec for spec in get_port_access_specs(global_pins, machine_angle) if spec["pin"] == "air_out"),
+        None,
+    )
+    if source_spec is None:
+        return None, "Missing air_out connector data", 0
     nodes_list = [(float(pt[0]), float(pt[1])) for pt in current_env.nodes]
     augmented_adj = _copy_env_adjacency(current_env.adj)
     debug = {
@@ -5809,13 +5883,11 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map, backend_lab
         "tree_nodes": [],
         "terminal_infos": {},
     }
-    root_candidates = _nearest_connected_graph_nodes(root_target["access_point"], max_nodes=24)
-    if int(root_target["node_idx"]) not in root_candidates:
-        root_candidates.insert(0, int(root_target["node_idx"]))
+    root_candidates = _nearest_connected_graph_nodes(source_point, max_nodes=24)
     root_node, root_error = _add_core_terminal_node(
         nodes_list,
         augmented_adj,
-        root_target["access_point"],
+        source_point,
         root_candidates,
         "air_out",
         debug=debug,
@@ -5828,7 +5900,7 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map, backend_lab
     route_leaf_nodes = {}
     terminal_nodes = [root_node]
     for route_name in supply_routes:
-        route_pt = get_clima_grille_steiner_point(route_name)
+        route_pt = adjusted_terminals.get(route_name)
         if route_pt is None:
             return None, f"Missing Steiner point for {route_name}", len(terminal_nodes)
         start_nodes = get_clima_grille_start_nodes(route_name)
@@ -5882,7 +5954,7 @@ def run_clima_supply_core_steiner_routing(global_pins, pin_node_map, backend_lab
         "air_out",
         root_node,
         global_pins,
-        root_target,
+        source_spec,
         node_point=augmented_nodes[int(root_node)],
     )
     debug["stub_segments"].extend(segs[before:])
