@@ -136,3 +136,45 @@ def select_two_stage_routing(big_first_runner, small_first_runner, count_crossin
 
     _, best_routes, best_total_nodes, best_status = min(candidates, key=lambda item: item[0])
     return True, best_routes, best_status, best_total_nodes
+
+
+def search_large_route_candidates(
+    pin_node_map, shaft_boundary_nodes, *, env, terminals, route_start_nodes,
+    route_one_pin_flow, route_segments_from_path, route_axis_records,
+    add_route_clearance_weights, add_route_interaction_weights, route_diameter,
+    count_crossings, score_routes, initial_edge_weights=None,
+):
+    """Evaluate Sal's large-duct port assignments and routing orders."""
+    if not shaft_boundary_nodes or KITCHEN_ROUTE_NAME not in terminals:
+        return None, None, float("inf"), 0, {}
+    kitchen_starts = route_start_nodes(KITCHEN_ROUTE_NAME)
+    if not kitchen_starts:
+        return None, None, float("inf"), 0, {}
+
+    best = (None, None, float("inf"), 0, {})
+    assignments = (
+        {SHAFT_ROUTE_NAME: "left_mid", KITCHEN_ROUTE_NAME: "right_mid"},
+        {SHAFT_ROUTE_NAME: "right_mid", KITCHEN_ROUTE_NAME: "left_mid"},
+    )
+    for assignment in assignments:
+        for shaft_start in shaft_boundary_nodes[:1]:
+            terminal_points = {SHAFT_ROUTE_NAME: env.nodes[int(shaft_start)], KITCHEN_ROUTE_NAME: kitchen_starts}
+            for order in ((SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME), (KITCHEN_ROUTE_NAME, SHAFT_ROUTE_NAME)):
+                paths, targets, prior_axes, total_cost = {}, {}, [], 0.0
+                for route_name in order:
+                    weights = (initial_edge_weights or {}).copy()
+                    add_route_clearance_weights(weights, route_name, env)
+                    add_route_interaction_weights(prior_axes, route_diameter(route_name), weights, env)
+                    path, target, cost = route_one_pin_flow(route_name, assignment[route_name], terminal_points[route_name], pin_node_map, edge_weights=weights)
+                    if path is None:
+                        break
+                    paths[route_name], targets[route_name] = path, target
+                    total_cost += cost
+                    prior_axes.extend(route_axis_records(route_name, route_segments_from_path(route_name, path, target["pin"], None, target)))
+                if len(paths) != 2:
+                    continue
+                routes = [(name, route_segments_from_path(name, paths[name], targets[name]["pin"], None, targets[name])) for name in (SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME)]
+                score = score_routes(routes, count_crossings(routes))
+                if score < best[2]:
+                    best = (paths, targets, score, 2, {"assignment": f"Shaft={assignment[SHAFT_ROUTE_NAME]},Kitchen={assignment[KITCHEN_ROUTE_NAME]}", "large_order": "->".join(order)})
+    return best

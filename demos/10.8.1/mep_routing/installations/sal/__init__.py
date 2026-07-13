@@ -2,7 +2,7 @@
 
 from .catalog import SAL_OZEO_FLAT_MACHINE
 from .routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
-from .strategies import run_sequential_routing, select_two_stage_routing
+from .strategies import run_sequential_routing, search_large_route_candidates, select_two_stage_routing
 
 __all__ = [
     "KITCHEN_ROUTE_NAME",
@@ -10,5 +10,6 @@ __all__ = [
     "SAL_OZEO_FLAT_MACHINE",
     "SHAFT_ROUTE_NAME",
     "run_sequential_routing",
+    "search_large_route_candidates",
     "select_two_stage_routing",
 ]

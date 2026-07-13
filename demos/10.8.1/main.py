@@ -23,6 +23,7 @@ from mep_routing.installations.sal import (
     LARGE_DUCT_ROUTE_NAMES,
     SAL_OZEO_FLAT_MACHINE,
     run_sequential_routing as _run_sal_sequential_routing,
+    search_large_route_candidates as _search_sal_large_route_candidates,
     select_two_stage_routing as _select_sal_two_stage_routing,
 )
 from mep_routing.geometry import (
@@ -2472,92 +2473,16 @@ def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, ed
         return None, None, cost
     return paths[route_name], targets[route_name], cost
 
-def _run_large_pin_order_candidate(order, assignment, pin_node_map, shaft_start, kitchen_start_spec, initial_edge_weights=None):
-    paths = {}
-    targets = {}
-    base_weights = (initial_edge_weights or {}).copy()
-    prior_axis_records = []
-    total_cost = 0.0
-
-    terminal_points = {
-        "Shaft": current_env.nodes[int(shaft_start)],
-        "Kitchen": kitchen_start_spec,
-    }
-
-    for route_name in order:
-        current_weights = base_weights.copy()
-        add_route_clearance_weights(current_weights, route_name, current_env)
-        add_route_interaction_weights(prior_axis_records, get_route_diameter(route_name), current_weights, current_env)
-        path, target, cost = _route_one_pin_flow(
-            route_name,
-            assignment[route_name],
-            terminal_points[route_name],
-            pin_node_map,
-            edge_weights=current_weights,
-        )
-        if path is None:
-            return None, None, float("inf")
-
-        paths[route_name] = path
-        targets[route_name] = target
-        total_cost += cost
-
-        segs = _route_segments_from_path(route_name, path, target["pin"], None, target)
-        prior_axis_records.extend(_route_axis_records(route_name, segs))
-
-    meta = {
-        "assignment": f"Shaft={assignment['Shaft']},Kitchen={assignment['Kitchen']}",
-        "large_order": "->".join(order),
-    }
-    return paths, targets, total_cost, meta
-
 def _run_large_pin_candidate_search(pin_node_map, shaft_boundary_nodes, edge_weights=None):
-    if not shaft_boundary_nodes or "Kitchen" not in terminals:
-        return None, None, float("inf"), 0, {}
-
-    best_paths = None
-    best_targets = None
-    best_cost = float("inf")
-    best_flow = 0
-    best_meta = {}
-    kitchen_start_nodes = get_route_start_nodes("Kitchen")
-    if not kitchen_start_nodes:
-        return None, None, float("inf"), 0, {}
-
-    assignments = [
-        {"Shaft": "left_mid", "Kitchen": "right_mid"},
-        {"Shaft": "right_mid", "Kitchen": "left_mid"},
-    ]
-
-    shaft_entry_nodes = list(shaft_boundary_nodes[:1])
-
-    for assignment in assignments:
-        for shaft_start in shaft_entry_nodes:
-            for order in (("Shaft", "Kitchen"), ("Kitchen", "Shaft")):
-                paths, targets, cost, meta = _run_large_pin_order_candidate(
-                    order,
-                    assignment,
-                    pin_node_map,
-                    shaft_start,
-                    kitchen_start_nodes,
-                    initial_edge_weights=edge_weights,
-                )
-                if paths is None:
-                    continue
-                route_pair = [
-                    (name, _route_segments_from_path(name, paths[name], targets[name]["pin"], None, targets[name]))
-                    for name in ("Shaft", "Kitchen")
-                ]
-                crossings = count_segment_crossings(route_pair)
-                score = get_solution_score(route_pair, crossings)
-                if score < best_cost:
-                    best_paths = paths
-                    best_targets = targets
-                    best_cost = score
-                    best_flow = 2
-                    best_meta = meta
-
-    return best_paths, best_targets, best_cost, best_flow, best_meta
+    return _search_sal_large_route_candidates(
+        pin_node_map, shaft_boundary_nodes, env=current_env, terminals=terminals,
+        route_start_nodes=get_route_start_nodes, route_one_pin_flow=_route_one_pin_flow,
+        route_segments_from_path=_route_segments_from_path, route_axis_records=_route_axis_records,
+        add_route_clearance_weights=add_route_clearance_weights,
+        add_route_interaction_weights=add_route_interaction_weights,
+        route_diameter=get_route_diameter, count_crossings=count_segment_crossings,
+        score_routes=get_solution_score, initial_edge_weights=edge_weights,
+    )
 
 def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
     base_weights = {}
