@@ -7,6 +7,8 @@ import numpy as np
 from mep_routing.geometry import (
     edge_parallel_segment_min_distances,
     edge_segment_min_distances,
+    extract_boundary_segments,
+    extract_line_segments,
     normalize_axis_segment,
 )
 
@@ -94,6 +96,49 @@ def static_clearance_distances(edge_coords, wall_segments, shaft_segments):
     return (
         edge_parallel_segment_min_distances(edge_coords, wall_segments),
         edge_segment_min_distances(edge_coords, shaft_segments),
+    )
+
+
+def static_wall_distance_segments(routing_region, room_polygons, walls, wall_polygons):
+    """Build static wall-like constraints for graph-edge clearance distances."""
+    segments = []
+
+    def append_boundary(geometry):
+        boundary = extract_boundary_segments(geometry)
+        if len(boundary):
+            segments.append(boundary)
+
+    if routing_region is not None and not routing_region.is_empty:
+        append_boundary(routing_region)
+    for polygon in room_polygons:
+        append_boundary(polygon)
+    for wall in walls:
+        line_segments = extract_line_segments(wall)
+        if len(line_segments):
+            segments.append(line_segments)
+    for polygon in wall_polygons:
+        append_boundary(polygon)
+    return np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+
+
+def static_shaft_distance_segments(shafts):
+    """Build static shaft boundary constraints for graph-edge clearance distances."""
+    segments = [extract_boundary_segments(shaft) for shaft in shafts]
+    segments = [segment_set for segment_set in segments if len(segment_set)]
+    return np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+
+
+def static_clearance_cache_key(routing_region, grid_edge_list, room_polygons, wall_polygons, shafts):
+    """Return a geometry-sensitive cache key for static graph clearance fields."""
+    return (
+        id(routing_region),
+        len(grid_edge_list or []),
+        len(room_polygons),
+        len(wall_polygons),
+        len(shafts),
+        tuple(polygon.bounds for polygon in room_polygons),
+        tuple(polygon.bounds for polygon in shafts),
+        tuple(polygon.bounds for polygon in wall_polygons),
     )
 
 

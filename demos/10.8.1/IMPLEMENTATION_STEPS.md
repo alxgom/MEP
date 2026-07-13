@@ -421,6 +421,12 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\terminal_regions.py tests\\test_terminal_regions.py`.
 - Validation: `python -m pytest tests\\test_terminal_regions.py tests\\test_terminal_validity.py`.
 
+- Extracted static wall/shaft clearance segment assembly and its geometry-sensitive cache key to `mep_routing.routing.clearance`.
+- Kept `main.py` responsible for cache ownership and active scenario state.
+- Added a focused contract for static constraints and cache-key geometry changes.
+- Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\clearance.py tests\\test_routing_clearance.py`.
+- Validation: `python -m pytest tests\\test_routing_clearance.py`.
+
 ## Commit Checklist
 
 Before each commit:

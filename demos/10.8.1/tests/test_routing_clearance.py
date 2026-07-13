@@ -1,4 +1,5 @@
 import numpy as np
+from shapely.geometry import LineString, box
 
 from mep_routing.routing import (
     add_machine_clearance_weights,
@@ -11,6 +12,9 @@ from mep_routing.routing import (
     route_axis_records,
     set_block_weight,
     static_clearance_distances,
+    static_clearance_cache_key,
+    static_shaft_distance_segments,
+    static_wall_distance_segments,
     weighted_edge_cost,
 )
 
@@ -90,6 +94,21 @@ def test_static_clearance_distances_delegates_wall_and_shaft_distance_fields():
 
     assert wall_distances.tolist() == [20.0]
     assert shaft_distances.tolist() == [0.0]
+
+
+def test_static_clearance_geometry_assemblers_include_constraints_and_track_geometry_bounds():
+    room = box(0, 0, 10, 10)
+    wall_polygon = box(20, 0, 21, 1)
+    shaft = box(30, 0, 31, 1)
+    wall_segments = static_wall_distance_segments(
+        box(-1, -1, 11, 11), [room], [LineString([(15, 0), (15, 10)])], [wall_polygon]
+    )
+
+    assert wall_segments.shape == (13, 4)
+    assert static_shaft_distance_segments([shaft]).shape == (4, 4)
+    first_key = static_clearance_cache_key(None, [(0, 1, 0.0, "E")], [room], [wall_polygon], [shaft])
+    second_key = static_clearance_cache_key(None, [(0, 1, 0.0, "E")], [box(0, 0, 11, 10)], [wall_polygon], [shaft])
+    assert first_key != second_key
 
 
 def test_static_clearance_blocks_wall_and_shaft_edges_unless_entry_is_allowed():

@@ -37,6 +37,9 @@ from .clearance import (
     route_axis_records,
     set_block_weight,
     static_clearance_distances,
+    static_clearance_cache_key,
+    static_shaft_distance_segments,
+    static_wall_distance_segments,
     weighted_edge_cost,
 )
 from .flow import (
@@ -117,6 +120,9 @@ __all__ = [
     "segment_metric_dir",
     "set_block_weight",
     "static_clearance_distances",
+    "static_clearance_cache_key",
+    "static_shaft_distance_segments",
+    "static_wall_distance_segments",
     "source_start_nodes",
     "small_pin_target_specs",
     "target_heuristic",

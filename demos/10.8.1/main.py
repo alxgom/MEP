@@ -37,8 +37,6 @@ from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
     edge_segment_min_distances as _edge_segment_min_distances,
-    extract_boundary_segments as _extract_bnd_segs,
-    extract_line_segments as _extract_line_segs,
     iter_polygons as _iter_polygons_from_geom,
     largest_polygon as _largest_polygon_from_geom,
     ray_ray_intersections_numpy as _ray_ray_intersections_numpy,
@@ -108,6 +106,9 @@ from mep_routing.routing import (
     selected_pin_names as _selected_pin_names,
     set_block_weight as _set_block_weight,
     static_clearance_distances as _static_clearance_distances_for_edges,
+    static_clearance_cache_key as _static_clearance_cache_key_for_geometry,
+    static_shaft_distance_segments as _static_shaft_distance_segments_for_geometry,
+    static_wall_distance_segments as _static_wall_distance_segments_for_geometry,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     small_pin_target_specs as _small_pin_target_specs,
@@ -1336,47 +1337,20 @@ def _machine_edge_clearance_distances():
     )
 
 def _static_wall_distance_segments():
-    segments = []
-    if routing_region_base is not None and not routing_region_base.is_empty:
-        bnd = _extract_bnd_segs(routing_region_base)
-        if len(bnd):
-            segments.append(bnd)
-    for room in rooms:
-        bnd = _extract_bnd_segs(room.polygon)
-        if len(bnd):
-            segments.append(bnd)
-    for wall in walls:
-        line = _extract_line_segs(wall)
-        if len(line):
-            segments.append(line)
-    for wp in wall_polys:
-        bnd = _extract_bnd_segs(wp)
-        if len(bnd):
-            segments.append(bnd)
-    return np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+    return _static_wall_distance_segments_for_geometry(
+        routing_region_base, [room.polygon for room in rooms], walls, wall_polys
+    )
 
 def _static_shaft_distance_segments():
-    segments = []
-    for shaft in shafts:
-        bnd = _extract_bnd_segs(shaft)
-        if len(bnd):
-            segments.append(bnd)
-    return np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+    return _static_shaft_distance_segments_for_geometry(shafts)
 
 def _static_clearance_distances():
     global static_clearance_cache
     if grid_edge_coords is None or len(grid_edge_coords) == 0:
         return None, None
 
-    key = (
-        id(routing_region_base),
-        len(grid_edge_list or []),
-        len(rooms),
-        len(wall_polys),
-        len(shafts),
-        tuple(room.polygon.bounds for room in rooms),
-        tuple(poly.bounds for poly in shafts),
-        tuple(poly.bounds for poly in wall_polys),
+    key = _static_clearance_cache_key_for_geometry(
+        routing_region_base, grid_edge_list, [room.polygon for room in rooms], wall_polys, shafts
     )
     if static_clearance_cache.get("key") == key:
         return static_clearance_cache.get("wall"), static_clearance_cache.get("shaft")
