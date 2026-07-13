@@ -117,6 +117,9 @@ from mep_routing.routing import (
     static_clearance_cache_key as _static_clearance_cache_key_for_geometry,
     static_shaft_distance_segments as _static_shaft_distance_segments_for_geometry,
     static_wall_distance_segments as _static_wall_distance_segments_for_geometry,
+    select_shaft_entry_nodes as _select_shaft_entry_nodes,
+    shaft_entry_geometry as _shaft_entry_geometry_for_shaft,
+    shaft_entry_segments as _shaft_entry_segments_for_geometry,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     small_pin_target_specs as _small_pin_target_specs,
@@ -745,155 +748,26 @@ def _shaft_entry_geometry_for_node(node_idx, env=None):
     if env is None or node_idx is None:
         return None
 
-    p = env.nodes[int(node_idx)]
-    node_pt = Point(float(p[0]), float(p[1]))
-    rep_x, rep_y = get_representative_point(shaft_extraction)
-    rep = np.array([float(rep_x), float(rep_y)], dtype=np.float64)
-
-    if shaft_extraction.contains(node_pt):
-        return {
-            "rep": (float(rep[0]), float(rep[1])),
-            "entry": (float(p[0]), float(p[1])),
-            "node": (float(p[0]), float(p[1])),
-            "distance": 0.0,
-            "orthogonality_error": 0.0,
-        }
-
-    boundary = shaft_extraction.boundary
-    entry_pt = boundary.interpolate(boundary.project(node_pt))
-    entry = np.array([float(entry_pt.x), float(entry_pt.y)], dtype=np.float64)
-    node = np.array([float(p[0]), float(p[1])], dtype=np.float64)
-
-    outward = node - entry
-    radial = entry - rep
-    outward_norm = float(np.linalg.norm(outward))
-    radial_norm = float(np.linalg.norm(radial))
-    if outward_norm < 1e-6 or radial_norm < 1e-6:
-        orthogonality_error = 1.0
-    else:
-        if float(np.dot(outward, radial)) < 0.0:
-            radial = -radial
-        cos_align = abs(float(np.dot(outward, radial)) / (outward_norm * radial_norm))
-        orthogonality_error = 1.0 - min(1.0, cos_align)
-
-    return {
-        "rep": (float(rep[0]), float(rep[1])),
-        "entry": (float(entry[0]), float(entry[1])),
-        "node": (float(node[0]), float(node[1])),
-        "distance": outward_norm,
-        "orthogonality_error": orthogonality_error,
-    }
+    return _shaft_entry_geometry_for_shaft(shaft_extraction, env.nodes[int(node_idx)])
 
 def get_shaft_entry_nodes(env, kd=None):
     global shaft_entry_geometry_by_node
     if shaft_extraction is None or env is None or len(env.nodes) == 0:
         return [], None
-
-    shaft_entry_geometry_by_node = {}
-    if shaft_core_entry_specs:
-        candidates = []
-        for spec_idx, spec in enumerate(shaft_core_entry_specs):
-            entry = np.array(spec["entry"], dtype=np.float64)
-            centroid = np.array(spec["centroid"], dtype=np.float64)
-            normal = np.array(spec["normal"], dtype=np.float64)
-            exit_wall = spec.get("exit_wall")
-            search_indices = range(len(env.nodes))
-            if kd is not None:
-                found = kd.query_ball_point(entry, SHAFT_ENTRY_SEARCH_MM)
-                if found:
-                    search_indices = found
-            for idx in search_indices:
-                p = env.nodes[int(idx)]
-                node = np.array([float(p[0]), float(p[1])], dtype=np.float64)
-                node_pt = Point(float(node[0]), float(node[1]))
-                if shaft_extraction.contains(node_pt):
-                    continue
-                offset = node - entry
-                dist = float(np.linalg.norm(offset))
-                if dist > SHAFT_ENTRY_SEARCH_MM:
-                    continue
-                offset_norm = float(np.linalg.norm(offset))
-                if offset_norm < 1e-6:
-                    align = 1.0
-                else:
-                    align = float(np.dot(offset / offset_norm, normal))
-                if align < -1e-6:
-                    continue
-                orthogonality_error = 1.0 - max(0.0, min(1.0, align))
-                exit_wall_penalty = 0.0
-                if exit_wall is not None:
-                    wall_line = LineString(exit_wall)
-                    exit_wall_penalty = min(CORE_EPSILON_GRID_MM, wall_line.distance(Point(float(entry[0]), float(entry[1]))))
-                shaft_distance = node_pt.distance(shaft_extraction)
-                score = dist + orthogonality_error * GRID_SPACING * 4.0 + shaft_distance * 0.25 + exit_wall_penalty
-                geom = {
-                    "rep": (float(centroid[0]), float(centroid[1])),
-                    "entry": (float(entry[0]), float(entry[1])),
-                    "node": (float(node[0]), float(node[1])),
-                    "distance": dist,
-                    "orthogonality_error": orthogonality_error,
-                    "source": "routing_core",
-                }
-                old = shaft_entry_geometry_by_node.get(int(idx))
-                if old is None or score < old.get("score", float("inf")):
-                    geom["score"] = score
-                    geom["spec_idx"] = spec_idx
-                    shaft_entry_geometry_by_node[int(idx)] = geom
-                candidates.append((score, dist, orthogonality_error, int(idx)))
-
-        if candidates:
-            candidates.sort()
-            chosen = []
-            seen = set()
-            for _, _, _, idx in candidates:
-                if idx in seen:
-                    continue
-                seen.add(idx)
-                chosen.append(idx)
-                if len(chosen) >= SHAFT_ENTRY_MAX_CANDIDATES:
-                    break
-            return chosen, chosen[0]
-
-    candidates = []
-    for idx, pt in enumerate(env.nodes):
-        node_pt = Point(float(pt[0]), float(pt[1]))
-        if shaft_extraction.contains(node_pt):
-            continue
-        dist = node_pt.distance(shaft_extraction)
-        if dist > SHAFT_ENTRY_SEARCH_MM:
-            continue
-        geom = _shaft_entry_geometry_for_node(idx, env)
-        if geom is None:
-            continue
-        score = dist + geom["orthogonality_error"] * GRID_SPACING * 2.0
-        candidates.append((score, dist, geom["orthogonality_error"], int(idx)))
-
-    if candidates:
-        candidates.sort()
-        return [idx for _, _, _, idx in candidates[:SHAFT_ENTRY_MAX_CANDIDATES]], candidates[0][3]
-
-    rep_pt = shaft_extraction.representative_point()
-    if kd is not None:
-        _, fallback_idx = kd.query((round(rep_pt.x), round(rep_pt.y)))
-        return [int(fallback_idx)], int(fallback_idx)
-
-    diffs = np.hypot(env.nodes[:, 0] - rep_pt.x, env.nodes[:, 1] - rep_pt.y)
-    fallback_idx = int(np.argmin(diffs))
-    return [fallback_idx], fallback_idx
+    candidates, chosen, shaft_entry_geometry_by_node = _select_shaft_entry_nodes(
+        env.nodes,
+        shaft_extraction,
+        search_radius_mm=SHAFT_ENTRY_SEARCH_MM,
+        grid_spacing_mm=GRID_SPACING,
+        max_candidates=SHAFT_ENTRY_MAX_CANDIDATES,
+        core_entry_specs=shaft_core_entry_specs,
+        spatial_index=kd,
+    )
+    return candidates, chosen
 
 def add_shaft_entry_segments(segs, first_node_idx):
     geom = _shaft_entry_geometry_for_node(first_node_idx)
-    if geom is None:
-        return
-
-    rep = geom["rep"]
-    entry = geom["entry"]
-    node = geom["node"]
-
-    if math.hypot(entry[0] - rep[0], entry[1] - rep[1]) > 1.0:
-        segs.append((rep, entry))
-    if math.hypot(node[0] - entry[0], node[1] - entry[1]) > 1.0:
-        segs.append((entry, node))
+    segs.extend(_shaft_entry_segments_for_geometry(geom))
 
 def _commit_grid(nodes_arr, valid_edges):
     global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache, geometry_distance_cache

@@ -71,6 +71,12 @@ from .search import (
 )
 from .terminal_validity import terminal_candidate_node_indices, terminal_validity_entries
 from .terminal_regions import room_cover_geometry, terminal_boundary_segments, terminal_valid_region
+from .shaft_entries import (
+    select_shaft_entry_nodes,
+    shaft_entry_geometry,
+    shaft_entry_segments,
+    shaft_representative_point,
+)
 from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
 
 __all__ = [
@@ -117,12 +123,16 @@ __all__ = [
     "route_quality_warnings",
     "score_routes",
     "selected_pin_names",
+    "select_shaft_entry_nodes",
     "segment_metric_dir",
     "set_block_weight",
     "static_clearance_distances",
     "static_clearance_cache_key",
     "static_shaft_distance_segments",
     "static_wall_distance_segments",
+    "shaft_entry_geometry",
+    "shaft_entry_segments",
+    "shaft_representative_point",
     "source_start_nodes",
     "small_pin_target_specs",
     "target_heuristic",
