@@ -31,6 +31,14 @@ from mep_routing.installations.sal import (
     search_large_route_candidates as _search_sal_large_route_candidates,
     select_two_stage_routing as _select_sal_two_stage_routing,
 )
+from mep_routing.installations.sal.orchestration import (
+    SalFlowRoutingRequest,
+    SalRoutingStrategy,
+    dispatch_flow_strategy,
+    is_negotiated_strategy,
+    sequential_room_orders,
+    should_stop_after_sequential_candidate,
+)
 from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
@@ -2136,45 +2144,37 @@ def solve_ventilation_routing():
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         return None, "Blocked: No path to shaft", elapsed_ms, 0
 
-    # 2. Backtracking search over permutations of the small duct rooms
-    from itertools import permutations
+    # 2. Dispatch the selected Sal small-duct strategy.
     other_rooms = _ordered_small_room_names(terminals, (machine_cx, machine_cy))
+    selected_strategy = SalRoutingStrategy(routing_strategy_idx)
+    flow_request = SalFlowRoutingRequest(
+        room_names=tuple(other_rooms),
+        pin_node_map=pin_node_map,
+        global_pins=global_pins,
+        shaft_node_idx=shaft_node_idx,
+        chosen_exhaust_pin=chosen_exhaust_pin,
+        chosen_exhaust_target=chosen_exhaust_target,
+        shaft_path=shaft_path,
+    )
+    flow_result = dispatch_flow_strategy(
+        selected_strategy,
+        flow_request,
+        run_small_pin_flow=run_small_pin_min_cost_flow_routing,
+        run_two_stage_flow=run_two_stage_min_cost_flow_routing,
+    )
 
-    if routing_strategy_idx == 5:
-        success, routes_cand, status_cand, total_nodes_cand = run_small_pin_min_cost_flow_routing(
-            other_rooms,
-            pin_node_map,
-            global_pins,
-            shaft_node_idx,
-            chosen_exhaust_pin,
-            chosen_exhaust_target,
-            shaft_path,
-        )
+    if flow_result is not None:
+        success, routes_cand, status_cand, total_nodes_cand = flow_result
         elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
         if success:
-            status_text = f"Success: Min-cost flow small pins ({get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
+            if selected_strategy is SalRoutingStrategy.MIN_COST_FLOW_SMALL_PINS:
+                status_text = f"Success: Min-cost flow small pins ({get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
+            else:
+                status_text = f"Success: Two-stage MCMF {status_cand} ({get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
             return routes_cand, status_text, elapsed_ms, total_nodes_cand
         return None, f"Routing Blocked: {status_cand} in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
-    if routing_strategy_idx == 6:
-        success, routes_cand, status_cand, total_nodes_cand = run_two_stage_min_cost_flow_routing(
-            other_rooms,
-            pin_node_map,
-            global_pins,
-            shaft_path,
-        )
-        elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-        if success:
-            status_text = f"Success: Two-stage MCMF {status_cand} ({get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
-            return routes_cand, status_text, elapsed_ms, total_nodes_cand
-        return None, f"Routing Blocked: {status_cand} in {elapsed_ms:.1f}ms", elapsed_ms, 0
-    
-    if routing_strategy_idx == 0:
-        close_to_far = tuple(other_rooms)
-        far_to_close = tuple(reversed(other_rooms))
-        all_perms = [close_to_far, far_to_close]
-    else:
-        all_perms = list(permutations(other_rooms))
+    all_perms = sequential_room_orders(selected_strategy, other_rooms)
 
     best_routes = None
     best_crossings = 1e9
@@ -2182,7 +2182,7 @@ def solve_ventilation_routing():
     best_total_nodes = 0
     perm_attempts = 0
 
-    if routing_strategy_idx in (3, 4):
+    if is_negotiated_strategy(selected_strategy):
         # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Strategy 3 & 4: Negotiated Congestion ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
         nets_list = ["Shaft", "Kitchen"] + other_rooms
         current_paths = {}
@@ -2253,7 +2253,7 @@ def solve_ventilation_routing():
                         node_hist = max(node_history_congestion.get(u, 0.0), node_history_congestion.get(v, 0.0))
                         
                         congestion_weight = (pres * P_present) + hist + (node_pres * 20000.0) + node_hist
-                        if routing_strategy_idx == 4 and net_name in ("Shaft", "Kitchen"):
+                        if selected_strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE and net_name in ("Shaft", "Kitchen"):
                             congestion_weight *= 0.35
                         current_weights[edge] = dist + congestion_weight
                 add_route_clearance_weights(current_weights, net_name, current_env)
@@ -2361,7 +2361,7 @@ def solve_ventilation_routing():
                 best_crossings = crossings
                 best_routes = routes_cand
                 best_total_nodes = total_nodes_cand
-            if routing_strategy_idx == 1 and crossings == 0:
+            if should_stop_after_sequential_candidate(selected_strategy, crossings):
                 break
 
     if best_routes is not None:

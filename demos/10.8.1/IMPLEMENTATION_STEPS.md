@@ -462,6 +462,10 @@ Manual validation milestones:
 - Added focused runtime-graph contracts.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\graphs\\runtime.py mep_routing\\graphs\\__init__.py tests\\test_graph_runtime.py`; Python 3.11 `-m pytest tests\\test_graph_runtime.py`.
 
+- Integrated Sal routing strategy dispatch into `main.py` through `mep_routing.installations.sal.orchestration`.
+- Kept Pygame/app callbacks and negotiated-congestion execution in `main.py`; the extracted module now owns typed strategy selection, min-cost-flow dispatch, sequential room-order policy, and First Fit early exit.
+- Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\installations\\sal\\orchestration.py tests\\test_sal_orchestration.py`. Focused pytest could not run because that virtual environment does not include pytest; no Python 3.11 executable is installed in this workspace.
+
 ## Commit Checklist
 
 Before each commit:
