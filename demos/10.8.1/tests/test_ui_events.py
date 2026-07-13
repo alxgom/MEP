@@ -57,4 +57,5 @@ def test_routing_key_transitions_preserve_auto_placement_policy_and_ignore_unkno
     auto = routing_key_transition("toggle_auto_placement", _state(auto_placement_mode_idx=0), COUNTS)
     assert auto.state["auto_placement_mode_idx"] == 2
     assert auto.needs_auto_placement is True
+    assert auto.record_history is False
     assert routing_key_transition("unhandled", _state(), COUNTS) is None

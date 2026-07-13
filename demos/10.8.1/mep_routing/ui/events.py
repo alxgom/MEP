@@ -22,6 +22,7 @@ class RoutingKeyTransition:
     state: dict[str, int]
     markers: tuple[Marker, ...] = ()
     solve: bool = True
+    record_history: bool = True
     rebuild_graph: bool = False
     apply_rotation_mode: bool = False
     refresh_placement_fields: bool = False
@@ -106,6 +107,7 @@ def routing_key_transition(
         next_state["auto_placement_mode_idx"] = 0 if next_state["auto_placement_mode_idx"] > 0 else 2
         return RoutingKeyTransition(
             next_state,
+            record_history=False,
             needs_auto_placement=next_state["auto_placement_mode_idx"] > 0,
         )
     if command == "cycle_auto_placement":
@@ -114,6 +116,7 @@ def routing_key_transition(
         )
         return RoutingKeyTransition(
             next_state,
+            record_history=False,
             needs_auto_placement=next_state["auto_placement_mode_idx"] > 0,
         )
     if command == "cycle_weight_mode":

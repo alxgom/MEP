@@ -205,6 +205,7 @@ from mep_routing.ui.overlays import (
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
 from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
+from mep_routing.ui.events import routing_key_transition as _routing_key_transition
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2590,6 +2591,75 @@ def draw_viewer_legend(screen, font_small):
         COLOR_PLAN_LABEL, COLOR_WET_ROOM_ACCENT, COLOR_WALL, draw_terminal_validity_square,
     )
 
+
+def apply_routing_key_command(event_key):
+    """Apply a pure routing-key transition through the live Pygame adapters."""
+    global machine_angle, auto_placement_mode_idx, routing_strategy_idx, room_start_mode_idx
+    global router_backend_idx, heuristic_mode_idx, graph_type_idx, rotation_mode_idx, weight_mode_idx
+    global ap_scores, ap_fields
+
+    command = {
+        pygame.K_r: "rotate_machine",
+        pygame.K_c: "cycle_strategy",
+        pygame.K_t: "cycle_room_start",
+        pygame.K_l: "cycle_router_backend",
+        pygame.K_y: "cycle_heuristic",
+        pygame.K_TAB: "cycle_graph",
+        pygame.K_a: "toggle_auto_placement",
+        pygame.K_p: "cycle_auto_placement",
+        pygame.K_u: "cycle_rotation_mode",
+        pygame.K_w: "cycle_weight_mode",
+    }.get(event_key)
+    if command is None:
+        return None
+
+    transition = _routing_key_transition(
+        command,
+        {
+            "machine_angle": machine_angle,
+            "auto_placement_mode_idx": auto_placement_mode_idx,
+            "routing_strategy_idx": routing_strategy_idx,
+            "room_start_mode_idx": room_start_mode_idx,
+            "router_backend_idx": router_backend_idx,
+            "heuristic_mode_idx": heuristic_mode_idx,
+            "graph_type_idx": graph_type_idx,
+            "rotation_mode_idx": rotation_mode_idx,
+            "weight_mode_idx": weight_mode_idx,
+        },
+        {
+            "routing_strategy": len(ROUTING_STRATEGIES),
+            "room_start": len(ROOM_START_MODES),
+            "router_backend": len(ROUTER_BACKENDS),
+            "heuristic": len(HEURISTIC_MODES),
+            "graph": len(GRAPH_TYPES),
+            "rotation_mode": len(ROTATION_MODES),
+            "auto_placement": len(AUTO_PLACEMENT_MODES),
+            "weight_mode": 2,
+        },
+    )
+    if transition is None:
+        return None
+
+    state = transition.state
+    machine_angle = state["machine_angle"]
+    auto_placement_mode_idx = state["auto_placement_mode_idx"]
+    routing_strategy_idx = state["routing_strategy_idx"]
+    room_start_mode_idx = state["room_start_mode_idx"]
+    router_backend_idx = state["router_backend_idx"]
+    heuristic_mode_idx = state["heuristic_mode_idx"]
+    graph_type_idx = state["graph_type_idx"]
+    rotation_mode_idx = state["rotation_mode_idx"]
+    weight_mode_idx = state["weight_mode_idx"]
+
+    if transition.rebuild_graph:
+        build_grid(machine_pins=get_machine_pins(machine_cx, machine_cy, machine_angle))
+    if transition.apply_rotation_mode:
+        apply_rotation_mode_once()
+    if transition.refresh_placement_fields and base_regular_env is not None and shaft_extraction is not None:
+        shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
+        ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
+    return transition
+
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
     global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
@@ -2938,25 +3008,19 @@ def main():
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
                     
-                elif event.key == pygame.K_r:
-                    auto_placement_mode_idx = 0
-                    machine_angle = (machine_angle + 90) % 360
+                elif routing_transition := apply_routing_key_command(event.key):
+                    if routing_transition.needs_auto_placement:
+                        needs_auto_placement = True
                     routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
+                    if routing_transition.record_history and routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"Rot:{machine_angle}", (46, 204, 113))
+                        for marker_label, marker_color in routing_transition.markers:
+                            routing_history.add_marker(marker_label, marker_color)
                     
                 elif event.key == pygame.K_g:
                     show_grid_graph = not show_grid_graph
                     
-                elif event.key == pygame.K_c:
-                    routing_strategy_idx = (routing_strategy_idx + 1) % len(ROUTING_STRATEGIES)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-
                 elif event.key == pygame.K_d:
                     dwelling_source_idx = (dwelling_source_idx + 1) % len(DWELLING_SOURCE_MODES)
                     generate_new_dwelling()
@@ -2982,65 +3046,6 @@ def main():
                         record_history(routes, crossings_c, elapsed_ms)
                         routing_history.add_marker(f"Frame:{routing_frame_idx}", (230, 126, 34))
 
-                elif event.key == pygame.K_t:
-                    room_start_mode_idx = (room_start_mode_idx + 1) % len(ROOM_START_MODES)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"Start:{room_start_mode_idx}", (155, 89, 182))
-                        routing_history.add_marker(f"Strat:{routing_strategy_idx}", (52, 152, 219))
-
-                elif event.key == pygame.K_l:
-                    router_backend_idx = (router_backend_idx + 1) % len(ROUTER_BACKENDS)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"R:{router_backend_idx}", (230, 126, 34))
-
-                elif event.key == pygame.K_y:
-                    heuristic_mode_idx = (heuristic_mode_idx + 1) % len(HEURISTIC_MODES)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"Heur:{heuristic_mode_idx}", (241, 196, 15))
-                    
-                elif event.key == pygame.K_TAB:
-                    graph_type_idx = (graph_type_idx + 1) % len(GRAPH_TYPES)
-                    g_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-                    build_grid(machine_pins=g_pins)
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"Grid:{graph_type_idx}", (155, 89, 182))
-                    
-                elif event.key == pygame.K_a:
-                    if auto_placement_mode_idx > 0:
-                        auto_placement_mode_idx = 0
-                    else:
-                        auto_placement_mode_idx = 2
-                    if auto_placement_mode_idx > 0:
-                        needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    
-                elif event.key == pygame.K_p:
-                    auto_placement_mode_idx = (auto_placement_mode_idx + 1) % len(AUTO_PLACEMENT_MODES)
-                    if auto_placement_mode_idx > 0:
-                        needs_auto_placement = True
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-
-                elif event.key == pygame.K_u:
-                    rotation_mode_idx = (rotation_mode_idx + 1) % len(ROTATION_MODES)
-                    apply_rotation_mode_once()
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"RotMode:{rotation_mode_idx}", (95, 178, 218))
-                    
                 elif event.key == pygame.K_v:
                     show_heatmap = not show_heatmap
                     if show_heatmap:
@@ -3068,22 +3073,6 @@ def main():
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
                         routing_history.add_marker(f"Pal:{'Vir' if heatmap_palette_idx==1 else 'Tur'}", (26, 188, 156))
-                    
-                elif event.key == pygame.K_w:
-                    weight_mode_idx = (weight_mode_idx + 1) % 2
-                    if auto_placement_mode_idx > 0:
-                        needs_auto_placement = True
-                    else:
-                        if base_regular_env is not None and shaft_extraction is not None:
-                            shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
-                            node_scores, distance_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
-                            ap_scores = node_scores
-                            ap_fields = distance_fields
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
-                        routing_history.add_marker(f"W:{'Eq' if weight_mode_idx==1 else 'Def'}", (241, 196, 15))
                     
         # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ RENDERING ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
         screen.fill(COLOR_BG)

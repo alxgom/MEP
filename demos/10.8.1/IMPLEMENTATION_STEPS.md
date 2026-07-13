@@ -470,6 +470,11 @@ Manual validation milestones:
 - Kept `main.py` responsible for source-metadata normalization and the live geometry cache; the routing module now owns the reusable geometric policy.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\routing\\shaft_entries.py mep_routing\\routing\\__init__.py tests\\test_shaft_entries.py`; Python 3.11 `-m pytest tests\\test_shaft_entries.py tests\\test_routing_segments.py`.
 
+- Integrated `mep_routing.ui.events` into the live keyboard routing-control cluster (`R`, `C`, `T`, `L`, `Y`, `Tab`, `A`, `P`, `U`, and `W`).
+- Kept Pygame-side routing, graph rebuild, rotation application, and placement-field refresh in `main.py`; the UI module now owns transition and marker policy.
+- Preserved the prior no-history behavior for auto-placement mode controls.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\events.py tests\\test_ui_events.py`; ran both UI event contracts directly because the available default Python environment does not include pytest.
+
 ## Commit Checklist
 
 Before each commit:
