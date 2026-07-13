@@ -22,6 +22,8 @@ Follow this workflow before changing code in `demos/10.8.1`.
 - Prefer medium-to-large coherent subsystem extractions over isolated helper moves when the dependency direction and adapter seam are already clear.
 - Include adjacent pure helpers, adapters, and exports in the same commit when they form one stable boundary; do not artificially split them into helper-only commits.
 - Keep each extraction reviewable: do not combine unrelated subsystems or alter behavior while moving code unless the commit explicitly declares that change.
+- When an extracted adapter is live and an old implementation is isolated, complete the mechanical cleanup in the same or immediate follow-up commit. A bounded deletion may proceed without pausing for further clarification when `git diff --check`, compilation, and staged-diff review can verify the change.
+- Do not let a temporary compatibility or legacy body block refactor progress; record it in `IMPLEMENTATION_STEPS.md` and remove it at the next safe cleanup boundary.
 - Keep pure computation independent from Pygame and filesystem adapters.
 - Use integer millimetres internally wherever practical.
 - Use English semantic config keys.
