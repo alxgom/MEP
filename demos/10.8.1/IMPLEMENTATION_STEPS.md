@@ -12,6 +12,11 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - UI ownership: most UI behavior and style is installation-domain scoped; shared tools like ruler, zoom, overlays, and base dwelling geometry styling are global UI.
 - Cli/Coc/San: treat as future unknowns. Do not design by guessing their details; leave extension points and merge concrete behavior later.
 - Validation pacing: use contract tests for public behavior and solver/geometry invariants. Do not add tests for simple forwarding wrappers or unchanged drawing moves; use compilation and the relevant manual milestone instead.
+- Graph subsystem: regular and baseline regular-grid construction are now moving into `vent_router.graphs`; Hannan and epsilon builders remain the next part of this same subsystem move.
+- Extracted regular-grid node/edge construction and wall filtering to `vent_router.graphs.regular`; `main.py` now only supplies active geometry and commits graph state.
+- Added one graph-builder contract test for integer-grid nodes and wall-crossing edge removal.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\regular.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
 
 ## External References
 

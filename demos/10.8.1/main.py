@@ -42,6 +42,7 @@ from vent_router.graphs import (
     add_polygon_vertex_axes as _add_polygon_vertex_axes_to_sets,
     extend_allowed_boundary_axes as _extend_allowed_boundary_axes_for_graph,
     merge_close_values as _merge_close_values_for_axes,
+    build_regular_grid as _build_regular_grid_for_context,
 )
 from vent_router.placement import (
     candidate_machine_rooms as _candidate_machine_rooms_for_placement,
@@ -1030,30 +1031,6 @@ def _commit_grid(nodes_arr, valid_edges):
     invalidate_room_start_node_cache()
     invalidate_terminal_validity_cache()
 
-def _wall_filter(raw_edges, nodes_arr):
-    wall_bounds = [wp.bounds for wp in wall_polys]
-    valid = []
-    for u, v, w, d in raw_edges:
-        pu = nodes_arr[u]; pv = nodes_arr[v]
-        ex1, ey1 = float(min(pu[0], pv[0])), float(min(pu[1], pv[1]))
-        ex2, ey2 = float(max(pu[0], pv[0])), float(max(pu[1], pv[1]))
-        
-        line = None
-        blocked = False
-        for idx, wp in enumerate(wall_polys):
-            wx1, wy1, wx2, wy2 = wall_bounds[idx]
-            if not (ex2 >= wx1 - 1.0 and ex1 <= wx2 + 1.0 and ey2 >= wy1 - 1.0 and ey1 <= wy2 + 1.0):
-                continue
-            if line is None:
-                line = LineString([(float(pu[0]), float(pu[1])), (float(pv[0]), float(pv[1]))])
-            if line.intersects(wp):
-                inter = line.intersection(wp)
-                if not inter.is_empty and inter.length > WALL_THICKNESS + 1:
-                    blocked = True; break
-        if not blocked:
-            valid.append((u, v, w, d))
-    return valid
-
 def _node_routing_region():
     if routing_region_base is None:
         return None
@@ -1065,35 +1042,9 @@ def _node_routing_region():
 def build_regular_grid():
     if routing_region_base is None:
         return
-    t0 = time.perf_counter()
-
-    bx1, by1, bx2, by2 = routing_region_base.bounds
-    xs = np.arange(int(bx1 // GRID_SPACING) * GRID_SPACING,
-                   int(bx2 // GRID_SPACING + 1) * GRID_SPACING + 1,
-                   GRID_SPACING, dtype=np.int32)
-    ys = np.arange(int(by1 // GRID_SPACING) * GRID_SPACING,
-                   int(by2 // GRID_SPACING + 1) * GRID_SPACING + 1,
-                   GRID_SPACING, dtype=np.int32)
-    xv, yv = np.meshgrid(xs, ys)
-    cands  = np.column_stack([xv.ravel(), yv.ravel()]).astype(np.int32)
-
-    preg  = shapely_prep(_node_routing_region())
-    valid = np.array([preg.contains(Point(int(x), int(y))) for x, y in cands], dtype=bool)
-    nodes_arr = cands[valid]
-    t1 = time.perf_counter()
-
-    node_map  = {(int(p[0]), int(p[1])): i for i, p in enumerate(nodes_arr)}
-    raw_edges = []
-    for i, (x, y) in enumerate(nodes_arr):
-        e = (int(x) + GRID_SPACING, int(y))
-        n = (int(x), int(y) + GRID_SPACING)
-        if e in node_map: raw_edges.append((i, node_map[e], GRID_SPACING, 'E'))
-        if n in node_map: raw_edges.append((i, node_map[n], GRID_SPACING, 'N'))
-    t2 = time.perf_counter()
-
-    valid_edges = _wall_filter(raw_edges, nodes_arr)
-    t3 = time.perf_counter()
-
+    nodes_arr, valid_edges = _build_regular_grid_for_context(
+        routing_region_base, _node_routing_region(), wall_polys, GRID_SPACING, WALL_THICKNESS,
+    )
     _commit_grid(nodes_arr, valid_edges)
 
 def build_base_regular_grid():
@@ -1101,30 +1052,9 @@ def build_base_regular_grid():
     if routing_region_base is None:
         return
     t0 = time.perf_counter()
-
-    bx1, by1, bx2, by2 = routing_region_base.bounds
-    xs = np.arange(int(bx1 // GRID_SPACING) * GRID_SPACING,
-                   int(bx2 // GRID_SPACING + 1) * GRID_SPACING + 1,
-                   GRID_SPACING, dtype=np.int32)
-    ys = np.arange(int(by1 // GRID_SPACING) * GRID_SPACING,
-                   int(by2 // GRID_SPACING + 1) * GRID_SPACING + 1,
-                   GRID_SPACING, dtype=np.int32)
-    xv, yv = np.meshgrid(xs, ys)
-    cands  = np.column_stack([xv.ravel(), yv.ravel()]).astype(np.int32)
-
-    preg  = shapely_prep(_node_routing_region())
-    valid = np.array([preg.contains(Point(int(x), int(y))) for x, y in cands], dtype=bool)
-    nodes_arr = cands[valid]
-
-    node_map  = {(int(p[0]), int(p[1])): i for i, p in enumerate(nodes_arr)}
-    raw_edges = []
-    for i, (x, y) in enumerate(nodes_arr):
-        e = (int(x) + GRID_SPACING, int(y))
-        n = (int(x), int(y) + GRID_SPACING)
-        if e in node_map: raw_edges.append((i, node_map[e], GRID_SPACING, 'E'))
-        if n in node_map: raw_edges.append((i, node_map[n], GRID_SPACING, 'N'))
-
-    valid_edges = _wall_filter(raw_edges, nodes_arr)
+    nodes_arr, valid_edges = _build_regular_grid_for_context(
+        routing_region_base, _node_routing_region(), wall_polys, GRID_SPACING, WALL_THICKNESS,
+    )
     
     DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
     adj = {i: [] for i in range(len(nodes_arr))}
