@@ -38,6 +38,7 @@ from vent_router.graphs import (
     build_axis_grid as _build_axis_grid_for_context,
     build_hannan_static_axes as _build_hannan_static_axes_for_context,
     build_epsilon_axes as _build_epsilon_axes_for_context,
+    filter_dynamic_machine_obstacle as _filter_dynamic_machine_obstacle,
     add_bounds_axes as _add_bounds_axes_to_sets,
     add_epsilon_axis_values as _add_epsilon_axis_values_to_sets,
     add_epsilon_geometry_axes as _add_epsilon_geometry_axes_to_sets,
@@ -1077,9 +1078,6 @@ def update_dynamic_env(machine_poly):
         return
 
     t0 = time.perf_counter()
-    blocked_machine_poly = machine_poly.buffer(MACHINE_CLEARANCE, join_style=2)
-    mx1, my1, mx2, my2 = blocked_machine_poly.bounds
-    prm = shapely_prep(blocked_machine_poly)
     protected_nodes = set()
     protected_points = list(terminals.values())
     protected_points.extend(
@@ -1093,51 +1091,12 @@ def update_dynamic_env(machine_poly):
         if np.hypot(grid_nodes[int(idx), 0] - pt[0], grid_nodes[int(idx), 1] - pt[1]) < 1.0:
             protected_nodes.add(int(idx))
 
-    nx, ny = grid_nodes[:, 0], grid_nodes[:, 1]
-    node_bbox = (nx >= mx1) & (nx <= mx2) & (ny >= my1) & (ny <= my2)
-    blocked_nodes = set()
-    for ni in np.where(node_bbox)[0]:
-        if int(ni) in protected_nodes:
-            continue
-        if prm.contains(Point(float(grid_nodes[ni, 0]), float(grid_nodes[ni, 1]))):
-            blocked_nodes.add(int(ni))
-
-    ec = grid_edge_coords
-    seg_x1 = np.minimum(ec[:, 0], ec[:, 2])
-    seg_x2 = np.maximum(ec[:, 0], ec[:, 2])
-    seg_y1 = np.minimum(ec[:, 1], ec[:, 3])
-    seg_y2 = np.maximum(ec[:, 1], ec[:, 3])
-    cand_edges = np.where(
-        (seg_x2 >= mx1) & (seg_x1 <= mx2) &
-        (seg_y2 >= my1) & (seg_y1 <= my2)
-    )[0]
-
-    blocked_edges = set()
-    for ei in cand_edges:
-        u, v, w, d = grid_edge_list[ei]
-        if u in blocked_nodes or v in blocked_nodes:
-            blocked_edges.add(ei)
-        else:
-            line = LineString([
-                (float(grid_nodes[u, 0]), float(grid_nodes[u, 1])),
-                (float(grid_nodes[v, 0]), float(grid_nodes[v, 1]))
-            ])
-            inter = line.intersection(blocked_machine_poly)
-            if not inter.is_empty and inter.length > 1.0 and u not in protected_nodes and v not in protected_nodes:
-                blocked_edges.add(ei)
-
-    DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
-    filtered_adj = {i: [] for i in range(len(grid_nodes))}
-    for ei, (u, v, w, d) in enumerate(grid_edge_list):
-        if ei in blocked_edges or u in blocked_nodes or v in blocked_nodes:
-            continue
-        filtered_adj[u].append((v, w, d))
-        filtered_adj[v].append((u, w, DIR_REV[d]))
-
-    current_env = EnvView(grid_nodes, filtered_adj)
+    current_env, blocked_node_count, blocked_edge_count = _filter_dynamic_machine_obstacle(
+        grid_nodes, grid_edge_list, grid_edge_coords, machine_poly, MACHINE_CLEARANCE, protected_nodes,
+    )
     invalidate_room_start_node_cache()
     ms = (time.perf_counter() - t0) * 1000.0
-    print(f"Grid update: {ms:.1f} ms  (blocked nodes={len(blocked_nodes)}, edges={len(blocked_edges)})")
+    print(f"Grid update: {ms:.1f} ms  (blocked nodes={blocked_node_count}, edges={blocked_edge_count})")
 
 def _iter_polygons(geom):
     yield from _iter_polygons_from_geom(geom)

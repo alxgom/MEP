@@ -14,6 +14,7 @@ from .axis_grid import build_axis_grid
 from .regular import build_regular_grid, filter_edges_against_walls
 from .hannan import build_static_axes as build_hannan_static_axes
 from .epsilon import build_axes as build_epsilon_axes
+from .dynamic import filter_dynamic_machine_obstacle
 
 __all__ = [
     "EnvView",
@@ -21,6 +22,7 @@ __all__ = [
     "build_regular_grid",
     "build_hannan_static_axes",
     "build_epsilon_axes",
+    "filter_dynamic_machine_obstacle",
     "filter_edges_against_walls",
     "add_bounds_axes",
     "add_epsilon_axis_values",
