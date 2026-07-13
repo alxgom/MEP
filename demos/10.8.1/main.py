@@ -181,7 +181,7 @@ from mep_routing.ui.help import (
     draw_viewer_legend as _draw_viewer_legend,
     help_lines as _help_lines,
 )
-from mep_routing.observability import clear_history_buffers as _clear_history_buffers, history_sample as _history_sample
+from mep_routing.observability import clear_history_buffers as _clear_history_buffers, history_sample as _history_sample, solution_snapshot as _solution_snapshot
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
@@ -2772,7 +2772,7 @@ def get_current_kpis(routes, elapsed_ms):
 
 def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
     kpis = get_current_kpis(routes, elapsed_ms)
-    return {
+    return _solution_snapshot({
         "source_mode_idx": dwelling_source_idx,
         "real_scenario_idx": real_scenario_idx,
         "routing_frame_idx": routing_frame_idx,
@@ -2790,18 +2790,9 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
         "min_piece_factor": float(min_piece_factor),
         "bend_weight": float(C_BEND),
         "crossing_penalty_multiplier": float(crossing_penalty_multiplier),
-        "preferred_terminal_points_by_room": {
-            room_name: [tuple(pt) for pt in points]
-            for room_name, points in preferred_terminal_points_by_room.items()
-        },
-        "preferred_terminal_areas": [
-            {"room": area["room"], "bounds": tuple(area["bounds"])}
-            for area in preferred_terminal_areas
-        ],
-        "status": status,
-        "total_nodes": int(total_nodes),
-        "kpis": kpis,
-    }
+        "preferred_terminal_points_by_room": preferred_terminal_points_by_room,
+        "preferred_terminal_areas": preferred_terminal_areas,
+    }, kpis, status, total_nodes)
 
 def log_current_solution(routes, status, elapsed_ms, total_nodes):
     global selected_log_id
