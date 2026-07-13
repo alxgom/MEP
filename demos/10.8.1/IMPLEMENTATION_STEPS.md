@@ -495,6 +495,10 @@ Manual validation milestones:
 - `main.py` now owns source selection, fallback messaging, cache resets, graph rebuild, and auto-placement while the data-source module owns scenario normalization, accent generation, and real-scenario preparation.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\data_sources\\scenario.py mep_routing\\data_sources\\__init__.py tests\\test_scenario_preparation.py`; Python 3.11 `-m pytest tests\\test_scenario_preparation.py tests\\test_synthetic_data_source.py tests\\test_dwelling_data_sources.py`.
 
+- Integrated core-like and topological machine-placement coordination through `mep_routing.placement.runtime`.
+- Kept `main.py` responsible for live state commits, graph rebuilding, and status output; the placement module now owns selection and score-field coordination through explicit callbacks.
+- Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\placement\\runtime.py tests\\test_placement_runtime.py`; direct focused placement-runtime contracts invoked because pytest is unavailable in that environment.
+
 ## Commit Checklist
 
 Before each commit:

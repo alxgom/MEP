@@ -77,6 +77,10 @@ from mep_routing.placement import (
     select_field_alignment_rotation as _select_field_alignment_rotation,
     topological_placement_scores as _topological_placement_scores,
 )
+from mep_routing.placement.runtime import (
+    run_core_like_placement as _run_core_like_placement,
+    run_topological_placement as _run_topological_placement,
+)
 from mep_routing.routing import (
     RouteScoreWeights,
     add_machine_clearance_weights as _add_machine_clearance_weights,
@@ -1823,61 +1827,61 @@ def apply_rotation_mode_once():
 def run_core_workflow_machine_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
     t0 = time.perf_counter()
-    selected, candidate_count = _choose_core_like_machine_placement(
+    outcome = _run_core_like_placement(
         _candidate_machine_rooms(),
         _candidate_room_points,
         (0, 90, 180, 270),
         is_machine_placement_valid,
         _core_like_machine_candidate_score,
+        _choose_core_like_machine_placement,
     )
-    ap_scores = {}
-    ap_fields = {}
-    if selected is None:
+    ap_scores = outcome.scores
+    ap_fields = outcome.fields
+    if outcome.position is None:
         return
 
-    best_x, best_y, best_rot, _score = selected
-    machine_cx, machine_cy, machine_angle = best_x, best_y, best_rot
+    machine_cx, machine_cy = outcome.position
+    machine_angle = outcome.rotation
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
-    print(f"[Core-like Machine Placement] tried {candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
+    print(f"[Core-like Machine Placement] tried {outcome.candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
 
 def run_auto_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
     if base_regular_env is None or not shaft_extraction:
         return
         
-    shaft_boundary_nodes, shaft_node_idx = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
+    shaft_boundary_nodes, _shaft_node_idx = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
     
     # Topological Distance Fields
     if auto_placement_mode_idx == 1:
         t0 = time.perf_counter()
         
-        node_scores, distance_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
-        ap_scores = node_scores
-        ap_fields = distance_fields
-        
-        if not node_scores:
-            return
-            
-        selected = _choose_topological_machine_placement(
+        outcome = _run_topological_placement(
             base_regular_env,
-            node_scores,
-            distance_fields,
+            shaft_boundary_nodes,
             (0, 90, 180, 270),
             is_machine_placement_valid,
             get_machine_pins,
             lambda pt: int(base_regular_kd.query(pt)[1]),
             wet_room_names,
             get_placement_weights(),
+            get_auto_placement_scores,
+            _choose_topological_machine_placement,
         )
-        if selected is not None:
-            machine_cx, machine_cy, machine_angle, _score = selected
-            pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-            build_grid(machine_pins=pins)
-            elapsed_ms = (time.perf_counter() - t0) * 1000.0
-            print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
+        ap_scores = outcome.scores
+        ap_fields = outcome.fields
+        if outcome.position is None:
             return
+
+        machine_cx, machine_cy = outcome.position
+        machine_angle = outcome.rotation
+        pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+        build_grid(machine_pins=pins)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
+        return
 
     elif auto_placement_mode_idx == 2:
         run_core_workflow_machine_placement()
