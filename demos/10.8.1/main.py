@@ -614,6 +614,21 @@ def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=
 def get_terminal_tool_buttons():
     return _terminal_tool_buttons(CANVAS_LEFT, CANVAS_TOP, CANVAS_W)
 
+def handle_terminal_tool_button_click(pos):
+    global preferred_terminal_tool_mode, terminal_validity_overlay_enabled
+    for mode, rect, _ in get_terminal_tool_buttons():
+        if not rect.collidepoint(pos):
+            continue
+        if mode == "reset":
+            preferred_terminal_tool_mode = None
+            return "reset"
+        if mode == "map":
+            terminal_validity_overlay_enabled = not terminal_validity_overlay_enabled
+            return "map"
+        preferred_terminal_tool_mode = None if preferred_terminal_tool_mode == mode else mode
+        return "mode"
+    return None
+
 def draw_terminal_tool_buttons(screen, font_bold, font_small):
     global terminal_tool_button_rects
     terminal_tool_button_rects = _draw_terminal_tool_buttons(screen, font_bold, font_small, get_terminal_tool_buttons(), preferred_terminal_tool_mode, terminal_validity_overlay_enabled, text_color=COLOR_TEXT, muted_color=COLOR_MUTED, allowed_color=COLOR_TERMINAL_ALLOWED)
