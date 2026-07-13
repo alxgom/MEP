@@ -12,7 +12,7 @@ from typing import Any, Callable, Sequence
 
 Color = tuple[int, int, int]
 HelpButtonDrawer = Callable[[str, Any, Any], None]
-MinPieceSliderDrawer = Callable[[Any, Any, int, int, int, float, float, float], None]
+MinPieceSliderDrawer = Callable[[Any, Any, int, int, int], None]
 WeightSliderDrawer = Callable[[Any, Any, int, int, int, str, float, float, float, Color, str, str, bool], None]
 
 
@@ -51,9 +51,6 @@ class SolverCard:
     edge_weights: str
     selected_route: str
     preferred_terminal_count: int
-    min_piece_value: float
-    min_piece_min: float
-    min_piece_max: float
     bend_value: float
     bend_min: float
     bend_max: float
@@ -197,10 +194,7 @@ def draw_sidebar(
     )
     for label, y in solver_rows:
         screen.blit(fonts.small.render(label, True, colors.text), (text_x, y))
-    draw_min_piece_slider(
-        screen, fonts.small, text_x, 385, canvas_left - 70,
-        view.solver.min_piece_value, view.solver.min_piece_min, view.solver.min_piece_max,
-    )
+    draw_min_piece_slider(screen, fonts.small, text_x, 385, canvas_left - 70)
     draw_weight_slider(
         screen, fonts.small, text_x, 420, canvas_left - 70, "Bend weight",
         view.solver.bend_value, view.solver.bend_min, view.solver.bend_max,
