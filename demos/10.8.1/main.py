@@ -110,7 +110,9 @@ from vent_router.ui.drawing import (
 )
 from vent_router.ui.solution_logs import (
     best_log_updates as _best_log_updates,
+    draw_solution_logs_panel as _draw_solution_logs_panel_widget,
     metric_value_for_log as _metric_value_for_log_entry,
+    solution_log_action as _solution_log_action,
     solution_kpis as _solution_kpis,
 )
 
@@ -4359,89 +4361,24 @@ def restore_solution_log(log_entry):
     return solve_ventilation_routing()
 
 def handle_solution_log_click(pos):
-    if log_button_rect.collidepoint(pos):
-        return "log"
-    for rect, log_id in log_row_rects:
-        if rect.collidepoint(pos):
-            return log_id
-    return None
+    return _solution_log_action(pos, log_button_rect, log_row_rects)
 
 def draw_solution_logs_panel(screen, font_small, font_bold):
     global log_button_rect, log_row_rects
-    log_row_rects = []
-    px = WINDOW_WIDTH - PANEL_W + 8
-    y = 703
-    width = PANEL_W - 24
-    height = WINDOW_HEIGHT - y - 10
-    if height < 90:
-        return
-
-    pygame.draw.rect(screen, COLOR_PLOT_BG, (px - 4, y, width + 8, height), border_radius=6)
-    pygame.draw.rect(screen, (55, 55, 70), (px - 4, y, width + 8, height), 1, border_radius=6)
-
-    lbl = font_bold.render("SOLUTION LOGS", True, (255, 255, 255))
-    screen.blit(lbl, (px, y + 8))
-    log_button_rect = pygame.Rect(px + width - 62, y + 6, 58, 24)
-    pygame.draw.rect(screen, (58, 80, 94), log_button_rect, border_radius=4)
-    pygame.draw.rect(screen, (170, 180, 190), log_button_rect, 1, border_radius=4)
-    btn_lbl = font_small.render("Log", True, COLOR_TEXT)
-    screen.blit(btn_lbl, (log_button_rect.centerx - btn_lbl.get_width() // 2, log_button_rect.centery - btn_lbl.get_height() // 2))
-
-    best_manual = {}
-    if solution_logs:
-        for metric in ("score", "length_m", "turns", "crossings", "short_pieces", "elapsed_ms"):
-            best_manual[metric] = min(_metric_value_for_log(entry, metric) for entry in solution_logs)
-    row_y = y + 40
-    row_h = 38
-
-    auto_entries = [
-        auto_best_logs[metric]
-        for metric in ("score", "length_m", "turns", "crossings", "short_pieces", "elapsed_ms")
-        if metric in auto_best_logs
-    ]
-    entries = auto_entries + list(solution_logs[-3:])
-
-    if not entries:
-        empty = font_small.render("No logged states", True, COLOR_MUTED)
-        screen.blit(empty, (px, y + 42))
-        return
-
-    row_h = 30
-    for entry in entries:
-        rect = pygame.Rect(px, row_y, width, row_h - 3)
-        active = entry["id"] == selected_log_id
-        fill = (45, 54, 80) if active else ((38, 42, 48) if entry.get("kind") == "auto" else (30, 34, 42))
-        border = (255, 255, 255) if active else (55, 55, 70)
-        pygame.draw.rect(screen, fill, rect, border_radius=4)
-        pygame.draw.rect(screen, border, rect, 1, border_radius=4)
-        log_row_rects.append((rect, entry["id"]))
-        k = entry["kpis"]
-        if entry.get("kind") == "auto":
-            prefix = {
-                "score": "Best score",
-                "length_m": "Best len",
-                "turns": "Best turns",
-                "crossings": "Best cross",
-                "short_pieces": "Best short",
-                "elapsed_ms": "Best time",
-            }.get(entry.get("metric"), "Best")
-        else:
-            prefix = f"L{entry['id']}"
-        title = font_small.render(f"{prefix}  {int(k['score'])}", True, COLOR_TEXT)
-        detail = font_small.render(f"{k['length_m']:.2f}m T{k['turns']} X{k['crossings']} S{k['short_pieces']}", True, COLOR_MUTED)
-        screen.blit(title, (rect.x + 6, rect.y + 3))
-        screen.blit(detail, (rect.x + 6, rect.y + 15))
-        if entry.get("kind") == "manual":
-            badges = []
-            for metric, badge in (("score", "S"), ("length_m", "L"), ("turns", "T"), ("crossings", "X"), ("short_pieces", "P")):
-                if abs(_metric_value_for_log(entry, metric) - best_manual.get(metric, float("inf"))) < 1e-9:
-                    badges.append(badge)
-            if badges:
-                badge_text = font_small.render(" ".join(badges[:3]), True, (241, 196, 15))
-                screen.blit(badge_text, (rect.right - badge_text.get_width() - 6, rect.y + 3))
-        row_y += row_h
-        if row_y + row_h > y + height:
-            break
+    log_button_rect, log_row_rects = _draw_solution_logs_panel_widget(
+        screen,
+        font_small,
+        font_bold,
+        window_width=WINDOW_WIDTH,
+        window_height=WINDOW_HEIGHT,
+        panel_width=PANEL_W,
+        solution_logs=solution_logs,
+        auto_best_logs=auto_best_logs,
+        selected_log_id=selected_log_id,
+        plot_background_color=COLOR_PLOT_BG,
+        text_color=COLOR_TEXT,
+        muted_color=COLOR_MUTED,
+    )
 
 def draw_plots(screen, font_small, font_bold):
     """Draw routing metrics and solve-time sparklines in the right panel."""

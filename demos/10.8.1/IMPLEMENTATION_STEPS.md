@@ -306,6 +306,12 @@ Manual validation milestones:
 - Validation: `python -m pytest demos\10.8.1\tests`.
 - Reused the shared route reconstruction adapter in sequential routing for shaft, kitchen, and small-duct routes.
 - This removes three local path-to-segment implementations while preserving sequential-routing order, weights, and terminal selection in `main.py`.
+- Extracted solution-log widget drawing and hit testing to `vent_router.ui.solution_logs`.
+- Kept `main.py` responsible for active log state and restoring a selected snapshot.
+- Kept Pygame imported only inside the drawing adapter so the widget's log-selection policy remains testable without Pygame.
+- Added focused tests for manual-best values, visible-entry ordering, and button/row action dispatch.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\solution_logs.py demos\10.8.1\tests\test_solution_logs.py`.
+- Validation: `python -m pytest demos\10.8.1\tests`.
 
 ## Commit Checklist
 

@@ -1,4 +1,11 @@
-from vent_router.ui.solution_logs import best_log_updates, metric_value_for_log, solution_kpis
+from vent_router.ui.solution_logs import (
+    best_log_updates,
+    manual_best_values,
+    metric_value_for_log,
+    solution_kpis,
+    solution_log_action,
+    visible_solution_log_entries,
+)
 
 
 def test_solution_kpis_uses_supplied_metric_functions():
@@ -78,3 +85,34 @@ def test_best_log_updates_returns_only_improved_metrics():
 
 def test_best_log_updates_ignores_missing_hist_idx():
     assert best_log_updates({"kpis": {}}, None, {}) == []
+
+
+def test_manual_best_values_and_visible_entries_preserve_metric_order():
+    logs = [
+        {"id": 1, "kpis": {"score": 10, "length_m": 5, "turns": 3, "crossings": 2, "short_pieces": 1, "elapsed_ms": 8}},
+        {"id": 2, "kpis": {"score": 8, "length_m": 6, "turns": 4, "crossings": 1, "short_pieces": 2, "elapsed_ms": 9}},
+    ]
+    auto_best = {
+        "turns": {"id": "best:turns", "kpis": logs[1]["kpis"]},
+        "score": {"id": "best:score", "kpis": logs[1]["kpis"]},
+    }
+
+    assert manual_best_values(logs, metrics=("score", "crossings")) == {"score": 8, "crossings": 1}
+    assert [entry["id"] for entry in visible_solution_log_entries(auto_best, logs, metrics=("score", "turns"), manual_limit=1)] == [
+        "best:score",
+        "best:turns",
+        2,
+    ]
+
+
+def test_solution_log_action_returns_button_then_matching_row():
+    class Rect:
+        def __init__(self, hit):
+            self.hit = hit
+
+        def collidepoint(self, _pos):
+            return self.hit
+
+    assert solution_log_action((0, 0), Rect(True), [(Rect(True), 1)]) == "log"
+    assert solution_log_action((0, 0), Rect(False), [(Rect(False), 1), (Rect(True), 2)]) == 2
+    assert solution_log_action((0, 0), Rect(False), [(Rect(False), 1)]) is None
