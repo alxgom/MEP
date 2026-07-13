@@ -427,6 +427,10 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\clearance.py tests\\test_routing_clearance.py`.
 - Validation: `python -m pytest tests\\test_routing_clearance.py`.
 
+- Created `mep_routing.ui.heatmaps` for distance-field, edge-weight overlay, and legend drawing.
+- Kept `main.py` responsible for visualization toggles, cache ownership, and coordinate/color adapters.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\heatmaps.py`.
+
 ## Commit Checklist
 
 Before each commit:

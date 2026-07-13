@@ -168,6 +168,12 @@ from mep_routing.ui.terminal_validity import (
     draw_terminal_validity_square as _draw_terminal_validity_square,
     draw_terminal_validity_tooltip as _draw_terminal_validity_tooltip,
 )
+from mep_routing.ui.heatmaps import (
+    build_distance_heatmap_surface as _build_distance_heatmap_surface,
+    draw_distance_colorbar as _draw_distance_colorbar,
+    draw_edge_weight_colorbar as _draw_edge_weight_colorbar,
+    draw_edge_weight_heatmap as _draw_edge_weight_heatmap,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2667,40 +2673,10 @@ def get_heatmap_color(t):
     return _heatmap_color(t, heatmap_palette_idx)
 
 def draw_colorbar(screen, node_scores):
-    if not node_scores:
-        return
-        
-    cb_x = COLORBAR_LEFT + (COLORBAR_W - 20) // 2
-    cb_y = CANVAS_TOP + 40
-    cb_w = 20
-    cb_h = CANVAS_H - 150
-    
-    # Border
-    pygame.draw.rect(screen, (255, 255, 255), (cb_x - 1, cb_y - 1, cb_w + 2, cb_h + 2), 1)
-    
-    # Fill gradient: High cost at the top (y=0, t=1.0), Low cost at the bottom (y=cb_h, t=0.0)
-    for y in range(cb_h):
-        t = 1.0 - (y / cb_h)
-        if heatmap_scale_mode == 0:
-            t_sat = min(1.0, t / 0.75)
-            c = get_heatmap_color(t_sat)
-        else:
-            c = get_heatmap_color(t)
-        pygame.draw.line(screen, c, (cb_x, cb_y + y), (cb_x + cb_w - 1, cb_y + y))
-        
-    font_lbl = pygame.font.SysFont("Outfit", 14, bold=True)
-    
-    high_color = get_heatmap_color(1.0)
-    low_color = get_heatmap_color(0.0)
-    lbl_high = font_lbl.render("HIGH", True, high_color)
-    screen.blit(lbl_high, (cb_x + cb_w // 2 - lbl_high.get_width() // 2, cb_y - 18))
-    
-    lbl_low = font_lbl.render("LOW", True, low_color)
-    screen.blit(lbl_low, (cb_x + cb_w // 2 - lbl_low.get_width() // 2, cb_y + cb_h + 6))
-    
-    palette_name = "VIRIDIS" if heatmap_palette_idx == 1 else "TURBO"
-    lbl_title = font_lbl.render(palette_name, True, COLOR_TEXT)
-    screen.blit(lbl_title, (cb_x + cb_w // 2 - lbl_title.get_width() // 2, cb_y + cb_h + 24))
+    return _draw_distance_colorbar(
+        screen, bool(node_scores), (COLORBAR_LEFT, COLORBAR_W), CANVAS_TOP, CANVAS_H,
+        heatmap_scale_mode, heatmap_palette_idx, get_heatmap_color, COLOR_TEXT,
+    )
 
 def _score_to_heatmap_t(score, min_s, max_s):
     return _score_to_heatmap_t_value(score, min_s, max_s, heatmap_scale_mode)
@@ -2709,33 +2685,11 @@ def _interpolate_regular_score(wx, wy, score_grid):
     return _interpolate_regular_score_for_grid(wx, wy, score_grid, GRID_SPACING)
 
 def _build_heatmap_surface(node_scores):
-    min_s = min(node_scores.values())
-    max_s = max(node_scores.values())
-    score_grid = {}
-    for node_idx, score in node_scores.items():
-        if node_idx >= len(base_regular_env.nodes):
-            continue
-        x, y = base_regular_env.nodes[node_idx]
-        score_grid[(round(float(x) / GRID_SPACING), round(float(y) / GRID_SPACING))] = float(score)
-
-    low_w = 320
-    low_h = max(1, round(low_w * CANVAS_H / CANVAS_W))
-    low = pygame.Surface((low_w, low_h), pygame.SRCALPHA)
-    alpha = 150
-
-    for py in range(low_h):
-        abs_y = CANVAS_TOP + (py + 0.5) * CANVAS_H / low_h
-        wy = 11000.0 - (abs_y - OFFSET_Y) / SCALE_PX_PER_MM
-        for px in range(low_w):
-            abs_x = CANVAS_LEFT + (px + 0.5) * CANVAS_W / low_w
-            wx = (abs_x - OFFSET_X) / SCALE_PX_PER_MM
-            score = _interpolate_regular_score(wx, wy, score_grid)
-            if score is None:
-                continue
-            c = get_heatmap_color(_score_to_heatmap_t(score, min_s, max_s))
-            low.set_at((px, py), (c[0], c[1], c[2], alpha))
-
-    return pygame.transform.smoothscale(low, (CANVAS_W, CANVAS_H))
+    return _build_distance_heatmap_surface(
+        node_scores, base_regular_env.nodes, GRID_SPACING,
+        (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), to_mm,
+        _interpolate_regular_score, _score_to_heatmap_t, get_heatmap_color,
+    )
 
 def draw_distance_heatmap(screen, node_scores):
     if not node_scores or base_regular_env is None:
@@ -2765,52 +2719,20 @@ def _edge_weight_log_scale():
 def draw_edge_weight_heatmap(screen):
     if not edge_weight_heatmap_enabled or not edge_weight_debug_map or current_env is None:
         return
-    _, log_max = _edge_weight_log_scale()
-
-    for (u, v), ratio in edge_weight_debug_map.items():
-        if u not in current_env.adj or u >= len(current_env.nodes) or v >= len(current_env.nodes):
-            continue
-        p1 = to_screen(current_env.nodes[u][0], current_env.nodes[u][1])
-        p2 = to_screen(current_env.nodes[v][0], current_env.nodes[v][1])
-        if ratio >= OVERLAP_BLOCK_WEIGHT:
-            color = COLOR_BLOCKED_EDGE
-            width = 5
-        else:
-            t = math.log1p(max(0.0, ratio)) / log_max
-            color = _cool_colormap(t)
-            width = 3
-        pygame.draw.line(screen, color, p1, p2, width)
+    return _draw_edge_weight_heatmap(
+        screen, edge_weight_debug_map, current_env.nodes, current_env.adj, to_screen,
+        OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE, _cool_colormap, _edge_weight_log_scale_for_values,
+    )
 
 def draw_edge_weight_colorbar(screen):
     if not edge_weight_heatmap_enabled or not edge_weight_debug_map:
         return
 
-    cb_x = COLORBAR_LEFT + (COLORBAR_W - 20) // 2
-    cb_y = CANVAS_TOP + 40
-    cb_w = 20
-    cb_h = CANVAS_H - 150
-    max_ratio, log_max = _edge_weight_log_scale()
-
-    pygame.draw.rect(screen, (255, 255, 255), (cb_x - 1, cb_y - 1, cb_w + 2, cb_h + 2), 1)
-    for y in range(cb_h):
-        t = 1.0 - (y / cb_h)
-        c = _cool_colormap(t)
-        pygame.draw.line(screen, c, (cb_x, cb_y + y), (cb_x + cb_w - 1, cb_y + y))
-
-    font_lbl = pygame.font.SysFont("Outfit", 13, bold=True)
-    lbl_title = font_lbl.render("WGT", True, COLOR_TEXT)
-    screen.blit(lbl_title, (cb_x + cb_w // 2 - lbl_title.get_width() // 2, cb_y - 32))
-
-    lbl_high = font_lbl.render(f"+{max_ratio:.1f}x", True, _cool_colormap(1.0))
-    screen.blit(lbl_high, (cb_x + cb_w // 2 - lbl_high.get_width() // 2, cb_y - 16))
-    lbl_low = font_lbl.render("+0x", True, _cool_colormap(0.0))
-    screen.blit(lbl_low, (cb_x + cb_w // 2 - lbl_low.get_width() // 2, cb_y + cb_h + 6))
-
-    if any(v >= OVERLAP_BLOCK_WEIGHT for v in edge_weight_debug_map.values()):
-        block_rect = pygame.Rect(cb_x, cb_y + cb_h + 28, cb_w, 8)
-        pygame.draw.rect(screen, COLOR_BLOCKED_EDGE, block_rect)
-        lbl_block = font_lbl.render("BLOCK", True, COLOR_TEXT)
-        screen.blit(lbl_block, (cb_x + cb_w // 2 - lbl_block.get_width() // 2, cb_y + cb_h + 40))
+    return _draw_edge_weight_colorbar(
+        screen, edge_weight_debug_map, (COLORBAR_LEFT, COLORBAR_W), CANVAS_TOP, CANVAS_H,
+        OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE, _cool_colormap, _edge_weight_log_scale_for_values,
+        COLOR_TEXT,
+    )
 
 def get_route_draw_width(route_name):
     if route_real_diameter_width_enabled:
