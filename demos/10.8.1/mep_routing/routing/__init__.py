@@ -67,6 +67,7 @@ from .search import (
     target_heuristic,
 )
 from .terminal_validity import terminal_candidate_node_indices, terminal_validity_entries
+from .terminal_regions import room_cover_geometry, terminal_boundary_segments, terminal_valid_region
 from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
 
 __all__ = [
@@ -121,6 +122,9 @@ __all__ = [
     "target_heuristic",
     "terminal_node_indices",
     "terminal_candidate_node_indices",
+    "room_cover_geometry",
+    "terminal_boundary_segments",
+    "terminal_valid_region",
     "terminal_validity_entries",
     "total_route_length",
     "total_route_length_m",

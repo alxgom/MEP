@@ -9,7 +9,6 @@ from collections import deque
 import numpy as np
 import pygame
 from shapely.geometry import Polygon, LineString, Point, box
-from shapely.ops import unary_union
 from scipy.spatial import cKDTree
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
@@ -115,6 +114,9 @@ from mep_routing.routing import (
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
     terminal_candidate_node_indices as _terminal_candidate_node_indices,
+    room_cover_geometry as _room_cover_geometry_for_terminal,
+    terminal_boundary_segments as _terminal_boundary_segments_for_routing,
+    terminal_valid_region as _terminal_valid_region_for_routing,
     terminal_validity_entries as _terminal_validity_entries,
     target_heuristic as _target_heuristic_for_env,
     total_route_length_m as _total_route_length_m,
@@ -1572,37 +1574,14 @@ def _room_cover_geometry(room_name):
     if cache_key in geometry_distance_cache:
         return geometry_distance_cache[cache_key]
 
-    room_poly = _room_polygon_by_name(room_name)
-    if room_poly is None or room_poly.is_empty or not covers:
-        geometry_distance_cache[cache_key] = None
-        return None
-
-    cover_parts = []
-    for cover in covers:
-        if cover is None or cover.is_empty or not cover.intersects(room_poly):
-            continue
-        part = cover.intersection(room_poly)
-        if not part.is_empty and getattr(part, "area", 0.0) > 1e-6:
-            cover_parts.append(part)
-
-    if not cover_parts:
-        geometry_distance_cache[cache_key] = None
-        return None
-
-    cover_geom = unary_union(cover_parts)
+    cover_geom = _room_cover_geometry_for_terminal(_room_polygon_by_name(room_name), covers)
     geometry_distance_cache[cache_key] = cover_geom
     return cover_geom
 
 def _room_terminal_valid_region(room_name):
-    room_poly = _room_polygon_by_name(room_name)
-    if room_poly is None or routing_region_base is None:
-        return room_poly
-
-    valid_region = room_poly.intersection(routing_region_base)
-    cover_geom = _room_cover_geometry(room_name)
-    if cover_geom is not None and not cover_geom.is_empty:
-        valid_region = valid_region.intersection(cover_geom)
-    return valid_region
+    return _terminal_valid_region_for_routing(
+        _room_polygon_by_name(room_name), routing_region_base, _room_cover_geometry(room_name)
+    )
 
 def _room_terminal_boundary_segments(room_name):
     cache_key = (
@@ -1616,30 +1595,10 @@ def _room_terminal_boundary_segments(room_name):
     if cache_key in geometry_distance_cache:
         return geometry_distance_cache[cache_key]
 
-    room_poly = _room_polygon_by_name(room_name)
-    cover_geom = _room_cover_geometry(room_name)
-    segments = []
-    if room_poly is not None:
-        bnd = _extract_bnd_segs(room_poly)
-        if len(bnd):
-            segments.append(bnd)
-    if cover_geom is not None and not cover_geom.is_empty:
-        bnd = _extract_bnd_segs(cover_geom)
-        if len(bnd):
-            segments.append(bnd)
-    for room in rooms:
-        bnd = _extract_bnd_segs(room.polygon)
-        if len(bnd):
-            segments.append(bnd)
-    for wall in walls:
-        line = _extract_line_segs(wall)
-        if len(line):
-            segments.append(line)
-    for wp in wall_polys:
-        bnd = _extract_bnd_segs(wp)
-        if len(bnd):
-            segments.append(bnd)
-    result = np.vstack(segments) if segments else np.empty((0, 4), dtype=np.float64)
+    result = _terminal_boundary_segments_for_routing(
+        _room_polygon_by_name(room_name), [room.polygon for room in rooms], walls,
+        wall_polys, _room_cover_geometry(room_name),
+    )
     geometry_distance_cache[cache_key] = result
     return result
 

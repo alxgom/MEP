@@ -415,6 +415,12 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\terminal_validity.py tests\\test_terminal_validity.py`.
 - Validation: `python -m pytest tests\\test_terminal_validity.py`.
 
+- Created `mep_routing.routing.terminal_regions` for room-cover intersections, terminal-valid-region construction, and boundary-segment assembly.
+- Kept `main.py` responsible for app-state lookups and geometry cache ownership.
+- Added focused geometry contracts for cover/routing constraints and combined boundary segments.
+- Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\terminal_regions.py tests\\test_terminal_regions.py`.
+- Validation: `python -m pytest tests\\test_terminal_regions.py tests\\test_terminal_validity.py`.
+
 ## Commit Checklist
 
 Before each commit:
