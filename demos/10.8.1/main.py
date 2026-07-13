@@ -190,6 +190,19 @@ from mep_routing.observability import (
     solution_snapshot as _solution_snapshot,
 )
 from mep_routing.ui.canvas_tools import draw_canvas_tool_controls as _draw_canvas_tool_controls, draw_ruler_overlay as _draw_ruler_overlay, draw_terminal_tool_buttons as _draw_terminal_tool_buttons, terminal_tool_buttons as _terminal_tool_buttons
+from mep_routing.ui.canvas import (
+    CanvasFonts,
+    CanvasPolygon,
+    CanvasRenderHooks,
+    CanvasScene,
+    GuideLine,
+    MachinePinMarker,
+    MachineRender,
+    RouteStroke,
+    ShaftPolygon,
+    TerminalMarker,
+    draw_canvas_scene as _draw_canvas_scene,
+)
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
@@ -2602,203 +2615,203 @@ def main():
                         routing_history.add_marker(f"Pal:{'Vir' if heatmap_palette_idx==1 else 'Tur'}", (26, 188, 156))
                     
         # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ RENDERING ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
-        screen.fill(COLOR_BG)
-        active_selection = bool(selected_route_name and routes and any(name == selected_route_name for name, _ in routes))
+        active_selection = bool(
+            selected_route_name and routes and any(name == selected_route_name for name, _ in routes)
+        )
         if not active_selection:
             selected_route_name = None
         selected_room_poly = get_route_room_polygon(selected_route_name) if selected_route_name else None
-        
-        for room in rooms:
-            if not hasattr(room, 'polygon') or room.polygon.is_empty:
-                continue
-            coords = list(room.polygon.exterior.coords)
-            screen_coords = [to_screen(x, y) for x, y in coords]
-            room_name = getattr(room, "name", None)
-            is_selected_room = (
-                selected_route_name
-                and (
-                    room_name == selected_route_name
-                    or (selected_room_poly is not None and room.polygon.equals(selected_room_poly))
-                )
-            )
-            if selected_route_name and not is_selected_room:
-                color = COLOR_DESELECTED_ROOM
-            else:
-                color = COLOR_ROOM_COVERED if room.has_cover else COLOR_ROOM
-            pygame.draw.polygon(screen, color, screen_coords)
 
-        draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY)
+        canvas_rooms = []
+        for room in rooms:
+            if not hasattr(room, "polygon") or room.polygon.is_empty:
+                continue
+            room_name = getattr(room, "name", None)
+            is_selected_room = selected_route_name and (
+                room_name == selected_route_name
+                or (selected_room_poly is not None and room.polygon.equals(selected_room_poly))
+            )
+            room_color = (
+                COLOR_DESELECTED_ROOM if selected_route_name and not is_selected_room
+                else COLOR_ROOM_COVERED if room.has_cover else COLOR_ROOM
+            )
+            canvas_rooms.append(CanvasPolygon(
+                points=[to_screen(x, y) for x, y in room.polygon.exterior.coords],
+                color=room_color,
+            ))
+
+        canvas_doors = [
+            (to_screen(door["d1"][0], door["d1"][1]), to_screen(door["d2"][0], door["d2"][1]))
+            for door in doors
+        ]
+        canvas_columns = [
+            CanvasPolygon([to_screen(x, y) for x, y in column.exterior.coords], COLOR_COLUMN)
+            for column in columns
+        ]
+        canvas_shafts = []
+        for shaft in shafts:
+            is_active_shaft = shaft_extraction is not None and shaft.equals(shaft_extraction)
+            canvas_shafts.append(ShaftPolygon(
+                points=[to_screen(x, y) for x, y in shaft.exterior.coords],
+                color=COLOR_SHAFT if is_active_shaft else COLOR_SHAFT_INACTIVE,
+                source_geometry=shaft,
+                show_hatch=not is_active_shaft,
+            ))
+
+        canvas_grid_edges = []
+        canvas_grid_nodes = []
+        if show_grid_graph and current_env is not None:
+            canvas_grid_edges = [
+                (to_screen(current_env.nodes[u][0], current_env.nodes[u][1]),
+                 to_screen(current_env.nodes[v][0], current_env.nodes[v][1]))
+                for u in current_env.adj
+                for v, _dist, _direction in current_env.adj[u]
+                if u < v
+            ]
+            canvas_grid_nodes = [to_screen(point[0], point[1]) for point in current_env.nodes]
+
+        canvas_terminals = []
+        for route_name, point in terminals.items():
+            core_color = ROUTE_COLORS.get(route_name, (255, 255, 255))
+            if selected_route_name and route_name != selected_route_name:
+                core_color, ring_color, text_color = COLOR_DESELECTED_PIN, (70, 74, 78), (84, 88, 94)
+            else:
+                ring_color, text_color = (255, 255, 255), COLOR_PLAN_LABEL
+            canvas_terminals.append(TerminalMarker(
+                point=to_screen(point[0], point[1]),
+                core_color=core_color,
+                ring_color=ring_color,
+                text_color=text_color,
+                label=route_name.replace("Bathroom", "Bath").replace("Washroom", "Wash"),
+            ))
+
+        shaft_marker = None
+        if shaft_extraction:
+            shaft_point = get_representative_point(shaft_extraction)
+            shaft_marker = to_screen(shaft_point[0], shaft_point[1])
+
+        canvas_routes = []
+        for route_name, segments in routes or ():
+            route_color = ROUTE_COLORS.get(route_name, COLOR_TEXT)
+            if selected_route_name and selected_route_name != route_name:
+                route_color = COLOR_DESELECTED_ROUTE
+            canvas_routes.append(RouteStroke(
+                segments=[(to_screen(p1[0], p1[1]), to_screen(p2[0], p2[1])) for p1, p2 in segments],
+                width=get_route_draw_width(route_name),
+                color=route_color,
+                selected=selected_route_name == route_name,
+            ))
+
+        global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+        machine_outline = [
+            to_screen(global_pins[name][0], global_pins[name][1])
+            for name in ("c_tl", "c_tr", "c_br", "c_bl")
+        ]
+        selected_pins = get_selected_pin_names(selected_route_name, routes, global_pins) if selected_route_name else set()
+        machine_pins = []
+        for pin_name in ("tl", "tr", "bl", "br", "left_mid", "right_mid"):
+            is_large = pin_name in ("left_mid", "right_mid")
+            pin_color = (241, 196, 15) if is_large else (230, 126, 34)
+            ring_color = (255, 255, 255)
+            if selected_route_name and pin_name not in selected_pins:
+                pin_color, ring_color = COLOR_DESELECTED_PIN, (80, 84, 88)
+            point = global_pins[pin_name]
+            machine_pins.append(MachinePinMarker(
+                point=to_screen(point[0], point[1]),
+                color=pin_color,
+                ring_color=ring_color,
+                radius=5 if is_large else 4,
+            ))
+
+        guide_lines = []
+        if auto_placement_mode_idx == 1 and ap_fields:
+            shaft_point = get_representative_point(shaft_extraction)
+            _, left_index = grid_kd.query(global_pins["left_mid"])
+            _, right_index = grid_kd.query(global_pins["right_mid"])
+            left_distance = ap_fields["Shaft"].get(int(left_index), 1e9)
+            right_distance = ap_fields["Shaft"].get(int(right_index), 1e9)
+            exhaust_pin = "left_mid" if left_distance < right_distance else "right_mid"
+            kitchen_pin = "right_mid" if left_distance < right_distance else "left_mid"
+            guide_lines.append(GuideLine(
+                to_screen(*global_pins[exhaust_pin]), to_screen(*shaft_point), (46, 204, 113), 2,
+            ))
+            if "Kitchen" in terminals:
+                guide_lines.append(GuideLine(
+                    to_screen(*global_pins[kitchen_pin]), to_screen(*terminals["Kitchen"]), (241, 196, 15), 2,
+                ))
+            used_pins = set()
+            for route_name in (name for name in wet_room_names if name != "Kitchen"):
+                terminal_point = terminals[route_name]
+                best_pin = None
+                best_distance = 1e9
+                for pin_name in ("tl", "tr", "bl", "br"):
+                    if pin_name in used_pins:
+                        continue
+                    _, pin_index = grid_kd.query(global_pins[pin_name])
+                    distance = ap_fields[route_name].get(int(pin_index), 1e9)
+                    if distance < best_distance:
+                        best_distance, best_pin = distance, pin_name
+                if best_pin:
+                    used_pins.add(best_pin)
+                    guide_lines.append(GuideLine(
+                        to_screen(*global_pins[best_pin]),
+                        to_screen(*terminal_point),
+                        ROUTE_COLORS.get(route_name, COLOR_TEXT),
+                        1,
+                    ))
 
         if show_heatmap:
             ensure_placement_heatmap_scores()
-            if ap_scores:
-                draw_distance_heatmap(screen, ap_scores)
-                if not edge_weight_heatmap_enabled:
-                    draw_colorbar(screen, ap_scores)
 
-        if edge_weight_heatmap_enabled:
-            refresh_edge_weight_view_overlay(routes)
-        draw_edge_weight_heatmap(screen)
-        draw_edge_weight_colorbar(screen)
-        draw_terminal_validity_overlay(screen)
+        def draw_edge_weight_overlay():
+            if edge_weight_heatmap_enabled:
+                refresh_edge_weight_view_overlay(routes)
+            draw_edge_weight_heatmap(screen)
 
-        draw_wet_room_outer_accents(screen)
+        canvas_scene = CanvasScene(
+            background_color=COLOR_BG,
+            rooms=canvas_rooms,
+            room_wall_color=COLOR_WALL,
+            room_wall_width=WALL_DRAW_WIDTH,
+            doors=canvas_doors,
+            door_color=COLOR_DOOR,
+            columns=canvas_columns,
+            shafts=canvas_shafts,
+            grid_edges=canvas_grid_edges,
+            grid_nodes=canvas_grid_nodes,
+            grid_edge_color=COLOR_GRAPH_EDGE,
+            grid_node_color=COLOR_GRAPH_NODE,
+            terminals=canvas_terminals,
+            shaft_marker=shaft_marker,
+            routes=canvas_routes,
+            selection_halo_color=COLOR_SELECTION_HALO,
+            selected_route_name=selected_route_name,
+            terminal_area_start=terminal_area_start_mm,
+            terminal_area_end=terminal_area_end_mm if terminal_area_dragging else None,
+            machine=MachineRender(
+                outline=machine_outline,
+                fill_color=(230, 126, 34) if auto_placement_mode_idx > 0 else (127, 140, 141),
+                pins=machine_pins,
+            ),
+            guide_lines=guide_lines,
+        )
+        canvas_hooks = CanvasRenderHooks(
+            draw_covers=lambda: draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY),
+            draw_distance_heatmap=lambda: draw_distance_heatmap(screen, ap_scores) if show_heatmap and ap_scores else None,
+            draw_distance_colorbar=lambda: draw_colorbar(screen, ap_scores) if show_heatmap and ap_scores and not edge_weight_heatmap_enabled else None,
+            draw_edge_weight_heatmap=draw_edge_weight_overlay,
+            draw_edge_weight_colorbar=lambda: draw_edge_weight_colorbar(screen),
+            draw_terminal_validity_overlay=lambda: draw_terminal_validity_overlay(screen),
+            draw_wet_room_accents=lambda: draw_wet_room_outer_accents(screen),
+            draw_polygon_hatch=lambda shaft: draw_polygon_hatch(screen, shaft, COLOR_SHAFT_INACTIVE_HATCH, spacing=9),
+            draw_outlined_text=lambda draw_screen, font, label, position, color: draw_outlined_text(draw_screen, font, label, position, color),
+            draw_preferred_terminal_areas=lambda selected: draw_preferred_terminal_areas(screen, selected),
+            draw_routed_terminal_endpoints=lambda selected: draw_routed_terminal_endpoint_markers(screen, routes, selected),
+            draw_preferred_terminal_markers=lambda selected: draw_preferred_terminal_markers(screen, selected, routes),
+            draw_terminal_area_drag=lambda start, end: draw_terminal_area_drag(screen, start, end),
+        )
+        _draw_canvas_scene(screen, scene=canvas_scene, fonts=CanvasFonts(small=font_small), hooks=canvas_hooks)
 
-        for room in rooms:
-            if not hasattr(room, 'polygon') or room.polygon.is_empty:
-                continue
-            coords = list(room.polygon.exterior.coords)
-            screen_coords = [to_screen(x, y) for x, y in coords]
-            pygame.draw.polygon(screen, COLOR_WALL, screen_coords, WALL_DRAW_WIDTH)
-            
-        for d in doors:
-            # Draw door line segment
-            sp1 = to_screen(d["d1"][0], d["d1"][1])
-            sp2 = to_screen(d["d2"][0], d["d2"][1])
-            pygame.draw.line(screen, COLOR_DOOR, sp1, sp2, 4)
-            
-        for col_poly in columns:
-            coords = list(col_poly.exterior.coords)
-            screen_coords = [to_screen(x, y) for x, y in coords]
-            pygame.draw.polygon(screen, COLOR_COLUMN, screen_coords)
-            
-        for s_poly in shafts:
-            coords = list(s_poly.exterior.coords)
-            screen_coords = [to_screen(x, y) for x, y in coords]
-            is_active_shaft = shaft_extraction is not None and s_poly.equals(shaft_extraction)
-            shaft_color = COLOR_SHAFT if is_active_shaft else COLOR_SHAFT_INACTIVE
-            pygame.draw.polygon(screen, shaft_color, screen_coords)
-            if not is_active_shaft:
-                draw_polygon_hatch(screen, s_poly, COLOR_SHAFT_INACTIVE_HATCH, spacing=9)
-                pygame.draw.polygon(screen, COLOR_WALL, screen_coords, 1)
-            
-        if show_grid_graph and current_env is not None:
-            for u in current_env.adj:
-                for v, dist, direction in current_env.adj[u]:
-                    if u < v:
-                        p1 = current_env.nodes[u]
-                        p2 = current_env.nodes[v]
-                        sp1 = to_screen(p1[0], p1[1])
-                        sp2 = to_screen(p2[0], p2[1])
-                        pygame.draw.line(screen, COLOR_GRAPH_EDGE, sp1, sp2, 1)
-            for p in current_env.nodes:
-                pygame.draw.circle(screen, COLOR_GRAPH_NODE, to_screen(p[0], p[1]), 2)
-            
-        for r_name, pt in terminals.items():
-            s_pt = to_screen(pt[0], pt[1])
-            c_core = ROUTE_COLORS.get(r_name, (255, 255, 255))
-            if selected_route_name and r_name != selected_route_name:
-                c_core = COLOR_DESELECTED_PIN
-                ring_color = (70, 74, 78)
-                text_color = (84, 88, 94)
-            else:
-                ring_color = (255, 255, 255)
-                text_color = COLOR_PLAN_LABEL
-            pygame.draw.circle(screen, ring_color, s_pt, 7)
-            pygame.draw.circle(screen, c_core, s_pt, 5)
-            lbl_name = r_name.replace("Bathroom", "Bath").replace("Washroom", "Wash")
-            text_surf = font_small.render(lbl_name, True, text_color)
-            draw_outlined_text(
-                screen,
-                font_small,
-                lbl_name,
-                (s_pt[0] - text_surf.get_width() // 2, s_pt[1] + 10),
-                text_color,
-            )
-            
-        if shaft_extraction:
-            s_rep = get_representative_point(shaft_extraction)
-            s_pt = to_screen(s_rep[0], s_rep[1])
-            pygame.draw.circle(screen, (255, 255, 255), s_pt, 8)
-            pygame.draw.circle(screen, (231, 76, 60), s_pt, 6)
-            
-        if routes:
-            for name, segs in routes:
-                width = get_route_draw_width(name)
-                if selected_route_name == name:
-                    for p1, p2 in segs:
-                        sp1 = to_screen(p1[0], p1[1])
-                        sp2 = to_screen(p2[0], p2[1])
-                        pygame.draw.line(screen, COLOR_SELECTION_HALO, sp1, sp2, width + 6)
-                c = ROUTE_COLORS.get(name, COLOR_TEXT)
-                if selected_route_name and selected_route_name != name:
-                    c = COLOR_DESELECTED_ROUTE
-                for p1, p2 in segs:
-                    sp1 = to_screen(p1[0], p1[1])
-                    sp2 = to_screen(p2[0], p2[1])
-                    pygame.draw.line(screen, c, sp1, sp2, width)
-
-        draw_preferred_terminal_areas(screen, selected_route_name)
-        draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name)
-        draw_preferred_terminal_markers(screen, selected_route_name, routes)
-        draw_terminal_area_drag(screen, terminal_area_start_mm, terminal_area_end_mm if terminal_area_dragging else None)
-                    
-        # Bounding box coordinates for machine
-        g_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-        m_screen_pts = [
-            to_screen(g_pins["c_tl"][0], g_pins["c_tl"][1]),
-            to_screen(g_pins["c_tr"][0], g_pins["c_tr"][1]),
-            to_screen(g_pins["c_br"][0], g_pins["c_br"][1]),
-            to_screen(g_pins["c_bl"][0], g_pins["c_bl"][1])
-        ]
-        
-        base_color = (230, 126, 34) if auto_placement_mode_idx > 0 else (127, 140, 141)
-        pygame.draw.polygon(screen, base_color, m_screen_pts)
-        pygame.draw.polygon(screen, (255, 255, 255), m_screen_pts, 2)
-
-        selected_pins = get_selected_pin_names(selected_route_name, routes, g_pins) if selected_route_name else set()
-        
-        for pin_name in ["tl", "tr", "bl", "br", "left_mid", "right_mid"]:
-            pt = g_pins[pin_name]
-            sp = to_screen(pt[0], pt[1])
-            is_large = pin_name in ("left_mid", "right_mid")
-            color = (241, 196, 15) if is_large else (230, 126, 34)
-            ring_color = (255, 255, 255)
-            if selected_route_name and pin_name not in selected_pins:
-                color = COLOR_DESELECTED_PIN
-                ring_color = (80, 84, 88)
-            size = 5 if is_large else 4
-            pygame.draw.circle(screen, color, sp, size)
-            pygame.draw.circle(screen, ring_color, sp, size, 1)
-            
-        if auto_placement_mode_idx == 1 and ap_fields:
-            s_rep = get_representative_point(shaft_extraction)
-            _, p_left_idx = grid_kd.query(g_pins["left_mid"])
-            _, p_right_idx = grid_kd.query(g_pins["right_mid"])
-            d_left = ap_fields["Shaft"].get(int(p_left_idx), 1e9)
-            d_right = ap_fields["Shaft"].get(int(p_right_idx), 1e9)
-            exhaust_pt = g_pins["left_mid"] if d_left < d_right else g_pins["right_mid"]
-            kitchen_pin = "right_mid" if d_left < d_right else "left_mid"
-            
-            sp_port = to_screen(exhaust_pt[0], exhaust_pt[1])
-            sp_term = to_screen(s_rep[0], s_rep[1])
-            pygame.draw.line(screen, (46, 204, 113), sp_port, sp_term, 2)
-            
-            if "Kitchen" in terminals:
-                k_term = terminals["Kitchen"]
-                k_port = g_pins[kitchen_pin]
-                pygame.draw.line(screen, (241, 196, 15), to_screen(k_port[0], k_port[1]), to_screen(k_term[0], k_term[1]), 2)
-                
-            small_pins = ["tl", "tr", "bl", "br"]
-            remaining_rooms = [r for r in wet_room_names if r != "Kitchen"]
-            used_pins = set()
-            for r_name in remaining_rooms:
-                term_pt = terminals[r_name]
-                best_d = 1e9
-                best_p = None
-                for p in small_pins:
-                    if p in used_pins: continue
-                    _, p_idx = grid_kd.query(g_pins[p])
-                    d = ap_fields[r_name].get(int(p_idx), 1e9)
-                    if d < best_d:
-                        best_d = d
-                        best_p = p
-                if best_p:
-                    used_pins.add(best_p)
-                    port_pt = g_pins[best_p]
-                    pygame.draw.line(screen, ROUTE_COLORS.get(r_name, COLOR_TEXT), to_screen(port_pt[0], port_pt[1]), to_screen(term_pt[0], term_pt[1]), 1)
-
-        # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ SIDEBAR PANEL ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
         draw_canvas_tool_controls(screen, font_small, ruler_mode)
         draw_terminal_tool_buttons(screen, font_bold, font_small)
