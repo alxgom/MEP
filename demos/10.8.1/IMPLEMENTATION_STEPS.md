@@ -119,6 +119,11 @@ Manual validation milestones:
 - Added focused tests for polygon, line, and geometry collection snapping.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\geometry\__init__.py demos\10.8.1\vent_router\geometry\shapely_utils.py demos\10.8.1\tests\test_shapely_utils.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
+- Extracted shared canvas toolbar geometry, slider conversion, slider drawing, and weight-view switch drawing to `vent_router.ui.controls`.
+- Kept live zoom, route-weight, and active-control state mutations in `main.py`.
+- Added focused tests for toolbar bounds, switch bounds, slider clamping, and slider fractions.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\controls.py demos\10.8.1\tests\test_ui_controls.py`.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
 - Extracted `point_segment_min_distances`, `edge_segment_min_distances`, and `edge_parallel_segment_min_distances` to `vent_router.geometry.distances`.
 - Kept `main.py` compatibility imports under the previous private helper names.
 - Added focused tests for projection, endpoint, empty-segment, sampled-edge, and parallel-overlap distance behavior.

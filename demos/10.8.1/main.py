@@ -108,6 +108,14 @@ from vent_router.ui.drawing import (
     draw_outlined_text as _draw_outlined_text,
     draw_polygon_hatch as _draw_polygon_hatch,
 )
+from vent_router.ui.controls import (
+    canvas_tool_button_bounds as _canvas_tool_button_bounds,
+    draw_min_piece_slider as _draw_min_piece_slider_widget,
+    draw_weight_slider as _draw_weight_slider_widget,
+    draw_weight_view_switch as _draw_weight_view_switch_widget,
+    slider_value_from_x as _slider_value_from_x,
+    weight_view_switch_bounds as _weight_view_switch_bounds,
+)
 from vent_router.ui.solution_logs import (
     best_log_updates as _best_log_updates,
     draw_solution_logs_panel as _draw_solution_logs_panel_widget,
@@ -416,23 +424,9 @@ def reset_view_transform():
     update_view_transform()
 
 def get_canvas_tool_buttons():
-    size = 28
-    gap = 6
-    x0 = CANVAS_LEFT + 12
-    y0 = CANVAS_TOP + 12
-    reset_w = 46
-    cursor = x0 + 2 * (size + gap) + reset_w + gap
-    ruler_rect = pygame.Rect(cursor, y0, 58, size)
-    weights_rect = pygame.Rect(ruler_rect.right + gap, y0, 72, size)
-    weight_switch_rect = get_weight_view_switch_rect(weights_rect)
-    diameter_rect = pygame.Rect(weight_switch_rect.right + gap, y0, 54, size)
     return [
-        ("in", pygame.Rect(x0, y0, size, size), "+"),
-        ("out", pygame.Rect(x0 + size + gap, y0, size, size), "-"),
-        ("reset", pygame.Rect(x0 + 2 * (size + gap), y0, reset_w, size), "1:1"),
-        ("ruler", ruler_rect, "Ruler"),
-        ("weights", weights_rect, "Weights"),
-        ("diameter", diameter_rect, "Diam"),
+        (action, pygame.Rect(bounds), label)
+        for action, bounds, label in _canvas_tool_button_bounds(CANVAS_LEFT, CANVAS_TOP)
     ]
 
 def handle_canvas_tool_button_click(pos):
@@ -454,28 +448,21 @@ def handle_canvas_tool_button_click(pos):
     return None
 
 def get_weight_view_switch_rect(weights_rect=None):
-    gap = 6
     if weights_rect is None:
         weights_rect = next(rect for action, rect, _ in get_canvas_tool_buttons() if action == "weights")
-    return pygame.Rect(weights_rect.right + gap, weights_rect.y + 2, 92, 24)
+    return pygame.Rect(_weight_view_switch_bounds((weights_rect.x, weights_rect.y, weights_rect.width, weights_rect.height)))
 
 def min_piece_factor_from_slider_x(x):
     if min_piece_slider_rect.width <= 0:
         return min_piece_factor
-    t = (float(x) - min_piece_slider_rect.x) / max(1.0, float(min_piece_slider_rect.width))
-    t = max(0.0, min(1.0, t))
-    return MIN_PIECE_FACTOR_MIN + t * (MIN_PIECE_FACTOR_MAX - MIN_PIECE_FACTOR_MIN)
+    return _slider_value_from_x(x, min_piece_slider_rect, MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX)
 
 def set_min_piece_factor_from_slider_x(x):
     global min_piece_factor
     min_piece_factor = min_piece_factor_from_slider_x(x)
 
 def slider_value_from_x(x, rect, min_value, max_value):
-    if rect.width <= 0:
-        return min_value
-    t = (float(x) - rect.x) / max(1.0, float(rect.width))
-    t = max(0.0, min(1.0, t))
-    return min_value + t * (max_value - min_value)
+    return _slider_value_from_x(x, rect, min_value, max_value)
 
 def refresh_route_weight_constants():
     global CROSSING_PENALTY, CLEARANCE_PENALTY, OVERLAP_SCORE_PENALTY, SHORT_PIECE_SCORE_PENALTY
@@ -512,48 +499,23 @@ def reset_crossing_weight():
 
 def draw_min_piece_slider(screen, font_small, x, y, width):
     global min_piece_slider_rect
-    min_piece_slider_rect = pygame.Rect(int(x), int(y + 18), int(width), 8)
-    label = font_small.render(f"Min pieces factor: {min_piece_factor:.2f}x", True, COLOR_TEXT)
-    screen.blit(label, (x, y))
-    pygame.draw.rect(screen, (22, 22, 30), min_piece_slider_rect, border_radius=4)
-    pygame.draw.rect(screen, COLOR_MUTED, min_piece_slider_rect, 1, border_radius=4)
-    t = (min_piece_factor - MIN_PIECE_FACTOR_MIN) / (MIN_PIECE_FACTOR_MAX - MIN_PIECE_FACTOR_MIN)
-    knob_x = int(min_piece_slider_rect.x + t * min_piece_slider_rect.width)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, min_piece_slider_rect.centery), 8)
-    pygame.draw.circle(screen, (190, 196, 204), (knob_x, min_piece_slider_rect.centery), 8, 1)
-    min_lbl = font_small.render(f"{MIN_PIECE_FACTOR_MIN:.1f}", True, COLOR_MUTED)
-    max_lbl = font_small.render(f"{MIN_PIECE_FACTOR_MAX:.1f}", True, COLOR_MUTED)
-    screen.blit(min_lbl, (min_piece_slider_rect.x, min_piece_slider_rect.bottom + 3))
-    screen.blit(max_lbl, (min_piece_slider_rect.right - max_lbl.get_width(), min_piece_slider_rect.bottom + 3))
+    min_piece_slider_rect = _draw_min_piece_slider_widget(
+        screen, font_small, x, y, width, min_piece_factor,
+        MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX, COLOR_TEXT, COLOR_MUTED,
+    )
 
 def draw_weight_slider(screen, font_small, x, y, width, label, value, min_value, max_value, color, rect_name, suffix="", integer=False):
     global bend_weight_slider_rect, crossing_weight_slider_rect, bend_weight_reset_rect, crossing_weight_reset_rect
-    reset_size = 18
-    slider_width = int(width) - reset_size - 8
-    rect = pygame.Rect(int(x), int(y + 18), int(slider_width), 8)
+    rect, reset_rect = _draw_weight_slider_widget(
+        screen, font_small, x, y, width, label, value, min_value, max_value,
+        COLOR_TEXT, COLOR_MUTED, suffix=suffix, integer=integer,
+    )
     if rect_name == "bend":
         bend_weight_slider_rect = rect
-        bend_weight_reset_rect = pygame.Rect(rect.right + 8, int(y + 13), reset_size, reset_size)
+        bend_weight_reset_rect = reset_rect
     else:
         crossing_weight_slider_rect = rect
-        crossing_weight_reset_rect = pygame.Rect(rect.right + 8, int(y + 13), reset_size, reset_size)
-    value_text = f"{int(round(value))}" if integer else f"{value:.1f}"
-    label_surf = font_small.render(f"{label}: {value_text}{suffix}", True, COLOR_TEXT)
-    screen.blit(label_surf, (x, y))
-    pygame.draw.rect(screen, (22, 22, 30), rect, border_radius=4)
-    pygame.draw.rect(screen, COLOR_MUTED, rect, 1, border_radius=4)
-    span = max_value - min_value
-    t = 0.0 if span <= 0 else (value - min_value) / span
-    knob_x = int(rect.x + max(0.0, min(1.0, t)) * rect.width)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), 8)
-    pygame.draw.circle(screen, (190, 196, 204), (knob_x, rect.centery), 8, 1)
-    reset_rect = bend_weight_reset_rect if rect_name == "bend" else crossing_weight_reset_rect
-    pygame.draw.rect(screen, (32, 34, 38), reset_rect, border_radius=4)
-    pygame.draw.rect(screen, (128, 136, 144), reset_rect, 1, border_radius=4)
-    cx, cy = reset_rect.center
-    icon_color = (198, 204, 210)
-    pygame.draw.arc(screen, icon_color, pygame.Rect(cx - 5, cy - 5, 10, 10), math.radians(35), math.radians(315), 2)
-    pygame.draw.polygon(screen, icon_color, [(cx + 4, cy - 6), (cx + 8, cy - 5), (cx + 5, cy - 2)])
+        crossing_weight_reset_rect = reset_rect
 
 def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
     if routes:
@@ -588,17 +550,7 @@ def handle_terminal_tool_button_click(pos):
 
 def draw_weight_view_switch(screen, font_small):
     rect = get_weight_view_switch_rect()
-    left_active = edge_weight_view_mode_idx == 0
-    pygame.draw.rect(screen, (32, 34, 38), rect, border_radius=rect.height // 2)
-    pygame.draw.rect(screen, (150, 158, 166), rect, 1, border_radius=rect.height // 2)
-    knob_radius = 4 if left_active else 8
-    knob_x = rect.left + 13 if left_active else rect.right - 13
-    pygame.draw.circle(screen, (198, 204, 210), (knob_x, rect.centery), knob_radius)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), knob_radius, 1)
-    label = "Small" if left_active else "Big"
-    lbl = font_small.render(label, True, COLOR_TEXT)
-    label_x = rect.x + 28 if left_active else rect.x + 14
-    screen.blit(lbl, (label_x, rect.centery - lbl.get_height() // 2))
+    _draw_weight_view_switch_widget(screen, font_small, rect, edge_weight_view_mode_idx == 0, COLOR_TEXT)
 
 def draw_terminal_tool_buttons(screen, font_bold, font_small):
     global terminal_tool_button_rects
