@@ -37,6 +37,7 @@ from vent_router.graphs import (
     EnvView,
     build_axis_grid as _build_axis_grid_for_context,
     build_hannan_static_axes as _build_hannan_static_axes_for_context,
+    build_epsilon_axes as _build_epsilon_axes_for_context,
     add_bounds_axes as _add_bounds_axes_to_sets,
     add_epsilon_axis_values as _add_epsilon_axis_values_to_sets,
     add_epsilon_geometry_axes as _add_epsilon_geometry_axes_to_sets,
@@ -1240,58 +1241,22 @@ def build_epsilon_grid(machine_pins=None):
         return
     t0 = time.perf_counter()
     eps = CORE_EPSILON_GRID_MM
-    xs, ys = set(), set()
-    preserve_x, preserve_y = set(), set()
-    required_points = []
-
-    if routing_region_base is not None:
-        _add_epsilon_geometry_axes(xs, ys, routing_region_base, eps)
-        minx, miny, maxx, maxy = routing_region_base.bounds
-        scaffold_xs = np.arange(
-            math.floor(minx / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING,
-            math.ceil(maxx / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING + 1,
-            HANNAN_SCAFFOLD_SPACING,
-        )
-        scaffold_ys = np.arange(
-            math.floor(miny / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING,
-            math.ceil(maxy / HANNAN_SCAFFOLD_SPACING) * HANNAN_SCAFFOLD_SPACING + 1,
-            HANNAN_SCAFFOLD_SPACING,
-        )
-        xs.update(round(float(x)) for x in scaffold_xs)
-        ys.update(round(float(y)) for y in scaffold_ys)
-
-    for cover in covers:
-        _add_epsilon_geometry_axes(xs, ys, cover, eps)
-
-    for geom in list(columns) + list(shafts) + list(wall_polys):
-        _add_epsilon_geometry_axes(xs, ys, geom, eps)
-
-    def add_required(point):
-        p = (round(float(point[0])), round(float(point[1])))
-        required_points.append(p)
-        _add_epsilon_axis_values(xs, ys, p, eps)
-        _add_point_axes(preserve_x, preserve_y, p)
-
-    for pt in terminals.values():
-        add_required(pt)
-
-    for spec in shaft_core_entry_specs:
-        add_required(spec["entry"])
-        add_required(spec["centroid"])
-        if spec.get("exit_wall"):
-            add_required(spec["exit_wall"][0])
-            add_required(spec["exit_wall"][1])
-
-    if shaft_extraction is not None and not shaft_core_entry_specs:
-        rep_pt = shaft_extraction.representative_point()
-        add_required((rep_pt.x, rep_pt.y))
-
+    machine_access_points = []
     if machine_pins:
-        for spec in get_port_access_specs(machine_pins, machine_angle):
-            add_required(spec["access_point"])
-
-    xs = _merge_close_values(xs, threshold=80.0, preserve_values=preserve_x)
-    ys = _merge_close_values(ys, threshold=80.0, preserve_values=preserve_y)
+        machine_access_points = [spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle)]
+    xs, ys, required_points = _build_epsilon_axes_for_context(
+        allowed_region=routing_region_base,
+        covers=covers,
+        columns=columns,
+        shafts=shafts,
+        wall_polys=wall_polys,
+        terminals=terminals,
+        shaft_core_entry_specs=shaft_core_entry_specs,
+        shaft_extraction=shaft_extraction,
+        machine_access_points=machine_access_points,
+        epsilon_mm=eps,
+        scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
+    )
     t1 = time.perf_counter()
 
     nodes_arr, raw_edges, (node_build_ms, edge_build_ms) = _build_axis_grid_for_context(

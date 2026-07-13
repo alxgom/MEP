@@ -17,6 +17,10 @@ This file is the execution ledger for the Demo 10.8.1 refactor. Keep it current 
 - Added one graph-builder contract test for integer-grid nodes and wall-crossing edge removal.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\regular.py demos\10.8.1\vent_router\graphs\__init__.py demos\10.8.1\tests\test_graph_env.py`.
 - Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
+- Extracted epsilon axis-generation policy to `vent_router.graphs.epsilon`; `main.py` supplies active machine access points and commits the shared axis-grid result.
+- All regular, Hannan, and epsilon graph construction now runs through `vent_router.graphs`; dynamic machine blocking remains the next graph-state move.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\epsilon.py demos\10.8.1\vent_router\graphs\hannan.py demos\10.8.1\vent_router\graphs\__init__.py`.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
 - Extracted Hannan static-axis generation to `vent_router.graphs.hannan` with explicit geometry, terminal, shaft, and graph-spacing inputs.
 - Kept `main.py` as the cache owner and active-state adapter; epsilon axis-generation policy remains in `main.py`.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\graphs\hannan.py demos\10.8.1\vent_router\graphs\__init__.py`.
