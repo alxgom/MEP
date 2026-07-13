@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from mep_routing.installations.sal import run_sequential_routing
+from mep_routing.installations.sal import select_two_stage_routing
 
 
 def test_sequential_strategy_routes_sal_large_routes_before_small_routes():
@@ -44,3 +45,14 @@ def test_sequential_strategy_routes_sal_large_routes_before_small_routes():
     assert [route_name for route_name, _ in routes] == ["Shaft", "Kitchen", "Bathroom"]
     assert total_nodes == 6
     assert search_calls == [([10], ["right_mid"]), ([20], ["tl", "tr", "bl", "br"])]
+
+
+def test_two_stage_strategy_selects_the_lowest_scoring_complete_candidate():
+    result = select_two_stage_routing(
+        lambda: (True, [("Shaft", [])], "big-first", 3),
+        lambda: (True, [("Kitchen", [])], "small-first", 4),
+        lambda _routes: 2,
+        lambda routes, crossings: len(routes) + crossings,
+    )
+
+    assert result == (True, [("Shaft", [])], "big-first", 3)

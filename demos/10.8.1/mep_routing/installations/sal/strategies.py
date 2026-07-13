@@ -120,3 +120,19 @@ def run_sequential_routing(
         available_small_pins.remove(chosen_small_pin)
 
     return True, routes, "Success", total_nodes
+
+
+def select_two_stage_routing(big_first_runner, small_first_runner, count_crossings, score_routes):
+    """Choose Sal's lower-scoring complete large/small routing stage order."""
+    candidates = []
+    for runner in (big_first_runner, small_first_runner):
+        success, routes, status, total_nodes = runner()
+        if not success:
+            continue
+        candidates.append((score_routes(routes, count_crossings(routes)), routes, total_nodes, status))
+
+    if not candidates:
+        return False, None, "Two-stage min-cost flow found no complete stage order", 0
+
+    _, best_routes, best_total_nodes, best_status = min(candidates, key=lambda item: item[0])
+    return True, best_routes, best_status, best_total_nodes

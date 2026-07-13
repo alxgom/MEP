@@ -23,6 +23,7 @@ from mep_routing.installations.sal import (
     LARGE_DUCT_ROUTE_NAMES,
     SAL_OZEO_FLAT_MACHINE,
     run_sequential_routing as _run_sal_sequential_routing,
+    select_two_stage_routing as _select_sal_two_stage_routing,
 )
 from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
@@ -2675,20 +2676,12 @@ def _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path
     return True, large_routes + small_routes, f"small-first {large_meta.get('assignment', '')} {large_meta.get('large_order', '')}", large_nodes + small_nodes
 
 def run_two_stage_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_path):
-    candidates = []
-    for runner in (_run_two_stage_big_first, _run_two_stage_small_first):
-        success, routes, status, total_nodes = runner(room_names, pin_node_map, global_pins, shaft_path)
-        if not success:
-            continue
-        crossings = count_segment_crossings(routes)
-        score = get_solution_score(routes, crossings)
-        candidates.append((score, routes, total_nodes, status))
-
-    if not candidates:
-        return False, None, "Two-stage min-cost flow found no complete stage order", 0
-
-    _, best_routes, best_total_nodes, best_status = min(candidates, key=lambda item: item[0])
-    return True, best_routes, best_status, best_total_nodes
+    return _select_sal_two_stage_routing(
+        lambda: _run_two_stage_big_first(room_names, pin_node_map, global_pins, shaft_path),
+        lambda: _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path),
+        count_segment_crossings,
+        get_solution_score,
+    )
 
 def get_solution_score(routes, crossings):
     weights = RouteScoreWeights(
