@@ -60,10 +60,12 @@ from .search import (
     target_heuristic,
 )
 from .terminal_validity import terminal_validity_entries
+from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
 
 __all__ = [
     "RouteScoreWeights",
     "add_edge",
+    "append_allowed_region_warning",
     "build_pin_min_cost_flow_network",
     "add_port_stub_segment",
     "block_terminal_node_edges",
@@ -74,6 +76,7 @@ __all__ = [
     "count_segment_clearance_conflicts",
     "count_segment_crossings",
     "count_segment_overlaps",
+    "count_segments_outside_allowed_region",
     "count_solution_short_pieces",
     "count_solution_turns",
     "find_route_at_point",

@@ -69,6 +69,7 @@ from vent_router.routing import (
     count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
     add_port_stub_segment as _add_port_stub_segment,
+    append_allowed_region_warning as _append_allowed_region_warning,
     build_pin_min_cost_flow_network as _build_pin_min_cost_flow_network,
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
@@ -3138,17 +3139,7 @@ def get_route_validation_warnings(routes):
         get_required_clearance_mm,
         get_min_piece_length,
     )
-    if routing_region_base is not None:
-        out_count = 0
-        for name, segs in routes:
-            for p1, p2 in segs:
-                line = LineString([(float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))])
-                if name == "Shaft" and shaft_extraction is not None and line.distance(shaft_extraction) < 1.0:
-                    continue
-                if not line.covered_by(routing_region_base):
-                    out_count += 1
-        if out_count:
-            warnings.append(f"{out_count} segment(s) outside allowed")
+    warnings = _append_allowed_region_warning(warnings, routes, routing_region_base, shaft_extraction)
     if shaft_extraction is not None and DWELLING_SOURCE_MODES[dwelling_source_idx] == "Real DB" and not shaft_core_entry_specs:
         warnings.append("missing core shaft entry metadata")
     return warnings

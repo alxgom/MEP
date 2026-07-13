@@ -124,6 +124,11 @@ Manual validation milestones:
 - Added focused tests for toolbar bounds, switch bounds, slider clamping, and slider fractions.
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\ui\controls.py demos\10.8.1\tests\test_ui_controls.py`.
 - Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
+- Extracted generic allowed-region route validation to `vent_router.routing.validation`.
+- Kept the real-dwelling core-shaft metadata policy in `main.py` because it remains source-specific.
+- Added focused tests for shaft-entry exemptions, outside-segment counts, and missing allowed-region handling.
+- Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\vent_router\routing\validation.py demos\10.8.1\vent_router\routing\__init__.py demos\10.8.1\tests\test_routing_validation.py`.
+- Validation: Python 3.11 `-m pytest demos\10.8.1\tests`.
 - Extracted the pin min-cost-flow residual-network builder to `vent_router.routing.flow`.
 - Kept `main.py` responsible for active graph/KD-tree access, edge-weight overlays, runtime cost callbacks, and consuming solved flow paths.
 - Added focused tests for a direct start-to-pin network and no-target handling.
