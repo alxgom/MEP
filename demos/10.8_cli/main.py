@@ -5494,8 +5494,6 @@ def run_core_workflow_machine_placement():
     for room in _candidate_machine_rooms():
         for cx, cy in _candidate_room_points(room):
             for rot in (0, 90, 180, 270):
-                if not is_machine_placement_valid(cx, cy, rot):
-                    continue
                 candidates.append((_core_machine_candidate_sort_key(cx, cy, rot, room), cx, cy, rot))
 
     ap_scores = {}
@@ -5508,7 +5506,7 @@ def run_core_workflow_machine_placement():
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
-    print(f"[Core-like Machine Placement] tried {len(candidates)} feasible candidates in {elapsed_ms:.1f}ms")
+    print(f"[Routing-Core Machine Placement] ranked {len(candidates)} candidates in {elapsed_ms:.1f}ms")
 
 def run_auto_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
