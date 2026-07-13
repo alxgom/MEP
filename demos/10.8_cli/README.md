@@ -85,7 +85,7 @@ Use indices to narrow a run while investigating a case. This example compares th
 ..\10.7\.venv\Scripts\python.exe compare_clima_backends.py --scenarios 1 --graphs 1 --backends 0,1
 ```
 
-`--output path\to\report.csv` writes the same data to a CSV file. The report includes status, solve time, route length, turns, geometric validation counts, diagonal and outside-allowed counts, and the core-port debug layer counts. The latter fields remain zero for the L(G) approximation because it does not generate the core-port overlay.
+`--output path\to\report.csv` writes the same data to a CSV file. The report includes status, solve time, route length, turns, geometric validation counts, diagonal and outside-allowed counts, experimental short-piece count, and the core-port debug layer counts. The latter fields remain zero for the L(G) approximation because it does not generate the core-port overlay.
 
 `Routing-Core Variant: Kou nonnegative heuristics` keeps the same core-port tree pipeline but removes the negative A* heuristic pairs from the 9-direction sweep, using only `(0,0)`, `(0,1)`, `(1,0)`, and `(1,1)`. It is intentionally labeled as a variant, not the core-parity default.
 
@@ -163,7 +163,7 @@ internal segment minimum = diameter * 2.0 * factor
 
 The default factor is `1.05`, matching `FACTOR_CONDUCTO_MINIMA_LONGITUD` in the local routing-core config. The sidebar slider sweeps this factor from `0.50` to `2.00`.
 
-Short-piece handling is intentionally post-route, matching routing-core's current validation phase. The demo merges consecutive collinear graph edges into physical duct pieces before counting, so the metric is not inflated by grid discretization. The count contributes to `Total Cost Score` and is shown as `Short Pieces` in the KPI card, but it no longer expands routing search state.
+The diameter-based short-piece count is an inherited demo experiment, not a routing-core Clima validity rule. Routing-core adds the grille and machine connector conductos, then `simplificar_tramo` removes only near-zero conductos below `TOLERANCIA_SIMPLIFICACION_TRAMO = 0.005 m`. The demo retains its merged physical-piece count for the L(G) approximation, but it is not scored or reported as a validation warning for either Routing-Core Port backend.
 
 ## Grille Preferences
 

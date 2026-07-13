@@ -4378,6 +4378,10 @@ def count_route_short_pieces(route_name, segs):
 def count_solution_short_pieces(routes):
     return sum(count_route_short_pieces(name, segs) for name, segs in routes)
 
+def _uses_experimental_short_piece_rule():
+    """The inherited diameter-based rule is not part of routing-core Clima."""
+    return clima_supply_backend_idx == 2
+
 def find_route_at_point(routes, world_pt):
     hit = find_route_hit_at_point(routes, world_pt)
     return hit[0] if hit else None
@@ -5036,7 +5040,7 @@ def get_solution_score(routes, crossings):
     total_turns = count_solution_turns(routes)
     overlaps = count_segment_overlaps(routes)
     clearance_conflicts = count_segment_clearance_conflicts(routes)
-    short_pieces = count_solution_short_pieces(routes)
+    short_pieces = count_solution_short_pieces(routes) if _uses_experimental_short_piece_rule() else 0
     score = (
         int(total_len)
         + int(C_BEND) * total_turns
@@ -5111,9 +5115,10 @@ def get_route_validation_warnings(routes):
     clearance_conflicts = count_segment_clearance_conflicts(routes)
     if clearance_conflicts:
         warnings.append(f"{clearance_conflicts} clearance conflict(s)")
-    short_pieces = count_solution_short_pieces(routes)
-    if short_pieces:
-        warnings.append(f"{short_pieces} short piece(s)")
+    if _uses_experimental_short_piece_rule():
+        short_pieces = count_solution_short_pieces(routes)
+        if short_pieces:
+            warnings.append(f"{short_pieces} experimental short piece(s)")
     out_count = len(get_route_outside_allowed_segments(routes))
     if out_count:
         warnings.append(f"{out_count} segment(s) outside allowed")
@@ -7630,9 +7635,9 @@ def main():
         lbl_cross = font_small.render(f"Duct Crossings: {crossings_count}", True, COLOR_TEXT)
         screen.blit(lbl_cross, (25, 665))
         short_pieces_count = count_solution_short_pieces(routes) if routes else 0
-        lbl_short = font_small.render(f"Short Pieces: {short_pieces_count}", True, COLOR_TEXT)
+        lbl_short = font_small.render(f"Experimental short: {short_pieces_count}", True, COLOR_TEXT)
         screen.blit(lbl_short, (25, 685))
-        lbl_score = font_small.render(f"Total Cost Score: {get_solution_score(routes, crossings_count) if routes else 0}", True, COLOR_TEXT)
+        lbl_score = font_small.render(f"Demo Cost Score: {get_solution_score(routes, crossings_count) if routes else 0}", True, COLOR_TEXT)
         screen.blit(lbl_score, (25, 705))
         
         # 5. Status Box
