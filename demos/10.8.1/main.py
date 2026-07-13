@@ -179,6 +179,7 @@ from mep_routing.ui.help import (
     draw_help_popup as _draw_help_popup,
     draw_transient_message as _draw_transient_message,
     draw_viewer_legend as _draw_viewer_legend,
+    help_lines as _help_lines,
 )
 from mep_routing.observability import clear_history_buffers as _clear_history_buffers
 from mep_routing.ui.overlays import (
@@ -3006,61 +3007,12 @@ def draw_plots(screen, font_small, font_bold):
         screen.blit(lbl_cur, (px, chart_y + chart_h + 2))
         screen.blit(lbl_min, (px + chart_w - lbl_min.get_width(), chart_y + chart_h + 2))
 
-HELP_TEXT = {
-    "auto": [
-        "[A] Auto-placement on/off",
-        "[P] Cycle placement mode",
-        "[U] Rotation mode",
-        "[V] Placement heatmap",
-        "[H] Heatmap scale",
-        "[B] Heatmap palette",
-        "[W] Placement weights",
-    ],
-    "solver": [
-        "[C] Routing strategy",
-        "[L] Router backend",
-        "[Y] A* heuristic",
-        "[Tab] Grid type",
-        "[G] Grid mesh",
-        "[T] Start mode",
-        "Terminal: click nearest node",
-        "Term. area: drag rectangle",
-        "Ctrl removes preferences",
-        "Reset prefs clears all",
-        "Sliders: piece/bend/cross",
-        "[M] Edge weights",
-        "[N] Small/big weight view",
-        "[X] Real pipe width",
-    ],
-    "machine": [
-        "Drag machine with mouse",
-        "Wheel: rotate machine",
-        "[U] Torque/field rotation",
-        "Shift+wheel: zoom",
-        "Shift+drag or middle drag: pan",
-        "[D] Dwelling source",
-        "[O] Routing frame",
-    ],
-    "kpi": [
-        "Plots compare current values",
-        "against best observed minimum.",
-        "Solver time excludes rendering.",
-    ],
-    "status": [
-        "Routing status and solver time.",
-        "Right log panel stores",
-        "session-local states.",
-        "[Esc] Clear selection / ruler",
-        "[Space] New apartment",
-    ],
-}
-
 def draw_card_help_button(screen, card_id, rect, font_small):
     global help_button_rects
     help_button_rects[card_id] = _draw_card_help_button(screen, card_id, rect, font_small, help_popup_card == card_id, COLOR_MUTED, COLOR_TEXT)
 
 def draw_help_popup(screen, font_small):
-    return _draw_help_popup(screen, font_small, HELP_TEXT.get(help_popup_card), (CANVAS_LEFT + 16, CANVAS_TOP + 58), COLOR_TEXT)
+    return _draw_help_popup(screen, font_small, _help_lines(help_popup_card), (CANVAS_LEFT + 16, CANVAS_TOP + 58), COLOR_TEXT)
 
 def set_transient_message(text, duration_ms=2400):
     global transient_message, transient_message_until_ms

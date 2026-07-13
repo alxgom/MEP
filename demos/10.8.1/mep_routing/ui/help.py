@@ -3,6 +3,19 @@
 from __future__ import annotations
 
 
+HELP_TEXT = {
+    "auto": ("[A] Auto-placement on/off", "[P] Cycle placement mode", "[U] Rotation mode", "[V] Placement heatmap", "[H] Heatmap scale", "[B] Heatmap palette", "[W] Placement weights"),
+    "solver": ("[C] Routing strategy", "[L] Router backend", "[Y] A* heuristic", "[Tab] Grid type", "[G] Grid mesh", "[T] Start mode", "Terminal: click nearest node", "Term. area: drag rectangle", "Ctrl removes preferences", "Reset prefs clears all", "Sliders: piece/bend/cross", "[M] Edge weights", "[N] Small/big weight view", "[X] Real pipe width"),
+    "machine": ("Drag machine with mouse", "Wheel: rotate machine", "[U] Torque/field rotation", "Shift+wheel: zoom", "Shift+drag or middle drag: pan", "[D] Dwelling source", "[O] Routing frame"),
+    "kpi": ("Plots compare current values", "against best observed minimum.", "Solver time excludes rendering."),
+    "status": ("Routing status and solver time.", "Right log panel stores", "session-local states.", "[Esc] Clear selection / ruler", "[Space] New apartment"),
+}
+
+
+def help_lines(card_id):
+    return HELP_TEXT.get(card_id)
+
+
 def draw_card_help_button(screen, card_id, card_rect, font, active, muted_color, text_color):
     import pygame
     button = pygame.Rect(card_rect.right - 26, card_rect.y + 8, 18, 18)
