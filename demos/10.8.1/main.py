@@ -181,6 +181,10 @@ from mep_routing.ui.help import (
     draw_viewer_legend as _draw_viewer_legend,
 )
 from mep_routing.observability import clear_history_buffers as _clear_history_buffers
+from mep_routing.ui.overlays import (
+    draw_terminal_area_drag as _draw_terminal_area_drag,
+    draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1790,26 +1794,13 @@ def draw_terminal_validity_tooltip(screen, font_small):
     )
 
 def draw_wet_room_outer_accents(screen):
-    for geom in wet_room_outer_accents:
-        for poly in _iter_polygons(geom):
-            coords = [to_screen(x, y) for x, y in poly.exterior.coords]
-            pygame.draw.lines(screen, COLOR_WET_ROOM_ACCENT, True, coords, 3)
+    return _draw_wet_room_outer_accents(screen, wet_room_outer_accents, to_screen, _iter_polygons, COLOR_WET_ROOM_ACCENT)
 
 def draw_outlined_text(screen, font, text, pos, color, outline_color=COLOR_PLAN_LABEL_HALO):
     return _draw_outlined_text(screen, font, text, pos, color, outline_color)
 
 def draw_terminal_area_drag(screen, start_world, end_world):
-    if start_world is None or end_world is None:
-        return
-    x1, y1 = to_screen(start_world[0], start_world[1])
-    x2, y2 = to_screen(end_world[0], end_world[1])
-    rect = pygame.Rect(min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1))
-    if rect.width <= 1 or rect.height <= 1:
-        return
-    overlay = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-    overlay.fill((155, 89, 182, 55))
-    screen.blit(overlay, rect.topleft)
-    pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+    return _draw_terminal_area_drag(screen, start_world, end_world, to_screen)
 
 def count_segment_crossings(routes):
     return _count_segment_crossings(routes)

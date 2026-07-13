@@ -441,6 +441,10 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\observability\\__init__.py mep_routing\\observability\\history.py tests\\test_history.py`.
 - Validation: `python -m pytest tests\\test_history.py`.
 
+- Created `mep_routing.ui.overlays` for wet-room accents and terminal-area drag rendering.
+- Kept `main.py` responsible for active geometry, transforms, and colors.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\overlays.py`.
+
 ## Commit Checklist
 
 Before each commit:
