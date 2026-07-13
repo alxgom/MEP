@@ -470,6 +470,9 @@ Manual validation milestones:
 - Kept live graph state, elapsed-time measurement, and status formatting in `main.py`; the Sal module owns route-ordering, congestion history, pin selection, and candidate scoring through explicit callbacks.
 - Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\installations\\sal\\negotiated.py tests\\test_sal_negotiated.py`; direct focused negotiated-routing contract invocation passed. Focused pytest and Python 3.11 remain unavailable in this workspace.
 
+- Integrated `SalFlowRuntime` as the live adapter for Sal min-cost-flow routing, leaving `main.py` with only the active-state factory and compatibility entrypoints.
+- Validation: compile and focused flow-runtime contract test.
+
 - Integrated shaft-entry geometry, entry-node ranking, and route-segment assembly through `mep_routing.routing.shaft_entries`.
 - Kept `main.py` responsible for source-metadata normalization and the live geometry cache; the routing module now owns the reusable geometric policy.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\routing\\shaft_entries.py mep_routing\\routing\\__init__.py tests\\test_shaft_entries.py`; Python 3.11 `-m pytest tests\\test_shaft_entries.py tests\\test_routing_segments.py`.

@@ -43,6 +43,7 @@ from mep_routing.installations.sal.negotiated import (
     SalNegotiatedContext,
     run_negotiated_congestion,
 )
+from mep_routing.installations.sal.flow_runtime import SalFlowRuntime
 from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
@@ -1564,47 +1565,10 @@ def _source_start_nodes(source_spec):
     return _source_start_nodes_for_kd(source_spec, grid_kd)
 
 def _run_pin_min_cost_flow(route_names, target_specs_by_route, terminal_points_by_route, edge_weights=None):
-    if not route_names:
-        return {}, {}, 0.0, 0
-    record_edge_weight_overlay(edge_weights, current_env)
-
-    start_nodes_by_route = {
-        route_name: _source_start_nodes(terminal_points_by_route[route_name])
-        for route_name in route_names
-    }
-    network = _build_pin_min_cost_flow_network(
-        route_names,
-        target_specs_by_route,
-        start_nodes_by_route,
-        current_env.adj,
-        lambda u, v, dist: _weighted_edge_cost(edge_weights, u, v, dist),
-        lambda u, v: _line_graph_dir_from_points(current_env, u, v),
-        C_BEND,
-        OVERLAP_BLOCK_WEIGHT,
-    )
-    if network is None:
-        return None, None, float("inf"), 0
-    graph, source, sink, route_flow_nodes = network
-
-    flow, cost = _min_cost_flow(graph, source, sink, len(route_names))
-    if flow < len(route_names):
-        return None, None, cost, flow
-
-    paths = {}
-    targets = {}
-    for route_name in route_names:
-        path, target = _trace_flow_path(graph, route_flow_nodes[route_name], sink)
-        if path is None:
-            return None, None, cost, flow
-        paths[route_name] = path
-        targets[route_name] = target
-
-    return paths, targets, cost, flow
+    return _sal_flow_runtime().run_pin_flow(route_names, target_specs_by_route, terminal_points_by_route, edge_weights)
 
 def _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=None):
-    target_specs_by_route = _small_pin_target_specs(room_names, pin_node_map)
-    terminal_points_by_route = {room_name: get_route_start_nodes(room_name) for room_name in room_names}
-    return _run_pin_min_cost_flow(room_names, target_specs_by_route, terminal_points_by_route, edge_weights=edge_weights)
+    return _sal_flow_runtime().run_small_pin_flow(room_names, pin_node_map, edge_weights)
 
 def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None):
     return _route_segments_from_path_for_env(
@@ -1620,56 +1584,34 @@ def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None,
 def _build_routes_from_paths(route_order, paths, targets, global_pins):
     return _build_routes_from_paths_for_env(route_order, paths, targets, global_pins, _route_segments_from_path)
 
-def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights=None):
-    target_specs_by_route = {route_name: pin_node_map.get(target_pin, [])}
-    terminal_points_by_route = {route_name: terminal_point}
-    paths, targets, cost, flow = _run_pin_min_cost_flow(
-        [route_name],
-        target_specs_by_route,
-        terminal_points_by_route,
-        edge_weights=edge_weights,
+def _sal_flow_runtime():
+    return SalFlowRuntime(
+        env=current_env, terminals=terminals, small_diameter=MACHINE_SMALL_DUCT_D,
+        large_diameter=MACHINE_LARGE_DUCT_D, bend_cost=C_BEND, overlap_block_weight=OVERLAP_BLOCK_WEIGHT,
+        source_start_nodes=_source_start_nodes, weighted_edge_cost=_weighted_edge_cost,
+        line_graph_direction=_line_graph_dir_from_points, record_edge_weight_overlay=record_edge_weight_overlay,
+        route_start_nodes=get_route_start_nodes, route_segments_from_path=_route_segments_from_path,
+        build_routes_from_paths=_build_routes_from_paths, route_axis_records=_route_axis_records,
+        add_static_clearance_weights=add_static_clearance_weights, add_machine_clearance_weights=add_machine_clearance_weights,
+        add_route_clearance_weights=add_route_clearance_weights, add_route_interaction_weights=add_route_interaction_weights,
+        route_diameter=get_route_diameter, run_search=run_super_sink_astar,
+        count_crossings=count_segment_crossings, score_routes=get_solution_score,
     )
-    if flow < 1 or paths is None:
-        return None, None, cost
-    return paths[route_name], targets[route_name], cost
+
+def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights=None):
+    return _sal_flow_runtime().route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights)
 
 def _run_large_pin_candidate_search(pin_node_map, shaft_boundary_nodes, edge_weights=None):
-    return _search_sal_large_route_candidates(
-        pin_node_map, shaft_boundary_nodes, env=current_env, terminals=terminals,
-        route_start_nodes=get_route_start_nodes, route_one_pin_flow=_route_one_pin_flow,
-        route_segments_from_path=_route_segments_from_path, route_axis_records=_route_axis_records,
-        add_route_clearance_weights=add_route_clearance_weights,
-        add_route_interaction_weights=add_route_interaction_weights,
-        route_diameter=get_route_diameter, count_crossings=count_segment_crossings,
-        score_routes=get_solution_score, initial_edge_weights=edge_weights,
-    )
+    return _sal_flow_runtime().run_large_search(pin_node_map, shaft_boundary_nodes, edge_weights)
 
 def _build_small_flow_weights(prior_axis_records, small_diameter, env):
-    weights = {}
-    add_static_clearance_weights(weights, small_diameter, env, allow_shaft_entry=False)
-    add_machine_clearance_weights(weights, small_diameter, env)
-    add_route_interaction_weights(prior_axis_records, small_diameter, weights, env)
-    return weights
+    return _sal_flow_runtime().build_small_flow_weights(prior_axis_records, small_diameter, env)
 
 def _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_records):
-    return _run_sal_small_flow_stage(
-        room_names, pin_node_map, global_pins, prior_axis_records,
-        small_diameter=MACHINE_SMALL_DUCT_D, env=current_env,
-        build_weights=_build_small_flow_weights, run_flow=_run_small_pin_min_cost_flow,
-        build_routes=_build_routes_from_paths,
-    )
+    return _sal_flow_runtime().run_small_stage(room_names, pin_node_map, global_pins, prior_axis_records)
 
 def _sal_flow_context():
-    return SalFlowContext(
-        env=current_env,
-        small_diameter=MACHINE_SMALL_DUCT_D,
-        large_diameter=MACHINE_LARGE_DUCT_D,
-        build_routes=_build_routes_from_paths,
-        route_axis_records=_route_axis_records,
-        run_small_stage=_run_sal_small_flow,
-        run_large_search=_run_large_pin_candidate_search,
-        build_weights=_build_small_flow_weights,
-    )
+    return _sal_flow_runtime().flow_context()
 
 def _sal_negotiated_context():
     return SalNegotiatedContext(
@@ -1688,7 +1630,7 @@ def _sal_negotiated_context():
     )
 
 def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
-    return _run_sal_direct_small_pin_flow(room_names, pin_node_map, global_pins, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, env=current_env, machine_angle=machine_angle, bend_cost=C_BEND, route_start_nodes=get_route_start_nodes, route_segments_from_path=_route_segments_from_path, route_axis_records=_route_axis_records, add_route_clearance_weights=add_route_clearance_weights, add_route_interaction_weights=add_route_interaction_weights, route_diameter=get_route_diameter, run_search=run_super_sink_astar, run_small_stage=_run_sal_small_flow)
+    return _sal_flow_runtime().run_direct_small_pin_flow(room_names, pin_node_map, global_pins, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, machine_angle=machine_angle)
 
 def _run_two_stage_big_first(room_names, pin_node_map, global_pins, shaft_path):
     return _sal_flow_context().run_big_first(room_names, pin_node_map, global_pins, shaft_path)
@@ -1697,12 +1639,7 @@ def _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path
     return _sal_flow_context().run_small_first(room_names, pin_node_map, global_pins, shaft_path)
 
 def run_two_stage_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_path):
-    return _select_sal_two_stage_routing(
-        lambda: _run_two_stage_big_first(room_names, pin_node_map, global_pins, shaft_path),
-        lambda: _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path),
-        count_segment_crossings,
-        get_solution_score,
-    )
+    return _sal_flow_runtime().run_two_stage(room_names, pin_node_map, global_pins, shaft_path)
 
 def get_solution_score(routes, crossings):
     weights = RouteScoreWeights(
