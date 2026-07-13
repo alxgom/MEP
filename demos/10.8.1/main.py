@@ -124,7 +124,9 @@ from mep_routing.routing import (
 )
 from mep_routing.ui import (
     cool_colormap as _cool_colormap_value,
+    edge_weight_log_scale as _edge_weight_log_scale_for_values,
     heatmap_color as _heatmap_color,
+    interpolate_regular_score as _interpolate_regular_score_for_grid,
     score_to_heatmap_t as _score_to_heatmap_t_value,
     turbo_color as _turbo_color,
     viridis_color as _viridis_color,
@@ -2975,47 +2977,7 @@ def _score_to_heatmap_t(score, min_s, max_s):
     return _score_to_heatmap_t_value(score, min_s, max_s, heatmap_scale_mode)
 
 def _interpolate_regular_score(wx, wy, score_grid):
-    gx = wx / GRID_SPACING
-    gy = wy / GRID_SPACING
-    ix0 = math.floor(gx)
-    iy0 = math.floor(gy)
-    fx = gx - ix0
-    fy = gy - iy0
-
-    q00 = score_grid.get((ix0, iy0))
-    q10 = score_grid.get((ix0 + 1, iy0))
-    q01 = score_grid.get((ix0, iy0 + 1))
-    q11 = score_grid.get((ix0 + 1, iy0 + 1))
-
-    if q00 is not None and q10 is not None and q01 is not None and q11 is not None:
-        return (
-            q00 * (1.0 - fx) * (1.0 - fy) +
-            q10 * fx * (1.0 - fy) +
-            q01 * (1.0 - fx) * fy +
-            q11 * fx * fy
-        )
-
-    candidates = []
-    for ix, iy, score in (
-        (ix0, iy0, q00),
-        (ix0 + 1, iy0, q10),
-        (ix0, iy0 + 1, q01),
-        (ix0 + 1, iy0 + 1, q11),
-    ):
-        if score is None:
-            continue
-        dx = wx - ix * GRID_SPACING
-        dy = wy - iy * GRID_SPACING
-        d2 = dx * dx + dy * dy
-        candidates.append((d2, score))
-
-    if not candidates:
-        return None
-
-    d2, score = min(candidates, key=lambda item: item[0])
-    if d2 <= (GRID_SPACING * 1.45) ** 2:
-        return score
-    return None
+    return _interpolate_regular_score_for_grid(wx, wy, score_grid, GRID_SPACING)
 
 def _build_heatmap_surface(node_scores):
     min_s = min(node_scores.values())
@@ -3069,9 +3031,7 @@ def _cool_colormap(t):
     return _cool_colormap_value(t)
 
 def _edge_weight_log_scale():
-    finite_values = [v for v in edge_weight_debug_map.values() if v < OVERLAP_BLOCK_WEIGHT]
-    max_ratio = max(finite_values) if finite_values else 1.0
-    return max_ratio, math.log1p(max(max_ratio, 1.0))
+    return _edge_weight_log_scale_for_values(edge_weight_debug_map, OVERLAP_BLOCK_WEIGHT)
 
 def draw_edge_weight_heatmap(screen):
     if not edge_weight_heatmap_enabled or not edge_weight_debug_map or current_env is None:

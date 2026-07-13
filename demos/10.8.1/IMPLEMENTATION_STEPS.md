@@ -389,6 +389,12 @@ Manual validation milestones:
 - Validation: `python -m pytest tests\\test_config.py`.
 - Startup smoke: the 10.7 virtual environment imported `main.py` with the expected 200 mm grid and 4000 mm bend defaults.
 
+- Extracted pure regular-grid heatmap interpolation and edge-weight logarithmic scale calculations to `mep_routing.ui.colors`.
+- Kept `main.py` responsible for Pygame surfaces, active visualization state, and drawing.
+- Added focused UI contracts for bilinear/fallback score interpolation and blocked-edge-excluding log scale calculation.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\__init__.py mep_routing\\ui\\colors.py tests\\test_ui_colors.py`.
+- Validation: `python -m pytest tests\\test_ui_colors.py`.
+
 ## Commit Checklist
 
 Before each commit:

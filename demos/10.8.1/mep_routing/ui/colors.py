@@ -69,3 +69,46 @@ def score_to_heatmap_t(score, min_s, max_s, scale_mode):
 def cool_colormap(t):
     t = max(0.0, min(1.0, float(t)))
     return (int(255 * t), int(255 * (1.0 - t)), 255)
+
+
+def interpolate_regular_score(world_x, world_y, score_grid, grid_spacing_mm):
+    """Interpolate a regular-grid score, falling back to a nearby grid point."""
+    grid_x = world_x / grid_spacing_mm
+    grid_y = world_y / grid_spacing_mm
+    index_x = math.floor(grid_x)
+    index_y = math.floor(grid_y)
+    fraction_x = grid_x - index_x
+    fraction_y = grid_y - index_y
+
+    q00 = score_grid.get((index_x, index_y))
+    q10 = score_grid.get((index_x + 1, index_y))
+    q01 = score_grid.get((index_x, index_y + 1))
+    q11 = score_grid.get((index_x + 1, index_y + 1))
+    if all(score is not None for score in (q00, q10, q01, q11)):
+        return (
+            q00 * (1.0 - fraction_x) * (1.0 - fraction_y)
+            + q10 * fraction_x * (1.0 - fraction_y)
+            + q01 * (1.0 - fraction_x) * fraction_y
+            + q11 * fraction_x * fraction_y
+        )
+
+    candidates = []
+    for candidate_x, candidate_y, score in (
+        (index_x, index_y, q00),
+        (index_x + 1, index_y, q10),
+        (index_x, index_y + 1, q01),
+        (index_x + 1, index_y + 1, q11),
+    ):
+        if score is not None:
+            distance_squared = (world_x - candidate_x * grid_spacing_mm) ** 2 + (world_y - candidate_y * grid_spacing_mm) ** 2
+            candidates.append((distance_squared, score))
+    if not candidates:
+        return None
+    distance_squared, score = min(candidates, key=lambda item: item[0])
+    return score if distance_squared <= (grid_spacing_mm * 1.45) ** 2 else None
+
+
+def edge_weight_log_scale(edge_weights, block_weight):
+    finite_values = [value for value in edge_weights.values() if value < block_weight]
+    max_ratio = max(finite_values) if finite_values else 1.0
+    return max_ratio, math.log1p(max(max_ratio, 1.0))
