@@ -13,13 +13,15 @@ Follow this workflow before changing code in `demos/10.8.1`.
 2. Read `IMPLEMENTATION_STEPS.md`.
 3. Run `git status --short` from the `MEP` repo root.
 4. Identify unrelated dirty files and leave them untouched.
-5. State the intended small step before editing.
+5. State the intended cohesive subsystem step before editing.
 
 ## Core Rules
 
 - Keep the work scoped to Demo 10.8.1.
 - Preserve `python main.py` as the app entrypoint until a deliberate migration changes it.
-- Move behavior in coherent, reviewable subsystem steps; do not split work into helper-only commits when a stable boundary can move together.
+- Prefer medium-to-large coherent subsystem extractions over isolated helper moves when the dependency direction and adapter seam are already clear.
+- Include adjacent pure helpers, adapters, and exports in the same commit when they form one stable boundary; do not artificially split them into helper-only commits.
+- Keep each extraction reviewable: do not combine unrelated subsystems or alter behavior while moving code unless the commit explicitly declares that change.
 - Keep pure computation independent from Pygame and filesystem adapters.
 - Use integer millimetres internally wherever practical.
 - Use English semantic config keys.
