@@ -1959,6 +1959,9 @@ def update_dynamic_env(machine_poly):
 
     t0 = time.perf_counter()
     blocked_machine_poly = machine_poly.buffer(MACHINE_CLEARANCE, join_style=2)
+    # Core's simple grid keeps invalid obstacle edges at 1e6.  The interactive
+    # environment must not use a protected terminal node to traverse equipment.
+    core_simple_machine_hard_block = graph_type_idx == 3
     mx1, my1, mx2, my2 = blocked_machine_poly.bounds
     prm = shapely_prep(blocked_machine_poly)
     protected_nodes = set()
@@ -1978,7 +1981,7 @@ def update_dynamic_env(machine_poly):
     node_bbox = (nx >= mx1) & (nx <= mx2) & (ny >= my1) & (ny <= my2)
     blocked_nodes = set()
     for ni in np.where(node_bbox)[0]:
-        if int(ni) in protected_nodes:
+        if int(ni) in protected_nodes and not core_simple_machine_hard_block:
             continue
         if prm.contains(Point(float(grid_nodes[ni, 0]), float(grid_nodes[ni, 1]))):
             blocked_nodes.add(int(ni))
@@ -2004,7 +2007,14 @@ def update_dynamic_env(machine_poly):
                 (float(grid_nodes[v, 0]), float(grid_nodes[v, 1]))
             ])
             inter = line.intersection(blocked_machine_poly)
-            if not inter.is_empty and inter.length > 1.0 and u not in protected_nodes and v not in protected_nodes:
+            if (
+                not inter.is_empty
+                and inter.length > 1.0
+                and (
+                    core_simple_machine_hard_block
+                    or (u not in protected_nodes and v not in protected_nodes)
+                )
+            ):
                 blocked_edges.add(ei)
 
     DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
