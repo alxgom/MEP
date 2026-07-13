@@ -1,9 +1,14 @@
 from mep_routing.ui.events import (
     CanvasGestureState,
     CanvasHit,
+    PanelHit,
+    PanelInteractionState,
     begin_canvas_gesture,
+    begin_panel_interaction,
     end_canvas_gesture,
+    end_panel_interaction,
     move_canvas_gesture,
+    move_panel_interaction,
     routing_key_transition,
 )
 
@@ -143,3 +148,45 @@ def test_canvas_gesture_selects_hits_and_commits_area_on_release():
     assert finished.commands[0].value == ((10.0, 20.0), (30.0, 40.0), True)
     assert finished.state.terminal_area_dragging is False
     assert finished.state.machine_dragging is False
+
+
+def test_panel_interaction_uses_click_priority_before_slider_or_tool_actions():
+    transition = begin_panel_interaction(
+        PanelInteractionState(),
+        hit=PanelHit(
+            help_card="routing",
+            min_piece_slider=True,
+            canvas_tool="ruler",
+            solution_log_action="log",
+        ),
+        screen_x=120,
+    )
+    assert transition.state.active_slider is None
+    assert transition.commands[0].name == "toggle_help"
+    assert transition.commands[0].value == "routing"
+
+    reset = begin_panel_interaction(
+        PanelInteractionState(),
+        hit=PanelHit(bend_reset=True, canvas_tool="weights"),
+        screen_x=120,
+    )
+    assert reset.commands[0].name == "reset_slider"
+    assert reset.commands[0].value == "bend"
+
+
+def test_panel_slider_drag_emits_initial_and_motion_updates_then_releases():
+    started = begin_panel_interaction(
+        PanelInteractionState(),
+        hit=PanelHit(crossing_slider=True),
+        screen_x=40,
+    )
+    assert started.state.active_slider == "crossing"
+    assert started.commands[0].value == ("crossing", 40)
+
+    moved = move_panel_interaction(started.state, screen_x=75)
+    assert moved.commands[0].name == "set_slider"
+    assert moved.commands[0].value == ("crossing", 75)
+
+    released = end_panel_interaction(moved.state)
+    assert released.state.active_slider is None
+    assert released.commands == ()

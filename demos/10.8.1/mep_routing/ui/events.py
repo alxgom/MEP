@@ -293,3 +293,90 @@ def end_canvas_gesture(
         ),
         commands,
     )
+
+
+@dataclass(frozen=True)
+class PanelInteractionState:
+    """Transient slider-drag state for the non-canvas control panel."""
+
+    active_slider: str | None = None
+
+
+@dataclass(frozen=True)
+class PanelHit:
+    """Already-resolved panel hit targets in the live click-priority order."""
+
+    help_card: str | None = None
+    min_piece_slider: bool = False
+    bend_slider: bool = False
+    bend_reset: bool = False
+    crossing_slider: bool = False
+    crossing_reset: bool = False
+    canvas_tool: str | None = None
+    solution_log_action: int | str | None = None
+    terminal_tool_action: str | None = None
+
+
+@dataclass(frozen=True)
+class PanelCommand:
+    """A semantic panel action for the Pygame adapter to execute."""
+
+    name: str
+    value: object | None = None
+
+
+@dataclass(frozen=True)
+class PanelInteractionTransition:
+    state: PanelInteractionState
+    commands: tuple[PanelCommand, ...] = ()
+
+
+def begin_panel_interaction(
+    state: PanelInteractionState,
+    *,
+    hit: PanelHit,
+    screen_x: int,
+) -> PanelInteractionTransition:
+    """Start one left-click panel interaction using existing hit-test results."""
+    if hit.help_card is not None:
+        return PanelInteractionTransition(state, (PanelCommand("toggle_help", hit.help_card),))
+    for slider_name, active in (
+        ("min_piece", hit.min_piece_slider),
+        ("bend", hit.bend_slider),
+        ("crossing", hit.crossing_slider),
+    ):
+        if active:
+            return PanelInteractionTransition(
+                replace(state, active_slider=slider_name),
+                (PanelCommand("set_slider", (slider_name, screen_x)),),
+            )
+    if hit.bend_reset:
+        return PanelInteractionTransition(state, (PanelCommand("reset_slider", "bend"),))
+    if hit.crossing_reset:
+        return PanelInteractionTransition(state, (PanelCommand("reset_slider", "crossing"),))
+    if hit.canvas_tool is not None:
+        return PanelInteractionTransition(state, (PanelCommand("canvas_tool", hit.canvas_tool),))
+    if hit.solution_log_action is not None:
+        return PanelInteractionTransition(state, (PanelCommand("solution_log", hit.solution_log_action),))
+    if hit.terminal_tool_action is not None:
+        return PanelInteractionTransition(state, (PanelCommand("terminal_tool", hit.terminal_tool_action),))
+    return PanelInteractionTransition(state)
+
+
+def move_panel_interaction(
+    state: PanelInteractionState,
+    *,
+    screen_x: int,
+) -> PanelInteractionTransition:
+    """Update the active slider, if any, while the pointer moves."""
+    if state.active_slider is None:
+        return PanelInteractionTransition(state)
+    return PanelInteractionTransition(
+        state,
+        (PanelCommand("set_slider", (state.active_slider, screen_x)),),
+    )
+
+
+def end_panel_interaction(state: PanelInteractionState) -> PanelInteractionTransition:
+    """Release any active panel slider drag."""
+    return PanelInteractionTransition(replace(state, active_slider=None))
