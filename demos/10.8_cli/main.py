@@ -2186,15 +2186,70 @@ def _core_simple_allowed_region():
     inset = routing_region_base.buffer(-CORE_CLIMA_BUFFER_ALLOWED_ROUTING_MM, cap_style=3, join_style=2)
     return routing_region_base if inset.is_empty else inset
 
-def _core_simple_fixed_obstacles():
-    """Port the fixed-obstacle buffer used by RouteClimaLivingRouting."""
+def _core_connector_obstacle_polygon(start, end, width, preserve_start):
+    """Port RouteClima's 20 mm terminal cut for connector obstacle polygons."""
+    start = np.array(start, dtype=np.float64)
+    end = np.array(end, dtype=np.float64)
+    vector = end - start
+    length = float(np.linalg.norm(vector))
+    if length <= 20.0 or width <= 0.0:
+        return None
+    unit = vector / length
+    if preserve_start:
+        end = end - unit * 20.0
+    else:
+        start = start + unit * 20.0
+    return LineString([tuple(start), tuple(end)]).buffer(float(width) / 2.0, cap_style=2, join_style=2)
+
+def _core_simple_routing_obstacles(machine_pins):
+    """Port RouteClimaLivingRouting's fixed and connector obstacle geometry."""
     air_width = float(get_current_machine()["connectors"]["air_out"]["size"][1])
     buffer_to_apply = air_width / 2.0 * CORE_CLIMA_BUFFER_RATIO
-    return [
+    obstacles = [
         obstacle.buffer(buffer_to_apply, cap_style=3, join_style=2)
         for obstacle in [*columns, *shafts]
         if obstacle is not None and not obstacle.is_empty
     ]
+    if not machine_pins:
+        return obstacles
+
+    machine_body = Polygon([
+        machine_pins["c_tl"], machine_pins["c_tr"], machine_pins["c_br"], machine_pins["c_bl"]
+    ])
+    obstacles.insert(0, machine_body.buffer(buffer_to_apply, cap_style=3, join_style=2))
+    port_specs = {spec["pin"]: spec for spec in get_port_access_specs(machine_pins, machine_angle)}
+    for pin_name in ("air_out", "freon1"):
+        spec = port_specs.get(pin_name)
+        if spec is None:
+            continue
+        connector = get_current_machine()["connectors"][pin_name]
+        width = float(connector["size"][1]) if "size" in connector else float(connector["radius"]) * 2.0
+        polygon = _core_connector_obstacle_polygon(
+            spec["pin_point"],
+            spec["access_point"],
+            width + buffer_to_apply * 2.0,
+            preserve_start=False,
+        )
+        if polygon is not None:
+            obstacles.append(polygon)
+
+    for route_name, terminal_pt in terminals.items():
+        if not str(route_name).endswith(" Supply"):
+            continue
+        steiner_pt = get_clima_grille_steiner_point(route_name)
+        spec = terminal_connection_specs.get(route_name, {})
+        if steiner_pt is None:
+            continue
+        width = float(spec.get("width", CLIMA_GRILLE_IMPULSION_WIDTH_MM))
+        polygon = _core_connector_obstacle_polygon(
+            steiner_pt,
+            terminal_pt,
+            width + buffer_to_apply * 2.0,
+            preserve_start=True,
+        )
+        if polygon is not None:
+            obstacles.append(polygon)
+    return obstacles
 
 def build_core_simple_grid(machine_pins=None):
     """NumPy adjacency port of routing-core `_create_grid_dynamic_simple`.
@@ -2221,7 +2276,7 @@ def build_core_simple_grid(machine_pins=None):
     boundary_x, boundary_y = _core_simple_allowed_boundary_axes(allowed)
     xs.update(boundary_x)
     ys.update(boundary_y)
-    obstacles = _core_simple_fixed_obstacles()
+    obstacles = _core_simple_routing_obstacles(machine_pins)
     for obstacle in obstacles:
         minx, miny, maxx, maxy = obstacle.buffer(pipe_diameter, join_style=2).bounds
         xs.update((round(float(minx)), round(float(maxx))))
