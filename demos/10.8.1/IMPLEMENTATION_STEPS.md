@@ -453,6 +453,10 @@ Manual validation milestones:
 - Removed the previous plot body after compiling the live adapter; `ui.plots` is now the sole renderer.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\plots.py`.
 
+- Integrated `RoutingHistory` and `SolutionLogSession` as the live owners of routing plot buffers, event markers, and manual/automatic solution logs.
+- Removed the parallel history/log globals from `main.py`; the app now passes session-owned state to the existing plot and solution-log UI adapters.
+- Validation: Demo 10.7 virtual environment `-m py_compile main.py mep_routing\\observability\\__init__.py mep_routing\\observability\\session.py`; ran both `test_observability_session.py` contracts directly because its environment does not include pytest.
+
 ## Commit Checklist
 
 Before each commit:

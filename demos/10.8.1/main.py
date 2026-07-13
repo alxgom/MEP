@@ -5,7 +5,6 @@ import time
 import itertools
 import heapq
 from pathlib import Path
-from collections import deque
 import numpy as np
 import pygame
 from shapely.geometry import Polygon, LineString, Point, box
@@ -148,13 +147,11 @@ from mep_routing.ui.controls import (
     weight_view_switch_bounds as _weight_view_switch_bounds,
 )
 from mep_routing.ui.solution_logs import (
-    best_log_updates as _best_log_updates,
+    DEFAULT_BEST_METRICS,
     draw_solution_logs_panel as _draw_solution_logs_panel_widget,
     metric_value_for_log as _metric_value_for_log_entry,
     solution_log_action as _solution_log_action,
     solution_kpis as _solution_kpis,
-    manual_log_entry as _manual_log_entry,
-    replace_history_marker as _replace_history_marker,
 )
 from mep_routing.ui.terminal_selection import (
     apply_preferred_terminal_area as _apply_preferred_terminal_area,
@@ -183,7 +180,13 @@ from mep_routing.ui.help import (
     draw_viewer_legend as _draw_viewer_legend,
     help_lines as _help_lines,
 )
-from mep_routing.observability import clear_history_buffers as _clear_history_buffers, history_sample as _history_sample, restored_snapshot_state as _restored_snapshot_state, solution_snapshot as _solution_snapshot
+from mep_routing.observability import (
+    RoutingHistory,
+    SolutionLogSession,
+    history_sample as _history_sample,
+    restored_snapshot_state as _restored_snapshot_state,
+    solution_snapshot as _solution_snapshot,
+)
 from mep_routing.ui.canvas_tools import draw_canvas_tool_controls as _draw_canvas_tool_controls, draw_ruler_overlay as _draw_ruler_overlay, draw_terminal_tool_buttons as _draw_terminal_tool_buttons, terminal_tool_buttons as _terminal_tool_buttons
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
@@ -422,19 +425,10 @@ SCALE_PX_PER_MM = BASE_SCALE_PX_PER_MM
 OFFSET_X = CANVAS_LEFT + (CANVAS_W - 15000.0 * SCALE_PX_PER_MM) / 2
 OFFSET_Y = CANVAS_TOP + (CANVAS_H - 11000.0 * SCALE_PX_PER_MM) / 2
 
-# History buffers for the right-side plots
+# Observation state for the right-side plots and solution-log panel.
 HIST_MAXLEN = 400
-hist_length = deque(maxlen=HIST_MAXLEN)        # total duct length in metres
-hist_score  = deque(maxlen=HIST_MAXLEN)         # weighted cost score
-hist_turns  = deque(maxlen=HIST_MAXLEN)         # number of turns
-hist_turns_per_len = deque(maxlen=HIST_MAXLEN)  # turns / meter of routed length
-hist_exec_ms = deque(maxlen=HIST_MAXLEN)         # solve execution time in milliseconds
-hist_sample_count = 0
-hist_ap_idx = None                              # sample index of last auto-placement
-hist_event_markers = []                         # list of (index, label, color) tuples
-solution_logs = []
-auto_best_logs = {}
-selected_log_id = None
+routing_history = RoutingHistory(maxlen=HIST_MAXLEN)
+solution_log_session = SolutionLogSession()
 log_button_rect = pygame.Rect(0, 0, 1, 1)
 log_row_rects = []
 weight_mode_idx = 0                             # 0 for Default, 1 for Equal Weights
@@ -591,7 +585,7 @@ def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=
         crossings_c = count_segment_crossings(routes)
         record_history(routes, crossings_c, elapsed_ms)
         if marker_label:
-            hist_event_markers.append((hist_sample_count - 1, marker_label, marker_color))
+            routing_history.add_marker(marker_label, marker_color)
 
 def get_terminal_tool_buttons():
     return _terminal_tool_buttons(CANVAS_LEFT, CANVAS_TOP, CANVAS_W)
@@ -2635,21 +2629,15 @@ def get_route_draw_width(route_name):
     return 5 if route_name in LARGE_DUCT_ROUTE_NAMES else 3
 
 def record_history(routes, crossings_count, elapsed_ms):
-    """Append one solved-route observation to the app-owned history buffers."""
-    global hist_sample_count
+    """Append one solved-route observation to the app-owned history session."""
     sample = _history_sample(routes, crossings_count, elapsed_ms, _total_route_length_m, count_solution_turns, get_solution_score)
-    hist_length.append(sample["length_m"])
-    hist_score.append(sample["score"])
-    hist_turns.append(sample["turns"])
-    hist_turns_per_len.append(sample["turns_per_m"])
-    hist_exec_ms.append(sample["elapsed_ms"])
-    hist_sample_count += 1
+    routing_history.append(sample)
     if routes:
         update_auto_best_logs(routes, "Auto best", elapsed_ms, 0)
+
+
 def clear_history_buffers():
-    global hist_sample_count
-    _clear_history_buffers(hist_length, hist_score, hist_turns, hist_turns_per_len, hist_exec_ms, hist_event_markers)
-    hist_sample_count = 0
+    routing_history.clear()
 
 def _routes_total_length_m(routes):
     return _total_route_length_m(routes)
@@ -2690,35 +2678,30 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
     }, kpis, status, total_nodes)
 
 def log_current_solution(routes, status, elapsed_ms, total_nodes):
-    global selected_log_id
     if not routes:
         return False
     record_history(routes, count_segment_crossings(routes), elapsed_ms)
-    log_id = len(solution_logs) + 1
-    entry = _manual_log_entry(snapshot_current_state(routes, status, elapsed_ms, total_nodes), log_id, hist_sample_count - 1 if hist_length else None)
-    solution_logs.append(entry)
-    selected_log_id = log_id
-    if hist_length:
-        hist_event_markers.append((hist_sample_count - 1, f"L{log_id}", (255, 255, 255)))
+    entry = solution_log_session.add_manual(
+        snapshot_current_state(routes, status, elapsed_ms, total_nodes),
+        routing_history.latest_index,
+    )
+    routing_history.add_marker(f"L{entry['id']}", (255, 255, 255))
     return True
 
 def _metric_value_for_log(entry, metric):
     return _metric_value_for_log_entry(entry, metric)
 
-def _replace_hist_marker(label, idx, color):
-    global hist_event_markers
-    hist_event_markers = _replace_history_marker(hist_event_markers, label, idx, color)
-
 def update_auto_best_logs(routes, status, elapsed_ms, total_nodes):
     if not routes:
         return
     entry_base = snapshot_current_state(routes, status, elapsed_ms, total_nodes)
-    hist_idx = hist_sample_count - 1 if hist_length else None
-    if hist_idx is None:
-        return
-    for metric, entry, label, color in _best_log_updates(entry_base, hist_idx, auto_best_logs):
-        auto_best_logs[metric] = entry
-        _replace_hist_marker(label, hist_idx, color)
+    for _metric, _entry, label, color in solution_log_session.update_auto_bests(
+        entry_base,
+        routing_history.latest_index,
+        DEFAULT_BEST_METRICS,
+        _metric_value_for_log_entry,
+    ):
+        routing_history.replace_marker(label, routing_history.latest_index, color)
 
 def restore_solution_log(log_entry):
     global machine_cx, machine_cy, machine_angle
@@ -2726,7 +2709,7 @@ def restore_solution_log(log_entry):
     global rotation_mode_idx
     global weight_mode_idx, edge_weight_view_mode_idx, route_real_diameter_width_enabled, min_piece_factor
     global C_BEND, crossing_penalty_multiplier
-    global preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id
+    global preferred_terminal_points_by_room, preferred_terminal_areas
 
     state = _restored_snapshot_state(log_entry, C_BEND_DEFAULT, CROSSING_MULTIPLIER_DEFAULT)
     machine_cx, machine_cy, machine_angle = state["machine"]
@@ -2736,7 +2719,8 @@ def restore_solution_log(log_entry):
     route_real_diameter_width_enabled, min_piece_factor = state["route_real_diameter_width_enabled"], state["min_piece_factor"]
     C_BEND, crossing_penalty_multiplier = state["bend_weight"], state["crossing_penalty_multiplier"]
     refresh_route_weight_constants()
-    preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id = state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"], state["id"]
+    preferred_terminal_points_by_room, preferred_terminal_areas = state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"]
+    solution_log_session.selected_log_id = state["id"]
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
     return solve_ventilation_routing()
@@ -2753,9 +2737,9 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
         window_width=WINDOW_WIDTH,
         window_height=WINDOW_HEIGHT,
         panel_width=PANEL_W,
-        solution_logs=solution_logs,
-        auto_best_logs=auto_best_logs,
-        selected_log_id=selected_log_id,
+        solution_logs=solution_log_session.manual_logs,
+        auto_best_logs=solution_log_session.auto_best_logs,
+        selected_log_id=solution_log_session.selected_log_id,
         plot_background_color=COLOR_PLOT_BG,
         text_color=COLOR_TEXT,
         muted_color=COLOR_MUTED,
@@ -2764,8 +2748,8 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
 def draw_plots(screen, font_small, font_bold):
     return _draw_routing_plots(
         screen, font_small, font_bold, WINDOW_WIDTH, PANEL_W,
-        (hist_length, hist_score, hist_turns, hist_turns_per_len, hist_exec_ms),
-        hist_sample_count, hist_event_markers, COLOR_PLOT_BG, COLOR_TEXT, COLOR_MUTED,
+        routing_history.buffers,
+        routing_history.sample_count, routing_history.event_markers, COLOR_PLOT_BG, COLOR_TEXT, COLOR_MUTED,
     )
 
 def draw_card_help_button(screen, card_id, rect, font_small):
@@ -2793,7 +2777,7 @@ def draw_viewer_legend(screen, font_small):
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
-    global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, hist_ap_idx, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
+    global router_backend_idx, heuristic_mode_idx, auto_placement_mode_idx, show_heatmap, weight_mode_idx, ap_scores, ap_fields, heatmap_scale_mode, heatmap_palette_idx
     global real_scenario_idx, routing_frame_idx, dwelling_source_idx, room_start_mode_idx
     global edge_weight_heatmap_enabled, edge_weight_view_mode_idx, route_real_diameter_width_enabled
     global rotation_mode_idx
@@ -2802,7 +2786,6 @@ def main():
     global help_popup_card
     global min_piece_factor, is_fullscreen
     global preferred_terminal_tool_mode
-    global selected_log_id
     
     pygame.init()
     pygame.font.init()
@@ -2854,7 +2837,7 @@ def main():
             if routes and not status.startswith("Blocked"):
                 crossings_c = count_segment_crossings(routes)
                 record_history(routes, crossings_c, elapsed_ms)
-                hist_event_markers.append((hist_sample_count - 1, "Auto", (230, 126, 34)))
+                routing_history.add_marker("Auto", (230, 126, 34))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -2927,9 +2910,9 @@ def main():
                         continue
                     elif log_action is not None:
                         if isinstance(log_action, str) and log_action.startswith("best:"):
-                            log_entry = auto_best_logs.get(log_action.split(":", 1)[1])
+                            log_entry = solution_log_session.auto_best_logs.get(log_action.split(":", 1)[1])
                         else:
-                            log_entry = next((entry for entry in solution_logs if entry["id"] == log_action), None)
+                            log_entry = next((entry for entry in solution_log_session.manual_logs if entry["id"] == log_action), None)
                         if log_entry is not None:
                             routes, status, elapsed_ms, total_nodes = restore_solution_log(log_entry)
                             if routes and not status.startswith("Blocked"):
@@ -3024,7 +3007,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Rot:{machine_angle}", (46, 204, 113)))
+                        routing_history.add_marker(f"Rot:{machine_angle}", (46, 204, 113))
                 elif event.button == 5: # Scroll Down (CW)
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_SHIFT:
@@ -3040,7 +3023,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Rot:{machine_angle}", (46, 204, 113)))
+                        routing_history.add_marker(f"Rot:{machine_angle}", (46, 204, 113))
                         
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button in (1, 2):
@@ -3131,15 +3114,8 @@ def main():
                     if DWELLING_SOURCE_MODES[dwelling_source_idx] == "Real DB":
                         real_scenario_idx = (real_scenario_idx + 1) % len(REAL_DWELLING_SCENARIOS)
                     generate_new_dwelling()
-                    solution_logs.clear()
-                    auto_best_logs.clear()
-                    selected_log_id = None
-                    hist_length.clear()
-                    hist_score.clear()
-                    hist_turns.clear()
-                    hist_turns_per_len.clear()
-                    hist_exec_ms.clear()
-                    hist_event_markers.clear()
+                    solution_log_session.clear()
+                    clear_history_buffers()
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
                     routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
@@ -3154,7 +3130,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Rot:{machine_angle}", (46, 204, 113)))
+                        routing_history.add_marker(f"Rot:{machine_angle}", (46, 204, 113))
                     
                 elif event.key == pygame.K_g:
                     show_grid_graph = not show_grid_graph
@@ -3169,36 +3145,27 @@ def main():
                 elif event.key == pygame.K_d:
                     dwelling_source_idx = (dwelling_source_idx + 1) % len(DWELLING_SOURCE_MODES)
                     generate_new_dwelling()
-                    solution_logs.clear()
-                    auto_best_logs.clear()
-                    selected_log_id = None
-                    hist_length.clear()
-                    hist_score.clear()
-                    hist_turns.clear()
-                    hist_turns_per_len.clear()
-                    hist_exec_ms.clear()
-                    hist_event_markers.clear()
+                    solution_log_session.clear()
+                    clear_history_buffers()
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
                     routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Src:{dwelling_source_idx}", (52, 152, 219)))
+                        routing_history.add_marker(f"Src:{dwelling_source_idx}", (52, 152, 219))
 
                 elif event.key == pygame.K_o:
                     routing_frame_idx = (routing_frame_idx + 1) % len(ROUTING_FRAME_OPTIONS)
                     generate_new_dwelling()
-                    solution_logs.clear()
-                    auto_best_logs.clear()
-                    selected_log_id = None
+                    solution_log_session.clear()
                     if auto_placement_mode_idx > 0:
                         needs_auto_placement = True
                     routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Frame:{routing_frame_idx}", (230, 126, 34)))
+                        routing_history.add_marker(f"Frame:{routing_frame_idx}", (230, 126, 34))
 
                 elif event.key == pygame.K_t:
                     room_start_mode_idx = (room_start_mode_idx + 1) % len(ROOM_START_MODES)
@@ -3206,8 +3173,8 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Start:{room_start_mode_idx}", (155, 89, 182)))
-                        hist_event_markers.append((hist_sample_count - 1, f"Strat:{routing_strategy_idx}", (52, 152, 219)))
+                        routing_history.add_marker(f"Start:{room_start_mode_idx}", (155, 89, 182))
+                        routing_history.add_marker(f"Strat:{routing_strategy_idx}", (52, 152, 219))
 
                 elif event.key == pygame.K_l:
                     router_backend_idx = (router_backend_idx + 1) % len(ROUTER_BACKENDS)
@@ -3215,7 +3182,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"R:{router_backend_idx}", (230, 126, 34)))
+                        routing_history.add_marker(f"R:{router_backend_idx}", (230, 126, 34))
 
                 elif event.key == pygame.K_y:
                     heuristic_mode_idx = (heuristic_mode_idx + 1) % len(HEURISTIC_MODES)
@@ -3223,7 +3190,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Heur:{heuristic_mode_idx}", (241, 196, 15)))
+                        routing_history.add_marker(f"Heur:{heuristic_mode_idx}", (241, 196, 15))
                     
                 elif event.key == pygame.K_TAB:
                     graph_type_idx = (graph_type_idx + 1) % len(GRAPH_TYPES)
@@ -3233,7 +3200,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Grid:{graph_type_idx}", (155, 89, 182)))
+                        routing_history.add_marker(f"Grid:{graph_type_idx}", (155, 89, 182))
                     
                 elif event.key == pygame.K_a:
                     if auto_placement_mode_idx > 0:
@@ -3257,7 +3224,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"RotMode:{rotation_mode_idx}", (95, 178, 218)))
+                        routing_history.add_marker(f"RotMode:{rotation_mode_idx}", (95, 178, 218))
                     
                 elif event.key == pygame.K_v:
                     show_heatmap = not show_heatmap
@@ -3278,14 +3245,14 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"H:{'Log' if heatmap_scale_mode==1 else 'Lin'}", (150, 150, 150)))
+                        routing_history.add_marker(f"H:{'Log' if heatmap_scale_mode==1 else 'Lin'}", (150, 150, 150))
 
                 elif event.key == pygame.K_b:
                     heatmap_palette_idx = (heatmap_palette_idx + 1) % 2
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"Pal:{'Vir' if heatmap_palette_idx==1 else 'Tur'}", (26, 188, 156)))
+                        routing_history.add_marker(f"Pal:{'Vir' if heatmap_palette_idx==1 else 'Tur'}", (26, 188, 156))
                     
                 elif event.key == pygame.K_w:
                     weight_mode_idx = (weight_mode_idx + 1) % 2
@@ -3301,7 +3268,7 @@ def main():
                     if routes and not status.startswith("Blocked"):
                         crossings_c = count_segment_crossings(routes)
                         record_history(routes, crossings_c, elapsed_ms)
-                        hist_event_markers.append((hist_sample_count - 1, f"W:{'Eq' if weight_mode_idx==1 else 'Def'}", (241, 196, 15)))
+                        routing_history.add_marker(f"W:{'Eq' if weight_mode_idx==1 else 'Def'}", (241, 196, 15))
                     
         # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ RENDERING ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
         screen.fill(COLOR_BG)
