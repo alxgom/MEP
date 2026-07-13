@@ -181,7 +181,7 @@ from mep_routing.ui.help import (
     draw_viewer_legend as _draw_viewer_legend,
     help_lines as _help_lines,
 )
-from mep_routing.observability import clear_history_buffers as _clear_history_buffers, history_sample as _history_sample, solution_snapshot as _solution_snapshot
+from mep_routing.observability import clear_history_buffers as _clear_history_buffers, history_sample as _history_sample, restored_snapshot_state as _restored_snapshot_state, solution_snapshot as _solution_snapshot
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
@@ -2837,29 +2837,15 @@ def restore_solution_log(log_entry):
     global C_BEND, crossing_penalty_multiplier
     global preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id
 
-    machine_cx, machine_cy, machine_angle = log_entry["machine"]
-    graph_type_idx = log_entry["graph_type_idx"]
-    routing_strategy_idx = log_entry["routing_strategy_idx"]
-    router_backend_idx = log_entry["router_backend_idx"]
-    heuristic_mode_idx = log_entry["heuristic_mode_idx"]
-    rotation_mode_idx = log_entry.get("rotation_mode_idx", 0)
-    room_start_mode_idx = log_entry["room_start_mode_idx"]
-    weight_mode_idx = log_entry["weight_mode_idx"]
-    edge_weight_view_mode_idx = log_entry["edge_weight_view_mode_idx"]
-    route_real_diameter_width_enabled = log_entry["route_real_diameter_width_enabled"]
-    min_piece_factor = log_entry["min_piece_factor"]
-    C_BEND = log_entry.get("bend_weight", C_BEND_DEFAULT)
-    crossing_penalty_multiplier = log_entry.get("crossing_penalty_multiplier", CROSSING_MULTIPLIER_DEFAULT)
+    state = _restored_snapshot_state(log_entry, C_BEND_DEFAULT, CROSSING_MULTIPLIER_DEFAULT)
+    machine_cx, machine_cy, machine_angle = state["machine"]
+    graph_type_idx, routing_strategy_idx, router_backend_idx = state["graph_type_idx"], state["routing_strategy_idx"], state["router_backend_idx"]
+    heuristic_mode_idx, rotation_mode_idx, room_start_mode_idx = state["heuristic_mode_idx"], state["rotation_mode_idx"], state["room_start_mode_idx"]
+    weight_mode_idx, edge_weight_view_mode_idx = state["weight_mode_idx"], state["edge_weight_view_mode_idx"]
+    route_real_diameter_width_enabled, min_piece_factor = state["route_real_diameter_width_enabled"], state["min_piece_factor"]
+    C_BEND, crossing_penalty_multiplier = state["bend_weight"], state["crossing_penalty_multiplier"]
     refresh_route_weight_constants()
-    preferred_terminal_points_by_room = {
-        room_name: [tuple(pt) for pt in points]
-        for room_name, points in log_entry["preferred_terminal_points_by_room"].items()
-    }
-    preferred_terminal_areas = [
-        {"room": area["room"], "bounds": tuple(area["bounds"])}
-        for area in log_entry.get("preferred_terminal_areas", [])
-    ]
-    selected_log_id = log_entry["id"]
+    preferred_terminal_points_by_room, preferred_terminal_areas, selected_log_id = state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"], state["id"]
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
     return solve_ventilation_routing()
