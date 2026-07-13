@@ -123,6 +123,7 @@ The geometry and clearance parameters are:
 | `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM` | `700` mm | Core `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE`, used for the `air_out` and visible `air_in` connector stubs. |
 | `MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM` | `25` mm | Core `MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO`, used for the visible `Freon1`/`Freon2` connector stubs. |
 | `MIN_SIZE_CONDUCTO_AIRE_MM` | `150` mm | Core `MIN_SIZE_CONDUCTO_AIRE`; a machine connector is split after its 200 mm first tract only when the remaining tract exceeds this value. |
+| `TRANSLATION_MACHINE_MM` | `250` mm | Core `TRANSLATION_MACHINE`; placement candidates include the room centroid plus one offset in each routing-frame direction. |
 
 The machine and connector parameters are derived from the indoor Clima family metadata:
 

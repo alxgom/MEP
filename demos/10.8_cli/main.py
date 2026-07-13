@@ -56,6 +56,7 @@ MIN_DISTANCE_REJA_MM = 400
 MIN_DISTANCE_MACHINE_CONNECTOR_AIRE_MM = 700
 MIN_DISTANCE_MACHINE_CONNECTOR_FRIGO_MM = 25
 MIN_SIZE_CONDUCTO_AIRE_MM = 150
+TRANSLATION_MACHINE_MM = 250
 MACHINE_CLEARANCE = 0
 CLIMA_MACHINES = [
     {
@@ -5412,7 +5413,7 @@ def _candidate_room_points(room):
         point = centroid
     base = (round(point.x), round(point.y))
     points = [base]
-    translation = 100.0
+    translation = TRANSLATION_MACHINE_MM
     for ax, ay in _routing_frame_axes():
         points.append((round(base[0] + ax * translation), round(base[1] + ay * translation)))
         points.append((round(base[0] - ax * translation), round(base[1] - ay * translation)))
