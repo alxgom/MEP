@@ -401,6 +401,10 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\ui\\terminal_selection.py tests\\test_ui_terminal_selection.py`.
 - Validation: `python -m pytest tests\\test_ui_terminal_selection.py`.
 
+- Extracted preferred-terminal area, preference-marker, and routed-endpoint drawing to `mep_routing.ui.terminal_selection`.
+- Kept `main.py` responsible for active state, theme values, and world-to-screen transformation injection.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\terminal_selection.py`.
+
 ## Commit Checklist
 
 Before each commit:

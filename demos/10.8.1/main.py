@@ -155,6 +155,9 @@ from mep_routing.ui.solution_logs import (
 from mep_routing.ui.terminal_selection import (
     apply_preferred_terminal_area as _apply_preferred_terminal_area,
     apply_preferred_terminal_point as _apply_preferred_terminal_point,
+    draw_preferred_terminal_areas as _draw_preferred_terminal_areas,
+    draw_preferred_terminal_markers as _draw_preferred_terminal_markers,
+    draw_routed_terminal_endpoint_markers as _draw_routed_terminal_endpoint_markers,
     find_room_candidate_node as _find_room_candidate_node,
     map_preferred_points_to_nodes as _map_preferred_points_to_nodes,
 )
@@ -1763,95 +1766,26 @@ def apply_preferred_terminal_area(start_world, end_world, remove=False):
 def draw_preferred_terminal_areas(screen, selected_route_name=None):
     if current_env is None:
         return
-    marker_side = max(3, _terminal_marker_side_px() // 2)
-    for area in preferred_terminal_areas:
-        room_name = area["room"]
-        if selected_route_name and room_name != selected_route_name:
-            color = (86, 90, 94)
-            node_color = (70, 74, 78)
-        else:
-            color = ROUTE_COLORS.get(room_name, (155, 89, 182))
-            node_color = color
-        minx, miny, maxx, maxy = area["bounds"]
-        x1, y1 = to_screen(minx, miny)
-        x2, y2 = to_screen(maxx, maxy)
-        rect = pygame.Rect(min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1))
-        if rect.width > 1 and rect.height > 1:
-            overlay = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            overlay.fill((color[0], color[1], color[2], 45))
-            screen.blit(overlay, rect.topleft)
-            dash = 8
-            for dx in range(0, rect.width, dash * 2):
-                pygame.draw.line(screen, color, (rect.left + dx, rect.top), (min(rect.left + dx + dash, rect.right), rect.top), 2)
-                pygame.draw.line(screen, color, (rect.left + dx, rect.bottom), (min(rect.left + dx + dash, rect.right), rect.bottom), 2)
-            for dy in range(0, rect.height, dash * 2):
-                pygame.draw.line(screen, color, (rect.left, rect.top + dy), (rect.left, min(rect.top + dy + dash, rect.bottom)), 2)
-                pygame.draw.line(screen, color, (rect.right, rect.top + dy), (rect.right, min(rect.top + dy + dash, rect.bottom)), 2)
-        for node_idx in get_room_candidate_start_nodes(room_name):
-            pt = current_env.nodes[int(node_idx)]
-            if minx <= float(pt[0]) <= maxx and miny <= float(pt[1]) <= maxy:
-                sx, sy = to_screen(float(pt[0]), float(pt[1]))
-                n_rect = pygame.Rect(0, 0, marker_side, marker_side)
-                n_rect.center = (sx, sy)
-                pygame.draw.rect(screen, node_color, n_rect, 1)
+    return _draw_preferred_terminal_areas(
+        screen, preferred_terminal_areas, selected_route_name, ROUTE_COLORS,
+        get_room_candidate_start_nodes, current_env.nodes, to_screen,
+        max(3, _terminal_marker_side_px() // 2),
+    )
 
 def draw_preferred_terminal_markers(screen, selected_route_name=None, routes=None):
     if current_env is None:
         return
-    routed_start_by_room = {}
-    if routes:
-        for route_name, segs in routes:
-            if segs:
-                routed_start_by_room[route_name] = segs[0][0]
-    marker_side = _terminal_marker_side_px()
-    for room_name in terminals.keys():
-        candidate_nodes = get_room_candidate_start_nodes(room_name)
-        _, mapped_pref_indices = _map_preferred_points_to_nodes(room_name, candidate_nodes)
-        route_color = ROUTE_COLORS.get(room_name, COLOR_TEXT)
-        muted = bool(selected_route_name and room_name != selected_route_name)
-        for node_idx in candidate_nodes:
-            preferred = int(node_idx) in mapped_pref_indices
-            if not preferred:
-                continue
-            pt = current_env.nodes[int(node_idx)]
-            sx, sy = to_screen(float(pt[0]), float(pt[1]))
-            rect = pygame.Rect(0, 0, marker_side, marker_side)
-            rect.center = (sx, sy)
-            routed_start = routed_start_by_room.get(room_name)
-            is_routed = (
-                routed_start is not None
-                and abs(float(pt[0]) - routed_start[0]) < 1e-6
-                and abs(float(pt[1]) - routed_start[1]) < 1e-6
-            )
-            if muted:
-                fill = (44, 48, 52) if is_routed else None
-                border = (86, 90, 94)
-            else:
-                fill = route_color if is_routed else None
-                border = (255, 255, 255)
-            if fill is not None:
-                pygame.draw.rect(screen, fill, rect)
-            pygame.draw.rect(screen, border, rect, 2)
+    return _draw_preferred_terminal_markers(
+        screen, terminals.keys(), preferred_terminal_points_by_room, selected_route_name, routes,
+        ROUTE_COLORS, COLOR_TEXT, get_room_candidate_start_nodes, current_env.nodes, to_screen,
+        _terminal_marker_side_px(), PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    )
 
 def draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name=None):
-    if not routes:
-        return
-    marker_side = _terminal_marker_side_px()
-    for route_name, segs in routes:
-        if route_name not in terminals or not segs:
-            continue
-        start = segs[0][0]
-        sx, sy = to_screen(float(start[0]), float(start[1]))
-        rect = pygame.Rect(0, 0, marker_side, marker_side)
-        rect.center = (sx, sy)
-        if selected_route_name and route_name != selected_route_name:
-            fill = (44, 48, 52)
-            border = (86, 90, 94)
-        else:
-            fill = ROUTE_COLORS.get(route_name, COLOR_TEXT)
-            border = (255, 255, 255)
-        pygame.draw.rect(screen, fill, rect)
-        pygame.draw.rect(screen, border, rect, 2)
+    return _draw_routed_terminal_endpoint_markers(
+        screen, routes, terminals.keys(), selected_route_name, ROUTE_COLORS, COLOR_TEXT,
+        to_screen, _terminal_marker_side_px(),
+    )
 
 def draw_geometry_overlay(screen, geometries, color_rgba):
     return _draw_geometry_overlay(screen, geometries, color_rgba, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT))
