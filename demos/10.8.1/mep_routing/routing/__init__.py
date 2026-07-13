@@ -26,12 +26,17 @@ from .hit_testing import (
     selected_pin_names,
 )
 from .clearance import (
+    add_machine_clearance_weights,
+    add_route_interaction_weights,
+    add_static_clearance_weights,
     block_terminal_node_edges,
     buffered_radius_mm,
+    machine_edge_clearance_distances,
     normalized_edge,
     required_clearance_mm,
     route_axis_records,
     set_block_weight,
+    static_clearance_distances,
     weighted_edge_cost,
 )
 from .flow import (
@@ -65,10 +70,13 @@ from .validation import append_allowed_region_warning, count_segments_outside_al
 __all__ = [
     "RouteScoreWeights",
     "add_edge",
+    "add_machine_clearance_weights",
     "append_allowed_region_warning",
     "build_pin_min_cost_flow_network",
     "add_port_stub_segment",
     "block_terminal_node_edges",
+    "add_route_interaction_weights",
+    "add_static_clearance_weights",
     "buffered_radius_mm",
     "build_routes_from_paths",
     "count_ordered_route_turns",
@@ -87,6 +95,7 @@ __all__ = [
     "metric_route_segments",
     "min_cost_flow",
     "line_graph_dir_from_points",
+    "machine_edge_clearance_distances",
     "normalized_edge",
     "ordered_small_room_names",
     "path_physical_length",
@@ -102,6 +111,7 @@ __all__ = [
     "selected_pin_names",
     "segment_metric_dir",
     "set_block_weight",
+    "static_clearance_distances",
     "source_start_nodes",
     "small_pin_target_specs",
     "target_heuristic",

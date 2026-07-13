@@ -71,6 +71,9 @@ from mep_routing.placement import (
 )
 from mep_routing.routing import (
     RouteScoreWeights,
+    add_machine_clearance_weights as _add_machine_clearance_weights,
+    add_route_interaction_weights as _add_route_interaction_weights,
+    add_static_clearance_weights as _add_static_clearance_weights,
     block_terminal_node_edges as _block_terminal_node_edges,
     build_routes_from_paths as _build_routes_from_paths_for_env,
     buffered_radius_mm as _buffered_radius_mm,
@@ -87,6 +90,7 @@ from mep_routing.routing import (
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
     line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
+    machine_edge_clearance_distances as _machine_edge_clearance_distances_for_machine,
     merged_route_piece_lengths as _merged_route_piece_lengths,
     ordered_small_room_names as _ordered_small_room_names,
     path_physical_length as _path_physical_length_for_env,
@@ -98,6 +102,7 @@ from mep_routing.routing import (
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
     set_block_weight as _set_block_weight,
+    static_clearance_distances as _static_clearance_distances_for_edges,
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     small_pin_target_specs as _small_pin_target_specs,
@@ -1295,26 +1300,13 @@ def get_required_clearance_mm(diameter_a, diameter_b):
 def _machine_edge_clearance_distances():
     if grid_edge_coords is None or len(grid_edge_coords) == 0:
         return None
-
-    coords = grid_edge_coords.astype(np.float64, copy=False)
-    samples_t = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float64)
-    xs = coords[:, 0:1] + (coords[:, 2:3] - coords[:, 0:1]) * samples_t
-    ys = coords[:, 1:2] + (coords[:, 3:4] - coords[:, 1:2]) * samples_t
-
-    rad = math.radians(machine_angle)
-    cos_a = math.cos(rad)
-    sin_a = math.sin(rad)
-    dx = xs - float(machine_cx)
-    dy = ys - float(machine_cy)
-
-    local_x = dx * cos_a + dy * sin_a
-    local_y = -dx * sin_a + dy * cos_a
-    half_w = MACHINE_OVERALL_W / 2.0
-    half_h = MACHINE_BODY_H / 2.0
-
-    outside_x = np.maximum(np.abs(local_x) - half_w, 0.0)
-    outside_y = np.maximum(np.abs(local_y) - half_h, 0.0)
-    return np.min(np.hypot(outside_x, outside_y), axis=1)
+    return _machine_edge_clearance_distances_for_machine(
+        grid_edge_coords,
+        machine_center=(machine_cx, machine_cy),
+        machine_angle_deg=machine_angle,
+        machine_overall_width_mm=MACHINE_OVERALL_W,
+        machine_body_height_mm=MACHINE_BODY_H,
+    )
 
 def _static_wall_distance_segments():
     segments = []
@@ -1362,57 +1354,44 @@ def _static_clearance_distances():
     if static_clearance_cache.get("key") == key:
         return static_clearance_cache.get("wall"), static_clearance_cache.get("shaft")
 
-    wall_distances = _edge_parallel_segment_min_distances(grid_edge_coords, _static_wall_distance_segments())
-    shaft_distances = _edge_segment_min_distances(grid_edge_coords, _static_shaft_distance_segments())
+    wall_distances, shaft_distances = _static_clearance_distances_for_edges(
+        grid_edge_coords,
+        _static_wall_distance_segments(),
+        _static_shaft_distance_segments(),
+    )
     static_clearance_cache = {"key": key, "wall": wall_distances, "shaft": shaft_distances}
     return wall_distances, shaft_distances
 
 def add_static_clearance_weights(edge_weights, route_diameter, env, allow_shaft_entry=False):
     wall_distances, shaft_distances = _static_clearance_distances()
-    if wall_distances is None and shaft_distances is None:
-        return
-
-    radius = float(get_buffered_radius_mm(route_diameter))
-    blocked_mask = np.zeros(len(grid_edge_list), dtype=bool)
-    if wall_distances is not None:
-        wall_limit = radius
-        blocked_mask |= wall_distances < wall_limit - 1e-7
-    if shaft_distances is not None and not allow_shaft_entry:
-        shaft_limit = max(float(PATINEJO_CLEARANCE_MM), radius)
-        blocked_mask |= shaft_distances < shaft_limit - 1e-7
-
-    for ei in np.flatnonzero(blocked_mask):
-        u, v, _, _ = grid_edge_list[int(ei)]
-        edge_weights[(min(u, v), max(u, v))] = OVERLAP_BLOCK_WEIGHT
+    _add_static_clearance_weights(
+        edge_weights,
+        grid_edge_list,
+        wall_distances,
+        shaft_distances,
+        route_diameter,
+        DUCT_BUFFER_RATIO,
+        PATINEJO_CLEARANCE_MM,
+        OVERLAP_BLOCK_WEIGHT,
+        allow_shaft_entry=allow_shaft_entry,
+    )
 
 def add_machine_clearance_weights(edge_weights, route_diameter, env):
-    if grid_edge_coords is None or grid_edge_list is None:
-        return
-    distances = _machine_edge_clearance_distances()
-    if distances is None:
-        return
-
-    radius = float(get_buffered_radius_mm(route_diameter))
-    soft_limit = radius + MACHINE_CLEARANCE_SOFT_MARGIN_MM
-    hard_mask = distances < radius - 1e-7
-    soft_mask = (distances >= radius - 1e-7) & (distances < soft_limit)
-
-    for ei in np.flatnonzero(hard_mask):
-        u, v, _, _ = grid_edge_list[int(ei)]
-        edge_weights[(min(u, v), max(u, v))] = OVERLAP_BLOCK_WEIGHT
-
-    soft_indices = np.flatnonzero(soft_mask)
-    if len(soft_indices) == 0:
-        return
-    t = (soft_limit - distances[soft_indices]) / MACHINE_CLEARANCE_SOFT_MARGIN_MM
-    penalties = CLEARANCE_PENALTY * np.square(t)
-    for ei, penalty in zip(soft_indices, penalties):
-        u, v, _, _ = grid_edge_list[int(ei)]
-        edge = (min(u, v), max(u, v))
-        if edge_weights.get(edge, 0.0) >= OVERLAP_BLOCK_WEIGHT:
-            continue
-        base_dist = float(np.hypot(env.nodes[v][0] - env.nodes[u][0], env.nodes[v][1] - env.nodes[u][1]))
-        edge_weights[edge] = edge_weights.get(edge, base_dist) + float(penalty)
+    _add_machine_clearance_weights(
+        edge_weights,
+        grid_edge_list,
+        grid_edge_coords,
+        env.nodes,
+        route_diameter,
+        DUCT_BUFFER_RATIO,
+        machine_center=(machine_cx, machine_cy),
+        machine_angle_deg=machine_angle,
+        machine_overall_width_mm=MACHINE_OVERALL_W,
+        machine_body_height_mm=MACHINE_BODY_H,
+        soft_margin_mm=MACHINE_CLEARANCE_SOFT_MARGIN_MM,
+        clearance_penalty=CLEARANCE_PENALTY,
+        block_weight=OVERLAP_BLOCK_WEIGHT,
+    )
 
 def add_route_clearance_weights(edge_weights, route_name, env):
     diameter = get_route_diameter(route_name)
@@ -1425,81 +1404,18 @@ def add_route_clearance_weights(edge_weights, route_name, env):
     add_machine_clearance_weights(edge_weights, diameter, env)
 
 def add_route_interaction_weights(prior_axis_records, current_diameter, accumulated_weights, env):
-    if not prior_axis_records or grid_edge_coords is None or grid_edge_list is None:
-        return
-
-    coords = grid_edge_coords.astype(np.float64, copy=False)
-    edge_x1 = np.minimum(coords[:, 0], coords[:, 2])
-    edge_x2 = np.maximum(coords[:, 0], coords[:, 2])
-    edge_y1 = np.minimum(coords[:, 1], coords[:, 3])
-    edge_y2 = np.maximum(coords[:, 1], coords[:, 3])
-    edge_is_h = np.abs(coords[:, 1] - coords[:, 3]) < 1e-7
-
-    blocked_edges = set()
-    crossing_counts = {}
-    clearance_counts = {}
-
-    for prior_seg, prior_diameter in prior_axis_records:
-        px1, py1, px2, py2, prior_dir = prior_seg
-        required = get_required_clearance_mm(current_diameter, prior_diameter)
-
-        if prior_dir == "H":
-            overlap_mask = (
-                edge_is_h
-                & (np.abs(edge_y1 - py1) < 1e-7)
-                & (np.minimum(edge_x2, px2) - np.maximum(edge_x1, px1) > 1e-7)
-            )
-            cross_mask = (
-                ~edge_is_h
-                & (edge_x1 >= px1 - 1e-7)
-                & (edge_x1 <= px2 + 1e-7)
-                & (edge_y1 <= py1 + 1e-7)
-                & (edge_y2 >= py1 - 1e-7)
-            )
-        else:
-            overlap_mask = (
-                ~edge_is_h
-                & (np.abs(edge_x1 - px1) < 1e-7)
-                & (np.minimum(edge_y2, py2) - np.maximum(edge_y1, py1) > 1e-7)
-            )
-            cross_mask = (
-                edge_is_h
-                & (edge_y1 >= py1 - 1e-7)
-                & (edge_y1 <= py2 + 1e-7)
-                & (edge_x1 <= px1 + 1e-7)
-                & (edge_x2 >= px1 - 1e-7)
-            )
-
-        dx = np.maximum.reduce([px1 - edge_x2, edge_x1 - px2, np.zeros_like(edge_x1)])
-        dy = np.maximum.reduce([py1 - edge_y2, edge_y1 - py2, np.zeros_like(edge_y1)])
-        clearance_mask = (np.hypot(dx, dy) < required) & ~overlap_mask & ~cross_mask
-
-        for ei in np.flatnonzero(overlap_mask):
-            u, v, _, _ = grid_edge_list[int(ei)]
-            blocked_edges.add((min(u, v), max(u, v)))
-        for ei in np.flatnonzero(cross_mask):
-            u, v, _, _ = grid_edge_list[int(ei)]
-            edge = (min(u, v), max(u, v))
-            crossing_counts[edge] = crossing_counts.get(edge, 0) + 1
-        for ei in np.flatnonzero(clearance_mask):
-            u, v, _, _ = grid_edge_list[int(ei)]
-            edge = (min(u, v), max(u, v))
-            clearance_counts[edge] = clearance_counts.get(edge, 0) + 1
-
-    for edge in blocked_edges:
-        accumulated_weights[edge] = OVERLAP_BLOCK_WEIGHT
-
-    for edge in set(crossing_counts) | set(clearance_counts):
-        if accumulated_weights.get(edge, 0.0) >= OVERLAP_BLOCK_WEIGHT:
-            continue
-        u, v = edge
-        base_dist = float(np.hypot(env.nodes[v][0] - env.nodes[u][0], env.nodes[v][1] - env.nodes[u][1]))
-        base_cost = accumulated_weights.get(edge, base_dist)
-        accumulated_weights[edge] = (
-            base_cost
-            + CROSSING_PENALTY * crossing_counts.get(edge, 0)
-            + CLEARANCE_PENALTY * clearance_counts.get(edge, 0)
-        )
+    _add_route_interaction_weights(
+        prior_axis_records,
+        current_diameter,
+        accumulated_weights,
+        grid_edge_list,
+        grid_edge_coords,
+        env.nodes,
+        DUCT_BUFFER_RATIO,
+        CROSSING_PENALTY,
+        CLEARANCE_PENALTY,
+        OVERLAP_BLOCK_WEIGHT,
+    )
 
 def _weighted_edge_cost(edge_weights, u, v, dist):
     return _weighted_edge_cost_for_weights(edge_weights, u, v, dist)

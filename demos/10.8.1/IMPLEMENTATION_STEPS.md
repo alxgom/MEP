@@ -357,6 +357,12 @@ Manual validation milestones:
 - Validation: `python -m py_compile demos\10.8.1\main.py demos\10.8.1\mep_routing\ui\solution_logs.py demos\10.8.1\tests\test_solution_logs.py`.
 - Validation: `python -m pytest demos\10.8.1\tests`.
 
+- Extracted static wall/shaft distance fields, machine-envelope clearance weighting, and route-to-route interaction weighting to `mep_routing.routing.clearance`.
+- Kept `main.py` as the adapter for active graph state, Sal dimensions/cost settings, and static-distance cache ownership.
+- Added focused tests for static distance fields, wall/shaft blocking, machine hard/soft clearances, and overlap/crossing/clearance interaction costs.
+- Validation: `python -m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\clearance.py tests\\test_routing_clearance.py`.
+- Validation: `python -m pytest tests\\test_routing_clearance.py`.
+
 ## Commit Checklist
 
 Before each commit:
