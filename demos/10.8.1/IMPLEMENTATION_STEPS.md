@@ -514,6 +514,10 @@ Manual validation milestones:
 - Kept `main.py` responsible for current display-value derivation, help-button state, and slider callbacks; the UI module now owns the fixed Pygame card layout and text rendering.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\ui\\sidebar.py tests\\test_ui_sidebar.py`; Python 3.11 `-m pytest tests\\test_ui_sidebar.py` (2 passed).
 
+- Integrated regular, Hannan, epsilon, and dynamic-obstacle graph lifecycle coordination through `mep_routing.graphs.lifecycle`.
+- Kept `main.py` responsible for live graph assignment, weight-runtime cache resets, terminal-runtime updates, and status output; the graph module now owns graph-mode construction, pin/shaft runtime assembly, and Hannan-template caching.
+- Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\graphs\\__init__.py mep_routing\\graphs\\lifecycle.py` plus 24 direct focused graph contracts from `test_graph_runtime.py`, `test_graph_variants.py`, `test_graph_env.py`, `test_graph_axes.py`, and `test_graph_lifecycle.py`.
+
 ## Commit Checklist
 
 Before each commit:

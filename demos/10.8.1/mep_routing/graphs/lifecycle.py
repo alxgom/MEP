@@ -131,7 +131,14 @@ class GraphLifecycle:
             restrict_pin_access_edges(edges, pin_indices, allowed_directions),
         )
 
-    def build_selected(self, graph_type: int, machine_pins, machine_angle: float) -> GraphBuildResult | None:
+    def build_selected(
+        self,
+        graph_type: int,
+        machine_pins,
+        machine_angle: float,
+        *,
+        shift_hannan_walls: bool = True,
+    ) -> GraphBuildResult | None:
         """Build the selected regular, Hannan, or epsilon routing graph."""
         if self.routing_region is None:
             return None
@@ -150,7 +157,7 @@ class GraphLifecycle:
         access_points = [spec["access_point"] for spec in self.port_access_specs(machine_pins, machine_angle)]
         if graph_type == 1:
             variant = build_hannan_variant(
-                template=self.hannan_template(shift_walls=True),
+                template=self.hannan_template(shift_walls=shift_hannan_walls),
                 allowed_region=self.routing_region,
                 node_region=self.node_region(),
                 wall_polys=self.wall_polygons,
@@ -178,7 +185,15 @@ class GraphLifecycle:
         runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle)
         return GraphBuildResult(runtime, graph_type, (perf_counter() - started) * 1000.0, variant)
 
-    def apply_dynamic_obstacle(self, runtime: RuntimeGraph, machine_polygon, machine_pins, machine_angle: float):
+    def apply_dynamic_obstacle(
+        self,
+        runtime: RuntimeGraph,
+        machine_polygon,
+        machine_pins,
+        machine_angle: float,
+        *,
+        clearance_mm: float,
+    ):
         """Filter a committed graph while preserving terminal and port-access nodes."""
         protected_nodes = set()
         protected_points = list(self.terminals.values())
@@ -193,7 +208,7 @@ class GraphLifecycle:
             runtime.edge_list,
             runtime.edge_coords,
             machine_polygon,
-            self.wall_clearance_mm,
+            clearance_mm,
             protected_nodes,
         )
         return DynamicGraphResult(env, blocked_nodes, blocked_edges)

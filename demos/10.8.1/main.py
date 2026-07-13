@@ -52,14 +52,7 @@ from mep_routing.geometry import (
     snap_to_integer_grid,
 )
 from mep_routing.graphs import (
-    append_shaft_runtime_node as _append_shaft_runtime_node,
-    build_hannan_static_axes as _build_hannan_static_axes_for_context,
-    build_hannan_variant as _build_hannan_variant,
-    build_epsilon_variant as _build_epsilon_variant,
-    filter_dynamic_machine_obstacle as _filter_dynamic_machine_obstacle,
-    build_regular_grid as _build_regular_grid_for_context,
-    create_runtime_graph as _create_runtime_graph,
-    restrict_pin_access_edges as _restrict_pin_access_edges,
+    GraphLifecycle,
 )
 from mep_routing.placement import (
     candidate_machine_rooms as _candidate_machine_rooms_for_placement,
@@ -349,6 +342,8 @@ transient_message_until_ms = 0
 help_button_rects = {}
 preferred_terminal_tool_mode = None
 terminal_runtime = None
+graph_lifecycle = None
+active_graph_runtime = None
 terminal_tool_button_rects = {}
 terminal_validity_overlay_enabled = False
 terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
@@ -802,197 +797,97 @@ def add_shaft_entry_segments(segs, first_node_idx):
     geom = _shaft_entry_geometry_for_node(first_node_idx)
     segs.extend(_shaft_entry_segments_for_geometry(geom))
 
-def _commit_grid(nodes_arr, valid_edges):
-    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache
-    shaft_center = None
-    shaft_bounds = None
-    if shaft_extraction is not None:
-        rep_pt = shaft_extraction.representative_point()
-        shaft_center = (round(rep_pt.x), round(rep_pt.y))
-        shaft_bounds = shaft_extraction.bounds
-    nodes_arr, valid_edges = _append_shaft_runtime_node(
-        nodes_arr,
-        valid_edges,
-        shaft_center=shaft_center,
-        shaft_bounds=shaft_bounds,
-        clearance_mm=ROUTING_WALL_CLEARANCE_MM,
-    )
-
-    pin_indices = {}
-    global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    for name, pt in global_pins.items():
-        diffs = np.hypot(nodes_arr[:, 0] - pt[0], nodes_arr[:, 1] - pt[1])
-        min_idx = np.argmin(diffs)
-        if diffs[min_idx] < 1.0:
-            pin_indices[int(min_idx)] = name
-
-    allowed_dirs_by_pin = {}
-    for spec in get_port_access_specs(global_pins, machine_angle):
-        allowed_dirs_by_pin.setdefault(spec["pin"], set()).add(spec["out_dir"])
-
-    runtime = _create_runtime_graph(
-        nodes_arr,
-        _restrict_pin_access_edges(valid_edges, pin_indices, allowed_dirs_by_pin),
-    )
+def _commit_grid(runtime):
+    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env
+    global static_clearance_cache, active_graph_runtime
     grid_nodes       = runtime.nodes
     grid_adj_base    = runtime.adjacency
     grid_edge_list   = runtime.edge_list
     grid_edge_coords = runtime.edge_coords
     grid_kd          = runtime.spatial_index
     current_env      = runtime.env
+    active_graph_runtime = runtime
     static_clearance_cache = StaticClearanceCache()
     if terminal_runtime is not None:
         terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
     invalidate_room_start_node_cache()
     invalidate_terminal_validity_cache()
 
-def _node_routing_region():
-    if routing_region_base is None:
-        return None
-    if ROUTING_WALL_CLEARANCE_MM <= 0:
-        return routing_region_base
-    inset = routing_region_base.buffer(-ROUTING_WALL_CLEARANCE_MM, join_style=2)
-    return routing_region_base if inset.is_empty else inset
-
 def build_regular_grid():
-    if routing_region_base is None:
+    if graph_lifecycle is None:
         return
-    nodes_arr, valid_edges = _build_regular_grid_for_context(
-        routing_region_base, _node_routing_region(), wall_polys, GRID_SPACING, WALL_THICKNESS,
-    )
-    _commit_grid(nodes_arr, valid_edges)
+    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+    result = graph_lifecycle.build_selected(0, pins, machine_angle)
+    if result is not None:
+        _commit_grid(result.runtime)
 
 def build_base_regular_grid():
     global base_regular_env, base_regular_kd
-    if routing_region_base is None:
+    if graph_lifecycle is None:
         return
     t0 = time.perf_counter()
-    nodes_arr, valid_edges = _build_regular_grid_for_context(
-        routing_region_base, _node_routing_region(), wall_polys, GRID_SPACING, WALL_THICKNESS,
-    )
-    
-    runtime = _create_runtime_graph(nodes_arr, valid_edges)
+    runtime = graph_lifecycle.build_base_regular()
+    if runtime is None:
+        return
     base_regular_env = runtime.env
     base_regular_kd = runtime.spatial_index
-    print(f"[Base Regular Grid] Built {len(nodes_arr)} nodes in {(time.perf_counter() - t0)*1000:.1f}ms")
+    print(f"[Base Regular Grid] Built {len(runtime.nodes)} nodes in {(time.perf_counter() - t0)*1000:.1f}ms")
 
 def update_dynamic_env(machine_poly):
     global current_env
-    if grid_nodes is None:
+    if graph_lifecycle is None or active_graph_runtime is None:
         current_env = None
         if terminal_runtime is not None:
             terminal_runtime.set_graph(None, None, None)
         invalidate_room_start_node_cache()
         return
-
     t0 = time.perf_counter()
-    protected_nodes = set()
-    protected_points = list(terminals.values())
-    protected_points.extend(
-        spec["access_point"]
-        for spec in get_port_access_specs(get_machine_pins(machine_cx, machine_cy, machine_angle), machine_angle)
+    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+    result = graph_lifecycle.apply_dynamic_obstacle(
+        active_graph_runtime,
+        machine_poly,
+        pins,
+        machine_angle,
+        clearance_mm=MACHINE_CLEARANCE,
     )
-    for pt in protected_points:
-        if str(pt).startswith("c_"):
-            continue
-        _, idx = grid_kd.query(pt)
-        if np.hypot(grid_nodes[int(idx), 0] - pt[0], grid_nodes[int(idx), 1] - pt[1]) < 1.0:
-            protected_nodes.add(int(idx))
-
-    current_env, blocked_node_count, blocked_edge_count = _filter_dynamic_machine_obstacle(
-        grid_nodes, grid_edge_list, grid_edge_coords, machine_poly, MACHINE_CLEARANCE, protected_nodes,
-    )
+    current_env = result.env
     if terminal_runtime is not None:
         terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
     invalidate_room_start_node_cache()
     ms = (time.perf_counter() - t0) * 1000.0
-    print(f"Grid update: {ms:.1f} ms  (blocked nodes={blocked_node_count}, edges={blocked_edge_count})")
-
-def _get_hannan_static_template(shift_walls=False):
-    global hannan_static_cache
-    cache_key = bool(shift_walls)
-    if cache_key in hannan_static_cache:
-        return hannan_static_cache[cache_key]
-    template = _build_hannan_static_axes_for_context(
-        allowed_region=routing_region_base,
-        terminals=terminals,
-        shaft_extraction=shaft_extraction,
-        covers=covers,
-        columns=columns,
-        shafts=shafts,
-        wall_polys=wall_polys,
-        walls=walls,
-        grid_spacing_mm=GRID_SPACING,
-        scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
-        wall_clearance_mm=ROUTING_WALL_CLEARANCE_MM,
-        shift_walls=shift_walls,
-    )
-    hannan_static_cache[cache_key] = template
-    return template
+    print(f"Grid update: {ms:.1f} ms  (blocked nodes={result.blocked_node_count}, edges={result.blocked_edge_count})")
 
 def build_hannan_grid(machine_pins=None, shift_walls=False):
-    if routing_region_base is None:
+    if graph_lifecycle is None:
         return
-    t0 = time.perf_counter()
-    machine_access_points = [] if not machine_pins else [
-        spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle)
-    ]
-    result = _build_hannan_variant(
-        template=_get_hannan_static_template(shift_walls=shift_walls),
-        allowed_region=routing_region_base,
-        node_region=_node_routing_region(),
-        wall_polys=wall_polys,
-        wall_thickness_mm=WALL_THICKNESS,
-        terminals=terminals,
-        shaft_extraction=shaft_extraction,
-        machine_access_points=machine_access_points,
-    )
-    if not len(result.nodes):
-        _commit_grid(result.nodes, [])
+    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
+    result = graph_lifecycle.build_selected(1, pins, machine_angle, shift_hannan_walls=shift_walls)
+    if result is None:
         return
-    _commit_grid(result.nodes, result.edges)
-    ms_total = (time.perf_counter() - t0) * 1000.0
-    print(
-        f"[Hannan Simple] axes={len(result.axes_x)}x{len(result.axes_y)} nodes={len(result.nodes)} edges={len(result.edges)} "
-        f"in {ms_total:.1f}ms (axes {result.axes_ms:.1f}, nodes {result.nodes_ms:.1f}, edges {result.edges_ms:.1f})"
-    )
+    _commit_grid(result.runtime)
+    if result.variant is not None and len(result.variant.nodes):
+        print(
+            f"[Hannan Simple] axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
+            f"nodes={len(result.variant.nodes)} edges={len(result.variant.edges)} in {result.elapsed_ms:.1f}ms "
+            f"(axes {result.variant.axes_ms:.1f}, nodes {result.variant.nodes_ms:.1f}, edges {result.variant.edges_ms:.1f})"
+        )
 
 def build_epsilon_grid(machine_pins=None):
-    if routing_region_base is None:
+    if graph_lifecycle is None:
         return
-    t0 = time.perf_counter()
-    eps = CORE_EPSILON_GRID_MM
-    machine_access_points = [] if not machine_pins else [
-        spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle)
-    ]
-    result = _build_epsilon_variant(
-        allowed_region=routing_region_base,
-        node_region=_node_routing_region(),
-        covers=covers,
-        columns=columns,
-        shafts=shafts,
-        wall_polys=wall_polys,
-        wall_thickness_mm=WALL_THICKNESS,
-        terminals=terminals,
-        shaft_core_entry_specs=shaft_core_entry_specs,
-        shaft_extraction=shaft_extraction,
-        machine_access_points=machine_access_points,
-        epsilon_mm=eps,
-        scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
-    )
-    if not len(result.nodes):
-        _commit_grid(result.nodes, [])
+    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
+    result = graph_lifecycle.build_selected(2, pins, machine_angle)
+    if result is None:
         return
-    _commit_grid(result.nodes, result.edges)
-    ms_total = (time.perf_counter() - t0) * 1000.0
-    print(
-        f"[Epsilon Core-like] eps={eps:.0f} axes={len(result.axes_x)}x{len(result.axes_y)} nodes={len(result.nodes)} "
-        f"edges={len(result.edges)} in {ms_total:.1f}ms "
-        f"(axes {result.axes_ms:.1f}, nodes {result.nodes_ms:.1f}, edges {result.edges_ms:.1f})"
-    )
+    _commit_grid(result.runtime)
+    if result.variant is not None and len(result.variant.nodes):
+        print(
+            f"[Epsilon Core-like] eps={CORE_EPSILON_GRID_MM:.0f} axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
+            f"nodes={len(result.variant.nodes)} edges={len(result.variant.edges)} in {result.elapsed_ms:.1f}ms "
+            f"(axes {result.variant.axes_ms:.1f}, nodes {result.variant.nodes_ms:.1f}, edges {result.variant.edges_ms:.1f})"
+        )
 
 def build_grid(machine_pins=None):
-    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env
     if graph_type_idx == 0:
         build_regular_grid()
     elif graph_type_idx == 1:
@@ -1831,9 +1726,9 @@ def generate_synthetic_dwelling():
 
 def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
-    global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
+    global machine_cx, machine_cy, machine_angle, _bnd_segs
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
-    global terminal_runtime
+    global terminal_runtime, graph_lifecycle, active_graph_runtime
     rooms = prepared.rooms
     columns = prepared.columns
     shafts = prepared.shafts
@@ -1853,7 +1748,24 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     shaft_core_entry_specs = prepared.shaft_core_entry_specs
     shaft_entry_geometry_by_node = {}
     _bnd_segs = None
-    hannan_static_cache = {}
+    active_graph_runtime = None
+    graph_lifecycle = GraphLifecycle(
+        routing_region=routing_region_base,
+        wall_polygons=wall_polys,
+        covers=covers,
+        columns=columns,
+        shafts=shafts,
+        walls=walls,
+        terminals=terminals,
+        shaft_extraction=shaft_extraction,
+        shaft_core_entry_specs=shaft_core_entry_specs,
+        grid_spacing_mm=GRID_SPACING,
+        scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
+        wall_thickness_mm=WALL_THICKNESS,
+        wall_clearance_mm=ROUTING_WALL_CLEARANCE_MM,
+        epsilon_mm=CORE_EPSILON_GRID_MM,
+        port_access_specs=get_port_access_specs,
+    )
     terminal_runtime = TerminalRuntime(
         terminals=terminals,
         room_polygons={room.name: room.polygon for room in rooms},

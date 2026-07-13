@@ -77,7 +77,7 @@ def test_dynamic_obstacle_preserves_terminal_node_when_it_matches_graph_node():
         0,
     )
 
-    result = lifecycle.apply_dynamic_obstacle(runtime, box(8, -2, 12, 2), {}, 0)
+    result = lifecycle.apply_dynamic_obstacle(runtime, box(8, -2, 12, 2), {}, 0, clearance_mm=0)
 
     assert result.blocked_node_count == 0
     assert result.blocked_edge_count == 0
