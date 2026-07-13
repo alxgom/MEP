@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pygame
 from shapely.geometry import Polygon, LineString, Point, box
-from scipy.spatial import cKDTree
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
     machine_pins as _machine_pins,
@@ -42,7 +41,7 @@ from mep_routing.geometry import (
     snap_to_integer_grid,
 )
 from mep_routing.graphs import (
-    EnvView,
+    append_shaft_runtime_node as _append_shaft_runtime_node,
     build_axis_grid as _build_axis_grid_for_context,
     build_hannan_static_axes as _build_hannan_static_axes_for_context,
     build_epsilon_axes as _build_epsilon_axes_for_context,
@@ -55,6 +54,8 @@ from mep_routing.graphs import (
     extend_allowed_boundary_axes as _extend_allowed_boundary_axes_for_graph,
     merge_close_values as _merge_close_values_for_axes,
     build_regular_grid as _build_regular_grid_for_context,
+    create_runtime_graph as _create_runtime_graph,
+    restrict_pin_access_edges as _restrict_pin_access_edges,
 )
 from mep_routing.placement import (
     candidate_machine_rooms as _candidate_machine_rooms_for_placement,
@@ -888,47 +889,19 @@ def add_shaft_entry_segments(segs, first_node_idx):
 
 def _commit_grid(nodes_arr, valid_edges):
     global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache, geometry_distance_cache
-    DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
-
-    if shaft_extraction is not None and len(nodes_arr) > 0:
+    shaft_center = None
+    shaft_bounds = None
+    if shaft_extraction is not None:
         rep_pt = shaft_extraction.representative_point()
-        sc = (round(rep_pt.x), round(rep_pt.y))
-        
-        minx_s, miny_s, maxx_s, maxy_s = shaft_extraction.bounds
-        cx_s = (minx_s + maxx_s) / 2
-        cy_s = (miny_s + maxy_s) / 2
-
-        offset_val = ROUTING_WALL_CLEARANCE_MM
-        face_pts = [
-            (maxx_s + offset_val, cy_s, 'W'),
-            (minx_s - offset_val, cy_s, 'E'),
-            (cx_s, maxy_s + offset_val, 'S'),
-            (cx_s, miny_s - offset_val, 'N')
-        ]
-        
-        shaft_idx = len(nodes_arr)
-        nodes_arr = np.vstack([nodes_arr, [sc[0], sc[1]]])
-        
-        connected_any = False
-        for px, py, d in face_pts:
-            diffs = np.hypot(nodes_arr[:-1, 0] - px, nodes_arr[:-1, 1] - py)
-            min_idx = np.argmin(diffs)
-            if diffs[min_idx] < 10.0:
-                w = float(np.hypot(sc[0] - nodes_arr[min_idx, 0], sc[1] - nodes_arr[min_idx, 1]))
-                valid_edges.append((min_idx, shaft_idx, w, d))
-                connected_any = True
-                
-        if not connected_any:
-            diffs = np.hypot(nodes_arr[:-1, 0] - sc[0], nodes_arr[:-1, 1] - sc[1])
-            min_idx = np.argmin(diffs)
-            dx = sc[0] - nodes_arr[min_idx, 0]
-            dy = sc[1] - nodes_arr[min_idx, 1]
-            if abs(dx) > abs(dy):
-                d = 'E' if dx > 0 else 'W'
-            else:
-                d = 'N' if dy > 0 else 'S'
-            w = float(np.hypot(dx, dy))
-            valid_edges.append((min_idx, shaft_idx, w, d))
+        shaft_center = (round(rep_pt.x), round(rep_pt.y))
+        shaft_bounds = shaft_extraction.bounds
+    nodes_arr, valid_edges = _append_shaft_runtime_node(
+        nodes_arr,
+        valid_edges,
+        shaft_center=shaft_center,
+        shaft_bounds=shaft_bounds,
+        clearance_mm=ROUTING_WALL_CLEARANCE_MM,
+    )
 
     pin_indices = {}
     global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
@@ -942,43 +915,16 @@ def _commit_grid(nodes_arr, valid_edges):
     for spec in get_port_access_specs(global_pins, machine_angle):
         allowed_dirs_by_pin.setdefault(spec["pin"], set()).add(spec["out_dir"])
 
-    filtered_edges = []
-    for u, v, w, d in valid_edges:
-        keep = True
-        if u in pin_indices:
-            pin_name = pin_indices[u]
-            allowed = allowed_dirs_by_pin.get(pin_name)
-            if allowed and d not in allowed:
-                keep = False
-        if v in pin_indices:
-            pin_name = pin_indices[v]
-            allowed = allowed_dirs_by_pin.get(pin_name)
-            if allowed and DIR_REV[d] not in allowed:
-                keep = False
-        if keep:
-            filtered_edges.append((u, v, w, d))
-            
-    valid_edges = filtered_edges
-
-    adj = {i: [] for i in range(len(nodes_arr))}
-    for u, v, w, d in valid_edges:
-        adj[u].append((v, w, d))
-        adj[v].append((u, w, DIR_REV[d]))
-
-    nodes_f32 = nodes_arr.astype(np.float32)
-    if valid_edges:
-        ec = np.array([[nodes_f32[u,0], nodes_f32[u,1],
-                        nodes_f32[v,0], nodes_f32[v,1]]
-                       for u, v, w, d in valid_edges], dtype=np.float32)
-    else:
-        ec = np.empty((0,4), dtype=np.float32)
-
-    grid_nodes       = nodes_f32
-    grid_adj_base    = adj
-    grid_edge_list   = valid_edges
-    grid_edge_coords = ec
-    grid_kd          = cKDTree(grid_nodes)
-    current_env      = EnvView(grid_nodes, adj)
+    runtime = _create_runtime_graph(
+        nodes_arr,
+        _restrict_pin_access_edges(valid_edges, pin_indices, allowed_dirs_by_pin),
+    )
+    grid_nodes       = runtime.nodes
+    grid_adj_base    = runtime.adjacency
+    grid_edge_list   = runtime.edge_list
+    grid_edge_coords = runtime.edge_coords
+    grid_kd          = runtime.spatial_index
+    current_env      = runtime.env
     static_clearance_cache = {"key": None, "wall": None, "shaft": None}
     geometry_distance_cache = {}
     invalidate_room_start_node_cache()
@@ -1009,14 +955,9 @@ def build_base_regular_grid():
         routing_region_base, _node_routing_region(), wall_polys, GRID_SPACING, WALL_THICKNESS,
     )
     
-    DIR_REV = {'E': 'W', 'N': 'S', 'W': 'E', 'S': 'N'}
-    adj = {i: [] for i in range(len(nodes_arr))}
-    for u, v, w, d in valid_edges:
-        adj[u].append((v, w, d))
-        adj[v].append((u, w, DIR_REV[d]))
-        
-    base_regular_env = EnvView(nodes_arr.astype(np.float32), adj)
-    base_regular_kd = cKDTree(base_regular_env.nodes)
+    runtime = _create_runtime_graph(nodes_arr, valid_edges)
+    base_regular_env = runtime.env
+    base_regular_kd = runtime.spatial_index
     print(f"[Base Regular Grid] Built {len(nodes_arr)} nodes in {(time.perf_counter() - t0)*1000:.1f}ms")
 
 def update_dynamic_env(machine_poly):

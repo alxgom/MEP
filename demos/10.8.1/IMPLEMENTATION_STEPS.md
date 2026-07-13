@@ -457,6 +457,11 @@ Manual validation milestones:
 - Removed the parallel history/log globals from `main.py`; the app now passes session-owned state to the existing plot and solution-log UI adapters.
 - Validation: Demo 10.7 virtual environment `-m py_compile main.py mep_routing\\observability\\__init__.py mep_routing\\observability\\session.py`; ran both `test_observability_session.py` contracts directly because its environment does not include pytest.
 
+- Created `mep_routing.graphs.runtime` for shaft runtime-node attachment, machine-pin direction filtering, graph adjacency/edge-coordinate assembly, and spatial-index creation.
+- Simplified `main.py` graph commits and base regular-grid setup to assign the extracted runtime representation while retaining app-state lookup and cache invalidation there.
+- Added focused runtime-graph contracts.
+- Validation: Python 3.11 `-m py_compile main.py mep_routing\\graphs\\runtime.py mep_routing\\graphs\\__init__.py tests\\test_graph_runtime.py`; Python 3.11 `-m pytest tests\\test_graph_runtime.py`.
+
 ## Commit Checklist
 
 Before each commit:

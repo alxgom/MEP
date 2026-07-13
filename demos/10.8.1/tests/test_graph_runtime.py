@@ -21,7 +21,7 @@ def test_shaft_attachment_and_pin_access_filter_preserve_direction_contract():
         np.array([(120, 50)]), [], shaft_center=(50, 50), shaft_bounds=(0, 0, 100, 100), clearance_mm=20,
     )
     filtered = restrict_pin_access_edges(
-        [(0, 1, 70.0, "W"), (1, 2, 10.0, "E")], {1: "supply"}, {"supply": {"E"}},
+        [(0, 1, 70.0, "E"), (1, 2, 10.0, "E")], {1: "supply"}, {"supply": {"E"}},
     )
 
     assert nodes.tolist() == [[120, 50], [50, 50]]
