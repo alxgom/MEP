@@ -7,12 +7,14 @@ translation here makes the transition policy testable without Pygame.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Mapping
 
 
 Color = tuple[int, int, int]
 Marker = tuple[str, Color]
+Point = tuple[float, float]
+ScreenPoint = tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -128,3 +130,166 @@ def routing_key_transition(
             needs_auto_placement=next_state["auto_placement_mode_idx"] > 0,
         )
     return None
+
+
+@dataclass(frozen=True)
+class CanvasGestureState:
+    """Transient canvas gesture state, independent from Pygame events."""
+
+    ruler_mode: bool = False
+    terminal_tool_mode: str | None = None
+    panning: bool = False
+    pan_last_screen: ScreenPoint | None = None
+    ruler_dragging: bool = False
+    ruler_start_mm: Point | None = None
+    ruler_end_mm: Point | None = None
+    terminal_area_dragging: bool = False
+    terminal_area_start_mm: Point | None = None
+    terminal_area_end_mm: Point | None = None
+    terminal_area_remove: bool = False
+    machine_dragging: bool = False
+    machine_drag_offset_mm: Point | None = None
+
+
+@dataclass(frozen=True)
+class CanvasHit:
+    """World-space hit-test results supplied by the application adapter."""
+
+    machine_hit: bool = False
+    route_name: str | None = None
+    room_route_name: str | None = None
+
+
+@dataclass(frozen=True)
+class CanvasGestureCommand:
+    """A semantic canvas action for the application to execute."""
+
+    name: str
+    value: object | None = None
+
+
+@dataclass(frozen=True)
+class CanvasGestureTransition:
+    state: CanvasGestureState
+    commands: tuple[CanvasGestureCommand, ...] = ()
+
+
+def begin_canvas_gesture(
+    state: CanvasGestureState,
+    *,
+    world_point: Point,
+    screen_point: ScreenPoint,
+    shift: bool,
+    ctrl: bool,
+    hit: CanvasHit,
+    machine_center_mm: Point | None = None,
+) -> CanvasGestureTransition:
+    """Start one canvas gesture using precomputed app hit-test results."""
+    if shift:
+        return CanvasGestureTransition(
+            replace(state, panning=True, pan_last_screen=screen_point),
+            (CanvasGestureCommand("start_pan"),),
+        )
+    if state.ruler_mode:
+        return CanvasGestureTransition(
+            replace(state, ruler_dragging=True, ruler_start_mm=world_point, ruler_end_mm=world_point),
+            (CanvasGestureCommand("start_ruler", world_point),),
+        )
+    if state.terminal_tool_mode == "point":
+        return CanvasGestureTransition(
+            state,
+            (CanvasGestureCommand("apply_terminal_point", (world_point, ctrl)),),
+        )
+    if state.terminal_tool_mode == "area":
+        return CanvasGestureTransition(
+            replace(
+                state,
+                terminal_area_dragging=True,
+                terminal_area_start_mm=world_point,
+                terminal_area_end_mm=world_point,
+                terminal_area_remove=ctrl,
+            ),
+            (CanvasGestureCommand("start_terminal_area", (world_point, ctrl)),),
+        )
+    if hit.machine_hit:
+        if machine_center_mm is None:
+            raise ValueError("machine center is required for a machine-drag hit")
+        offset = (world_point[0] - machine_center_mm[0], world_point[1] - machine_center_mm[1])
+        return CanvasGestureTransition(
+            replace(state, machine_dragging=True, machine_drag_offset_mm=offset),
+            (CanvasGestureCommand("start_machine_drag", offset),),
+        )
+    if hit.route_name is not None:
+        return CanvasGestureTransition(state, (CanvasGestureCommand("select_route", hit.route_name),))
+    if hit.room_route_name is not None:
+        return CanvasGestureTransition(state, (CanvasGestureCommand("select_route", hit.room_route_name),))
+    return CanvasGestureTransition(state, (CanvasGestureCommand("clear_route_selection"),))
+
+
+def move_canvas_gesture(
+    state: CanvasGestureState,
+    *,
+    world_point: Point,
+    screen_point: ScreenPoint,
+) -> CanvasGestureTransition:
+    """Advance the active canvas gesture and emit its adapter action."""
+    if state.panning and state.pan_last_screen is not None:
+        dx = screen_point[0] - state.pan_last_screen[0]
+        dy = screen_point[1] - state.pan_last_screen[1]
+        return CanvasGestureTransition(
+            replace(state, pan_last_screen=screen_point),
+            (CanvasGestureCommand("pan_by", (dx, dy)),),
+        )
+    if state.ruler_dragging:
+        return CanvasGestureTransition(
+            replace(state, ruler_end_mm=world_point),
+            (CanvasGestureCommand("update_ruler", world_point),),
+        )
+    if state.terminal_area_dragging:
+        return CanvasGestureTransition(
+            replace(state, terminal_area_end_mm=world_point),
+            (CanvasGestureCommand("update_terminal_area", world_point),),
+        )
+    if state.machine_dragging:
+        if state.machine_drag_offset_mm is None:
+            raise ValueError("machine drag requires a drag offset")
+        offset_x, offset_y = state.machine_drag_offset_mm
+        machine_center = (world_point[0] - offset_x, world_point[1] - offset_y)
+        return CanvasGestureTransition(
+            state,
+            (CanvasGestureCommand("move_machine", machine_center),),
+        )
+    return CanvasGestureTransition(state)
+
+
+def end_canvas_gesture(
+    state: CanvasGestureState,
+    *,
+    button: str,
+) -> CanvasGestureTransition:
+    """Finish a left or middle canvas gesture and request any terminal-area commit."""
+    commands: tuple[CanvasGestureCommand, ...] = ()
+    if (
+        button == "left"
+        and state.terminal_area_dragging
+        and state.terminal_area_start_mm is not None
+        and state.terminal_area_end_mm is not None
+    ):
+        commands = (
+            CanvasGestureCommand(
+                "apply_terminal_area",
+                (state.terminal_area_start_mm, state.terminal_area_end_mm, state.terminal_area_remove),
+            ),
+        )
+    return CanvasGestureTransition(
+        replace(
+            state,
+            panning=False,
+            pan_last_screen=None,
+            ruler_dragging=False,
+            terminal_area_dragging=False,
+            machine_dragging=False,
+            machine_drag_offset_mm=None,
+        ),
+        commands,
+    )

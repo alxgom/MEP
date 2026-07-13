@@ -1,4 +1,11 @@
-from mep_routing.ui.events import routing_key_transition
+from mep_routing.ui.events import (
+    CanvasGestureState,
+    CanvasHit,
+    begin_canvas_gesture,
+    end_canvas_gesture,
+    move_canvas_gesture,
+    routing_key_transition,
+)
 
 
 def _state(**overrides):
@@ -59,3 +66,80 @@ def test_routing_key_transitions_preserve_auto_placement_policy_and_ignore_unkno
     assert auto.needs_auto_placement is True
     assert auto.record_history is False
     assert routing_key_transition("unhandled", _state(), COUNTS) is None
+
+
+def test_canvas_gesture_begin_prioritizes_pan_ruler_terminal_and_machine_actions():
+    point = (100.0, 200.0)
+    screen = (10, 20)
+    pan = begin_canvas_gesture(
+        CanvasGestureState(ruler_mode=True, terminal_tool_mode="point"),
+        world_point=point,
+        screen_point=screen,
+        shift=True,
+        ctrl=False,
+        hit=CanvasHit(machine_hit=True),
+    )
+    assert pan.state.panning is True
+    assert pan.commands[0].name == "start_pan"
+
+    ruler = begin_canvas_gesture(
+        CanvasGestureState(ruler_mode=True, terminal_tool_mode="point"),
+        world_point=point,
+        screen_point=screen,
+        shift=False,
+        ctrl=False,
+        hit=CanvasHit(machine_hit=True),
+    )
+    assert ruler.state.ruler_dragging is True
+    assert ruler.commands[0].name == "start_ruler"
+
+    terminal = begin_canvas_gesture(
+        CanvasGestureState(terminal_tool_mode="point"),
+        world_point=point,
+        screen_point=screen,
+        shift=False,
+        ctrl=True,
+        hit=CanvasHit(machine_hit=True),
+    )
+    assert terminal.commands[0].name == "apply_terminal_point"
+    assert terminal.commands[0].value == (point, True)
+
+    machine = begin_canvas_gesture(
+        CanvasGestureState(),
+        world_point=point,
+        screen_point=screen,
+        shift=False,
+        ctrl=False,
+        hit=CanvasHit(machine_hit=True),
+        machine_center_mm=(90.0, 180.0),
+    )
+    assert machine.state.machine_drag_offset_mm == (10.0, 20.0)
+
+
+def test_canvas_gesture_selects_hits_and_commits_area_on_release():
+    selected = begin_canvas_gesture(
+        CanvasGestureState(),
+        world_point=(1.0, 1.0),
+        screen_point=(1, 1),
+        shift=False,
+        ctrl=False,
+        hit=CanvasHit(route_name="Kitchen", room_route_name="Bathroom"),
+    )
+    assert selected.commands == (selected.commands[0],)
+    assert selected.commands[0].name == "select_route"
+    assert selected.commands[0].value == "Kitchen"
+
+    started = begin_canvas_gesture(
+        CanvasGestureState(terminal_tool_mode="area"),
+        world_point=(10.0, 20.0),
+        screen_point=(10, 20),
+        shift=False,
+        ctrl=True,
+        hit=CanvasHit(),
+    )
+    moved = move_canvas_gesture(started.state, world_point=(30.0, 40.0), screen_point=(30, 40))
+    finished = end_canvas_gesture(moved.state, button="left")
+    assert finished.commands[0].name == "apply_terminal_area"
+    assert finished.commands[0].value == ((10.0, 20.0), (30.0, 40.0), True)
+    assert finished.state.terminal_area_dragging is False
+    assert finished.state.machine_dragging is False
