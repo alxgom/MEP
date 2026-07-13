@@ -382,6 +382,13 @@ Manual validation milestones:
 - Validation: `python -m pytest tests\\test_synthetic_data_source.py`.
 - Synthetic smoke: Demo 10.8.1 generated an 8-room / 4-terminal scenario and rebuilt the regular and Hannan grids using the 10.7 virtual environment.
 
+- Wired the existing Sal semantic config catalog into Demo 10.8.1 runtime defaults for graph resolution, clearances, solver penalties, UI slider bounds, paths, and input selection.
+- Kept machine geometry owned by the Sal machine specification instead of duplicating it through config defaults.
+- Added focused config tests for semantic/legacy key resolution and solver-versus-feasibility defaults.
+- Validation: `python -m py_compile main.py mep_routing\\config\\__init__.py mep_routing\\config\\schema.py mep_routing\\config\\defaults_sal.py tests\\test_config.py`.
+- Validation: `python -m pytest tests\\test_config.py`.
+- Startup smoke: the 10.7 virtual environment imported `main.py` with the expected 200 mm grid and 4000 mm bend defaults.
+
 ## Commit Checklist
 
 Before each commit:
