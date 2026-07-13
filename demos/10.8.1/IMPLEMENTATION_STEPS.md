@@ -486,6 +486,11 @@ Manual validation milestones:
 - Removed unused graph-axis forwarding wrappers from `main.py`; it now owns cache/state selection and graph-runtime commit only.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\graphs\\variants.py mep_routing\\graphs\\__init__.py tests\\test_graph_variants.py`; Python 3.11 `-m pytest tests\\test_graph_variants.py tests\\test_graph_axes.py tests\\test_graph_env.py`.
 
+- Integrated the `ui.events` canvas-gesture and panel-interaction transitions into the live Pygame loop.
+- Kept Pygame hit testing, cursor changes, slider values, terminal callbacks, solution-log restoration, routing solves, and history writes in `main.py`; `ui.events` now owns pointer/control transition ordering and transient drag state.
+- Preserved the original slider priority, control-panel priority, and no-history auto-placement behavior.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\events.py tests\\test_ui_events.py`; six focused UI event contracts invoked directly because pytest is unavailable in the active Python environment.
+
 ## Commit Checklist
 
 Before each commit:

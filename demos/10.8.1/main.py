@@ -5,6 +5,7 @@ import time
 import itertools
 import heapq
 from pathlib import Path
+from dataclasses import replace as _replace
 import numpy as np
 import pygame
 from shapely.geometry import Polygon, LineString, Point, box
@@ -201,7 +202,19 @@ from mep_routing.ui.overlays import (
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
 from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
-from mep_routing.ui.events import routing_key_transition as _routing_key_transition
+from mep_routing.ui.events import (
+    CanvasGestureState as _CanvasGestureState,
+    CanvasHit as _CanvasHit,
+    PanelHit as _PanelHit,
+    PanelInteractionState as _PanelInteractionState,
+    begin_canvas_gesture as _begin_canvas_gesture,
+    begin_panel_interaction as _begin_panel_interaction,
+    end_canvas_gesture as _end_canvas_gesture,
+    end_panel_interaction as _end_panel_interaction,
+    move_canvas_gesture as _move_canvas_gesture,
+    move_panel_interaction as _move_panel_interaction,
+    routing_key_transition as _routing_key_transition,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2453,6 +2466,38 @@ def main():
     dragging_crossing_weight_slider = False
     selected_route_name = None
     last_wheel_rotate_ms = 0
+    canvas_gesture = _CanvasGestureState()
+    panel_interaction = _PanelInteractionState()
+
+    def current_canvas_gesture():
+        return _replace(
+            canvas_gesture,
+            ruler_mode=ruler_mode,
+            terminal_tool_mode=preferred_terminal_tool_mode,
+        )
+
+    def apply_canvas_gesture(state):
+        nonlocal canvas_gesture, dragging, drag_offset_x, drag_offset_y
+        nonlocal ruler_dragging, ruler_start_mm, ruler_end_mm
+        nonlocal terminal_area_dragging, terminal_area_start_mm, terminal_area_end_mm, terminal_area_remove
+        nonlocal panning_view, pan_last_pos
+        canvas_gesture = state
+        dragging = state.machine_dragging
+        drag_offset_x, drag_offset_y = state.machine_drag_offset_mm or (0.0, 0.0)
+        ruler_dragging = state.ruler_dragging
+        ruler_start_mm, ruler_end_mm = state.ruler_start_mm, state.ruler_end_mm
+        terminal_area_dragging = state.terminal_area_dragging
+        terminal_area_start_mm, terminal_area_end_mm = state.terminal_area_start_mm, state.terminal_area_end_mm
+        terminal_area_remove = state.terminal_area_remove
+        panning_view, pan_last_pos = state.panning, state.pan_last_screen
+
+    def apply_panel_interaction(state):
+        nonlocal panel_interaction, dragging_min_piece_slider
+        nonlocal dragging_bend_weight_slider, dragging_crossing_weight_slider
+        panel_interaction = state
+        dragging_min_piece_slider = state.active_slider == "min_piece"
+        dragging_bend_weight_slider = state.active_slider == "bend"
+        dragging_crossing_weight_slider = state.active_slider == "crossing"
     
     routes = []
     status = "Initial"
@@ -2484,144 +2529,183 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     mx, my = event.pos
-                    clicked_help = False
-                    for card_id, rect in help_button_rects.items():
-                        if rect.collidepoint((mx, my)):
+                    help_card = next(
+                        (card_id for card_id, rect in help_button_rects.items() if rect.collidepoint((mx, my))),
+                        None,
+                    )
+                    min_piece_hit = min_piece_slider_rect.collidepoint((mx, my))
+                    bend_slider_hit = bend_weight_slider_rect.collidepoint((mx, my))
+                    bend_reset_hit = bend_weight_reset_rect.collidepoint((mx, my))
+                    crossing_slider_hit = crossing_weight_slider_rect.collidepoint((mx, my))
+                    crossing_reset_hit = crossing_weight_reset_rect.collidepoint((mx, my))
+                    panel_target_found = any((
+                        help_card is not None,
+                        min_piece_hit,
+                        bend_slider_hit,
+                        bend_reset_hit,
+                        crossing_slider_hit,
+                        crossing_reset_hit,
+                    ))
+                    tool_action = None
+                    log_action = None
+                    terminal_tool_action = None
+                    if not panel_target_found:
+                        tool_action = handle_canvas_tool_button_click((mx, my))
+                        panel_target_found = tool_action is not None
+                    if not panel_target_found:
+                        log_action = handle_solution_log_click((mx, my))
+                        panel_target_found = log_action is not None
+                    if not panel_target_found:
+                        terminal_tool_action = handle_terminal_tool_button_click((mx, my))
+                    panel_transition = _begin_panel_interaction(
+                        panel_interaction,
+                        hit=_PanelHit(
+                            help_card=help_card,
+                            min_piece_slider=min_piece_hit,
+                            bend_slider=bend_slider_hit,
+                            bend_reset=bend_reset_hit,
+                            crossing_slider=crossing_slider_hit,
+                            crossing_reset=crossing_reset_hit,
+                            canvas_tool=tool_action,
+                            solution_log_action=log_action,
+                            terminal_tool_action=terminal_tool_action,
+                        ),
+                        screen_x=mx,
+                    )
+                    apply_panel_interaction(panel_transition.state)
+                    if panel_transition.commands:
+                        panel_command = panel_transition.commands[0]
+                        if panel_command.name == "toggle_help":
+                            card_id = panel_command.value
                             help_popup_card = None if help_popup_card == card_id else card_id
-                            clicked_help = True
-                            break
-                    if clicked_help:
-                        continue
-                    if min_piece_slider_rect.collidepoint((mx, my)):
-                        dragging_min_piece_slider = True
-                        set_min_piece_factor_from_slider_x(mx)
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                        if routes and not status.startswith("Blocked"):
-                            record_current_solution(routes, elapsed_ms, f"Min:{min_piece_factor:.2f}", (241, 196, 15))
-                        continue
-                    if bend_weight_slider_rect.collidepoint((mx, my)):
-                        dragging_bend_weight_slider = True
-                        set_bend_weight_from_slider_x(mx)
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                        if routes and not status.startswith("Blocked"):
-                            record_current_solution(routes, elapsed_ms, f"B:{C_BEND:.0f}", (155, 89, 182))
-                        continue
-                    if bend_weight_reset_rect.collidepoint((mx, my)):
-                        reset_bend_weight()
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                        if routes and not status.startswith("Blocked"):
-                            record_current_solution(routes, elapsed_ms, "B:reset", (155, 89, 182))
-                        continue
-                    if crossing_weight_slider_rect.collidepoint((mx, my)):
-                        dragging_crossing_weight_slider = True
-                        set_crossing_weight_from_slider_x(mx)
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                        if routes and not status.startswith("Blocked"):
-                            record_current_solution(routes, elapsed_ms, f"X:{crossing_penalty_multiplier:.1f}", (230, 126, 34))
-                        continue
-                    if crossing_weight_reset_rect.collidepoint((mx, my)):
-                        reset_crossing_weight()
-                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                        if routes and not status.startswith("Blocked"):
-                            record_current_solution(routes, elapsed_ms, "X:reset", (230, 126, 34))
-                        continue
-                    tool_action = handle_canvas_tool_button_click((mx, my))
-                    if tool_action:
-                        if tool_action == "ruler":
-                            ruler_mode = not ruler_mode
-                            ruler_dragging = False
-                            if ruler_mode:
-                                preferred_terminal_tool_mode = None
-                            set_ruler_cursor(ruler_mode)
-                        elif tool_action == "weights":
-                            edge_weight_heatmap_enabled = not edge_weight_heatmap_enabled
-                        elif tool_action == "weight_view":
-                            edge_weight_view_mode_idx = (edge_weight_view_mode_idx + 1) % 2
-                        continue
-                    log_action = handle_solution_log_click((mx, my))
-                    if log_action == "log":
-                        log_current_solution(routes, status, elapsed_ms, total_nodes)
-                        continue
-                    elif log_action is not None:
-                        if isinstance(log_action, str) and log_action.startswith("best:"):
-                            log_entry = solution_log_session.auto_best_logs.get(log_action.split(":", 1)[1])
-                        else:
-                            log_entry = next((entry for entry in solution_log_session.manual_logs if entry["id"] == log_action), None)
-                        if log_entry is not None:
-                            routes, status, elapsed_ms, total_nodes = restore_solution_log(log_entry)
-                            if routes and not status.startswith("Blocked"):
-                                record_current_solution(routes, elapsed_ms, f"Back:L{log_action}", (255, 255, 255))
-                        continue
-                    terminal_tool_action = handle_terminal_tool_button_click((mx, my))
-                    if terminal_tool_action:
-                        if terminal_tool_action == "reset":
-                            preferred_terminal_points_by_room.clear()
-                            preferred_terminal_areas.clear()
+                        elif panel_command.name == "set_slider":
+                            slider_name, slider_x = panel_command.value
+                            if slider_name == "min_piece":
+                                set_min_piece_factor_from_slider_x(slider_x)
+                                marker_label, marker_color = f"Min:{min_piece_factor:.2f}", (241, 196, 15)
+                            elif slider_name == "bend":
+                                set_bend_weight_from_slider_x(slider_x)
+                                marker_label, marker_color = f"B:{C_BEND:.0f}", (155, 89, 182)
+                            else:
+                                set_crossing_weight_from_slider_x(slider_x)
+                                marker_label, marker_color = f"X:{crossing_penalty_multiplier:.1f}", (230, 126, 34)
                             routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                             if routes and not status.startswith("Blocked"):
-                                record_current_solution(routes, elapsed_ms, "Prefs reset", (26, 188, 156))
-                        if preferred_terminal_tool_mode:
-                            ruler_mode = False
-                            ruler_dragging = False
-                        set_ruler_cursor(bool(preferred_terminal_tool_mode))
-                        continue
-                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                        panning_view = True
-                        pan_last_pos = (mx, my)
-                        try:
-                            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
-                        except pygame.error:
-                            pass
+                                record_current_solution(routes, elapsed_ms, marker_label, marker_color)
+                        elif panel_command.name == "reset_slider":
+                            if panel_command.value == "bend":
+                                reset_bend_weight()
+                                marker_label, marker_color = "B:reset", (155, 89, 182)
+                            else:
+                                reset_crossing_weight()
+                                marker_label, marker_color = "X:reset", (230, 126, 34)
+                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                            if routes and not status.startswith("Blocked"):
+                                record_current_solution(routes, elapsed_ms, marker_label, marker_color)
+                        elif panel_command.name == "canvas_tool":
+                            if panel_command.value == "ruler":
+                                ruler_mode = not ruler_mode
+                                apply_canvas_gesture(_replace(current_canvas_gesture(), ruler_dragging=False))
+                                if ruler_mode:
+                                    preferred_terminal_tool_mode = None
+                                set_ruler_cursor(ruler_mode)
+                            elif panel_command.value == "weights":
+                                edge_weight_heatmap_enabled = not edge_weight_heatmap_enabled
+                            elif panel_command.value == "weight_view":
+                                edge_weight_view_mode_idx = (edge_weight_view_mode_idx + 1) % 2
+                        elif panel_command.name == "solution_log":
+                            log_action = panel_command.value
+                            if log_action == "log":
+                                log_current_solution(routes, status, elapsed_ms, total_nodes)
+                            else:
+                                if isinstance(log_action, str) and log_action.startswith("best:"):
+                                    log_entry = solution_log_session.auto_best_logs.get(log_action.split(":", 1)[1])
+                                else:
+                                    log_entry = next((entry for entry in solution_log_session.manual_logs if entry["id"] == log_action), None)
+                                if log_entry is not None:
+                                    routes, status, elapsed_ms, total_nodes = restore_solution_log(log_entry)
+                                    if routes and not status.startswith("Blocked"):
+                                        record_current_solution(routes, elapsed_ms, f"Back:L{log_action}", (255, 255, 255))
+                        elif panel_command.name == "terminal_tool":
+                            if panel_command.value == "reset":
+                                preferred_terminal_points_by_room.clear()
+                                preferred_terminal_areas.clear()
+                                routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                                if routes and not status.startswith("Blocked"):
+                                    record_current_solution(routes, elapsed_ms, "Prefs reset", (26, 188, 156))
+                            if preferred_terminal_tool_mode:
+                                ruler_mode = False
+                                apply_canvas_gesture(_replace(current_canvas_gesture(), ruler_dragging=False))
+                            set_ruler_cursor(bool(preferred_terminal_tool_mode))
                         continue
                     world_x, world_y = to_mm(mx, my)
-                    if ruler_mode:
-                        ruler_dragging = True
-                        ruler_start_mm = (world_x, world_y)
-                        ruler_end_mm = (world_x, world_y)
-                        continue
-                    if preferred_terminal_tool_mode == "point":
-                        remove_marker = bool(pygame.key.get_mods() & pygame.KMOD_CTRL)
-                        changed, marker_room = apply_preferred_terminal_point((world_x, world_y), remove=remove_marker)
-                        if marker_room:
-                            selected_route_name = marker_room
-                        elif not remove_marker:
-                            set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
-                        if changed:
-                            routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                            if routes and not status.startswith("Blocked"):
-                                label = "Term-" if remove_marker else "Term+"
-                                record_current_solution(routes, elapsed_ms, label, (26, 188, 156))
-                        continue
-                    if preferred_terminal_tool_mode == "area":
-                        terminal_area_dragging = True
-                        terminal_area_remove = bool(pygame.key.get_mods() & pygame.KMOD_CTRL)
-                        terminal_area_start_mm = (world_x, world_y)
-                        terminal_area_end_mm = (world_x, world_y)
-                        continue
-                    g_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-                    m_poly = Polygon([g_pins["c_tl"], g_pins["c_tr"], g_pins["c_br"], g_pins["c_bl"]])
-                    p_obj = Point(world_x, world_y)
-                    
-                    if m_poly.contains(p_obj) or m_poly.distance(p_obj) < 200.0:
-                        dragging = True
-                        auto_placement_mode_idx = 0
-                        drag_offset_x = world_x - machine_cx
-                        drag_offset_y = world_y - machine_cy
-                        continue
-                    route_names = {name for name, _ in routes} if routes else set()
-                    room_hit = find_room_route_at_point((world_x, world_y), route_names)
-                    route_hit = find_route_hit_at_point(routes, (world_x, world_y))
-                    direct_duct_click_mm = max(20.0, 4.0 / SCALE_PX_PER_MM)
-                    if route_hit and (not room_hit or route_hit[1] <= direct_duct_click_mm):
-                        selected_route_name = route_hit[0]
-                        continue
-                    if room_hit:
-                        selected_route_name = room_hit
-                        continue
-                    selected_route_name = None
+                    mods = pygame.key.get_mods()
+                    shift_pressed = bool(mods & pygame.KMOD_SHIFT)
+                    ctrl_pressed = bool(mods & pygame.KMOD_CTRL)
+                    canvas_hit = _CanvasHit()
+                    machine_center = None
+                    if not shift_pressed and not ruler_mode and preferred_terminal_tool_mode is None:
+                        g_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+                        m_poly = Polygon([g_pins["c_tl"], g_pins["c_tr"], g_pins["c_br"], g_pins["c_bl"]])
+                        p_obj = Point(world_x, world_y)
+                        machine_hit = m_poly.contains(p_obj) or m_poly.distance(p_obj) < 200.0
+                        route_names = {name for name, _ in routes} if routes else set()
+                        room_hit = find_room_route_at_point((world_x, world_y), route_names)
+                        route_hit = find_route_hit_at_point(routes, (world_x, world_y))
+                        direct_duct_click_mm = max(20.0, 4.0 / SCALE_PX_PER_MM)
+                        direct_route_name = route_hit[0] if route_hit and (not room_hit or route_hit[1] <= direct_duct_click_mm) else None
+                        canvas_hit = _CanvasHit(
+                            machine_hit=machine_hit,
+                            route_name=direct_route_name,
+                            room_route_name=room_hit,
+                        )
+                        machine_center = (machine_cx, machine_cy) if machine_hit else None
+                    canvas_transition = _begin_canvas_gesture(
+                        current_canvas_gesture(),
+                        world_point=(world_x, world_y),
+                        screen_point=(mx, my),
+                        shift=shift_pressed,
+                        ctrl=ctrl_pressed,
+                        hit=canvas_hit,
+                        machine_center_mm=machine_center,
+                    )
+                    apply_canvas_gesture(canvas_transition.state)
+                    for canvas_command in canvas_transition.commands:
+                        if canvas_command.name == "start_pan":
+                            try:
+                                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
+                            except pygame.error:
+                                pass
+                        elif canvas_command.name == "apply_terminal_point":
+                            terminal_point, remove_marker = canvas_command.value
+                            changed, marker_room = apply_preferred_terminal_point(terminal_point, remove=remove_marker)
+                            if marker_room:
+                                selected_route_name = marker_room
+                            elif not remove_marker:
+                                set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
+                            if changed:
+                                routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                                if routes and not status.startswith("Blocked"):
+                                    label = "Term-" if remove_marker else "Term+"
+                                    record_current_solution(routes, elapsed_ms, label, (26, 188, 156))
+                        elif canvas_command.name == "start_machine_drag":
+                            auto_placement_mode_idx = 0
+                        elif canvas_command.name == "select_route":
+                            selected_route_name = canvas_command.value
+                        elif canvas_command.name == "clear_route_selection":
+                            selected_route_name = None
+                    continue
                 elif event.button == 2:
-                    panning_view = True
-                    pan_last_pos = event.pos
+                    mouse_x, mouse_y = event.pos
+                    canvas_transition = _begin_canvas_gesture(
+                        current_canvas_gesture(),
+                        world_point=to_mm(mouse_x, mouse_y),
+                        screen_point=(mouse_x, mouse_y),
+                        shift=True,
+                        ctrl=False,
+                        hit=_CanvasHit(),
+                    )
+                    apply_canvas_gesture(canvas_transition.state)
                     try:
                         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                     except pygame.error:
@@ -2661,66 +2745,60 @@ def main():
                         
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button in (1, 2):
-                    if event.button == 1 and terminal_area_dragging:
-                        changed, marker_room = apply_preferred_terminal_area(
-                            terminal_area_start_mm,
-                            terminal_area_end_mm,
-                            remove=terminal_area_remove,
-                        )
+                    apply_panel_interaction(_end_panel_interaction(panel_interaction).state)
+                    canvas_transition = _end_canvas_gesture(
+                        current_canvas_gesture(),
+                        button="left" if event.button == 1 else "middle",
+                    )
+                    apply_canvas_gesture(canvas_transition.state)
+                    for canvas_command in canvas_transition.commands:
+                        if canvas_command.name != "apply_terminal_area":
+                            continue
+                        start_point, end_point, remove_area = canvas_command.value
+                        changed, marker_room = apply_preferred_terminal_area(start_point, end_point, remove=remove_area)
                         if marker_room:
                             selected_route_name = marker_room
                         if changed:
                             routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                             if routes and not status.startswith("Blocked"):
-                                label = "Area-" if terminal_area_remove else "Area+"
+                                label = "Area-" if remove_area else "Area+"
                                 record_current_solution(routes, elapsed_ms, label, (155, 89, 182))
-                    dragging = False
-                    dragging_min_piece_slider = False
-                    dragging_bend_weight_slider = False
-                    dragging_crossing_weight_slider = False
-                    ruler_dragging = False
-                    terminal_area_dragging = False
-                    panning_view = False
-                    pan_last_pos = None
                     set_ruler_cursor(ruler_mode or bool(preferred_terminal_tool_mode))
                     
             elif event.type == pygame.MOUSEMOTION:
-                if dragging_min_piece_slider:
-                    set_min_piece_factor_from_slider_x(event.pos[0])
+                panel_transition = _move_panel_interaction(panel_interaction, screen_x=event.pos[0])
+                apply_panel_interaction(panel_transition.state)
+                if panel_transition.commands:
+                    slider_name, slider_x = panel_transition.commands[0].value
+                    if slider_name == "min_piece":
+                        set_min_piece_factor_from_slider_x(slider_x)
+                    elif slider_name == "bend":
+                        set_bend_weight_from_slider_x(slider_x)
+                    else:
+                        set_crossing_weight_from_slider_x(slider_x)
                     routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                     if routes and not status.startswith("Blocked"):
                         record_current_solution(routes, elapsed_ms)
-                elif dragging_bend_weight_slider:
-                    set_bend_weight_from_slider_x(event.pos[0])
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        record_current_solution(routes, elapsed_ms)
-                elif dragging_crossing_weight_slider:
-                    set_crossing_weight_from_slider_x(event.pos[0])
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        record_current_solution(routes, elapsed_ms)
-                elif panning_view and pan_last_pos is not None:
-                    mx, my = event.pos
-                    dx = mx - pan_last_pos[0]
-                    dy = my - pan_last_pos[1]
-                    view_pan_x_px += dx
-                    view_pan_y_px += dy
-                    pan_last_pos = (mx, my)
-                    update_view_transform()
-                elif ruler_dragging:
-                    ruler_end_mm = to_mm(event.pos[0], event.pos[1])
-                elif terminal_area_dragging:
-                    terminal_area_end_mm = to_mm(event.pos[0], event.pos[1])
-                elif dragging:
-                    mx, my = event.pos
-                    wx, wy = to_mm(mx, my)
-                    machine_cx = wx - drag_offset_x
-                    machine_cy = wy - drag_offset_y
-                    routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
-                    if routes and not status.startswith("Blocked"):
-                        crossings_c = count_segment_crossings(routes)
-                        record_history(routes, crossings_c, elapsed_ms)
+                    continue
+                mouse_x, mouse_y = event.pos
+                canvas_transition = _move_canvas_gesture(
+                    current_canvas_gesture(),
+                    world_point=to_mm(mouse_x, mouse_y),
+                    screen_point=(mouse_x, mouse_y),
+                )
+                apply_canvas_gesture(canvas_transition.state)
+                for canvas_command in canvas_transition.commands:
+                    if canvas_command.name == "pan_by":
+                        dx, dy = canvas_command.value
+                        view_pan_x_px += dx
+                        view_pan_y_px += dy
+                        update_view_transform()
+                    elif canvas_command.name == "move_machine":
+                        machine_cx, machine_cy = canvas_command.value
+                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        if routes and not status.startswith("Blocked"):
+                            crossings_c = count_segment_crossings(routes)
+                            record_history(routes, crossings_c, elapsed_ms)
                     
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F11:
@@ -2736,11 +2814,11 @@ def main():
                 elif event.key == pygame.K_ESCAPE:
                     if ruler_mode:
                         ruler_mode = False
-                        ruler_dragging = False
+                        apply_canvas_gesture(_replace(current_canvas_gesture(), ruler_dragging=False))
                         set_ruler_cursor(False)
                     elif preferred_terminal_tool_mode:
                         preferred_terminal_tool_mode = None
-                        terminal_area_dragging = False
+                        apply_canvas_gesture(_replace(current_canvas_gesture(), terminal_area_dragging=False))
                         set_ruler_cursor(False)
                     else:
                         selected_route_name = None

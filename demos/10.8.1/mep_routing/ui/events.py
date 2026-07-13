@@ -340,18 +340,23 @@ def begin_panel_interaction(
     """Start one left-click panel interaction using existing hit-test results."""
     if hit.help_card is not None:
         return PanelInteractionTransition(state, (PanelCommand("toggle_help", hit.help_card),))
-    for slider_name, active in (
-        ("min_piece", hit.min_piece_slider),
-        ("bend", hit.bend_slider),
-        ("crossing", hit.crossing_slider),
-    ):
-        if active:
-            return PanelInteractionTransition(
-                replace(state, active_slider=slider_name),
-                (PanelCommand("set_slider", (slider_name, screen_x)),),
-            )
+    if hit.min_piece_slider:
+        return PanelInteractionTransition(
+            replace(state, active_slider="min_piece"),
+            (PanelCommand("set_slider", ("min_piece", screen_x)),),
+        )
+    if hit.bend_slider:
+        return PanelInteractionTransition(
+            replace(state, active_slider="bend"),
+            (PanelCommand("set_slider", ("bend", screen_x)),),
+        )
     if hit.bend_reset:
         return PanelInteractionTransition(state, (PanelCommand("reset_slider", "bend"),))
+    if hit.crossing_slider:
+        return PanelInteractionTransition(
+            replace(state, active_slider="crossing"),
+            (PanelCommand("set_slider", ("crossing", screen_x)),),
+        )
     if hit.crossing_reset:
         return PanelInteractionTransition(state, (PanelCommand("reset_slider", "crossing"),))
     if hit.canvas_tool is not None:
