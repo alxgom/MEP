@@ -39,6 +39,10 @@ from mep_routing.installations.sal.orchestration import (
     sequential_room_orders,
     should_stop_after_sequential_candidate,
 )
+from mep_routing.installations.sal.negotiated import (
+    SalNegotiatedContext,
+    run_negotiated_congestion,
+)
 from mep_routing.geometry import (
     cast_rays_numpy as _cast_rays_numpy,
     edge_parallel_segment_min_distances as _edge_parallel_segment_min_distances,
@@ -1728,6 +1732,22 @@ def _sal_flow_context():
         build_weights=_build_small_flow_weights,
     )
 
+def _sal_negotiated_context():
+    return SalNegotiatedContext(
+        env=current_env,
+        route_start_nodes=get_route_start_nodes,
+        terminal_node_indices=get_all_terminal_node_indices,
+        set_terminal_block_weight=set_terminal_block_weight,
+        add_route_clearance_weights=add_route_clearance_weights,
+        add_route_interaction_weights=add_route_interaction_weights,
+        route_diameter=get_route_diameter,
+        route_segments_from_path=_route_segments_from_path,
+        route_axis_records=_route_axis_records,
+        run_search=run_super_sink_astar,
+        count_crossings=count_segment_crossings,
+        score_routes=get_solution_score,
+    )
+
 def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
     return _run_sal_direct_small_pin_flow(room_names, pin_node_map, global_pins, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, env=current_env, machine_angle=machine_angle, bend_cost=C_BEND, route_start_nodes=get_route_start_nodes, route_segments_from_path=_route_segments_from_path, route_axis_records=_route_axis_records, add_route_clearance_weights=add_route_clearance_weights, add_route_interaction_weights=add_route_interaction_weights, route_diameter=get_route_diameter, run_search=run_super_sink_astar, run_small_stage=_run_sal_small_flow)
 
@@ -2058,170 +2078,23 @@ def solve_ventilation_routing():
     perm_attempts = 0
 
     if is_negotiated_strategy(selected_strategy):
-        # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Strategy 3 & 4: Negotiated Congestion ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
-        nets_list = ["Shaft", "Kitchen"] + other_rooms
-        current_paths = {}
-        current_pins = {}
-        current_pin_targets = {}
-        
-        P_present = 20000.0
-        P_history = 4000.0
-        history_congestion = {}
-        node_history_congestion = {}
-        
-        for iteration in range(20):
-            perm_attempts += 1
-            
-            for net_name in nets_list:
-                if net_name == "Shaft":
-                    start_nodes = shaft_boundary_nodes
-                    targets = ["left_mid", "right_mid"]
-                else:
-                    if net_name == "Kitchen":
-                        start_nodes = get_route_start_nodes("Kitchen")
-                        if not start_nodes:
-                            continue
-                        shaft_pin = current_pins.get("Shaft", "left_mid")
-                        kitchen_pin_name = "right_mid" if shaft_pin == "left_mid" else "left_mid"
-                        targets = [kitchen_pin_name]
-                    else:
-                        start_nodes = get_route_start_nodes(net_name)
-                        if not start_nodes:
-                            continue
-                        used_small_pins = [current_pins[n] for n in other_rooms if n != net_name and n in current_pins]
-                        targets = [p for p in ["tl", "tr", "bl", "br"] if p not in used_small_pins]
-                        if not targets:
-                            targets = ["tl"]
-                
-                current_paths[net_name] = None
-                
-                edge_usage = {}
-                node_usage = {}
-                for other_name, path in current_paths.items():
-                    if path is None:
-                        continue
-                    for u in path:
-                        node_usage[u] = node_usage.get(u, 0) + 1
-                    for k in range(len(path) - 1):
-                        e = (min(path[k], path[k+1]), max(path[k], path[k+1]))
-                        edge_usage[e] = edge_usage.get(e, 0) + 1
-                        
-                current_weights = {}
-                terminal_nodes = get_all_terminal_node_indices(pin_node_map, shaft_node_idx)
-                for r_name, t_node_idx in terminal_nodes.items():
-                    if r_name == net_name:
-                        continue
-                    if t_node_idx in current_env.adj:
-                        for nbr, _, _ in current_env.adj[t_node_idx]:
-                            set_terminal_block_weight(current_weights, t_node_idx, nbr)
-                            
-                for u in current_env.adj:
-                    for v, dist, direction in current_env.adj[u]:
-                        edge = (min(u, v), max(u, v))
-                        if edge in current_weights and current_weights[edge] >= 1e9:
-                            continue
-                        
-                        pres = edge_usage.get(edge, 0)
-                        hist = history_congestion.get(edge, 0.0)
-                        
-                        node_pres = max(node_usage.get(u, 0), node_usage.get(v, 0))
-                        node_hist = max(node_history_congestion.get(u, 0.0), node_history_congestion.get(v, 0.0))
-                        
-                        congestion_weight = (pres * P_present) + hist + (node_pres * 20000.0) + node_hist
-                        if selected_strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE and net_name in ("Shaft", "Kitchen"):
-                            congestion_weight *= 0.35
-                        current_weights[edge] = dist + congestion_weight
-                add_route_clearance_weights(current_weights, net_name, current_env)
+        negotiated_result = run_negotiated_congestion(
+            other_rooms,
+            pin_node_map,
+            global_pins,
+            shaft_boundary_nodes,
+            shaft_node_idx,
+            context=_sal_negotiated_context(),
+            machine_angle=machine_angle,
+            bend_cost=C_BEND,
+            favour_large=selected_strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE,
+        )
+        elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
+        if negotiated_result.success:
+            status_text = f"Success: Routed all (tried {negotiated_result.attempts} iters, {get_route_conflict_summary(negotiated_result.routes)}) in {elapsed_ms:.1f}ms"
+            return negotiated_result.routes, status_text, elapsed_ms, negotiated_result.total_nodes
+        return None, f"Routing Blocked (tried {negotiated_result.attempts} iters) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
-                negotiated_axis_records = []
-                for other_name, other_path in current_paths.items():
-                    if other_path is None or other_name == net_name:
-                        continue
-                    other_segs = _route_segments_from_path(other_name, other_path)
-                    negotiated_axis_records.extend(_route_axis_records(other_name, other_segs))
-                add_route_interaction_weights(
-                    negotiated_axis_records,
-                    get_route_diameter(net_name),
-                    current_weights,
-                    current_env,
-                )
-                        
-                path, _, chosen_pin, chosen_target = run_super_sink_astar(
-                    current_env,
-                    start_nodes,
-                    targets,
-                    pin_node_map,
-                    global_pins,
-                    machine_angle,
-                    C_BEND,
-                    edge_weights=current_weights,
-                )
-                
-                if path is not None:
-                    current_paths[net_name] = path
-                    current_pins[net_name] = chosen_pin
-                    current_pin_targets[net_name] = chosen_target
-                    
-            routes_cand = []
-            success = True
-            total_nodes_cand = 0
-            for name in nets_list:
-                path = current_paths.get(name)
-                if path is None:
-                    success = False
-                    break
-                segs = []
-                if name == "Shaft" and path and shaft_extraction:
-                    add_shaft_entry_segments(segs, path[0])
-                for k in range(len(path) - 1):
-                    p1 = current_env.nodes[path[k]]
-                    p2 = current_env.nodes[path[k+1]]
-                    segs.append(((float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))))
-                if name in current_pins:
-                    add_port_stub_segment(segs, current_pins[name], path[-1], global_pins, current_pin_targets.get(name))
-                routes_cand.append((name, segs))
-                total_nodes_cand += len(path)
-                
-            if success:
-                crossings = count_segment_crossings(routes_cand)
-                score = get_solution_score(routes_cand, crossings)
-                
-                if score < best_score:
-                    best_score = score
-                    best_crossings = crossings
-                    best_routes = routes_cand
-                    best_total_nodes = total_nodes_cand
-                    
-                if crossings == 0:
-                    elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-                    status_text = f"Success: Routed all (tried {perm_attempts} iters, {get_route_conflict_summary(routes_cand)}) in {elapsed_ms:.1f}ms"
-                    return routes_cand, status_text, elapsed_ms, total_nodes_cand
-                    
-                edge_counts = {}
-                node_counts = {}
-                for name, path in current_paths.items():
-                    if path is None:
-                        continue
-                    for u in path:
-                        node_counts[u] = node_counts.get(u, 0) + 1
-                    for k in range(len(path) - 1):
-                        edge = (min(path[k], path[k+1]), max(path[k], path[k+1]))
-                        edge_counts[edge] = edge_counts.get(edge, 0) + 1
-                        
-                for edge, count in edge_counts.items():
-                    if count > 1:
-                        history_congestion[edge] = history_congestion.get(edge, 0.0) + P_history
-                for node, count in node_counts.items():
-                    if count > 1:
-                        node_history_congestion[node] = node_history_congestion.get(node, 0.0) + 4000.0
-                        
-        if best_routes is not None:
-            elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-            status_text = f"Success: Routed all (tried {perm_attempts} iters, {get_route_conflict_summary(best_routes)}) in {elapsed_ms:.1f}ms"
-            return best_routes, status_text, elapsed_ms, best_total_nodes
-        else:
-            elapsed_ms = (time.perf_counter() - t_solver) * 1000.0
-            return None, f"Routing Blocked (tried {perm_attempts} iters) in {elapsed_ms:.1f}ms", elapsed_ms, 0
 
     for perm in all_perms:
         perm_attempts += 1

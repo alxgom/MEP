@@ -466,6 +466,10 @@ Manual validation milestones:
 - Kept Pygame/app callbacks and negotiated-congestion execution in `main.py`; the extracted module now owns typed strategy selection, min-cost-flow dispatch, sequential room-order policy, and First Fit early exit.
 - Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\installations\\sal\\orchestration.py tests\\test_sal_orchestration.py`. Focused pytest could not run because that virtual environment does not include pytest; no Python 3.11 executable is installed in this workspace.
 
+- Integrated Sal's negotiated-congestion routing behind `mep_routing.installations.sal.negotiated` and removed the legacy branch from `main.py`.
+- Kept live graph state, elapsed-time measurement, and status formatting in `main.py`; the Sal module owns route-ordering, congestion history, pin selection, and candidate scoring through explicit callbacks.
+- Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\installations\\sal\\negotiated.py tests\\test_sal_negotiated.py`; direct focused negotiated-routing contract invocation passed. Focused pytest and Python 3.11 remain unavailable in this workspace.
+
 - Integrated shaft-entry geometry, entry-node ranking, and route-segment assembly through `mep_routing.routing.shaft_entries`.
 - Kept `main.py` responsible for source-metadata normalization and the live geometry cache; the routing module now owns the reusable geometric policy.
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\routing\\shaft_entries.py mep_routing\\routing\\__init__.py tests\\test_shaft_entries.py`; Python 3.11 `-m pytest tests\\test_shaft_entries.py tests\\test_routing_segments.py`.
