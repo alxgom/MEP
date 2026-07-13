@@ -375,6 +375,13 @@ Manual validation milestones:
 - Validation: `python -m py_compile main.py mep_routing\\data_sources\\__init__.py mep_routing\\data_sources\\dwelling.py tests\\test_dwelling_data_sources.py`.
 - Validation: `python -m pytest tests\\test_dwelling_data_sources.py`.
 
+- Extracted synthetic dwelling generation and millimetre normalization to `mep_routing.data_sources.synthetic` behind an injected layout-provider interface.
+- Kept `main.py` responsible for applying the generated scenario, resetting app caches, and rebuilding the interactive graph.
+- Added a focused fake-provider contract test covering normalized rooms, doors, terminals, machine position, and routing region.
+- Validation: `python -m py_compile main.py mep_routing\\data_sources\\__init__.py mep_routing\\data_sources\\synthetic.py tests\\test_synthetic_data_source.py`.
+- Validation: `python -m pytest tests\\test_synthetic_data_source.py`.
+- Synthetic smoke: Demo 10.8.1 generated an 8-room / 4-terminal scenario and rebuilt the regular and Hannan grids using the 10.7 virtual environment.
+
 ## Commit Checklist
 
 Before each commit:

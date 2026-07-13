@@ -10,7 +10,6 @@ import numpy as np
 import pygame
 from shapely.geometry import Polygon, LineString, Point, box
 from shapely.ops import unary_union
-from shapely.affinity import scale as shapely_scale
 from shapely.prepared import prep as shapely_prep
 from scipy.spatial import cKDTree
 from mep_routing.domain import (
@@ -21,6 +20,7 @@ from mep_routing.domain import (
 )
 from mep_routing.data_sources import (
     build_wall_polygons as _build_wall_polygons_for_dwelling,
+    build_synthetic_dwelling as _build_synthetic_dwelling_for_layout,
     choose_initial_machine_position as _choose_initial_machine_position_for_dwelling,
     derive_room_boundary_walls as _derive_room_boundary_walls_for_dwelling,
 )
@@ -2809,126 +2809,26 @@ def generate_synthetic_dwelling():
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node
-    
-    rooms_m = generative_layout.generate_layout(width=15.0, height=11.0, num_rooms=8)
-    
-    rooms = []
-    covered_names = ["Hallway", "Kitchen", "Bathroom", "Bathroom 1", "Bathroom 2", "Toilet", "Washroom", "Bedroom 1"]
-    for r in rooms_m:
-        scaled_poly = snap_to_integer_grid(shapely_scale(r.polygon, xfact=SCALE_TO_MM, yfact=SCALE_TO_MM, origin=(0,0)))
-        room_scaled = generative_layout.Room(scaled_poly, r.name)
-        room_scaled.has_cover = any(cn in r.name for cn in covered_names)
-        rooms.append(room_scaled)
-    covers = [r.polygon for r in rooms if getattr(r, "has_cover", False)]
-        
-    shafts_m = generative_layout.generate_mep_shafts(rooms_m)
-    shafts = [snap_to_integer_grid(shapely_scale(s, xfact=SCALE_TO_MM, yfact=SCALE_TO_MM, origin=(0,0))) for s in shafts_m]
-
-    columns_m = generative_layout.generate_structural_grid(unary_union([r.polygon for r in rooms_m]), spacing=4.0)
-    columns = []
-    for col in columns_m:
-        col_scaled = snap_to_integer_grid(shapely_scale(col, xfact=SCALE_TO_MM, yfact=SCALE_TO_MM, origin=(0,0)))
-        if any(col_scaled.intersects(s) for s in shafts):
-            continue
-        columns.append(col_scaled)
-    
-    doors_m = generative_layout.find_door_openings(rooms_m)
-    doors = []
-    for d in doors_m:
-        d_scaled = {
-            "d1": (round(d["d1"][0] * SCALE_TO_MM), round(d["d1"][1] * SCALE_TO_MM)),
-            "d2": (round(d["d2"][0] * SCALE_TO_MM), round(d["d2"][1] * SCALE_TO_MM)),
-            "swing_dir": d["swing_dir"],
-            "width": d["width"] * SCALE_TO_MM,
-            "is_entrance": d.get("is_entrance", False)
-        }
-        doors.append(d_scaled)
-        
-    entrance = generative_layout.find_entrance_door(rooms_m, unary_union([r.polygon for r in rooms_m]))
-    if entrance:
-        doors.append({
-            "d1": (round(entrance["d1"][0] * SCALE_TO_MM), round(entrance["d1"][1] * SCALE_TO_MM)),
-            "d2": (round(entrance["d2"][0] * SCALE_TO_MM), round(entrance["d2"][1] * SCALE_TO_MM)),
-            "swing_dir": entrance["swing_dir"],
-            "width": entrance["width"] * SCALE_TO_MM,
-            "is_entrance": True
-        })
-
-    # Extract wall line centerlines and subtract columns/shafts
-    walls_m = []
-    for i in range(len(rooms_m)):
-        for j in range(i + 1, len(rooms_m)):
-            shared = rooms_m[i].polygon.intersection(rooms_m[j].polygon)
-            if isinstance(shared, LineString):
-                walls_m.append(shared)
-            elif hasattr(shared, 'geoms'):
-                for g in shared.geoms:
-                    if isinstance(g, LineString):
-                        walls_m.append(g)
-                        
-    raw_walls = [snap_to_integer_grid(shapely_scale(w, xfact=SCALE_TO_MM, yfact=SCALE_TO_MM, origin=(0,0))) for w in walls_m]
-    walls = []
-    for rw in raw_walls:
-        w_cut = rw
-        for col in columns:
-            w_cut = w_cut.difference(col)
-        for s in shafts:
-            w_cut = w_cut.difference(s)
-        if w_cut.is_empty:
-            continue
-        if w_cut.geom_type == 'LineString':
-            walls.append(w_cut)
-        elif hasattr(w_cut, 'geoms'):
-            for g in w_cut.geoms:
-                if g.geom_type == 'LineString':
-                    walls.append(g)
-    
-    wall_polys = []
-    for w in walls:
-        wp = w.buffer(WALL_THICKNESS / 2 - 0.1)
-        for col in columns:
-            wp = wp.difference(col)
-        for s in shafts:
-            wp = wp.difference(s)
-        if not wp.is_empty:
-            wall_polys.append(wp)
-    
-    routing_region_m = unary_union([r.polygon for r in rooms_m if any(cn in r.name for cn in covered_names)])
-    routing_region_base = snap_to_integer_grid(shapely_scale(routing_region_m, xfact=SCALE_TO_MM, yfact=SCALE_TO_MM, origin=(0,0)))
-    
-    for col in columns:
-        routing_region_base = routing_region_base.difference(col)
-    for shaft in shafts:
-        routing_region_base = routing_region_base.difference(shaft)
-        
-    shaft_extraction = shafts[0] if shafts else None
-    
-    wet_rooms = [r for r in rooms if any(w in r.name for w in ["Kitchen", "Bathroom", "Toilet", "Washroom"])]
-    terminals = {}
-    for r in wet_rooms:
-        t_pt = get_representative_point(r.polygon)
-        terminals[r.name] = t_pt
-        
-    best_room = None
-    best_dist = 1e9
-    if shaft_extraction:
-        rep_pt = shaft_extraction.representative_point()
-        sx, sy = rep_pt.x, rep_pt.y
-        for r in wet_rooms:
-            if any(w in r.name for w in ["Bathroom", "Washroom"]):
-                rx, ry = r.polygon.centroid.x, r.polygon.centroid.y
-                dist = abs(sx - rx) + abs(sy - ry)
-                if dist < best_dist:
-                    best_dist = dist
-                    best_room = r
-                    
-    if best_room:
-        machine_cx, machine_cy = get_representative_point(best_room.polygon)
-    else:
-        machine_cx, machine_cy = 7500.0, 5500.0
-        
+    scenario = _build_synthetic_dwelling_for_layout(
+        generative_layout,
+        generative_layout.Room,
+        get_representative_point,
+        scale_to_mm=SCALE_TO_MM,
+        wall_thickness_mm=WALL_THICKNESS,
+    )
+    rooms = scenario.rooms
+    columns = scenario.columns
+    shafts = scenario.shafts
+    covers = scenario.covers
+    doors = scenario.doors
+    walls = scenario.walls
+    wall_polys = scenario.wall_polygons
+    routing_region_base = scenario.routing_region_base
+    shaft_extraction = scenario.shaft_extraction
+    terminals = scenario.terminals
+    wet_room_names = scenario.wet_room_names
+    machine_cx, machine_cy = scenario.machine_position
     machine_angle = 0
-    wet_room_names = list(terminals.keys())
     rebuild_wet_room_outer_accents()
     current_scenario_label = "synthetic"
     current_scenario_summary = {}
