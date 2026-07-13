@@ -180,6 +180,7 @@ from mep_routing.ui.help import (
     draw_transient_message as _draw_transient_message,
     draw_viewer_legend as _draw_viewer_legend,
 )
+from mep_routing.observability import clear_history_buffers as _clear_history_buffers
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2769,12 +2770,7 @@ def record_history(routes, crossings_count, elapsed_ms):
 
 def clear_history_buffers():
     global hist_sample_count
-    hist_length.clear()
-    hist_score.clear()
-    hist_turns.clear()
-    hist_turns_per_len.clear()
-    hist_exec_ms.clear()
-    hist_event_markers.clear()
+    _clear_history_buffers(hist_length, hist_score, hist_turns, hist_turns_per_len, hist_exec_ms, hist_event_markers)
     hist_sample_count = 0
 
 def _routes_total_length_m(routes):

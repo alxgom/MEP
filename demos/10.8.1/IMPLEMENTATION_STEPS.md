@@ -435,6 +435,12 @@ Manual validation milestones:
 - Kept `main.py` responsible for active help/status state and current theme/layout values.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\help.py`.
 
+- Created `mep_routing.observability.history` for reusable history samples and buffer resets.
+- Wired the buffer reset through the new module; the sample contract is ready for subsequent app-state extraction.
+- Added focused observability coverage.
+- Validation: `python -m py_compile main.py mep_routing\\observability\\__init__.py mep_routing\\observability\\history.py tests\\test_history.py`.
+- Validation: `python -m pytest tests\\test_history.py`.
+
 ## Commit Checklist
 
 Before each commit:
