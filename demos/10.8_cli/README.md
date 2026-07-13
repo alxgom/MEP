@@ -68,6 +68,23 @@ The core-port adapter now uses exact Steiner terminal points for the machine `ai
 
 Use `[J]` to inspect the core-port layers separately from the final route: exact terminals, temporary access links, bridge points, source-rooted directed tree, and connector stubs. This is a visual parity/debug aid only; it does not change the solver.
 
+## Backend Comparison Harness
+
+`compare_clima_backends.py` measures the existing routing path without opening the Pygame UI. By default it runs every configured real dwelling against every graph builder and all three supply backends, then writes CSV to standard output. It fixes placement to `Routing-Core Workflow` and uses routing frame `dominant_walls`, so each backend receives the same generated scenario and machine placement for a given graph.
+
+```powershell
+cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.8_cli"
+..\10.7\.venv\Scripts\python.exe compare_clima_backends.py
+```
+
+Use indices to narrow a run while investigating a case. This example compares the two Kou variants on the second real dwelling with the Hannan graph (indices are zero-based):
+
+```powershell
+..\10.7\.venv\Scripts\python.exe compare_clima_backends.py --scenarios 1 --graphs 1 --backends 0,1
+```
+
+`--output path\to\report.csv` writes the same data to a CSV file. The report includes status, solve time, route length, turns, geometric validation counts, diagonal count, and the core-port debug layer counts. The latter fields remain zero for the L(G) approximation because it does not generate the core-port overlay.
+
 `Routing-Core Variant: Kou nonnegative heuristics` keeps the same core-port tree pipeline but removes the negative A* heuristic pairs from the 9-direction sweep, using only `(0,0)`, `(0,1)`, `(1,0)`, and `(1,1)`. It is intentionally labeled as a variant, not the core-parity default.
 
 The previous line-graph metric-closure MST remains in code as `Core Approximation: L(G) MST` for comparison. It solves pairwise group paths on directed edge states `(u, v)` so turns are transition costs in `L(G)`, then unions the selected metric-closure paths into one route named `Supply Air Tree`. It is not the default core-port lane.
