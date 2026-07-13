@@ -4899,6 +4899,57 @@ def get_solution_score(routes, crossings):
     )
     return score
 
+def _point_lies_on_segment(point, start, end, tolerance=1.0):
+    sx, sy = float(start[0]), float(start[1])
+    ex, ey = float(end[0]), float(end[1])
+    px, py = float(point[0]), float(point[1])
+    dx, dy = ex - sx, ey - sy
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-7:
+        return math.hypot(px - sx, py - sy) <= tolerance
+    projection = ((px - sx) * dx + (py - sy) * dy) / length_sq
+    projection_tolerance = tolerance / math.sqrt(length_sq)
+    if projection < -projection_tolerance or projection > 1.0 + projection_tolerance:
+        return False
+    closest_x = sx + projection * dx
+    closest_y = sy + projection * dy
+    return math.hypot(px - closest_x, py - closest_y) <= tolerance
+
+def _is_clima_grille_connector_segment(p1, p2):
+    """Return whether a segment is the modeled grille-to-Steiner connector tramo.
+
+    The grille point can lie on the allowed-area boundary while routing-core
+    models its physical connector to the inward Steiner point. This is not a
+    routed duct escaping the allowed geometry.
+    """
+    for route_name, terminal_pt in terminals.items():
+        if not str(route_name).endswith(" Supply"):
+            continue
+        steiner_pt = get_clima_grille_steiner_point(route_name)
+        if steiner_pt is None:
+            continue
+        if (
+            _point_lies_on_segment(p1, terminal_pt, steiner_pt)
+            and _point_lies_on_segment(p2, terminal_pt, steiner_pt)
+        ):
+            return True
+    return False
+
+def get_route_outside_allowed_segments(routes):
+    if not routes or routing_region_base is None:
+        return []
+    outside = []
+    for name, segs in routes:
+        for p1, p2 in segs:
+            line = LineString([(float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))])
+            if name == "Shaft" and shaft_extraction is not None and line.distance(shaft_extraction) < 1.0:
+                continue
+            if _is_clima_grille_connector_segment(p1, p2):
+                continue
+            if not line.covered_by(routing_region_base):
+                outside.append((name, p1, p2))
+    return outside
+
 def get_route_validation_warnings(routes):
     if not routes:
         return []
@@ -4915,17 +4966,9 @@ def get_route_validation_warnings(routes):
     short_pieces = count_solution_short_pieces(routes)
     if short_pieces:
         warnings.append(f"{short_pieces} short piece(s)")
-    if routing_region_base is not None:
-        out_count = 0
-        for name, segs in routes:
-            for p1, p2 in segs:
-                line = LineString([(float(p1[0]), float(p1[1])), (float(p2[0]), float(p2[1]))])
-                if name == "Shaft" and shaft_extraction is not None and line.distance(shaft_extraction) < 1.0:
-                    continue
-                if not line.covered_by(routing_region_base):
-                    out_count += 1
-        if out_count:
-            warnings.append(f"{out_count} segment(s) outside allowed")
+    out_count = len(get_route_outside_allowed_segments(routes))
+    if out_count:
+        warnings.append(f"{out_count} segment(s) outside allowed")
     if shaft_extraction is not None and DWELLING_SOURCE_MODES[dwelling_source_idx] == "Real DB" and not shaft_core_entry_specs:
         warnings.append("missing core shaft entry metadata")
     return warnings

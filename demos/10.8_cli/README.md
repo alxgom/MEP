@@ -83,7 +83,7 @@ Use indices to narrow a run while investigating a case. This example compares th
 ..\10.7\.venv\Scripts\python.exe compare_clima_backends.py --scenarios 1 --graphs 1 --backends 0,1
 ```
 
-`--output path\to\report.csv` writes the same data to a CSV file. The report includes status, solve time, route length, turns, geometric validation counts, diagonal count, and the core-port debug layer counts. The latter fields remain zero for the L(G) approximation because it does not generate the core-port overlay.
+`--output path\to\report.csv` writes the same data to a CSV file. The report includes status, solve time, route length, turns, geometric validation counts, diagonal and outside-allowed counts, and the core-port debug layer counts. The latter fields remain zero for the L(G) approximation because it does not generate the core-port overlay.
 
 `Routing-Core Variant: Kou nonnegative heuristics` keeps the same core-port tree pipeline but removes the negative A* heuristic pairs from the 9-direction sweep, using only `(0,0)`, `(0,1)`, `(1,0)`, and `(1,1)`. It is intentionally labeled as a variant, not the core-parity default.
 
@@ -248,6 +248,8 @@ Cli supply grilles use their generated grille connector point to find nearby con
 The demo no longer creates fallback supply/return terminals from room representative points when no valid core-like grille option exists. Those fallback points had no connector vector and could appear as disconnected route stubs. A room with no valid grille candidate is skipped for the current supply route instead of being routed from a fake terminal.
 
 The routed supply tree now follows the core connector-point split at demo scale: the L(G) terminal is the grille Steiner point at `MIN_DISTANCE_REJA` from the grille connector along the transformed connector vector, the last `SIZE_FIRST_TRAMO_REJA` is kept as a separate grille-width connector tramo, and the machine air connector uses `MIN_DISTANCE_MACHINE_CONNECTOR_AIRE` with its final `SIZE_FIRST_TRAMO_MAQUINA_AIRE` split. This keeps the interactive geometry closer to `RouteClimaLivingRouting` while still drawing a single blue supply tree.
+
+Route validation excludes only the physical segment between a supply grille and its inward Steiner point from the `outside allowed` warning. A grille connector may intentionally start on the allowed-area boundary, while routing-core models the connector tramo into the room. Raw tree edges, terminal-access bridges, and machine stubs are still checked against the allowed geometry.
 
 Grille and machine connector directions are also fed into the L(G) metric closure. For wall-mounted grilles, the placement code stores the room-inward normal only as placement metadata; routing uses the opposite connector vector, matching core's `reja.R @ connector.orientation` convention. Selected grille markers draw supply and return arrows with the same direction semantics used in core export images. The demo applies a finite bend-like penalty when the first/last graph edge does not match the connector vector. This differs from a hard validity filter on purpose: with the interactive Hannan/epsilon graph, a strict direction requirement can remove all connected metric-closure edges for otherwise routable cases.
 
