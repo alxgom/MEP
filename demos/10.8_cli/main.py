@@ -44,6 +44,7 @@ WALL_THICKNESS = 150
 GRID_SPACING   = 200    # mm — regular routing grid resolution
 HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
 CORE_EPSILON_GRID_MM = 200
+CORE_SIMPLE_GRID_PIPE_DIAMETER_MM = 100
 SMALL_PIN_STUB_LENGTH = 100
 LARGE_PIN_STUB_LENGTH = 250
 SIZE_FIRST_TRAMO_REJA_MM = 100
@@ -207,6 +208,7 @@ GRAPH_TYPES = [
     "Regular 200mm Grid",
     "Hannan Grid (numpy)",
     "Epsilon Grid (core-like numpy)",
+    "Routing-Core Port: Simple Grid",
 ]
 
 ROUTING_STRATEGIES = [
@@ -2114,6 +2116,150 @@ def _extend_allowed_boundary_axes(allowed, inset=100.0, cluster_dist=300.0):
     ys = sorted({round(float(p[1])) for p in clusters})
     return xs, ys
 
+def _core_simple_allowed_boundary_axes(allowed):
+    """Port routing-core's simple-grid inward corner axis generation in mm."""
+    poly = _largest_polygon(allowed)
+    if poly is None:
+        return [], []
+    points = list(poly.exterior.coords)[:-1]
+    if len(points) < 3:
+        return [], []
+
+    inward = []
+    for index, point in enumerate(points):
+        previous = np.array(points[index - 1], dtype=np.float64)
+        current = np.array(point, dtype=np.float64)
+        following = np.array(points[(index + 1) % len(points)], dtype=np.float64)
+        v1 = previous - current
+        v2 = following - current
+        n1 = float(np.linalg.norm(v1))
+        n2 = float(np.linalg.norm(v2))
+        if n1 <= 1e-7 or n2 <= 1e-7:
+            continue
+        angle = math.degrees(math.acos(float(np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0))))
+        if angle >= 170.0:
+            continue
+        direction = v1 / n1 + v2 / n2
+        norm = float(np.linalg.norm(direction))
+        if norm <= 1e-7:
+            continue
+        direction /= norm
+        candidate = current + direction * CORE_EPSILON_GRID_MM
+        if not poly.contains(Point(float(candidate[0]), float(candidate[1]))):
+            candidate = current - direction * CORE_EPSILON_GRID_MM
+        if poly.buffer(-110.0).convex_hull.contains(Point(float(candidate[0]), float(candidate[1]))):
+            inward.append(candidate)
+
+    if not inward:
+        return [], []
+    coords = np.array(inward, dtype=np.float64)
+    used = np.zeros(len(coords), dtype=bool)
+    clustered = []
+    for index, point in enumerate(coords):
+        if used[index]:
+            continue
+        group = np.linalg.norm(coords - point, axis=1) < 300.0
+        used[group] = True
+        clustered.append(coords[group].mean(axis=0))
+
+    def spaced_axes(values):
+        result = []
+        for value in sorted(float(value) for value in values):
+            if not result or value - result[-1] >= CORE_EPSILON_GRID_MM:
+                result.append(round(value))
+        return result
+
+    return spaced_axes(point[0] for point in clustered), spaced_axes(point[1] for point in clustered)
+
+def _core_simple_steiner_points(machine_pins):
+    points = []
+    if machine_pins:
+        points.extend(spec["access_point"] for spec in get_port_access_specs(machine_pins, machine_angle) if spec["pin"] == "air_out")
+    points.extend(get_clima_supply_routing_points())
+    return [(round(float(point[0])), round(float(point[1]))) for point in points]
+
+def build_core_simple_grid(machine_pins=None):
+    """NumPy adjacency port of routing-core `_create_grid_dynamic_simple`.
+
+    It intentionally uses only Clima's cover allowed region, exact supply
+    Steiner terminals, and shaft/column obstacles. Hannan scaffolding, wall
+    shifts, and synthetic recovery links belong to the demo graph builders.
+    """
+    if routing_region_base is None:
+        return
+    t0 = time.perf_counter()
+    pipe_diameter = CORE_SIMPLE_GRID_PIPE_DIAMETER_MM
+    terminal_points = _core_simple_steiner_points(machine_pins)
+    if not terminal_points:
+        _commit_grid(np.empty((0, 2), dtype=np.float32), [])
+        return
+
+    xs = {point[0] for point in terminal_points}
+    ys = {point[1] for point in terminal_points}
+    boundary_x, boundary_y = _core_simple_allowed_boundary_axes(routing_region_base)
+    xs.update(boundary_x)
+    ys.update(boundary_y)
+    obstacles = [geom for geom in [*columns, *shafts] if geom is not None and not geom.is_empty]
+    for obstacle in obstacles:
+        minx, miny, maxx, maxy = obstacle.buffer(pipe_diameter, join_style=2).bounds
+        xs.update((round(float(minx)), round(float(maxx))))
+        ys.update((round(float(miny)), round(float(maxy))))
+
+    preserve_x = {point[0] for point in terminal_points}
+    preserve_y = {point[1] for point in terminal_points}
+    xs = _merge_close_values(xs, pipe_diameter, preserve_values=preserve_x, priority_values=boundary_x)
+    ys = _merge_close_values(ys, pipe_diameter, preserve_values=preserve_y, priority_values=boundary_y)
+    terminal_set = set(terminal_points)
+    t_axes = time.perf_counter()
+
+    node_map = {}
+    nodes = []
+    for y in ys:
+        for x in xs:
+            point = (x, y)
+            shapely_point = Point(float(x), float(y))
+            if point not in terminal_set:
+                if not routing_region_base.contains(shapely_point):
+                    continue
+                if any(obstacle.contains(shapely_point) for obstacle in obstacles):
+                    continue
+            node_map[point] = len(nodes)
+            nodes.append(point)
+    if not nodes:
+        _commit_grid(np.empty((0, 2), dtype=np.float32), [])
+        return
+    nodes_arr = np.array(nodes, dtype=np.float32)
+    t_nodes = time.perf_counter()
+
+    raw_edges = []
+    for y in ys:
+        for x1, x2 in zip(xs, xs[1:]):
+            u = node_map.get((x1, y))
+            v = node_map.get((x2, y))
+            if u is None or v is None:
+                continue
+            line = LineString([(float(x1), float(y)), (float(x2), float(y))])
+            blocked = not line.covered_by(routing_region_base) or any(line.intersects(obstacle) for obstacle in obstacles)
+            weight = 1e6 if blocked else float(abs(x2 - x1))
+            raw_edges.append((u, v, weight, "E"))
+    for x in xs:
+        for y1, y2 in zip(ys, ys[1:]):
+            u = node_map.get((x, y1))
+            v = node_map.get((x, y2))
+            if u is None or v is None:
+                continue
+            line = LineString([(float(x), float(y1)), (float(x), float(y2))])
+            blocked = not line.covered_by(routing_region_base) or any(line.intersects(obstacle) for obstacle in obstacles)
+            weight = 1e6 if blocked else float(abs(y2 - y1))
+            raw_edges.append((u, v, weight, "N"))
+
+    _commit_grid(nodes_arr, raw_edges)
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    print(
+        f"[Routing-Core Simple Port] axes={len(xs)}x{len(ys)} nodes={len(nodes_arr)} edges={len(raw_edges)} "
+        f"in {elapsed_ms:.1f}ms (axes {(t_axes-t0)*1000:.1f}, nodes {(t_nodes-t_axes)*1000:.1f})"
+    )
+
 def _merge_close_values(values, threshold, preserve_values=None, priority_values=None):
     preserve_values = {round(float(v)) for v in (preserve_values or [])}
     priority_values = {round(float(v)) for v in (priority_values or [])}
@@ -2559,8 +2705,10 @@ def build_grid(machine_pins=None):
         build_regular_grid()
     elif graph_type_idx == 1:
         build_hannan_grid(machine_pins=machine_pins, shift_walls=True)
-    else:
+    elif graph_type_idx == 2:
         build_epsilon_grid(machine_pins=machine_pins)
+    else:
+        build_core_simple_grid(machine_pins=machine_pins)
 
 # Machine representation helper
 CLIMA_CONNECTOR_PIN_NAMES = ("air_out", "air_in", "freon1", "freon2")
