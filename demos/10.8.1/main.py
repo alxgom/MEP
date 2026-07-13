@@ -80,6 +80,7 @@ from mep_routing.placement.runtime import (
 )
 from mep_routing.routing import (
     RouteScoreWeights,
+    TerminalRuntime,
     add_machine_clearance_weights as _add_machine_clearance_weights,
     add_route_interaction_weights as _add_route_interaction_weights,
     add_static_clearance_weights as _add_static_clearance_weights,
@@ -125,10 +126,6 @@ from mep_routing.routing import (
     small_pin_target_specs as _small_pin_target_specs,
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
-    terminal_candidate_node_indices as _terminal_candidate_node_indices,
-    room_cover_geometry as _room_cover_geometry_for_terminal,
-    terminal_boundary_segments as _terminal_boundary_segments_for_routing,
-    terminal_valid_region as _terminal_valid_region_for_routing,
     terminal_validity_entries as _terminal_validity_entries,
     target_heuristic as _target_heuristic_for_env,
     total_route_length_m as _total_route_length_m,
@@ -166,13 +163,9 @@ from mep_routing.ui.solution_logs import (
     solution_kpis as _solution_kpis,
 )
 from mep_routing.ui.terminal_selection import (
-    apply_preferred_terminal_area as _apply_preferred_terminal_area,
-    apply_preferred_terminal_point as _apply_preferred_terminal_point,
     draw_preferred_terminal_areas as _draw_preferred_terminal_areas,
     draw_preferred_terminal_markers as _draw_preferred_terminal_markers,
     draw_routed_terminal_endpoint_markers as _draw_routed_terminal_endpoint_markers,
-    find_room_candidate_node as _find_room_candidate_node,
-    map_preferred_points_to_nodes as _map_preferred_points_to_nodes,
 )
 from mep_routing.ui.terminal_validity import (
     draw_terminal_validity_overlay as _draw_terminal_validity_overlay,
@@ -335,15 +328,12 @@ route_real_diameter_width_enabled = False
 edge_weight_debug_map = {}
 edge_weight_overlay_excluded_edges = set()
 static_clearance_cache = {"key": None, "wall": None, "shaft": None}
-geometry_distance_cache = {}
 help_popup_card = None
 transient_message = None
 transient_message_until_ms = 0
 help_button_rects = {}
 preferred_terminal_tool_mode = None
-preferred_terminal_points_by_room = {}
-preferred_terminal_areas = []
-room_start_node_cache = {}
+terminal_runtime = None
 terminal_tool_button_rects = {}
 terminal_validity_overlay_enabled = False
 terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
@@ -669,8 +659,8 @@ def draw_ruler_overlay(screen, font_small, start_mm, end_mm):
     return _draw_ruler_overlay(screen, font_small, start_mm, end_mm, to_screen, text_color=COLOR_TEXT)
 
 def invalidate_room_start_node_cache():
-    global room_start_node_cache
-    room_start_node_cache = {}
+    if terminal_runtime is not None:
+        terminal_runtime.invalidate_candidates()
 
 def invalidate_terminal_validity_cache():
     global terminal_validity_cache
@@ -798,7 +788,7 @@ def add_shaft_entry_segments(segs, first_node_idx):
     segs.extend(_shaft_entry_segments_for_geometry(geom))
 
 def _commit_grid(nodes_arr, valid_edges):
-    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache, geometry_distance_cache
+    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env, static_clearance_cache
     shaft_center = None
     shaft_bounds = None
     if shaft_extraction is not None:
@@ -836,7 +826,8 @@ def _commit_grid(nodes_arr, valid_edges):
     grid_kd          = runtime.spatial_index
     current_env      = runtime.env
     static_clearance_cache = {"key": None, "wall": None, "shaft": None}
-    geometry_distance_cache = {}
+    if terminal_runtime is not None:
+        terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
     invalidate_room_start_node_cache()
     invalidate_terminal_validity_cache()
 
@@ -874,6 +865,8 @@ def update_dynamic_env(machine_poly):
     global current_env
     if grid_nodes is None:
         current_env = None
+        if terminal_runtime is not None:
+            terminal_runtime.set_graph(None, None, None)
         invalidate_room_start_node_cache()
         return
 
@@ -894,6 +887,8 @@ def update_dynamic_env(machine_poly):
     current_env, blocked_node_count, blocked_edge_count = _filter_dynamic_machine_obstacle(
         grid_nodes, grid_edge_list, grid_edge_coords, machine_poly, MACHINE_CLEARANCE, protected_nodes,
     )
+    if terminal_runtime is not None:
+        terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
     invalidate_room_start_node_cache()
     ms = (time.perf_counter() - t0) * 1000.0
     print(f"Grid update: {ms:.1f} ms  (blocked nodes={blocked_node_count}, edges={blocked_edge_count})")
@@ -1245,162 +1240,56 @@ def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
     return _terminal_node_indices_for_kd(terminals, shaft_node_idx, grid_kd)
 
 def _room_polygon_by_name(room_name):
-    for room in rooms:
-        if room.name == room_name:
-            return room.polygon
-    return None
+    return None if terminal_runtime is None else terminal_runtime.room_polygon(room_name)
 
 def _room_cover_geometry(room_name):
-    cache_key = ("room_cover_geometry", room_name, tuple(id(cover) for cover in covers), len(covers))
-    if cache_key in geometry_distance_cache:
-        return geometry_distance_cache[cache_key]
-
-    cover_geom = _room_cover_geometry_for_terminal(_room_polygon_by_name(room_name), covers)
-    geometry_distance_cache[cache_key] = cover_geom
-    return cover_geom
+    return None if terminal_runtime is None else terminal_runtime.room_cover(room_name)
 
 def _room_terminal_valid_region(room_name):
-    return _terminal_valid_region_for_routing(
-        _room_polygon_by_name(room_name), routing_region_base, _room_cover_geometry(room_name)
-    )
+    return None if terminal_runtime is None else terminal_runtime.valid_region(room_name)
 
 def _room_terminal_boundary_segments(room_name):
-    cache_key = (
-        "room_terminal_boundary",
-        room_name,
-        id(routing_region_base),
-        len(rooms),
-        len(wall_polys),
-        tuple(id(cover) for cover in covers),
-    )
-    if cache_key in geometry_distance_cache:
-        return geometry_distance_cache[cache_key]
-
-    result = _terminal_boundary_segments_for_routing(
-        _room_polygon_by_name(room_name), [room.polygon for room in rooms], walls,
-        wall_polys, _room_cover_geometry(room_name),
-    )
-    geometry_distance_cache[cache_key] = result
-    return result
+    return None if terminal_runtime is None else terminal_runtime.boundary_segments(room_name)
 
 def get_room_candidate_start_nodes(route_name):
-    if grid_kd is None or current_env is None:
-        return []
-    if route_name in room_start_node_cache:
-        return list(room_start_node_cache[route_name])
-
-    terminal_pt = terminals.get(route_name)
-    if terminal_pt is None:
-        return []
-
-    room_poly = _room_polygon_by_name(route_name)
-    if room_poly is None or routing_region_base is None:
-        _, node_idx = grid_kd.query(terminal_pt)
-        nodes = [int(node_idx)]
-        room_start_node_cache[route_name] = nodes
-        return list(nodes)
-
-    valid_region = _room_terminal_valid_region(route_name)
-    if valid_region is None or valid_region.is_empty:
-        room_start_node_cache[route_name] = []
-        return []
-
-    nodes = _terminal_candidate_node_indices(
-        current_env.nodes, current_env.adj, valid_region, terminal_pt,
-        _room_terminal_boundary_segments(route_name),
-        max(TERMINAL_REGULATION_CLEARANCE_MM, BUFFER_ROOM_TERMINALES_AIRE_MM),
-    )
-    if nodes:
-        room_start_node_cache[route_name] = nodes
-        return list(nodes)
-
-    nodes = []
-    room_start_node_cache[route_name] = nodes
-    return list(nodes)
-
-def _preferred_points_for_room(route_name):
-    return preferred_terminal_points_by_room.get(route_name, [])
-
-def _map_preferred_points_to_nodes(route_name, candidate_nodes):
-    prefs = _preferred_points_for_room(route_name)
-    if not prefs or not candidate_nodes or current_env is None:
-        return [], {}
-
-    return _map_preferred_points_to_nodes(
-        prefs, candidate_nodes, current_env.nodes, PREFERRED_TERMINAL_REMAP_TOLERANCE_MM
-    )
+    return [] if terminal_runtime is None else terminal_runtime.candidate_nodes(route_name)
 
 def get_route_start_nodes(route_name):
-    if grid_kd is None or current_env is None:
-        return []
-    terminal_pt = terminals.get(route_name)
-    if terminal_pt is None:
-        return []
-    if room_start_mode_idx == 1:
-        _, node_idx = grid_kd.query(terminal_pt)
-        return [int(node_idx)]
-
-    candidate_nodes = get_room_candidate_start_nodes(route_name)
-    if _preferred_points_for_room(route_name):
-        preferred_nodes, _ = _map_preferred_points_to_nodes(route_name, candidate_nodes)
-        return preferred_nodes
-    return candidate_nodes
+    return [] if terminal_runtime is None else terminal_runtime.route_start_nodes(
+        route_name, use_nearest_terminal=(room_start_mode_idx == 1),
+    )
 
 def _terminal_marker_side_px():
     return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
 
 def find_room_candidate_node_at_world(world_pt):
-    if current_env is None:
-        return None
-    point = Point(float(world_pt[0]), float(world_pt[1]))
-    return _find_room_candidate_node(
-        world_pt, terminals.keys(),
-        lambda room_name, _world_pt: (
-            (room_poly := _room_polygon_by_name(room_name)) is not None
-            and (room_poly.contains(point) or room_poly.distance(point) < 1e-7)
-        ),
-        get_room_candidate_start_nodes, current_env.nodes,
-    )
+    return None if terminal_runtime is None else terminal_runtime.find_candidate_at(world_pt)
 
 def apply_preferred_terminal_point(world_pt, remove=False):
-    global preferred_terminal_points_by_room
-    if current_env is None:
-        return False, None
-    point = Point(float(world_pt[0]), float(world_pt[1]))
-    return _apply_preferred_terminal_point(
-        preferred_terminal_points_by_room, world_pt, remove, terminals.keys(),
-        lambda room_name, _world_pt: (
-            (room_poly := _room_polygon_by_name(room_name)) is not None
-            and (room_poly.contains(point) or room_poly.distance(point) < 1e-7)
-        ),
-        get_room_candidate_start_nodes, current_env.nodes, PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    return (False, None) if terminal_runtime is None else terminal_runtime.apply_point_preference(
+        world_pt, remove=remove,
     )
 
 def apply_preferred_terminal_area(start_world, end_world, remove=False):
-    global preferred_terminal_points_by_room, preferred_terminal_areas
-    if current_env is None:
-        return False, None
-    return _apply_preferred_terminal_area(
-        preferred_terminal_points_by_room, preferred_terminal_areas, start_world, end_world, remove,
-        terminals.keys(), get_room_candidate_start_nodes, current_env.nodes,
-        PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    return (False, None) if terminal_runtime is None else terminal_runtime.apply_area_preference(
+        start_world, end_world, remove=remove,
     )
 
 def draw_preferred_terminal_areas(screen, selected_route_name=None):
-    if current_env is None:
+    if current_env is None or terminal_runtime is None:
         return
     return _draw_preferred_terminal_areas(
-        screen, preferred_terminal_areas, selected_route_name, ROUTE_COLORS,
-        get_room_candidate_start_nodes, current_env.nodes, to_screen,
+        screen, terminal_runtime.preferred_areas, selected_route_name, ROUTE_COLORS,
+        terminal_runtime.candidate_nodes, current_env.nodes, to_screen,
         max(3, _terminal_marker_side_px() // 2),
     )
 
 def draw_preferred_terminal_markers(screen, selected_route_name=None, routes=None):
-    if current_env is None:
+    if current_env is None or terminal_runtime is None:
         return
     return _draw_preferred_terminal_markers(
-        screen, terminals.keys(), preferred_terminal_points_by_room, selected_route_name, routes,
-        ROUTE_COLORS, COLOR_TEXT, get_room_candidate_start_nodes, current_env.nodes, to_screen,
+        screen, terminals.keys(), terminal_runtime.preferred_points_by_room, selected_route_name, routes,
+        ROUTE_COLORS, COLOR_TEXT, terminal_runtime.candidate_nodes, current_env.nodes, to_screen,
         _terminal_marker_side_px(), PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
     )
 
@@ -1978,6 +1867,7 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs, hannan_static_cache
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
+    global terminal_runtime
     rooms = prepared.rooms
     columns = prepared.columns
     shafts = prepared.shafts
@@ -1998,6 +1888,17 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     shaft_entry_geometry_by_node = {}
     _bnd_segs = None
     hannan_static_cache = {}
+    terminal_runtime = TerminalRuntime(
+        terminals=terminals,
+        room_polygons={room.name: room.polygon for room in rooms},
+        routing_region=routing_region_base,
+        covers=covers,
+        walls=walls,
+        wall_polygons=wall_polys,
+        regulation_clearance_mm=TERMINAL_REGULATION_CLEARANCE_MM,
+        terminal_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
+        remap_tolerance_mm=PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    )
     build_base_regular_grid()
     if auto_place:
         run_auto_placement()
@@ -2022,10 +1923,6 @@ def _load_real_dwelling():
     return scenario, f"{execution} / {dwelling_id}", scenario_summary(scenario) if scenario_summary else {}
 
 def generate_new_dwelling():
-    global preferred_terminal_points_by_room, preferred_terminal_areas
-
-    preferred_terminal_points_by_room = {}
-    preferred_terminal_areas = []
     invalidate_room_start_node_cache()
     if DWELLING_SOURCE_MODES[dwelling_source_idx] == "Random Synthetic":
         generate_synthetic_dwelling()
@@ -2172,8 +2069,10 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
         "min_piece_factor": float(min_piece_factor),
         "bend_weight": float(C_BEND),
         "crossing_penalty_multiplier": float(crossing_penalty_multiplier),
-        "preferred_terminal_points_by_room": preferred_terminal_points_by_room,
-        "preferred_terminal_areas": preferred_terminal_areas,
+        "preferred_terminal_points_by_room": (
+            {} if terminal_runtime is None else terminal_runtime.preferred_points_by_room
+        ),
+        "preferred_terminal_areas": [] if terminal_runtime is None else terminal_runtime.preferred_areas,
     }, kpis, status, total_nodes)
 
 def log_current_solution(routes, status, elapsed_ms, total_nodes):
@@ -2208,7 +2107,6 @@ def restore_solution_log(log_entry):
     global rotation_mode_idx
     global weight_mode_idx, edge_weight_view_mode_idx, route_real_diameter_width_enabled, min_piece_factor
     global C_BEND, crossing_penalty_multiplier
-    global preferred_terminal_points_by_room, preferred_terminal_areas
 
     state = _restored_snapshot_state(log_entry, C_BEND_DEFAULT, CROSSING_MULTIPLIER_DEFAULT)
     machine_cx, machine_cy, machine_angle = state["machine"]
@@ -2218,7 +2116,10 @@ def restore_solution_log(log_entry):
     route_real_diameter_width_enabled, min_piece_factor = state["route_real_diameter_width_enabled"], state["min_piece_factor"]
     C_BEND, crossing_penalty_multiplier = state["bend_weight"], state["crossing_penalty_multiplier"]
     refresh_route_weight_constants()
-    preferred_terminal_points_by_room, preferred_terminal_areas = state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"]
+    if terminal_runtime is not None:
+        terminal_runtime.restore_preferences(
+            state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"],
+        )
     solution_log_session.selected_log_id = state["id"]
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
@@ -2549,8 +2450,8 @@ def main():
                                         record_current_solution(routes, elapsed_ms, f"Back:L{log_action}", (255, 255, 255))
                         elif panel_command.name == "terminal_tool":
                             if panel_command.value == "reset":
-                                preferred_terminal_points_by_room.clear()
-                                preferred_terminal_areas.clear()
+                                if terminal_runtime is not None:
+                                    terminal_runtime.clear_preferences()
                                 routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
                                 if routes and not status.startswith("Blocked"):
                                     record_current_solution(routes, elapsed_ms, "Prefs reset", (26, 188, 156))
@@ -3081,7 +2982,10 @@ def main():
         lbl_mw = font_small.render(f"Edge weights: {mw_mode}/{weight_view} | Pipes: {diameter_mode}", True, COLOR_TEXT)
         screen.blit(lbl_mw, (25, 350))
         selected_text = selected_route_name if selected_route_name else "None"
-        preferred_count = sum(len(points) for points in preferred_terminal_points_by_room.values())
+        preferred_count = sum(
+            len(points)
+            for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values())
+        )
         lbl_selected = font_small.render(f"Selected: {selected_text[:14]} | Prefs: {preferred_count}", True, COLOR_TEXT)
         screen.blit(lbl_selected, (25, 365))
         draw_min_piece_slider(screen, font_small, 25, 385, CANVAS_LEFT - 70)

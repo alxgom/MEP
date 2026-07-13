@@ -71,6 +71,7 @@ from .search import (
 )
 from .terminal_validity import terminal_candidate_node_indices, terminal_validity_entries
 from .terminal_regions import room_cover_geometry, terminal_boundary_segments, terminal_valid_region
+from .terminal_runtime import TerminalRuntime
 from .shaft_entries import (
     select_shaft_entry_nodes,
     shaft_entry_geometry,
@@ -142,6 +143,7 @@ __all__ = [
     "terminal_boundary_segments",
     "terminal_valid_region",
     "terminal_validity_entries",
+    "TerminalRuntime",
     "total_route_length",
     "total_route_length_m",
     "trace_flow_path",

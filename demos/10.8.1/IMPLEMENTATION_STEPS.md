@@ -502,6 +502,10 @@ Manual validation milestones:
 - Kept `main.py` responsible for live state commits, graph rebuilding, and status output; the placement module now owns selection and score-field coordination through explicit callbacks.
 - Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\placement\\runtime.py tests\\test_placement_runtime.py`; direct focused placement-runtime contracts invoked because pytest is unavailable in that environment.
 
+- Integrated terminal candidate/cache and preferred-start orchestration through `mep_routing.routing.terminal_runtime`.
+- Kept `main.py` responsible for scenario construction, graph commits, terminal rendering, and snapshot calls; the routing runtime now owns terminal geometry caches, candidate selection, preference state, and explicit invalidation.
+- Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\terminal_runtime.py` plus 13 direct terminal contracts from `test_terminal_runtime.py`, `test_terminal_regions.py`, `test_terminal_validity.py`, and `test_ui_terminal_selection.py`.
+
 ## Commit Checklist
 
 Before each commit:
