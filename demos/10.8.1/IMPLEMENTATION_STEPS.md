@@ -448,6 +448,10 @@ Manual validation milestones:
 - Moved the contextual-help catalog into `mep_routing.ui.help` with the associated help renderers.
 - Validation: `python -m py_compile main.py mep_routing\\ui\\help.py`.
 
+- Created `mep_routing.ui.plots` and switched the live routing-history panel to its rendering adapter.
+- Kept the previous plot body temporarily as a private fallback pending visual cleanup.
+- Validation: `python -m py_compile main.py mep_routing\\ui\\plots.py`.
+
 ## Commit Checklist
 
 Before each commit:

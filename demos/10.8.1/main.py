@@ -186,6 +186,7 @@ from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
+from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2902,7 +2903,7 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
         muted_color=COLOR_MUTED,
     )
 
-def draw_plots(screen, font_small, font_bold):
+def _draw_plots_legacy(screen, font_small, font_bold):
     """Draw routing metrics and solve-time sparklines in the right panel."""
     px = WINDOW_WIDTH - PANEL_W + 8
     pw = PANEL_W - 24
@@ -3006,6 +3007,13 @@ def draw_plots(screen, font_small, font_bold):
 
         screen.blit(lbl_cur, (px, chart_y + chart_h + 2))
         screen.blit(lbl_min, (px + chart_w - lbl_min.get_width(), chart_y + chart_h + 2))
+
+def draw_plots(screen, font_small, font_bold):
+    return _draw_routing_plots(
+        screen, font_small, font_bold, WINDOW_WIDTH, PANEL_W,
+        (hist_length, hist_score, hist_turns, hist_turns_per_len, hist_exec_ms),
+        hist_sample_count, hist_event_markers, COLOR_PLOT_BG, COLOR_TEXT, COLOR_MUTED,
+    )
 
 def draw_card_help_button(screen, card_id, rect, font_small):
     global help_button_rects
