@@ -178,3 +178,15 @@ def search_large_route_candidates(
                 if score < best[2]:
                     best = (paths, targets, score, 2, {"assignment": f"Shaft={assignment[SHAFT_ROUTE_NAME]},Kitchen={assignment[KITCHEN_ROUTE_NAME]}", "large_order": "->".join(order)})
     return best
+
+
+def run_small_flow_stage(room_names, pin_node_map, global_pins, prior_axis_records, *, small_diameter, env, build_weights, run_flow, build_routes):
+    """Run Sal's shared small-duct flow stage after the supplied prior routes."""
+    weights = build_weights(prior_axis_records, small_diameter, env)
+    paths, targets, _, flow = run_flow(room_names, pin_node_map, edge_weights=weights)
+    if paths is None:
+        return False, None, f"Min-cost flow routed {flow}/{len(room_names)} small ducts", 0
+    routes, nodes = build_routes(room_names, paths, targets, global_pins)
+    if routes is None:
+        return False, None, "Could not build small duct routes", 0
+    return True, routes, "Success", nodes

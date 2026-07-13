@@ -23,6 +23,7 @@ from mep_routing.installations.sal import (
     LARGE_DUCT_ROUTE_NAMES,
     SAL_OZEO_FLAT_MACHINE,
     run_sequential_routing as _run_sal_sequential_routing,
+    run_small_flow_stage as _run_sal_small_flow_stage,
     search_large_route_candidates as _search_sal_large_route_candidates,
     select_two_stage_routing as _select_sal_two_stage_routing,
 )
@@ -2484,6 +2485,21 @@ def _run_large_pin_candidate_search(pin_node_map, shaft_boundary_nodes, edge_wei
         score_routes=get_solution_score, initial_edge_weights=edge_weights,
     )
 
+def _build_small_flow_weights(prior_axis_records, small_diameter, env):
+    weights = {}
+    add_static_clearance_weights(weights, small_diameter, env, allow_shaft_entry=False)
+    add_machine_clearance_weights(weights, small_diameter, env)
+    add_route_interaction_weights(prior_axis_records, small_diameter, weights, env)
+    return weights
+
+def _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_records):
+    return _run_sal_small_flow_stage(
+        room_names, pin_node_map, global_pins, prior_axis_records,
+        small_diameter=MACHINE_SMALL_DUCT_D, env=current_env,
+        build_weights=_build_small_flow_weights, run_flow=_run_small_pin_min_cost_flow,
+        build_routes=_build_routes_from_paths,
+    )
+
 def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
     base_weights = {}
     prior_axis_records = []
@@ -2520,17 +2536,9 @@ def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, s
     prior_axis_records.extend(_route_axis_records("Kitchen", kitchen_segs))
     total_nodes += len(kitchen_path)
 
-    small_weights = base_weights.copy()
-    add_static_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
-    add_machine_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env)
-    add_route_interaction_weights(prior_axis_records, MACHINE_SMALL_DUCT_D, small_weights, current_env)
-    paths, targets, _, flow = _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=small_weights)
-    if paths is None:
-        return False, None, f"Min-cost flow routed {flow}/{len(room_names)} small ducts", 0
-
-    small_routes, small_nodes = _build_routes_from_paths(room_names, paths, targets, global_pins)
-    if small_routes is None:
-        return False, None, "Could not build small duct routes", 0
+    success, small_routes, status, small_nodes = _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_records)
+    if not success:
+        return False, None, status, 0
     routes.extend(small_routes)
     total_nodes += small_nodes
 
@@ -2554,30 +2562,15 @@ def _run_two_stage_big_first(room_names, pin_node_map, global_pins, shaft_path):
     for route_name, segs in routes:
         prior_axis_records.extend(_route_axis_records(route_name, segs))
 
-    small_weights = {}
-    add_static_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
-    add_machine_clearance_weights(small_weights, MACHINE_SMALL_DUCT_D, current_env)
-    add_route_interaction_weights(prior_axis_records, MACHINE_SMALL_DUCT_D, small_weights, current_env)
-    small_paths, small_targets, _, flow = _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=small_weights)
-    if small_paths is None:
-        return False, None, f"Min-cost flow routed {flow}/{len(room_names)} small ducts", 0
-
-    small_routes, small_nodes = _build_routes_from_paths(room_names, small_paths, small_targets, global_pins)
-    if small_routes is None:
-        return False, None, "Could not build small duct routes", 0
+    success, small_routes, status, small_nodes = _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_records)
+    if not success:
+        return False, None, status, 0
     return True, routes + small_routes, f"big-first {large_meta.get('assignment', '')} {large_meta.get('large_order', '')}", total_nodes + small_nodes
 
 def _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path):
-    initial_small_weights = {}
-    add_static_clearance_weights(initial_small_weights, MACHINE_SMALL_DUCT_D, current_env, allow_shaft_entry=False)
-    add_machine_clearance_weights(initial_small_weights, MACHINE_SMALL_DUCT_D, current_env)
-    small_paths, small_targets, _, flow = _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=initial_small_weights)
-    if small_paths is None:
-        return False, None, f"Min-cost flow routed {flow}/{len(room_names)} small ducts", 0
-
-    small_routes, small_nodes = _build_routes_from_paths(room_names, small_paths, small_targets, global_pins)
-    if small_routes is None:
-        return False, None, "Could not build small duct routes", 0
+    success, small_routes, status, small_nodes = _run_sal_small_flow(room_names, pin_node_map, global_pins, [])
+    if not success:
+        return False, None, status, 0
 
     prior_axis_records = []
     for route_name, segs in small_routes:
