@@ -506,6 +506,10 @@ Manual validation milestones:
 - Kept `main.py` responsible for scenario construction, graph commits, terminal rendering, and snapshot calls; the routing runtime now owns terminal geometry caches, candidate selection, preference state, and explicit invalidation.
 - Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile main.py mep_routing\\routing\\__init__.py mep_routing\\routing\\terminal_runtime.py` plus 13 direct terminal contracts from `test_terminal_runtime.py`, `test_terminal_regions.py`, `test_terminal_validity.py`, and `test_ui_terminal_selection.py`.
 
+- Integrated routing edge-weight assembly through `mep_routing.routing.weight_runtime`.
+- Kept `main.py` responsible for live graph/geometry context, the existing display globals, and terminal-block exclusions; the routing runtime now owns static distance caching, clearance and interaction composition, and overlay calculation.
+- Validation: Python 3.11 `-m py_compile main.py mep_routing\\routing\\weight_runtime.py mep_routing\\routing\\__init__.py tests\\test_weight_runtime.py`; Python 3.11 `-m pytest tests\\test_weight_runtime.py tests\\test_routing_clearance.py` (14 passed).
+
 ## Commit Checklist
 
 Before each commit:

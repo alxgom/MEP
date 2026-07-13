@@ -42,6 +42,14 @@ from .clearance import (
     static_wall_distance_segments,
     weighted_edge_cost,
 )
+from .weight_runtime import (
+    EdgeWeightOverlay,
+    RoutingWeightRuntimeContext,
+    StaticClearanceCache,
+    add_route_clearance_weights as add_runtime_route_clearance_weights,
+    record_weight_overlay,
+    refresh_weight_overlay,
+)
 from .flow import (
     add_edge,
     build_pin_min_cost_flow_network,
@@ -82,6 +90,9 @@ from .validation import append_allowed_region_warning, count_segments_outside_al
 
 __all__ = [
     "RouteScoreWeights",
+    "RoutingWeightRuntimeContext",
+    "StaticClearanceCache",
+    "EdgeWeightOverlay",
     "add_edge",
     "add_machine_clearance_weights",
     "append_allowed_region_warning",
@@ -89,6 +100,7 @@ __all__ = [
     "add_port_stub_segment",
     "block_terminal_node_edges",
     "add_route_interaction_weights",
+    "add_runtime_route_clearance_weights",
     "add_static_clearance_weights",
     "buffered_radius_mm",
     "build_routes_from_paths",
@@ -119,6 +131,8 @@ __all__ = [
     "run_super_sink_line_graph_search",
     "run_super_sink_state_astar",
     "required_clearance_mm",
+    "record_weight_overlay",
+    "refresh_weight_overlay",
     "route_axis_records",
     "route_quality_counts",
     "route_quality_warnings",

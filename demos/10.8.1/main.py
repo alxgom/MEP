@@ -81,9 +81,6 @@ from mep_routing.placement.runtime import (
 from mep_routing.routing import (
     RouteScoreWeights,
     TerminalRuntime,
-    add_machine_clearance_weights as _add_machine_clearance_weights,
-    add_route_interaction_weights as _add_route_interaction_weights,
-    add_static_clearance_weights as _add_static_clearance_weights,
     block_terminal_node_edges as _block_terminal_node_edges,
     build_routes_from_paths as _build_routes_from_paths_for_env,
     buffered_radius_mm as _buffered_radius_mm,
@@ -100,7 +97,6 @@ from mep_routing.routing import (
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
     line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
-    machine_edge_clearance_distances as _machine_edge_clearance_distances_for_machine,
     merged_route_piece_lengths as _merged_route_piece_lengths,
     ordered_small_room_names as _ordered_small_room_names,
     path_physical_length as _path_physical_length_for_env,
@@ -114,10 +110,6 @@ from mep_routing.routing import (
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
     set_block_weight as _set_block_weight,
-    static_clearance_distances as _static_clearance_distances_for_edges,
-    static_clearance_cache_key as _static_clearance_cache_key_for_geometry,
-    static_shaft_distance_segments as _static_shaft_distance_segments_for_geometry,
-    static_wall_distance_segments as _static_wall_distance_segments_for_geometry,
     select_shaft_entry_nodes as _select_shaft_entry_nodes,
     shaft_entry_geometry as _shaft_entry_geometry_for_shaft,
     shaft_entry_segments as _shaft_entry_segments_for_geometry,
@@ -131,6 +123,18 @@ from mep_routing.routing import (
     total_route_length_m as _total_route_length_m,
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
+)
+from mep_routing.routing.weight_runtime import (
+    EdgeWeightOverlay,
+    RoutingWeightRuntimeContext,
+    StaticClearanceCache,
+    add_machine_clearance_weights as _add_machine_clearance_weights_for_runtime,
+    add_route_clearance_weights as _add_route_clearance_weights_for_runtime,
+    add_route_interaction_weights as _add_route_interaction_weights_for_runtime,
+    add_static_clearance_weights as _add_static_clearance_weights_for_runtime,
+    record_weight_overlay as _record_weight_overlay,
+    refresh_weight_overlay as _refresh_weight_overlay,
+    route_axis_records_for_routes as _route_axis_records_for_runtime,
 )
 from mep_routing.ui import (
     cool_colormap as _cool_colormap_value,
@@ -327,7 +331,7 @@ edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
 edge_weight_debug_map = {}
 edge_weight_overlay_excluded_edges = set()
-static_clearance_cache = {"key": None, "wall": None, "shaft": None}
+static_clearance_cache = StaticClearanceCache()
 help_popup_card = None
 transient_message = None
 transient_message_until_ms = 0
@@ -825,7 +829,7 @@ def _commit_grid(nodes_arr, valid_edges):
     grid_edge_coords = runtime.edge_coords
     grid_kd          = runtime.spatial_index
     current_env      = runtime.env
-    static_clearance_cache = {"key": None, "wall": None, "shaft": None}
+    static_clearance_cache = StaticClearanceCache()
     if terminal_runtime is not None:
         terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
     invalidate_room_start_node_cache()
@@ -1015,157 +1019,108 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_s
 def get_outward_vector(pin_name, machine_angle):
     return _outward_vector(pin_name, machine_angle)
 
+def _routing_weight_runtime_context(env):
+    return RoutingWeightRuntimeContext(
+        edge_list=grid_edge_list,
+        edge_coords=grid_edge_coords,
+        nodes=env.nodes,
+        routing_region=routing_region_base,
+        room_polygons=[room.polygon for room in rooms],
+        walls=walls,
+        wall_polygons=wall_polys,
+        shafts=shafts,
+        machine_center=(machine_cx, machine_cy),
+        machine_angle_deg=machine_angle,
+        machine_overall_width_mm=MACHINE_OVERALL_W,
+        machine_body_height_mm=MACHINE_BODY_H,
+        buffer_ratio=DUCT_BUFFER_RATIO,
+        shaft_clearance_mm=PATINEJO_CLEARANCE_MM,
+        machine_soft_margin_mm=MACHINE_CLEARANCE_SOFT_MARGIN_MM,
+        crossing_penalty=CROSSING_PENALTY,
+        clearance_penalty=CLEARANCE_PENALTY,
+        block_weight=OVERLAP_BLOCK_WEIGHT,
+        route_diameter=get_route_diameter,
+    )
+
+
+def _edge_weight_overlay():
+    return EdgeWeightOverlay(edge_weight_debug_map, edge_weight_overlay_excluded_edges)
+
+
 def _route_axis_records(route_name, route_segs):
-    return _route_axis_records_for_policy(route_name, route_segs, get_route_diameter)
+    if current_env is None:
+        return _route_axis_records_for_policy(route_name, route_segs, get_route_diameter)
+    return _route_axis_records_for_runtime(
+        route_name, route_segs, _routing_weight_runtime_context(current_env),
+    )
+
 
 def get_route_diameter(route_name):
     return MACHINE_SPEC.route_diameter_mm(route_name)
 
+
 def get_buffered_radius_mm(diameter_mm):
     return _buffered_radius_mm(diameter_mm, DUCT_BUFFER_RATIO)
+
 
 def get_required_clearance_mm(diameter_a, diameter_b):
     return _required_clearance_mm(diameter_a, diameter_b, DUCT_BUFFER_RATIO)
 
-def _machine_edge_clearance_distances():
-    if grid_edge_coords is None or len(grid_edge_coords) == 0:
-        return None
-    return _machine_edge_clearance_distances_for_machine(
-        grid_edge_coords,
-        machine_center=(machine_cx, machine_cy),
-        machine_angle_deg=machine_angle,
-        machine_overall_width_mm=MACHINE_OVERALL_W,
-        machine_body_height_mm=MACHINE_BODY_H,
-    )
-
-def _static_wall_distance_segments():
-    return _static_wall_distance_segments_for_geometry(
-        routing_region_base, [room.polygon for room in rooms], walls, wall_polys
-    )
-
-def _static_shaft_distance_segments():
-    return _static_shaft_distance_segments_for_geometry(shafts)
-
-def _static_clearance_distances():
-    global static_clearance_cache
-    if grid_edge_coords is None or len(grid_edge_coords) == 0:
-        return None, None
-
-    key = _static_clearance_cache_key_for_geometry(
-        routing_region_base, grid_edge_list, [room.polygon for room in rooms], wall_polys, shafts
-    )
-    if static_clearance_cache.get("key") == key:
-        return static_clearance_cache.get("wall"), static_clearance_cache.get("shaft")
-
-    wall_distances, shaft_distances = _static_clearance_distances_for_edges(
-        grid_edge_coords,
-        _static_wall_distance_segments(),
-        _static_shaft_distance_segments(),
-    )
-    static_clearance_cache = {"key": key, "wall": wall_distances, "shaft": shaft_distances}
-    return wall_distances, shaft_distances
 
 def add_static_clearance_weights(edge_weights, route_diameter, env, allow_shaft_entry=False):
-    wall_distances, shaft_distances = _static_clearance_distances()
-    _add_static_clearance_weights(
+    return _add_static_clearance_weights_for_runtime(
         edge_weights,
-        grid_edge_list,
-        wall_distances,
-        shaft_distances,
         route_diameter,
-        DUCT_BUFFER_RATIO,
-        PATINEJO_CLEARANCE_MM,
-        OVERLAP_BLOCK_WEIGHT,
+        _routing_weight_runtime_context(env),
+        static_clearance_cache,
         allow_shaft_entry=allow_shaft_entry,
     )
 
+
 def add_machine_clearance_weights(edge_weights, route_diameter, env):
-    _add_machine_clearance_weights(
-        edge_weights,
-        grid_edge_list,
-        grid_edge_coords,
-        env.nodes,
-        route_diameter,
-        DUCT_BUFFER_RATIO,
-        machine_center=(machine_cx, machine_cy),
-        machine_angle_deg=machine_angle,
-        machine_overall_width_mm=MACHINE_OVERALL_W,
-        machine_body_height_mm=MACHINE_BODY_H,
-        soft_margin_mm=MACHINE_CLEARANCE_SOFT_MARGIN_MM,
-        clearance_penalty=CLEARANCE_PENALTY,
-        block_weight=OVERLAP_BLOCK_WEIGHT,
+    return _add_machine_clearance_weights_for_runtime(
+        edge_weights, route_diameter, _routing_weight_runtime_context(env),
     )
+
 
 def add_route_clearance_weights(edge_weights, route_name, env):
-    diameter = get_route_diameter(route_name)
-    add_static_clearance_weights(
-        edge_weights,
-        diameter,
-        env,
-        allow_shaft_entry=(route_name == "Shaft"),
+    return _add_route_clearance_weights_for_runtime(
+        edge_weights, route_name, _routing_weight_runtime_context(env), static_clearance_cache,
     )
-    add_machine_clearance_weights(edge_weights, diameter, env)
+
 
 def add_route_interaction_weights(prior_axis_records, current_diameter, accumulated_weights, env):
-    _add_route_interaction_weights(
-        prior_axis_records,
-        current_diameter,
-        accumulated_weights,
-        grid_edge_list,
-        grid_edge_coords,
-        env.nodes,
-        DUCT_BUFFER_RATIO,
-        CROSSING_PENALTY,
-        CLEARANCE_PENALTY,
-        OVERLAP_BLOCK_WEIGHT,
+    return _add_route_interaction_weights_for_runtime(
+        prior_axis_records, current_diameter, accumulated_weights, _routing_weight_runtime_context(env),
     )
+
 
 def _weighted_edge_cost(edge_weights, u, v, dist):
     return _weighted_edge_cost_for_weights(edge_weights, u, v, dist)
+
 
 def set_terminal_block_weight(edge_weights, u, v):
     edge = _set_block_weight(edge_weights, u, v, OVERLAP_BLOCK_WEIGHT)
     edge_weight_overlay_excluded_edges.add(edge)
 
+
 def record_edge_weight_overlay(edge_weights, env):
-    if not edge_weights or env is None:
-        return
-    for (u, v), cost in edge_weights.items():
-        if u < 0 or v < 0 or u >= len(env.nodes) or v >= len(env.nodes):
-            continue
-        base_len = float(np.hypot(env.nodes[v][0] - env.nodes[u][0], env.nodes[v][1] - env.nodes[u][1]))
-        if base_len <= 1e-7:
-            continue
-        edge = (min(int(u), int(v)), max(int(u), int(v)))
-        if edge in edge_weight_overlay_excluded_edges:
-            continue
-        if cost >= OVERLAP_BLOCK_WEIGHT:
-            edge_weight_debug_map[edge] = max(edge_weight_debug_map.get(edge, 0.0), OVERLAP_BLOCK_WEIGHT)
-            continue
-        added = float(cost) - base_len
-        if added <= 1e-7:
-            continue
-        ratio = added / base_len
-        edge_weight_debug_map[edge] = max(edge_weight_debug_map.get(edge, 0.0), ratio)
+    if edge_weights and env is not None:
+        _record_weight_overlay(edge_weights, _routing_weight_runtime_context(env), _edge_weight_overlay())
+
 
 def refresh_edge_weight_view_overlay(routes):
-    global edge_weight_debug_map, edge_weight_overlay_excluded_edges
-    edge_weight_debug_map = {}
-    edge_weight_overlay_excluded_edges = set()
     if current_env is None:
         return
-
     diameter = MACHINE_SMALL_DUCT_D if edge_weight_view_mode_idx == 0 else MACHINE_LARGE_DUCT_D
-    weights = {}
-    add_static_clearance_weights(weights, diameter, current_env, allow_shaft_entry=False)
-    add_machine_clearance_weights(weights, diameter, current_env)
+    _refresh_weight_overlay(
+        routes,
+        diameter,
+        _routing_weight_runtime_context(current_env),
+        static_clearance_cache,
+        _edge_weight_overlay(),
+    )
 
-    prior_axis_records = []
-    if routes:
-        for route_name, segs in routes:
-            prior_axis_records.extend(_route_axis_records(route_name, segs))
-    add_route_interaction_weights(prior_axis_records, diameter, weights, current_env)
-    record_edge_weight_overlay(weights, current_env)
 
 def _line_graph_dir_from_points(env, u, v):
     return _line_graph_dir_from_points_for_env(env, u, v)
