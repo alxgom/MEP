@@ -29,6 +29,7 @@ from mep_routing.installations.sal import (
     SalRoutingControllerContext,
     SalFlowContext,
     SalSolverPolicy,
+    SalStrategyRuntime,
     solve_routing as _solve_sal_routing,
     run_direct_small_pin_flow as _run_sal_direct_small_pin_flow,
     run_sequential_routing as _run_sal_sequential_routing,
@@ -1648,7 +1649,7 @@ def _sal_routing_controller_context():
             global_pins, machine_angle, bend_cost, edge_weights=weights, policy=policy,
         )
 
-    def run_negotiated(prepared, *, favour_large):
+    def run_negotiated(prepared, favour_large):
         return run_negotiated_congestion(
             prepared.route_plan.small_routes,
             prepared.pin_node_map,
@@ -1675,6 +1676,18 @@ def _sal_routing_controller_context():
             policy=prepared.policy,
         )
 
+    strategy_runtime = SalStrategyRuntime(
+        run_small_pin_flow=lambda prepared: flow_runtime.run_prepared_small_pin_flow(
+            prepared, machine_angle=machine_angle,
+        ),
+        run_two_stage_flow=flow_runtime.run_prepared_two_stage,
+        run_negotiated=run_negotiated,
+        run_sequential=run_sequential,
+        count_crossings=count_segment_crossings,
+        score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
+        conflict_summary=get_route_conflict_summary,
+    )
+
     return SalRoutingControllerContext(
         preflight_error=preflight_error,
         grid_available=lambda: grid_nodes is not None,
@@ -1691,15 +1704,7 @@ def _sal_routing_controller_context():
         routing_strategy=routing_strategy_idx,
         policy=policy,
         route_plan=route_plan,
-        run_small_pin_flow=lambda prepared: flow_runtime.run_prepared_small_pin_flow(
-            prepared, machine_angle=machine_angle,
-        ),
-        run_two_stage_flow=flow_runtime.run_prepared_two_stage,
-        run_negotiated=run_negotiated,
-        run_sequential=run_sequential,
-        count_crossings=count_segment_crossings,
-        score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
-        conflict_summary=get_route_conflict_summary,
+        strategy_runtime=strategy_runtime,
     )
 
 

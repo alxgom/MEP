@@ -551,6 +551,11 @@ Manual validation milestones:
 
 ## Commit Checklist
 
+- Integrated `SalStrategyRuntime` and `solve_prepared_strategy` as the single post-preparation strategy boundary used by the live Sal controller.
+- Replaced seven solver callback fields on `SalRoutingControllerContext` with one runtime object and removed duplicate flow, negotiated, and sequential branching from the controller.
+- Removed orchestration dispatch/category helpers made obsolete by the strategy dispatcher while retaining deterministic sequential-order policy helpers.
+- Validation: focused Sal strategy/controller/orchestration compilation and contracts plus a headless interactive startup smoke.
+
 - Integrated `SalRoutePlan` as the single live owner of Sal shaft, kitchen, wet-room, and machine-port topology.
 - The Sal controller now builds one plan per solve and threads it through sequential, negotiated-congestion, and min-cost-flow execution; shared routing helpers receive the plan's shaft and port names explicitly.
 - Preserved existing small-room keyword filtering, distance ordering, large/small port tie-break order, and each strategy's missing-Kitchen behavior.

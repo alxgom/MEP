@@ -2,6 +2,7 @@ from mep_routing.installations.sal.controller import SalRoutingControllerContext
 from mep_routing.installations.sal.orchestration import SalRoutingStrategy
 from mep_routing.installations.sal.policy import SalSolverPolicy
 from mep_routing.installations.sal.route_plan import build_sal_route_plan
+from mep_routing.installations.sal.strategy_dispatch import SalStrategyRuntime
 
 
 def make_context(**overrides):
@@ -19,13 +20,15 @@ def make_context(**overrides):
         routing_strategy=SalRoutingStrategy.MIN_COST_FLOW_SMALL_PINS,
         policy=SalSolverPolicy(100.0, 5.0, 1.05, 200.0, 150.0, 1e9, 1.05, 0),
         route_plan=build_sal_route_plan({"Bathroom": (5, 5)}, (0, 0)),
-        run_small_pin_flow=lambda *_args: (True, [("Shaft", [])], "ok", 2),
-        run_two_stage_flow=lambda *_args: (False, None, "unused", 0),
-        run_negotiated=lambda *_args: None,
-        run_sequential=lambda *_args: (False, None, "unused", 0),
-        count_crossings=lambda _routes: 0,
-        score_routes=lambda _routes, _crossings: 0.0,
-        conflict_summary=lambda _routes: "0 crossings",
+        strategy_runtime=SalStrategyRuntime(
+            run_small_pin_flow=lambda *_args: (True, [("Shaft", [])], "ok", 2),
+            run_two_stage_flow=lambda *_args: (False, None, "unused", 0),
+            run_negotiated=lambda *_args: None,
+            run_sequential=lambda *_args: (False, None, "unused", 0),
+            count_crossings=lambda _routes: 0,
+            score_routes=lambda _routes, _crossings: 0.0,
+            conflict_summary=lambda _routes: "0 crossings",
+        ),
         clock=lambda: 1.0,
     )
     values.update(overrides)
@@ -58,9 +61,15 @@ def test_controller_keeps_lowest_scoring_sequential_candidate():
     result = solve_routing(make_context(
         routing_strategy=SalRoutingStrategy.BEST_FIT,
         route_plan=build_sal_route_plan({"Bathroom": (1, 1), "Washroom": (2, 2)}, (0, 0)),
-        run_sequential=lambda _plan, order, *_args: (True, routes_by_order[tuple(order)], "ok", len(order)),
-        count_crossings=lambda _routes: 1,
-        score_routes=lambda routes, _crossings: 10 if routes[0][0] == "first" else 2,
+        strategy_runtime=SalStrategyRuntime(
+            run_small_pin_flow=lambda *_args: (False, None, "unused", 0),
+            run_two_stage_flow=lambda *_args: (False, None, "unused", 0),
+            run_negotiated=lambda *_args: None,
+            run_sequential=lambda _plan, order: (True, routes_by_order[tuple(order)], "ok", len(order)),
+            count_crossings=lambda _routes: 1,
+            score_routes=lambda routes, _crossings: 10 if routes[0][0] == "first" else 2,
+            conflict_summary=lambda _routes: "1 crossing",
+        ),
     ))
 
     assert result.routes == [("second", [])]
