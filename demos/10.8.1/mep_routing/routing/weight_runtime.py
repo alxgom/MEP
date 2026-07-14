@@ -14,7 +14,9 @@ from .clearance import (
     static_clearance_distances,
     static_shaft_distance_segments,
     static_wall_distance_segments,
+    set_block_weight,
 )
+from .search import run_super_sink_search
 
 
 @dataclass
@@ -61,6 +63,104 @@ class RoutingWeightRuntimeContext:
     clearance_penalty: float
     block_weight: float
     route_diameter: Callable[[str], float]
+
+
+class RoutingRuntime:
+    """Concrete weight and search service for one live routing graph."""
+
+    def __init__(
+        self,
+        env,
+        context: RoutingWeightRuntimeContext,
+        cache: StaticClearanceCache,
+        overlay: EdgeWeightOverlay,
+        *,
+        search_backend,
+        heuristic_mode: int,
+        bend_cost: float,
+        estimate_turns_fn: Callable,
+    ) -> None:
+        self.env = env
+        self.context = context
+        self.cache = cache
+        self.overlay = overlay
+        self.search_backend = search_backend
+        self.heuristic_mode = heuristic_mode
+        self.bend_cost = bend_cost
+        self.estimate_turns_fn = estimate_turns_fn
+
+    def route_axis_records(self, route_name, route_segments):
+        return route_axis_records_for_routes(route_name, route_segments, self.context)
+
+    def add_static_clearance_weights(self, edge_weights, route_diameter, *, allow_shaft_entry=False):
+        return add_static_clearance_weights(
+            edge_weights,
+            route_diameter,
+            self.context,
+            self.cache,
+            allow_shaft_entry=allow_shaft_entry,
+        )
+
+    def add_machine_clearance_weights(self, edge_weights, route_diameter):
+        return add_machine_clearance_weights(edge_weights, route_diameter, self.context)
+
+    def add_route_clearance_weights(self, edge_weights, route_name, *, shaft_route_name="Shaft"):
+        return add_route_clearance_weights(
+            edge_weights,
+            route_name,
+            self.context,
+            self.cache,
+            shaft_route_name=shaft_route_name,
+        )
+
+    def add_route_interaction_weights(self, prior_axes, route_diameter, edge_weights):
+        return add_route_interaction_weights(
+            prior_axes,
+            route_diameter,
+            edge_weights,
+            self.context,
+        )
+
+    def set_terminal_block_weight(self, edge_weights, u, v):
+        edge = set_block_weight(edge_weights, u, v, self.context.block_weight)
+        self.overlay.excluded_edges.add(edge)
+        return edge
+
+    def record_edge_weight_overlay(self, edge_weights):
+        if edge_weights and self.env is not None:
+            record_weight_overlay(edge_weights, self.context, self.overlay)
+
+    def refresh_edge_weight_overlay(self, routes, route_diameter):
+        return refresh_weight_overlay(
+            routes,
+            route_diameter,
+            self.context,
+            self.cache,
+            self.overlay,
+        )
+
+    def run_super_sink_search(
+        self,
+        start_node_indices,
+        target_pin_names,
+        pin_node_map,
+        *,
+        edge_weights=None,
+        bend_cost=None,
+    ):
+        self.record_edge_weight_overlay(edge_weights)
+        return run_super_sink_search(
+            self.search_backend,
+            self.env,
+            start_node_indices,
+            target_pin_names,
+            pin_node_map,
+            self.bend_cost if bend_cost is None else bend_cost,
+            edge_weights=edge_weights,
+            heuristic_mode=self.heuristic_mode,
+            machine_center=self.context.machine_center,
+            estimate_turns_fn=self.estimate_turns_fn,
+        )
 
 
 def static_clearance_fields(

@@ -44,6 +44,7 @@ from .clearance import (
 )
 from .weight_runtime import (
     EdgeWeightOverlay,
+    RoutingRuntime,
     RoutingWeightRuntimeContext,
     StaticClearanceCache,
     add_route_clearance_weights as add_runtime_route_clearance_weights,
@@ -106,6 +107,7 @@ __all__ = [
     "NegotiatedRuntime",
     "RouteScoreWeights",
     "RoutingProblem",
+    "RoutingRuntime",
     "RoutingRequest",
     "RoutingWeightRuntimeContext",
     "StaticClearanceCache",
