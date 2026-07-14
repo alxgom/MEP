@@ -28,19 +28,9 @@ from mep_routing.data_sources import (
 from mep_routing.installations.sal import (
     SAL_INSTALLATION,
     SalRoutingControllerContext,
-    SalFlowContext,
     SalSolverPolicy,
     SalStrategyRuntime,
     solve_routing as _solve_sal_routing,
-    run_direct_small_pin_flow as _run_sal_direct_small_pin_flow,
-    run_sequential_routing as _run_sal_sequential_routing,
-    run_small_flow_stage as _run_sal_small_flow_stage,
-    search_large_route_candidates as _search_sal_large_route_candidates,
-    select_two_stage_routing as _select_sal_two_stage_routing,
-)
-from mep_routing.installations.sal.negotiated import (
-    SalNegotiatedContext,
-    run_negotiated_congestion,
 )
 from mep_routing.installations.sal.flow_runtime import SalFlowRuntime
 from mep_routing.geometry import (
@@ -1039,9 +1029,6 @@ def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map
         estimate_turns_fn=estimate_turns,
     )
 
-def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
-    return _terminal_node_indices_for_kd(terminals, shaft_node_idx, grid_kd)
-
 def _room_polygon_by_name(room_name):
     return None if terminal_runtime is None else terminal_runtime.room_polygon(room_name)
 
@@ -1262,31 +1249,6 @@ def find_room_route_at_point(world_pt, route_names):
 def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
-def run_sequential_routing(route_plan, perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, *, policy=None):
-    policy = policy or _sal_solver_policy()
-    return _run_sal_sequential_routing(
-        perm,
-        pin_node_map,
-        global_pins,
-        shaft_node_idx,
-        chosen_exhaust_pin,
-        chosen_exhaust_target,
-        shaft_path,
-        route_plan=route_plan,
-        env=current_env,
-        machine_angle=machine_angle,
-        bend_cost=policy.bend_cost,
-        route_start_nodes=get_route_start_nodes,
-        route_segments_from_path=_route_segments_from_path,
-        run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
-        terminal_node_indices=get_all_terminal_node_indices,
-        set_terminal_block_weight=lambda *args: set_terminal_block_weight(*args, policy=policy),
-        add_route_clearance_weights=lambda *args: add_route_clearance_weights(*args, policy=policy),
-        add_route_interaction_weights=lambda *args: add_route_interaction_weights(*args, policy=policy),
-        route_diameter=get_route_diameter,
-        route_axis_records=_route_axis_records,
-    )
-
 def _source_start_nodes(source_spec):
     return _source_start_nodes_for_kd(source_spec, grid_kd)
 
@@ -1334,28 +1296,10 @@ def _sal_flow_runtime(route_plan=None, policy=None):
         run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
         count_crossings=count_segment_crossings,
         score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
-    )
-
-def _sal_negotiated_context(route_plan=None, policy=None):
-    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
-    policy = policy or _sal_solver_policy()
-    return SalNegotiatedContext(
-        env=current_env,
-        route_start_nodes=get_route_start_nodes,
         terminal_node_indices=lambda _pin_map, shaft_idx: _terminal_node_indices_for_kd(
             terminals, shaft_idx, grid_kd, shaft_route_name=plan.shaft_route,
         ),
         set_terminal_block_weight=lambda *args: set_terminal_block_weight(*args, policy=policy),
-        add_route_clearance_weights=lambda weights, name, env: add_route_clearance_weights(
-            weights, name, env, shaft_route_name=plan.shaft_route, policy=policy,
-        ),
-        add_route_interaction_weights=lambda *args: add_route_interaction_weights(*args, policy=policy),
-        route_diameter=get_route_diameter,
-        route_segments_from_path=lambda *args: _route_segments_from_path(*args, route_plan=plan),
-        route_axis_records=_route_axis_records,
-        run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
-        count_crossings=count_segment_crossings,
-        score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
     )
 
 def get_solution_score(routes, crossings, *, policy=None):
@@ -1617,40 +1561,17 @@ def _sal_routing_controller_context():
             global_pins, machine_angle, bend_cost, edge_weights=weights, policy=policy,
         )
 
-    def run_negotiated(prepared, favour_large):
-        return run_negotiated_congestion(
-            prepared.route_plan.small_routes,
-            prepared.pin_node_map,
-            prepared.global_pins,
-            prepared.shaft_boundary_nodes,
-            prepared.shaft_node_idx,
-            route_plan=prepared.route_plan,
-            policy=prepared.policy,
-            context=_sal_negotiated_context(prepared.route_plan, prepared.policy),
-            machine_angle=machine_angle,
-            favour_large=favour_large,
-        )
-
-    def run_sequential(prepared, room_order):
-        return run_sequential_routing(
-            prepared.route_plan,
-            room_order,
-            prepared.pin_node_map,
-            prepared.global_pins,
-            prepared.shaft_node_idx,
-            prepared.chosen_shaft_pin,
-            prepared.chosen_shaft_target,
-            prepared.shaft_path,
-            policy=prepared.policy,
-        )
-
     strategy_runtime = SalStrategyRuntime(
         run_small_pin_flow=lambda prepared: flow_runtime.run_prepared_small_pin_flow(
             prepared, machine_angle=machine_angle,
         ),
         run_two_stage_flow=flow_runtime.run_prepared_two_stage,
-        run_negotiated=run_negotiated,
-        run_sequential=run_sequential,
+        run_negotiated=lambda prepared, favour_large: flow_runtime.run_prepared_negotiated(
+            prepared, favour_large, machine_angle=machine_angle,
+        ),
+        run_sequential=lambda prepared, room_order: flow_runtime.run_prepared_sequential(
+            prepared, room_order, machine_angle=machine_angle,
+        ),
         count_crossings=count_segment_crossings,
         score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
         conflict_summary=get_route_conflict_summary,

@@ -568,6 +568,10 @@ Manual validation milestones:
 - Removed unused Sal flow compatibility wrappers left behind after prepared-strategy integration and added persistent traceback capture for uncaught interactive crashes.
 - Validation: all four real dwellings loaded and routed; six dwelling-cycle events including wraparound and eight source-mode toggles completed in the headless Pygame loop without an exception.
 
+- Integrated prepared sequential and negotiated execution through the existing `SalFlowRuntime`, including its terminal-node and blocking adapters.
+- Removed the duplicate sequential wrapper, negotiated-context factory, and controller-local strategy closures from `main.py`; no additional runtime abstraction was introduced.
+- Validation: focused Sal runtime/strategy/controller contracts plus dwelling-cycle and startup smoke.
+
 Before each commit:
 
 - `git status --short`
