@@ -5,6 +5,7 @@ from mep_routing.installations.sal.negotiated import (
     run_negotiated_congestion,
 )
 from mep_routing.installations.sal.route_plan import build_sal_route_plan
+from mep_routing.installations.sal.policy import SalSolverPolicy
 
 
 def test_negotiated_routing_builds_sal_routes_and_stops_on_zero_crossings():
@@ -42,7 +43,7 @@ def test_negotiated_routing_builds_sal_routes_and_stops_on_zero_crossings():
         route_plan=build_sal_route_plan({"Kitchen": (1, 0), "Bathroom": (2, 0)}, (0, 0)),
         context=context,
         machine_angle=0,
-        bend_cost=100,
+        policy=SalSolverPolicy(100, 5, 1.05, 200, 150, 1e9, 1.05, 0),
     )
 
     assert result.success is True

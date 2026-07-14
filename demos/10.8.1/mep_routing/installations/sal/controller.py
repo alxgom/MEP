@@ -16,6 +16,7 @@ from .orchestration import (
     should_stop_after_sequential_candidate,
 )
 from .route_plan import SalRoutePlan
+from .policy import SalSolverPolicy
 
 
 @dataclass
@@ -33,7 +34,7 @@ class SalRoutingControllerContext:
     add_shaft_clearance_weights: Callable[[dict], None]
     run_shaft_search: Callable[[list[int], Any, Mapping[str, Any], float, dict], tuple[Any, Any, str | None, Any]]
     routing_strategy: int | SalRoutingStrategy
-    bend_cost: float
+    policy: SalSolverPolicy
     route_plan: SalRoutePlan
     run_small_pin_flow: Callable[..., tuple[bool, Any, str, int]]
     run_two_stage_flow: Callable[..., tuple[bool, Any, str, int]]
@@ -78,7 +79,7 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
         shaft_boundary_nodes,
         pin_node_map,
         global_pins,
-        context.bend_cost,
+        context.policy.bend_cost,
         shaft_weights,
     )
     if shaft_path is None:

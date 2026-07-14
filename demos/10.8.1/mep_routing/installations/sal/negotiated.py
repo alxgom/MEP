@@ -7,6 +7,7 @@ through a narrow context supplied by the application adapter.
 from dataclasses import dataclass
 
 from .route_plan import SalRoutePlan
+from .policy import SalSolverPolicy
 
 
 @dataclass
@@ -46,13 +47,10 @@ def run_negotiated_congestion(
     shaft_node_idx,
     *,
     route_plan: SalRoutePlan,
+    policy: SalSolverPolicy,
     context: SalNegotiatedContext,
     machine_angle,
-    bend_cost,
     favour_large=False,
-    iterations=20,
-    present_penalty=20_000.0,
-    history_penalty=4_000.0,
 ):
     """Route Sal's shaft, kitchen, and small ducts with negotiated congestion.
 
@@ -70,7 +68,7 @@ def run_negotiated_congestion(
     best_score = float("inf")
     best_total_nodes = 0
 
-    for attempt in range(1, iterations + 1):
+    for attempt in range(1, policy.negotiated_iterations + 1):
         for route_name in nets:
             if route_name == route_plan.shaft_route:
                 start_nodes = shaft_boundary_nodes
@@ -108,7 +106,8 @@ def run_negotiated_congestion(
                 context,
                 route_plan,
                 favour_large,
-                present_penalty,
+                policy.negotiated_present_penalty,
+                policy.negotiated_large_route_factor,
             )
             path, _, chosen_pin, chosen_target = context.run_search(
                 context.env,
@@ -117,7 +116,7 @@ def run_negotiated_congestion(
                 pin_node_map,
                 global_pins,
                 machine_angle,
-                bend_cost,
+                policy.bend_cost,
                 edge_weights=edge_weights,
             )
             if path is not None:
@@ -138,11 +137,14 @@ def run_negotiated_congestion(
         if crossings == 0:
             return NegotiatedRoutingResult(True, routes, total_nodes, attempt, True)
 
-        _update_history(current_paths.values(), history_congestion, node_history_congestion, history_penalty)
+        _update_history(
+            current_paths.values(), history_congestion, node_history_congestion,
+            policy.negotiated_history_penalty,
+        )
 
     if best_routes is None:
-        return NegotiatedRoutingResult(False, None, 0, iterations, False)
-    return NegotiatedRoutingResult(True, best_routes, best_total_nodes, iterations, False)
+        return NegotiatedRoutingResult(False, None, 0, policy.negotiated_iterations, False)
+    return NegotiatedRoutingResult(True, best_routes, best_total_nodes, policy.negotiated_iterations, False)
 
 
 def _weights_for_route(
@@ -158,6 +160,7 @@ def _weights_for_route(
     route_plan,
     favour_large,
     present_penalty,
+    large_route_factor,
 ):
     weights = {}
     for terminal_route, terminal_node in context.terminal_node_indices(pin_node_map, shaft_node_idx).items():
@@ -178,7 +181,7 @@ def _weights_for_route(
                 + max(node_history_congestion.get(node, 0.0), node_history_congestion.get(neighbour, 0.0))
             )
             if favour_large and route_name in route_plan.large_routes:
-                congestion *= 0.35
+                congestion *= large_route_factor
             weights[edge] = distance + congestion
 
     context.add_route_clearance_weights(weights, route_name, context.env)

@@ -28,6 +28,7 @@ from mep_routing.installations.sal import (
     SAL_INSTALLATION,
     SalRoutingControllerContext,
     SalFlowContext,
+    SalSolverPolicy,
     solve_routing as _solve_sal_routing,
     run_direct_small_pin_flow as _run_sal_direct_small_pin_flow,
     run_sequential_routing as _run_sal_sequential_routing,
@@ -284,14 +285,10 @@ CROSSING_MULTIPLIER_MIN = _SALUBRIDAD_DEFAULTS.get_default("CROSSING_MULTIPLIER_
 CROSSING_MULTIPLIER_MAX = _SALUBRIDAD_DEFAULTS.get_default("CROSSING_MULTIPLIER_MAX")
 C_BEND         = C_BEND_DEFAULT  # Turn penalty in mm
 crossing_penalty_multiplier = CROSSING_MULTIPLIER_DEFAULT
-CROSSING_PENALTY = crossing_penalty_multiplier * C_BEND
-CLEARANCE_PENALTY = CROSSING_PENALTY
 OVERLAP_BLOCK_WEIGHT = _SALUBRIDAD_DEFAULTS.get_default("OVERLAP_BLOCK_WEIGHT")
-OVERLAP_SCORE_PENALTY = 50 * C_BEND
 MIN_PIECE_FACTOR_DEFAULT = _SALUBRIDAD_DEFAULTS.get_default("MIN_PIECE_FACTOR_DEFAULT")
 MIN_PIECE_FACTOR_MIN = _SALUBRIDAD_DEFAULTS.get_default("MIN_PIECE_FACTOR_MIN")
 MIN_PIECE_FACTOR_MAX = _SALUBRIDAD_DEFAULTS.get_default("MIN_PIECE_FACTOR_MAX")
-SHORT_PIECE_SCORE_PENALTY = 2 * C_BEND
 min_piece_factor = MIN_PIECE_FACTOR_DEFAULT
 
 # Graph types
@@ -548,18 +545,10 @@ def set_min_piece_factor_from_slider_x(x):
 def slider_value_from_x(x, rect, min_value, max_value):
     return _slider_value_from_x(x, rect, min_value, max_value)
 
-def refresh_route_weight_constants():
-    global CROSSING_PENALTY, CLEARANCE_PENALTY, OVERLAP_SCORE_PENALTY, SHORT_PIECE_SCORE_PENALTY
-    CROSSING_PENALTY = crossing_penalty_multiplier * C_BEND
-    CLEARANCE_PENALTY = CROSSING_PENALTY
-    OVERLAP_SCORE_PENALTY = 50 * C_BEND
-    SHORT_PIECE_SCORE_PENALTY = 2 * C_BEND
-
 def set_bend_weight_from_slider_x(x):
     global C_BEND
     raw_value = slider_value_from_x(x, bend_weight_slider_rect, C_BEND_MIN, C_BEND_MAX)
     C_BEND = float(round(raw_value / 100.0) * 100)
-    refresh_route_weight_constants()
 
 def set_crossing_weight_from_slider_x(x):
     global crossing_penalty_multiplier
@@ -569,17 +558,14 @@ def set_crossing_weight_from_slider_x(x):
         CROSSING_MULTIPLIER_MIN,
         CROSSING_MULTIPLIER_MAX,
     )
-    refresh_route_weight_constants()
 
 def reset_bend_weight():
     global C_BEND
     C_BEND = C_BEND_DEFAULT
-    refresh_route_weight_constants()
 
 def reset_crossing_weight():
     global crossing_penalty_multiplier
     crossing_penalty_multiplier = CROSSING_MULTIPLIER_DEFAULT
-    refresh_route_weight_constants()
 
 def draw_min_piece_slider(screen, font_small, x, y, width):
     global min_piece_slider_rect
@@ -913,7 +899,21 @@ def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_s
 def get_outward_vector(pin_name, machine_angle):
     return _outward_vector(pin_name, machine_angle)
 
-def _routing_weight_runtime_context(env):
+def _sal_solver_policy():
+    return SalSolverPolicy(
+        bend_cost=C_BEND,
+        crossing_penalty_multiplier=crossing_penalty_multiplier,
+        duct_buffer_ratio=DUCT_BUFFER_RATIO,
+        shaft_clearance_mm=PATINEJO_CLEARANCE_MM,
+        machine_clearance_soft_margin_mm=MACHINE_CLEARANCE_SOFT_MARGIN_MM,
+        overlap_block_weight=OVERLAP_BLOCK_WEIGHT,
+        min_piece_factor=min_piece_factor,
+        heuristic_mode=heuristic_mode_idx,
+    )
+
+
+def _routing_weight_runtime_context(env, policy=None):
+    policy = policy or _sal_solver_policy()
     return RoutingWeightRuntimeContext(
         edge_list=grid_edge_list,
         edge_coords=grid_edge_coords,
@@ -927,12 +927,12 @@ def _routing_weight_runtime_context(env):
         machine_angle_deg=machine_angle,
         machine_overall_width_mm=MACHINE_OVERALL_W,
         machine_body_height_mm=MACHINE_BODY_H,
-        buffer_ratio=DUCT_BUFFER_RATIO,
-        shaft_clearance_mm=PATINEJO_CLEARANCE_MM,
-        machine_soft_margin_mm=MACHINE_CLEARANCE_SOFT_MARGIN_MM,
-        crossing_penalty=CROSSING_PENALTY,
-        clearance_penalty=CLEARANCE_PENALTY,
-        block_weight=OVERLAP_BLOCK_WEIGHT,
+        buffer_ratio=policy.duct_buffer_ratio,
+        shaft_clearance_mm=policy.shaft_clearance_mm,
+        machine_soft_margin_mm=policy.machine_clearance_soft_margin_mm,
+        crossing_penalty=policy.crossing_penalty,
+        clearance_penalty=policy.clearance_penalty,
+        block_weight=policy.overlap_block_weight,
         route_diameter=get_route_diameter,
     )
 
@@ -961,32 +961,32 @@ def get_required_clearance_mm(diameter_a, diameter_b):
     return _required_clearance_mm(diameter_a, diameter_b, DUCT_BUFFER_RATIO)
 
 
-def add_static_clearance_weights(edge_weights, route_diameter, env, allow_shaft_entry=False):
+def add_static_clearance_weights(edge_weights, route_diameter, env, allow_shaft_entry=False, *, policy=None):
     return _add_static_clearance_weights_for_runtime(
         edge_weights,
         route_diameter,
-        _routing_weight_runtime_context(env),
+        _routing_weight_runtime_context(env, policy),
         static_clearance_cache,
         allow_shaft_entry=allow_shaft_entry,
     )
 
 
-def add_machine_clearance_weights(edge_weights, route_diameter, env):
+def add_machine_clearance_weights(edge_weights, route_diameter, env, *, policy=None):
     return _add_machine_clearance_weights_for_runtime(
-        edge_weights, route_diameter, _routing_weight_runtime_context(env),
+        edge_weights, route_diameter, _routing_weight_runtime_context(env, policy),
     )
 
 
-def add_route_clearance_weights(edge_weights, route_name, env, *, shaft_route_name="Shaft"):
+def add_route_clearance_weights(edge_weights, route_name, env, *, shaft_route_name="Shaft", policy=None):
     return _add_route_clearance_weights_for_runtime(
-        edge_weights, route_name, _routing_weight_runtime_context(env), static_clearance_cache,
+        edge_weights, route_name, _routing_weight_runtime_context(env, policy), static_clearance_cache,
         shaft_route_name=shaft_route_name,
     )
 
 
-def add_route_interaction_weights(prior_axis_records, current_diameter, accumulated_weights, env):
+def add_route_interaction_weights(prior_axis_records, current_diameter, accumulated_weights, env, *, policy=None):
     return _add_route_interaction_weights_for_runtime(
-        prior_axis_records, current_diameter, accumulated_weights, _routing_weight_runtime_context(env),
+        prior_axis_records, current_diameter, accumulated_weights, _routing_weight_runtime_context(env, policy),
     )
 
 
@@ -994,14 +994,15 @@ def _weighted_edge_cost(edge_weights, u, v, dist):
     return _weighted_edge_cost_for_weights(edge_weights, u, v, dist)
 
 
-def set_terminal_block_weight(edge_weights, u, v):
-    edge = _set_block_weight(edge_weights, u, v, OVERLAP_BLOCK_WEIGHT)
+def set_terminal_block_weight(edge_weights, u, v, *, policy=None):
+    policy = policy or _sal_solver_policy()
+    edge = _set_block_weight(edge_weights, u, v, policy.overlap_block_weight)
     edge_weight_overlay_excluded_edges.add(edge)
 
 
-def record_edge_weight_overlay(edge_weights, env):
+def record_edge_weight_overlay(edge_weights, env, *, policy=None):
     if edge_weights and env is not None:
-        _record_weight_overlay(edge_weights, _routing_weight_runtime_context(env), _edge_weight_overlay())
+        _record_weight_overlay(edge_weights, _routing_weight_runtime_context(env, policy), _edge_weight_overlay())
 
 
 def refresh_edge_weight_view_overlay(routes):
@@ -1023,8 +1024,9 @@ def _line_graph_dir_from_points(env, u, v):
 def _path_physical_length(env, path):
     return _path_physical_length_for_env(env, path)
 
-def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
-    record_edge_weight_overlay(edge_weights, env)
+def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, *, policy=None):
+    policy = policy or _sal_solver_policy()
+    record_edge_weight_overlay(edge_weights, env, policy=policy)
     return _run_super_sink_search_for_env(
         SAL_INSTALLATION.search_backends[router_backend_idx],
         env,
@@ -1033,7 +1035,7 @@ def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map
         pin_node_map,
         C_bend,
         edge_weights=edge_weights,
-        heuristic_mode=heuristic_mode_idx,
+        heuristic_mode=policy.heuristic_mode,
         machine_center=(machine_cx, machine_cy),
         estimate_turns_fn=estimate_turns,
     )
@@ -1198,10 +1200,11 @@ def count_ordered_route_turns(route_name, segs):
 def count_solution_turns(routes):
     return _count_solution_turns(routes)
 
-def get_min_piece_length(route_name, terminal_segment=False):
+def get_min_piece_length(route_name, terminal_segment=False, *, policy=None):
+    policy = policy or _sal_solver_policy()
     diameter = get_route_diameter(route_name)
     multiplier = 1.0 if terminal_segment else 2.0
-    return diameter * multiplier * min_piece_factor
+    return diameter * multiplier * policy.min_piece_factor
 
 def merged_route_piece_lengths(route_name, segs):
     return _merged_route_piece_lengths(route_name, segs)
@@ -1260,7 +1263,8 @@ def find_room_route_at_point(world_pt, route_names):
 def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
-def run_sequential_routing(route_plan, perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
+def run_sequential_routing(route_plan, perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, *, policy=None):
+    policy = policy or _sal_solver_policy()
     return _run_sal_sequential_routing(
         perm,
         pin_node_map,
@@ -1272,14 +1276,14 @@ def run_sequential_routing(route_plan, perm, pin_node_map, global_pins, shaft_no
         route_plan=route_plan,
         env=current_env,
         machine_angle=machine_angle,
-        bend_cost=C_BEND,
+        bend_cost=policy.bend_cost,
         route_start_nodes=get_route_start_nodes,
         route_segments_from_path=_route_segments_from_path,
-        run_search=run_super_sink_astar,
+        run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
         terminal_node_indices=get_all_terminal_node_indices,
-        set_terminal_block_weight=set_terminal_block_weight,
-        add_route_clearance_weights=add_route_clearance_weights,
-        add_route_interaction_weights=add_route_interaction_weights,
+        set_terminal_block_weight=lambda *args: set_terminal_block_weight(*args, policy=policy),
+        add_route_clearance_weights=lambda *args: add_route_clearance_weights(*args, policy=policy),
+        add_route_interaction_weights=lambda *args: add_route_interaction_weights(*args, policy=policy),
         route_diameter=get_route_diameter,
         route_axis_records=_route_axis_records,
     )
@@ -1313,24 +1317,30 @@ def _build_routes_from_paths(route_order, paths, targets, global_pins, *, route_
         lambda *args: _route_segments_from_path(*args, route_plan=plan),
     )
 
-def _sal_flow_runtime(route_plan=None):
+def _sal_flow_runtime(route_plan=None, policy=None):
     plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
+    policy = policy or _sal_solver_policy()
     route_segments = lambda *args: _route_segments_from_path(*args, route_plan=plan)
     route_clearance = lambda weights, name, env: add_route_clearance_weights(
-        weights, name, env, shaft_route_name=plan.shaft_route,
+        weights, name, env, shaft_route_name=plan.shaft_route, policy=policy,
     )
     return SalFlowRuntime(
         env=current_env, route_plan=plan, terminals=terminals, small_diameter=MACHINE_SMALL_DUCT_D,
-        large_diameter=MACHINE_LARGE_DUCT_D, bend_cost=C_BEND, overlap_block_weight=OVERLAP_BLOCK_WEIGHT,
+        large_diameter=MACHINE_LARGE_DUCT_D, policy=policy,
         source_start_nodes=_source_start_nodes, weighted_edge_cost=_weighted_edge_cost,
-        line_graph_direction=_line_graph_dir_from_points, record_edge_weight_overlay=record_edge_weight_overlay,
+        line_graph_direction=_line_graph_dir_from_points,
+        record_edge_weight_overlay=lambda weights, env: record_edge_weight_overlay(weights, env, policy=policy),
         route_start_nodes=get_route_start_nodes, route_segments_from_path=route_segments,
         build_routes_from_paths=lambda *args: _build_routes_from_paths(*args, route_plan=plan),
         route_axis_records=_route_axis_records,
-        add_static_clearance_weights=add_static_clearance_weights, add_machine_clearance_weights=add_machine_clearance_weights,
-        add_route_clearance_weights=route_clearance, add_route_interaction_weights=add_route_interaction_weights,
-        route_diameter=get_route_diameter, run_search=run_super_sink_astar,
-        count_crossings=count_segment_crossings, score_routes=get_solution_score,
+        add_static_clearance_weights=lambda *args, **kwargs: add_static_clearance_weights(*args, **kwargs, policy=policy),
+        add_machine_clearance_weights=lambda *args: add_machine_clearance_weights(*args, policy=policy),
+        add_route_clearance_weights=route_clearance,
+        add_route_interaction_weights=lambda *args: add_route_interaction_weights(*args, policy=policy),
+        route_diameter=get_route_diameter,
+        run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
+        count_crossings=count_segment_crossings,
+        score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
     )
 
 def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights=None):
@@ -1348,25 +1358,26 @@ def _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_record
 def _sal_flow_context():
     return _sal_flow_runtime().flow_context()
 
-def _sal_negotiated_context(route_plan=None):
+def _sal_negotiated_context(route_plan=None, policy=None):
     plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
+    policy = policy or _sal_solver_policy()
     return SalNegotiatedContext(
         env=current_env,
         route_start_nodes=get_route_start_nodes,
         terminal_node_indices=lambda _pin_map, shaft_idx: _terminal_node_indices_for_kd(
             terminals, shaft_idx, grid_kd, shaft_route_name=plan.shaft_route,
         ),
-        set_terminal_block_weight=set_terminal_block_weight,
+        set_terminal_block_weight=lambda *args: set_terminal_block_weight(*args, policy=policy),
         add_route_clearance_weights=lambda weights, name, env: add_route_clearance_weights(
-            weights, name, env, shaft_route_name=plan.shaft_route,
+            weights, name, env, shaft_route_name=plan.shaft_route, policy=policy,
         ),
-        add_route_interaction_weights=add_route_interaction_weights,
+        add_route_interaction_weights=lambda *args: add_route_interaction_weights(*args, policy=policy),
         route_diameter=get_route_diameter,
         route_segments_from_path=lambda *args: _route_segments_from_path(*args, route_plan=plan),
         route_axis_records=_route_axis_records,
-        run_search=run_super_sink_astar,
+        run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
         count_crossings=count_segment_crossings,
-        score_routes=get_solution_score,
+        score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
     )
 
 def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
@@ -1381,20 +1392,21 @@ def _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path
 def run_two_stage_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_path):
     return _sal_flow_runtime().run_two_stage(room_names, pin_node_map, global_pins, shaft_path)
 
-def get_solution_score(routes, crossings):
+def get_solution_score(routes, crossings, *, policy=None):
+    policy = policy or _sal_solver_policy()
     weights = RouteScoreWeights(
-        bend=C_BEND,
-        crossing=CROSSING_PENALTY,
-        overlap=OVERLAP_SCORE_PENALTY,
-        clearance=CLEARANCE_PENALTY,
-        short_piece=SHORT_PIECE_SCORE_PENALTY,
+        bend=policy.bend_cost,
+        crossing=policy.crossing_penalty,
+        overlap=policy.overlap_score_penalty,
+        clearance=policy.clearance_penalty,
+        short_piece=policy.short_piece_score_penalty,
     )
     return _score_routes(
         routes,
         weights,
         get_route_diameter,
         get_required_clearance_mm,
-        get_min_piece_length,
+        lambda *args, **kwargs: get_min_piece_length(*args, **kwargs, policy=policy),
         crossings=crossings,
     )
 
@@ -1598,7 +1610,8 @@ def run_auto_placement():
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 def _sal_routing_controller_context():
     route_plan = SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
-    flow_runtime = _sal_flow_runtime(route_plan)
+    policy = _sal_solver_policy()
+    flow_runtime = _sal_flow_runtime(route_plan, policy)
 
     def preflight_error():
         global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
@@ -1623,26 +1636,26 @@ def _sal_routing_controller_context():
 
     def block_terminal_edges(weights, terminal_node_map):
         return _block_terminal_node_edges(
-            weights, current_env.adj, terminal_node_map, OVERLAP_BLOCK_WEIGHT,
+            weights, current_env.adj, terminal_node_map, policy.overlap_block_weight,
         )
 
     def add_shaft_clearance_weights(weights):
         add_route_clearance_weights(
             weights, route_plan.shaft_route, current_env,
-            shaft_route_name=route_plan.shaft_route,
+            shaft_route_name=route_plan.shaft_route, policy=policy,
         )
 
     def run_shaft_search(boundary_nodes, pin_node_map, global_pins, bend_cost, weights):
         return run_super_sink_astar(
             current_env, boundary_nodes, list(route_plan.large_ports), pin_node_map,
-            global_pins, machine_angle, bend_cost, edge_weights=weights,
+            global_pins, machine_angle, bend_cost, edge_weights=weights, policy=policy,
         )
 
     def run_negotiated(plan, room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx, strategy):
         return run_negotiated_congestion(
             room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx,
-            route_plan=plan, context=_sal_negotiated_context(plan),
-            machine_angle=machine_angle, bend_cost=C_BEND,
+            route_plan=plan, policy=policy, context=_sal_negotiated_context(plan, policy),
+            machine_angle=machine_angle,
             favour_large=strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE,
         )
 
@@ -1666,14 +1679,14 @@ def _sal_routing_controller_context():
         add_shaft_clearance_weights=add_shaft_clearance_weights,
         run_shaft_search=run_shaft_search,
         routing_strategy=routing_strategy_idx,
-        bend_cost=C_BEND,
+        policy=policy,
         route_plan=route_plan,
         run_small_pin_flow=run_small_flow,
         run_two_stage_flow=flow_runtime.run_two_stage,
         run_negotiated=run_negotiated,
-        run_sequential=run_sequential_routing,
+        run_sequential=lambda *args: run_sequential_routing(*args, policy=policy),
         count_crossings=count_segment_crossings,
-        score_routes=get_solution_score,
+        score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
         conflict_summary=get_route_conflict_summary,
     )
 
@@ -1965,7 +1978,6 @@ def restore_solution_log(log_entry):
     weight_mode_idx, edge_weight_view_mode_idx = state["weight_mode_idx"], state["edge_weight_view_mode_idx"]
     route_real_diameter_width_enabled, min_piece_factor = state["route_real_diameter_width_enabled"], state["min_piece_factor"]
     C_BEND, crossing_penalty_multiplier = state["bend_weight"], state["crossing_penalty_multiplier"]
-    refresh_route_weight_constants()
     if terminal_runtime is not None:
         terminal_runtime.restore_preferences(
             state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"],

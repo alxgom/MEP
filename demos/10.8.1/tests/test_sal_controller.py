@@ -1,5 +1,6 @@
 from mep_routing.installations.sal.controller import SalRoutingControllerContext, solve_routing
 from mep_routing.installations.sal.orchestration import SalRoutingStrategy
+from mep_routing.installations.sal.policy import SalSolverPolicy
 from mep_routing.installations.sal.route_plan import build_sal_route_plan
 
 
@@ -16,7 +17,7 @@ def make_context(**overrides):
         add_shaft_clearance_weights=lambda _weights: None,
         run_shaft_search=lambda *_args: ([3, 2], 0.0, "left_mid", {"pin": "left_mid"}),
         routing_strategy=SalRoutingStrategy.MIN_COST_FLOW_SMALL_PINS,
-        bend_cost=100.0,
+        policy=SalSolverPolicy(100.0, 5.0, 1.05, 200.0, 150.0, 1e9, 1.05, 0),
         route_plan=build_sal_route_plan({"Bathroom": (5, 5)}, (0, 0)),
         run_small_pin_flow=lambda *_args: (True, [("Shaft", [])], "ok", 2),
         run_two_stage_flow=lambda *_args: (False, None, "unused", 0),

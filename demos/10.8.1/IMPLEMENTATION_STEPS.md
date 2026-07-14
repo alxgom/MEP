@@ -534,6 +534,11 @@ Manual validation milestones:
 - Removed the parallel State A*, Line-Graph A*, and Line-Graph GBFS wrappers from `main.py`; the compatibility entrypoint still owns weight-overlay recording and supplies live heuristic inputs.
 - Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile` for the application, Sal definition, routing exports, and focused tests; eight direct backend/Sal/controller contracts passed because pytest is unavailable; the interactive app remained alive through a 10-second startup smoke.
 
+- Integrated one immutable `SalSolverPolicy` snapshot through the live controller, sequential, flow, negotiated-congestion, search, edge-weight, and scoring paths.
+- Removed parallel derived solver-penalty globals; the policy now owns their existing formulas while the UI retains only its mutable bend, crossing-multiplier, minimum-piece, and heuristic controls.
+- Moved negotiated iteration, present/history congestion, and large-route favouring constants into explicit policy values.
+- Validation: Python 3.11 compilation and 42 focused Sal, weight, clearance, search, and scoring contracts passed. Demo 10.7 Python 3.12 virtual environment remained running after an 8-second startup/initial-solve smoke.
+
 ## Commit Checklist
 
 - Integrated `SalRoutePlan` as the single live owner of Sal shaft, kitchen, wet-room, and machine-port topology.

@@ -11,6 +11,7 @@ from mep_routing.routing import (
 
 from .strategies import SalFlowContext, run_direct_small_pin_flow, run_small_flow_stage, search_large_route_candidates, select_two_stage_routing
 from .route_plan import SalRoutePlan
+from .policy import SalSolverPolicy
 
 
 @dataclass
@@ -22,8 +23,7 @@ class SalFlowRuntime:
     terminals: object
     small_diameter: int
     large_diameter: int
-    bend_cost: float
-    overlap_block_weight: float
+    policy: SalSolverPolicy
     source_start_nodes: object
     weighted_edge_cost: object
     line_graph_direction: object
@@ -50,7 +50,7 @@ class SalFlowRuntime:
             route_names, target_specs_by_route, starts, self.env.adj,
             lambda u, v, distance: self.weighted_edge_cost(edge_weights, u, v, distance),
             lambda u, v: self.line_graph_direction(self.env, u, v),
-            self.bend_cost, self.overlap_block_weight,
+            self.policy.bend_cost, self.policy.overlap_block_weight,
         )
         if network is None:
             return None, None, float("inf"), 0
@@ -119,7 +119,7 @@ class SalFlowRuntime:
     def run_direct_small_pin_flow(self, room_names, pin_node_map, global_pins, chosen_pin, chosen_target, shaft_path, *, machine_angle):
         return run_direct_small_pin_flow(
             room_names, pin_node_map, global_pins, chosen_pin, chosen_target, shaft_path,
-            route_plan=self.route_plan, env=self.env, machine_angle=machine_angle, bend_cost=self.bend_cost,
+            route_plan=self.route_plan, env=self.env, machine_angle=machine_angle, bend_cost=self.policy.bend_cost,
             route_start_nodes=self.route_start_nodes, route_segments_from_path=self.route_segments_from_path,
             route_axis_records=self.route_axis_records, add_route_clearance_weights=self.add_route_clearance_weights,
             add_route_interaction_weights=self.add_route_interaction_weights, route_diameter=self.route_diameter,
