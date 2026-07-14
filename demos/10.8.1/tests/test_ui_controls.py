@@ -1,9 +1,16 @@
 from mep_routing.ui.controls import (
     canvas_tool_button_bounds,
+    dwelling_selector_bounds,
     slider_fraction,
     slider_value_from_x,
     weight_view_switch_bounds,
 )
+
+
+def test_dwelling_selector_options_stack_below_the_control():
+    selector, options = dwelling_selector_bounds(100, 50, 3)
+    assert selector == (112, 116, 250, 28)
+    assert options == ((112, 144, 250, 28), (112, 172, 250, 28), (112, 200, 250, 28))
 
 
 class Rect:

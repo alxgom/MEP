@@ -61,20 +61,9 @@ class SolverCard:
 
 @dataclass(frozen=True)
 class MachineCard:
-    source: str
-    scenario: str
     frame: str
     position_mm: tuple[float, float]
     rotation: str
-
-
-@dataclass(frozen=True)
-class KpiCard:
-    total_length_mm: float
-    total_turns: int
-    crossings: int
-    short_pieces: int
-    total_cost: float | int
 
 
 @dataclass(frozen=True)
@@ -91,7 +80,6 @@ class SidebarView:
     auto_placement: AutoPlacementCard
     solver: SolverCard
     machine: MachineCard
-    kpis: KpiCard
     execution: ExecutionStatusCard
 
 
@@ -206,40 +194,25 @@ def draw_sidebar(
         (230, 126, 34), "crossing", "x", False,
     )
 
-    machine_card = pygame.Rect(15, 480, card_width, 105)
+    machine_card = pygame.Rect(15, 480, card_width, 85)
     pygame.draw.rect(screen, colors.card, machine_card, border_radius=6)
     screen.blit(fonts.bold.render("MACHINE PLACEMENT", True, colors.text), (text_x, 490))
     draw_help_button("machine", machine_card, fonts.small)
-    screen.blit(fonts.small.render(f"Source: {view.machine.source[:10]} / {view.machine.scenario[-22:]}", True, colors.text), (text_x, 510))
-    screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 530))
+    screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 510))
     machine_x, machine_y = view.machine.position_mm
-    screen.blit(fonts.small.render(f"Position: ({int(machine_x)}, {int(machine_y)}) mm", True, colors.text), (text_x, 550))
-    screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 570))
+    screen.blit(fonts.small.render(f"Position: ({int(machine_x)}, {int(machine_y)}) mm", True, colors.text), (text_x, 530))
+    screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 550))
 
-    kpi_card = pygame.Rect(15, 595, card_width, 135)
-    pygame.draw.rect(screen, colors.card, kpi_card, border_radius=6)
-    screen.blit(fonts.bold.render("ROUTING RUNTIME KPIs", True, colors.text), (text_x, 605))
-    draw_help_button("kpi", kpi_card, fonts.small)
-    kpi_rows = (
-        (f"Total Duct Length: {view.kpis.total_length_mm / 1000.0:.2f} m", 625),
-        (f"Total Turns: {view.kpis.total_turns}", 645),
-        (f"Duct Crossings: {view.kpis.crossings}", 665),
-        (f"Short Pieces: {view.kpis.short_pieces}", 685),
-        (f"Total Cost Score: {view.kpis.total_cost}", 705),
-    )
-    for label, y in kpi_rows:
-        screen.blit(fonts.small.render(label, True, colors.text), (text_x, y))
-
-    status_card = pygame.Rect(15, 740, card_width, 170)
+    status_card = pygame.Rect(15, 575, card_width, 170)
     pygame.draw.rect(screen, colors.card, status_card, border_radius=6)
-    screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, 750))
+    screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, 585))
     draw_help_button("status", status_card, fonts.small)
     for index, line in enumerate(wrap_status_lines(view.execution.message)):
-        screen.blit(fonts.small.render(line, True, colors.text), (text_x, 770 + index * 18))
+        screen.blit(fonts.small.render(line, True, colors.text), (text_x, 605 + index * 18))
 
     warning_text = format_validation_warning(view.execution.validation_warnings)
     warning_color = colors.muted if not view.execution.validation_warnings else colors.warning
-    screen.blit(fonts.small.render(warning_text, True, warning_color), (text_x, 835))
-    screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, 865))
-    screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, 885))
-    screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, 905))
+    screen.blit(fonts.small.render(warning_text, True, warning_color), (text_x, 670))
+    screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, 700))
+    screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, 720))
+    screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, 740))

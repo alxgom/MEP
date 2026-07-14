@@ -587,6 +587,9 @@ Before each commit:
 
 ## Open Items
 
+- The redundant routing KPI sidebar card was removed; live plot values now share each plot header, while crossing counts remain execution warnings.
+- The active dwelling moved from machine placement into a canvas dropdown below the zoom controls, allowing direct selection of any configured real dwelling or a new synthetic dwelling.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

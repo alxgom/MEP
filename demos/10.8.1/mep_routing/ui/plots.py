@@ -14,9 +14,15 @@ def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width,
         pygame.draw.rect(screen, (55, 55, 70), (x - 4, y, width + 8, height), 1, border_radius=6)
         screen.blit(font_bold.render(title, True, color), (x, y + 6))
         chart_y, chart_h, count = y + 26, height - 42, len(buffer)
+        if count:
+            values = list(buffer)
+            current, minimum = values[-1], min(values)
+            pct = "0.0%" if abs(minimum) < 1e-5 else f"+{max(0.0, (current - minimum) / minimum * 100):.1f}%"
+            current_label = font_small.render(f"{current:.1f}  {pct}", True, text_color)
+            screen.blit(current_label, (x + width - current_label.get_width(), y + 6))
         if count < 2:
             screen.blit(font_small.render("Move machine to trace…", True, muted_color), (x, chart_y + chart_h // 2 - 8)); continue
-        values, maximum = list(buffer), max(buffer)
+        maximum = max(values)
         scale = maximum if maximum > 0 else 1.0
         sx = lambda i: x + int(i / (count - 1) * width)
         sy = lambda v: chart_y + chart_h - int(v / scale * chart_h)
@@ -40,8 +46,5 @@ def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width,
             pygame.draw.polygon(screen, marker_color, diamond); pygame.draw.polygon(screen, (255, 255, 255), diamond, 1)
             marker_label = font_small.render(label, True, marker_color)
             screen.blit(marker_label, (marker_x + 8, max(chart_y, marker_y - 8)))
-        current = values[-1]
-        pct = "0.0%" if abs(minimum) < 1e-5 else f"+{max(0.0, (current - minimum) / minimum * 100):.1f}%"
-        screen.blit(font_small.render(f"Cur: {current:.1f} ({pct})", True, text_color), (x, chart_y + chart_h + 2))
         minimum_label = font_small.render(f"Min: {minimum:.1f}", True, (231, 76, 60))
         screen.blit(minimum_label, (x + width - minimum_label.get_width(), chart_y + chart_h + 2))

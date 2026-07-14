@@ -125,6 +125,7 @@ from mep_routing.ui.drawing import (
 )
 from mep_routing.ui.controls import (
     canvas_tool_button_bounds as _canvas_tool_button_bounds,
+    dwelling_selector_bounds as _dwelling_selector_bounds,
     draw_min_piece_slider as _draw_min_piece_slider_widget,
     draw_weight_slider as _draw_weight_slider_widget,
     draw_weight_view_switch as _draw_weight_view_switch_widget,
@@ -190,7 +191,6 @@ from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
 from mep_routing.ui.sidebar import (
     AutoPlacementCard,
     ExecutionStatusCard,
-    KpiCard,
     MachineCard,
     SidebarColors,
     SidebarFonts,
@@ -596,7 +596,13 @@ def draw_terminal_tool_buttons(screen, font_bold, font_small):
     global terminal_tool_button_rects
     terminal_tool_button_rects = _draw_terminal_tool_buttons(screen, font_bold, font_small, get_terminal_tool_buttons(), preferred_terminal_tool_mode, terminal_validity_overlay_enabled, text_color=COLOR_TEXT, muted_color=COLOR_MUTED, allowed_color=COLOR_TERMINAL_ALLOWED)
 
-def draw_canvas_tool_controls(screen, font_small, ruler_mode):
+def dwelling_selector_options():
+    return ("New random dwelling",) + tuple(
+        f"{execution} / {dwelling_id}" for execution, dwelling_id in REAL_DWELLING_SCENARIOS
+    )
+
+
+def draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open=False):
     return _draw_canvas_tool_controls(
         screen,
         font_small,
@@ -607,6 +613,9 @@ def draw_canvas_tool_controls(screen, font_small, ruler_mode):
         diameter_width_enabled=route_real_diameter_width_enabled,
         small_weight_view=edge_weight_view_mode_idx == 0,
         zoom_level=zoom_level,
+        dwelling_label=current_scenario_label,
+        dwelling_options=dwelling_selector_options(),
+        dwelling_selector_open=dwelling_selector_open,
         canvas_left=CANVAS_LEFT,
         canvas_top=CANVAS_TOP,
         active_terminal_mode=preferred_terminal_tool_mode,
@@ -1991,6 +2000,7 @@ def main():
     dragging_bend_weight_slider = False
     dragging_crossing_weight_slider = False
     selected_route_name = None
+    dwelling_selector_open = False
     last_wheel_rotate_ms = 0
     canvas_gesture = _CanvasGestureState()
     panel_interaction = _PanelInteractionState()
@@ -2055,6 +2065,33 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     mx, my = event.pos
+                    selector_bounds, option_bounds = _dwelling_selector_bounds(
+                        CANVAS_LEFT, CANVAS_TOP, len(dwelling_selector_options())
+                    )
+                    if pygame.Rect(selector_bounds).collidepoint((mx, my)):
+                        dwelling_selector_open = not dwelling_selector_open
+                        continue
+                    selected_dwelling = None
+                    if dwelling_selector_open:
+                        selected_dwelling = next(
+                            (index for index, bounds in enumerate(option_bounds) if pygame.Rect(bounds).collidepoint((mx, my))),
+                            None,
+                        )
+                        dwelling_selector_open = False
+                    if selected_dwelling is not None:
+                        if selected_dwelling == 0:
+                            dwelling_source_idx = DWELLING_SOURCE_MODES.index("Random Synthetic")
+                        else:
+                            dwelling_source_idx = DWELLING_SOURCE_MODES.index("Real DB")
+                            real_scenario_idx = selected_dwelling - 1
+                        generate_new_dwelling()
+                        solution_log_session.clear()
+                        clear_history_buffers()
+                        needs_auto_placement = auto_placement_mode_idx > 0
+                        routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                        if routes and not status.startswith("Blocked"):
+                            record_current_solution(routes, elapsed_ms, f"Home:{selected_dwelling}", (52, 152, 219))
+                        continue
                     help_card = next(
                         (card_id for card_id, rect in help_button_rects.items() if rect.collidepoint((mx, my))),
                         None,
@@ -2626,7 +2663,7 @@ def main():
         _draw_canvas_scene(screen, scene=canvas_scene, fonts=CanvasFonts(small=font_small), hooks=canvas_hooks)
 
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
-        draw_canvas_tool_controls(screen, font_small, ruler_mode)
+        draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open)
         draw_terminal_tool_buttons(screen, font_bold, font_small)
 
         heatmap_text = "Disabled"
@@ -2656,14 +2693,6 @@ def main():
         else:
             rotation_text = f"Rotation: {machine_angle}° / {rotation_mode_short}"
 
-        total_len_mm = sum(
-            np.hypot(p2[0] - p1[0], p2[1] - p1[1])
-            for _route_name, segments in (routes or ())
-            for p1, p2 in segments
-        )
-        total_turns_count = count_solution_turns(routes) if routes else 0
-        crossings_count = count_segment_crossings(routes) if routes else 0
-        short_pieces_count = count_solution_short_pieces(routes) if routes else 0
         validation_warnings = get_route_validation_warnings(routes)
         sidebar_view = SidebarView(
             auto_placement=AutoPlacementCard(
@@ -2689,18 +2718,9 @@ def main():
                 crossing_max=CROSSING_MULTIPLIER_MAX,
             ),
             machine=MachineCard(
-                source=DWELLING_SOURCE_MODES[dwelling_source_idx],
-                scenario=current_scenario_label,
                 frame=frame_name,
                 position_mm=(machine_cx, machine_cy),
                 rotation=rotation_text,
-            ),
-            kpis=KpiCard(
-                total_length_mm=total_len_mm,
-                total_turns=total_turns_count,
-                crossings=crossings_count,
-                short_pieces=short_pieces_count,
-                total_cost=get_solution_score(routes, crossings_count) if routes else 0,
             ),
             execution=ExecutionStatusCard(
                 message=status,

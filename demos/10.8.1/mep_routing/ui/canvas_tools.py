@@ -7,6 +7,7 @@ import math
 import pygame
 
 from .controls import draw_weight_view_switch
+from .controls import dwelling_selector_bounds
 from .drawing import draw_dashed_polyline
 
 
@@ -82,6 +83,9 @@ def draw_canvas_tool_controls(
     diameter_width_enabled,
     small_weight_view,
     zoom_level,
+    dwelling_label,
+    dwelling_options,
+    dwelling_selector_open,
     canvas_left,
     canvas_top,
     active_terminal_mode,
@@ -106,6 +110,21 @@ def draw_canvas_tool_controls(
     draw_weight_view_switch(screen, font_small, weight_switch_rect, small_weight_view, text_color)
     zoom_label = font_small.render(f"{zoom_level:.2f}x", True, text_color)
     screen.blit(zoom_label, (canvas_left + 12, canvas_top + 46))
+    selector_bounds, option_bounds = dwelling_selector_bounds(canvas_left, canvas_top, len(dwelling_options))
+    selector = pygame.Rect(selector_bounds)
+    pygame.draw.rect(screen, (38, 44, 54), selector, border_radius=4)
+    pygame.draw.rect(screen, (170, 180, 190), selector, 1, border_radius=4)
+    label = font_small.render(f"Dwelling: {dwelling_label[:24]}", True, text_color)
+    screen.blit(label, (selector.x + 8, selector.centery - label.get_height() // 2))
+    arrow = font_small.render("^" if dwelling_selector_open else "v", True, text_color)
+    screen.blit(arrow, (selector.right - arrow.get_width() - 8, selector.centery - arrow.get_height() // 2))
+    if dwelling_selector_open:
+        for option, bounds in zip(dwelling_options, option_bounds):
+            rect = pygame.Rect(bounds)
+            pygame.draw.rect(screen, (45, 52, 64), rect)
+            pygame.draw.rect(screen, (170, 180, 190), rect, 1)
+            option_label = font_small.render(option[:29], True, text_color)
+            screen.blit(option_label, (rect.x + 8, rect.centery - option_label.get_height() // 2))
     if edge_weights_enabled:
         weight_view = "small pipe" if small_weight_view else "big pipe"
         weight_label = font_small.render(f"modified edge weights: {weight_view}", True, text_color)
@@ -113,7 +132,7 @@ def draw_canvas_tool_controls(
     if active_terminal_mode:
         hint = "click add, Ctrl+click erase" if active_terminal_mode == "point" else "drag area, Ctrl+drag erase"
         terminal_label = font_small.render(f"terminal {active_terminal_mode}: {hint}", True, text_color)
-        screen.blit(terminal_label, (canvas_left + 86, canvas_top + 64))
+        screen.blit(terminal_label, (canvas_left + 12, canvas_top + 102))
 
 
 def draw_ruler_overlay(screen, font_small, start_mm, end_mm, world_to_screen, *, text_color):

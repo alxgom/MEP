@@ -25,6 +25,16 @@ def canvas_tool_button_bounds(canvas_left, canvas_top):
     )
 
 
+def dwelling_selector_bounds(canvas_left, canvas_top, option_count):
+    """Return the dwelling selector and its dropdown option bounds."""
+    selector = (canvas_left + 12, canvas_top + 66, 250, 28)
+    options = tuple(
+        (selector[0], selector[1] + selector[3] + index * 28, selector[2], 28)
+        for index in range(option_count)
+    )
+    return selector, options
+
+
 def weight_view_switch_bounds(weights_bounds, gap=6):
     x, y, width, _height = weights_bounds
     return x + width + gap, y + 2, 92, 24
