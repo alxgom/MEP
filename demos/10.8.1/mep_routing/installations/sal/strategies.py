@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .routes import KITCHEN_ROUTE_NAME, SHAFT_ROUTE_NAME
+from .route_plan import SalRoutePlan
 
 
 @dataclass
@@ -17,6 +17,7 @@ class SalFlowContext:
     run_small_stage: object
     run_large_search: object
     build_weights: object
+    route_plan: SalRoutePlan
 
     def _axis_records(self, routes):
         records = []
@@ -28,7 +29,7 @@ class SalFlowContext:
         paths, targets, _, flow, meta = self.run_large_search(pin_node_map, [shaft_path[0]], edge_weights=None)
         if paths is None:
             return False, None, f"Min-cost flow routed {flow}/2 large ducts", 0
-        routes, nodes = self.build_routes([SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME], paths, targets, global_pins)
+        routes, nodes = self.build_routes(self.route_plan.large_routes, paths, targets, global_pins)
         if routes is None:
             return False, None, "Could not build large duct routes", 0
         success, small_routes, status, small_nodes = self.run_small_stage(room_names, pin_node_map, global_pins, self._axis_records(routes))
@@ -44,7 +45,7 @@ class SalFlowContext:
         paths, targets, _, flow, meta = self.run_large_search(pin_node_map, [shaft_path[0]], edge_weights=weights)
         if paths is None:
             return False, None, f"Min-cost flow routed {flow}/2 large ducts", 0
-        routes, nodes = self.build_routes([SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME], paths, targets, global_pins)
+        routes, nodes = self.build_routes(self.route_plan.large_routes, paths, targets, global_pins)
         if routes is None:
             return False, None, "Could not build large duct routes", 0
         return True, routes + small_routes, f"small-first {meta.get('assignment', '')} {meta.get('large_order', '')}", nodes + small_nodes
@@ -59,6 +60,7 @@ def run_sequential_routing(
     chosen_exhaust_target,
     shaft_path,
     *,
+    route_plan,
     env,
     machine_angle,
     bend_cost,
@@ -75,18 +77,18 @@ def run_sequential_routing(
     """Route Sal's shaft, kitchen, then small ducts in the supplied order."""
     base_weights = {}
     prior_axis_records = []
-    kitchen_pin_name = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
+    kitchen_pin_name = route_plan.kitchen_port_for(chosen_exhaust_pin)
     routes = []
 
     shaft_segs = route_segments_from_path(
-        SHAFT_ROUTE_NAME,
+        route_plan.shaft_route,
         shaft_path,
         chosen_exhaust_pin,
         global_pins,
         chosen_exhaust_target,
     )
-    routes.append((SHAFT_ROUTE_NAME, shaft_segs))
-    prior_axis_records.extend(route_axis_records(SHAFT_ROUTE_NAME, shaft_segs))
+    routes.append((route_plan.shaft_route, shaft_segs))
+    prior_axis_records.extend(route_axis_records(route_plan.shaft_route, shaft_segs))
     total_nodes = len(shaft_path)
     terminal_nodes = terminal_node_indices(pin_node_map, shaft_node_idx)
 
@@ -107,7 +109,7 @@ def run_sequential_routing(
         )
         return weights
 
-    kitchen_start_nodes = route_start_nodes(KITCHEN_ROUTE_NAME)
+    kitchen_start_nodes = route_start_nodes(route_plan.kitchen_route)
     if kitchen_start_nodes:
         kitchen_path, _, _, kitchen_target = run_search(
             env,
@@ -117,23 +119,23 @@ def run_sequential_routing(
             global_pins,
             machine_angle,
             bend_cost,
-            edge_weights=weights_for_route(KITCHEN_ROUTE_NAME),
+            edge_weights=weights_for_route(route_plan.kitchen_route),
         )
         if kitchen_path is None:
             return False, None, "No path to Kitchen", 0
 
         kitchen_segs = route_segments_from_path(
-            KITCHEN_ROUTE_NAME,
+            route_plan.kitchen_route,
             kitchen_path,
             kitchen_pin_name,
             global_pins,
             kitchen_target,
         )
-        routes.append((KITCHEN_ROUTE_NAME, kitchen_segs))
-        prior_axis_records.extend(route_axis_records(KITCHEN_ROUTE_NAME, kitchen_segs))
+        routes.append((route_plan.kitchen_route, kitchen_segs))
+        prior_axis_records.extend(route_axis_records(route_plan.kitchen_route, kitchen_segs))
         total_nodes += len(kitchen_path)
 
-    available_small_pins = ["tl", "tr", "bl", "br"]
+    available_small_pins = list(route_plan.small_ports)
     for route_name in small_route_order:
         if not available_small_pins:
             return False, None, f"No port for {route_name}", 0
@@ -189,24 +191,24 @@ def search_large_route_candidates(
     pin_node_map, shaft_boundary_nodes, *, env, terminals, route_start_nodes,
     route_one_pin_flow, route_segments_from_path, route_axis_records,
     add_route_clearance_weights, add_route_interaction_weights, route_diameter,
-    count_crossings, score_routes, initial_edge_weights=None,
+    count_crossings, score_routes, route_plan, initial_edge_weights=None,
 ):
     """Evaluate Sal's large-duct port assignments and routing orders."""
-    if not shaft_boundary_nodes or KITCHEN_ROUTE_NAME not in terminals:
+    if not shaft_boundary_nodes or not route_plan.has_kitchen:
         return None, None, float("inf"), 0, {}
-    kitchen_starts = route_start_nodes(KITCHEN_ROUTE_NAME)
+    kitchen_starts = route_start_nodes(route_plan.kitchen_route)
     if not kitchen_starts:
         return None, None, float("inf"), 0, {}
 
     best = (None, None, float("inf"), 0, {})
     assignments = (
-        {SHAFT_ROUTE_NAME: "left_mid", KITCHEN_ROUTE_NAME: "right_mid"},
-        {SHAFT_ROUTE_NAME: "right_mid", KITCHEN_ROUTE_NAME: "left_mid"},
+        {route_plan.shaft_route: route_plan.large_ports[0], route_plan.kitchen_route: route_plan.large_ports[1]},
+        {route_plan.shaft_route: route_plan.large_ports[1], route_plan.kitchen_route: route_plan.large_ports[0]},
     )
     for assignment in assignments:
         for shaft_start in shaft_boundary_nodes[:1]:
-            terminal_points = {SHAFT_ROUTE_NAME: env.nodes[int(shaft_start)], KITCHEN_ROUTE_NAME: kitchen_starts}
-            for order in ((SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME), (KITCHEN_ROUTE_NAME, SHAFT_ROUTE_NAME)):
+            terminal_points = {route_plan.shaft_route: env.nodes[int(shaft_start)], route_plan.kitchen_route: kitchen_starts}
+            for order in (route_plan.large_routes, tuple(reversed(route_plan.large_routes))):
                 paths, targets, prior_axes, total_cost = {}, {}, [], 0.0
                 for route_name in order:
                     weights = (initial_edge_weights or {}).copy()
@@ -220,10 +222,10 @@ def search_large_route_candidates(
                     prior_axes.extend(route_axis_records(route_name, route_segments_from_path(route_name, path, target["pin"], None, target)))
                 if len(paths) != 2:
                     continue
-                routes = [(name, route_segments_from_path(name, paths[name], targets[name]["pin"], None, targets[name])) for name in (SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME)]
+                routes = [(name, route_segments_from_path(name, paths[name], targets[name]["pin"], None, targets[name])) for name in route_plan.large_routes]
                 score = score_routes(routes, count_crossings(routes))
                 if score < best[2]:
-                    best = (paths, targets, score, 2, {"assignment": f"Shaft={assignment[SHAFT_ROUTE_NAME]},Kitchen={assignment[KITCHEN_ROUTE_NAME]}", "large_order": "->".join(order)})
+                    best = (paths, targets, score, 2, {"assignment": f"Shaft={assignment[route_plan.shaft_route]},Kitchen={assignment[route_plan.kitchen_route]}", "large_order": "->".join(order)})
     return best
 
 
@@ -239,23 +241,23 @@ def run_small_flow_stage(room_names, pin_node_map, global_pins, prior_axis_recor
     return True, routes, "Success", nodes
 
 
-def run_direct_small_pin_flow(room_names, pin_node_map, global_pins, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, *, env, machine_angle, bend_cost, route_start_nodes, route_segments_from_path, route_axis_records, add_route_clearance_weights, add_route_interaction_weights, route_diameter, run_search, run_small_stage):
+def run_direct_small_pin_flow(room_names, pin_node_map, global_pins, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, *, route_plan, env, machine_angle, bend_cost, route_start_nodes, route_segments_from_path, route_axis_records, add_route_clearance_weights, add_route_interaction_weights, route_diameter, run_search, run_small_stage):
     """Run Sal's fixed Shaft, Kitchen, then small-pin flow sequence."""
-    routes = [(SHAFT_ROUTE_NAME, route_segments_from_path(SHAFT_ROUTE_NAME, shaft_path, chosen_exhaust_pin, global_pins, chosen_exhaust_target))]
+    routes = [(route_plan.shaft_route, route_segments_from_path(route_plan.shaft_route, shaft_path, chosen_exhaust_pin, global_pins, chosen_exhaust_target))]
     prior_axes = list(route_axis_records(*routes[0]))
-    kitchen_starts = route_start_nodes(KITCHEN_ROUTE_NAME)
+    kitchen_starts = route_start_nodes(route_plan.kitchen_route)
     if not kitchen_starts:
         return False, None, "Missing Kitchen terminal", 0
-    kitchen_pin = "right_mid" if chosen_exhaust_pin == "left_mid" else "left_mid"
+    kitchen_pin = route_plan.kitchen_port_for(chosen_exhaust_pin)
     weights = {}
-    add_route_clearance_weights(weights, KITCHEN_ROUTE_NAME, env)
-    add_route_interaction_weights(prior_axes, route_diameter(KITCHEN_ROUTE_NAME), weights, env)
+    add_route_clearance_weights(weights, route_plan.kitchen_route, env)
+    add_route_interaction_weights(prior_axes, route_diameter(route_plan.kitchen_route), weights, env)
     path, _, _, target = run_search(env, kitchen_starts, [kitchen_pin], pin_node_map, global_pins, machine_angle, bend_cost, edge_weights=weights)
     if path is None:
         return False, None, "No path to Kitchen", 0
-    kitchen = route_segments_from_path(KITCHEN_ROUTE_NAME, path, kitchen_pin, global_pins, target)
-    routes.append((KITCHEN_ROUTE_NAME, kitchen))
-    prior_axes.extend(route_axis_records(KITCHEN_ROUTE_NAME, kitchen))
+    kitchen = route_segments_from_path(route_plan.kitchen_route, path, kitchen_pin, global_pins, target)
+    routes.append((route_plan.kitchen_route, kitchen))
+    prior_axes.extend(route_axis_records(route_plan.kitchen_route, kitchen))
     success, small_routes, status, small_nodes = run_small_stage(room_names, pin_node_map, global_pins, prior_axes)
     if not success:
         return False, None, status, 0

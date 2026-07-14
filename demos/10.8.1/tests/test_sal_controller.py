@@ -1,5 +1,6 @@
 from mep_routing.installations.sal.controller import SalRoutingControllerContext, solve_routing
 from mep_routing.installations.sal.orchestration import SalRoutingStrategy
+from mep_routing.installations.sal.route_plan import build_sal_route_plan
 
 
 def make_context(**overrides):
@@ -14,11 +15,9 @@ def make_context(**overrides):
         block_terminal_edges=lambda _weights, _nodes: {(7, 8)},
         add_shaft_clearance_weights=lambda _weights: None,
         run_shaft_search=lambda *_args: ([3, 2], 0.0, "left_mid", {"pin": "left_mid"}),
-        terminals={"Bathroom": (5, 5)},
-        machine_center=(0, 0),
         routing_strategy=SalRoutingStrategy.MIN_COST_FLOW_SMALL_PINS,
         bend_cost=100.0,
-        ordered_room_names=lambda _terminals, _center: ["Bathroom"],
+        route_plan=build_sal_route_plan({"Bathroom": (5, 5)}, (0, 0)),
         run_small_pin_flow=lambda *_args: (True, [("Shaft", [])], "ok", 2),
         run_two_stage_flow=lambda *_args: (False, None, "unused", 0),
         run_negotiated=lambda *_args: None,
@@ -52,14 +51,13 @@ def test_controller_returns_flow_success_and_overlay_edges_explicitly():
 
 def test_controller_keeps_lowest_scoring_sequential_candidate():
     routes_by_order = {
-        ("Bathroom", "Kitchen"): [("first", [])],
-        ("Kitchen", "Bathroom"): [("second", [])],
+        ("Bathroom", "Washroom"): [("first", [])],
+        ("Washroom", "Bathroom"): [("second", [])],
     }
     result = solve_routing(make_context(
         routing_strategy=SalRoutingStrategy.BEST_FIT,
-        terminals={"Bathroom": (1, 1), "Kitchen": (2, 2)},
-        ordered_room_names=lambda *_args: ["Bathroom", "Kitchen"],
-        run_sequential=lambda order, *_args: (True, routes_by_order[tuple(order)], "ok", len(order)),
+        route_plan=build_sal_route_plan({"Bathroom": (1, 1), "Washroom": (2, 2)}, (0, 0)),
+        run_sequential=lambda _plan, order, *_args: (True, routes_by_order[tuple(order)], "ok", len(order)),
         count_crossings=lambda _routes: 1,
         score_routes=lambda routes, _crossings: 10 if routes[0][0] == "first" else 2,
     ))

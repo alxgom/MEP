@@ -977,9 +977,10 @@ def add_machine_clearance_weights(edge_weights, route_diameter, env):
     )
 
 
-def add_route_clearance_weights(edge_weights, route_name, env):
+def add_route_clearance_weights(edge_weights, route_name, env, *, shaft_route_name="Shaft"):
     return _add_route_clearance_weights_for_runtime(
         edge_weights, route_name, _routing_weight_runtime_context(env), static_clearance_cache,
+        shaft_route_name=shaft_route_name,
     )
 
 
@@ -1259,7 +1260,7 @@ def find_room_route_at_point(world_pt, route_names):
 def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
-def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
+def run_sequential_routing(route_plan, perm, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
     return _run_sal_sequential_routing(
         perm,
         pin_node_map,
@@ -1268,6 +1269,7 @@ def run_sequential_routing(perm, pin_node_map, global_pins, shaft_node_idx, chos
         chosen_exhaust_pin,
         chosen_exhaust_target,
         shaft_path,
+        route_plan=route_plan,
         env=current_env,
         machine_angle=machine_angle,
         bend_cost=C_BEND,
@@ -1291,7 +1293,8 @@ def _run_pin_min_cost_flow(route_names, target_specs_by_route, terminal_points_b
 def _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=None):
     return _sal_flow_runtime().run_small_pin_flow(room_names, pin_node_map, edge_weights)
 
-def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None):
+def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None, *, route_plan=None):
+    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     return _route_segments_from_path_for_env(
         route_name,
         path,
@@ -1300,21 +1303,32 @@ def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None,
         pin_name,
         global_pins,
         target,
+        shaft_route_name=plan.shaft_route,
     )
 
-def _build_routes_from_paths(route_order, paths, targets, global_pins):
-    return _build_routes_from_paths_for_env(route_order, paths, targets, global_pins, _route_segments_from_path)
+def _build_routes_from_paths(route_order, paths, targets, global_pins, *, route_plan=None):
+    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
+    return _build_routes_from_paths_for_env(
+        route_order, paths, targets, global_pins,
+        lambda *args: _route_segments_from_path(*args, route_plan=plan),
+    )
 
-def _sal_flow_runtime():
+def _sal_flow_runtime(route_plan=None):
+    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
+    route_segments = lambda *args: _route_segments_from_path(*args, route_plan=plan)
+    route_clearance = lambda weights, name, env: add_route_clearance_weights(
+        weights, name, env, shaft_route_name=plan.shaft_route,
+    )
     return SalFlowRuntime(
-        env=current_env, terminals=terminals, small_diameter=MACHINE_SMALL_DUCT_D,
+        env=current_env, route_plan=plan, terminals=terminals, small_diameter=MACHINE_SMALL_DUCT_D,
         large_diameter=MACHINE_LARGE_DUCT_D, bend_cost=C_BEND, overlap_block_weight=OVERLAP_BLOCK_WEIGHT,
         source_start_nodes=_source_start_nodes, weighted_edge_cost=_weighted_edge_cost,
         line_graph_direction=_line_graph_dir_from_points, record_edge_weight_overlay=record_edge_weight_overlay,
-        route_start_nodes=get_route_start_nodes, route_segments_from_path=_route_segments_from_path,
-        build_routes_from_paths=_build_routes_from_paths, route_axis_records=_route_axis_records,
+        route_start_nodes=get_route_start_nodes, route_segments_from_path=route_segments,
+        build_routes_from_paths=lambda *args: _build_routes_from_paths(*args, route_plan=plan),
+        route_axis_records=_route_axis_records,
         add_static_clearance_weights=add_static_clearance_weights, add_machine_clearance_weights=add_machine_clearance_weights,
-        add_route_clearance_weights=add_route_clearance_weights, add_route_interaction_weights=add_route_interaction_weights,
+        add_route_clearance_weights=route_clearance, add_route_interaction_weights=add_route_interaction_weights,
         route_diameter=get_route_diameter, run_search=run_super_sink_astar,
         count_crossings=count_segment_crossings, score_routes=get_solution_score,
     )
@@ -1334,16 +1348,21 @@ def _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_record
 def _sal_flow_context():
     return _sal_flow_runtime().flow_context()
 
-def _sal_negotiated_context():
+def _sal_negotiated_context(route_plan=None):
+    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     return SalNegotiatedContext(
         env=current_env,
         route_start_nodes=get_route_start_nodes,
-        terminal_node_indices=get_all_terminal_node_indices,
+        terminal_node_indices=lambda _pin_map, shaft_idx: _terminal_node_indices_for_kd(
+            terminals, shaft_idx, grid_kd, shaft_route_name=plan.shaft_route,
+        ),
         set_terminal_block_weight=set_terminal_block_weight,
-        add_route_clearance_weights=add_route_clearance_weights,
+        add_route_clearance_weights=lambda weights, name, env: add_route_clearance_weights(
+            weights, name, env, shaft_route_name=plan.shaft_route,
+        ),
         add_route_interaction_weights=add_route_interaction_weights,
         route_diameter=get_route_diameter,
-        route_segments_from_path=_route_segments_from_path,
+        route_segments_from_path=lambda *args: _route_segments_from_path(*args, route_plan=plan),
         route_axis_records=_route_axis_records,
         run_search=run_super_sink_astar,
         count_crossings=count_segment_crossings,
@@ -1578,6 +1597,9 @@ def run_auto_placement():
 # MAIN SOLVER WRAPPER
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 def _sal_routing_controller_context():
+    route_plan = SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
+    flow_runtime = _sal_flow_runtime(route_plan)
+
     def preflight_error():
         global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
         machine_poly = Polygon([
@@ -1605,19 +1627,29 @@ def _sal_routing_controller_context():
         )
 
     def add_shaft_clearance_weights(weights):
-        add_route_clearance_weights(weights, "Shaft", current_env)
+        add_route_clearance_weights(
+            weights, route_plan.shaft_route, current_env,
+            shaft_route_name=route_plan.shaft_route,
+        )
 
     def run_shaft_search(boundary_nodes, pin_node_map, global_pins, bend_cost, weights):
         return run_super_sink_astar(
-            current_env, boundary_nodes, ["left_mid", "right_mid"], pin_node_map,
+            current_env, boundary_nodes, list(route_plan.large_ports), pin_node_map,
             global_pins, machine_angle, bend_cost, edge_weights=weights,
         )
 
-    def run_negotiated(room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx, strategy):
+    def run_negotiated(plan, room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx, strategy):
         return run_negotiated_congestion(
             room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx,
-            context=_sal_negotiated_context(), machine_angle=machine_angle, bend_cost=C_BEND,
+            route_plan=plan, context=_sal_negotiated_context(plan),
+            machine_angle=machine_angle, bend_cost=C_BEND,
             favour_large=strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE,
+        )
+
+    def run_small_flow(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_pin, chosen_target, shaft_path):
+        return flow_runtime.run_direct_small_pin_flow(
+            room_names, pin_node_map, global_pins, chosen_pin, chosen_target,
+            shaft_path, machine_angle=machine_angle,
         )
 
     return SalRoutingControllerContext(
@@ -1627,17 +1659,17 @@ def _sal_routing_controller_context():
         refresh_graph=refresh_graph,
         snap_pins=snap_pins_to_graph,
         shaft_entry_nodes=lambda: get_shaft_entry_nodes(current_env, grid_kd),
-        terminal_nodes=get_all_terminal_node_indices,
+        terminal_nodes=lambda _pin_map, shaft_idx: _terminal_node_indices_for_kd(
+            terminals, shaft_idx, grid_kd, shaft_route_name=route_plan.shaft_route,
+        ),
         block_terminal_edges=block_terminal_edges,
         add_shaft_clearance_weights=add_shaft_clearance_weights,
         run_shaft_search=run_shaft_search,
-        terminals=terminals,
-        machine_center=(machine_cx, machine_cy),
         routing_strategy=routing_strategy_idx,
         bend_cost=C_BEND,
-        ordered_room_names=_ordered_small_room_names,
-        run_small_pin_flow=run_small_pin_min_cost_flow_routing,
-        run_two_stage_flow=run_two_stage_min_cost_flow_routing,
+        route_plan=route_plan,
+        run_small_pin_flow=run_small_flow,
+        run_two_stage_flow=flow_runtime.run_two_stage,
         run_negotiated=run_negotiated,
         run_sequential=run_sequential_routing,
         count_crossings=count_segment_crossings,

@@ -15,6 +15,7 @@ from .orchestration import (
     sequential_room_orders,
     should_stop_after_sequential_candidate,
 )
+from .route_plan import SalRoutePlan
 
 
 @dataclass
@@ -31,14 +32,12 @@ class SalRoutingControllerContext:
     block_terminal_edges: Callable[[dict, Mapping[str, int]], Any]
     add_shaft_clearance_weights: Callable[[dict], None]
     run_shaft_search: Callable[[list[int], Any, Mapping[str, Any], float, dict], tuple[Any, Any, str | None, Any]]
-    terminals: Mapping[str, Any]
-    machine_center: tuple[float, float]
     routing_strategy: int | SalRoutingStrategy
     bend_cost: float
-    ordered_room_names: Callable[[Mapping[str, Any], tuple[float, float]], list[str]]
+    route_plan: SalRoutePlan
     run_small_pin_flow: Callable[..., tuple[bool, Any, str, int]]
     run_two_stage_flow: Callable[..., tuple[bool, Any, str, int]]
-    run_negotiated: Callable[[list[str], Any, Mapping[str, Any], list[int], int | None, SalRoutingStrategy], Any]
+    run_negotiated: Callable[..., Any]
     run_sequential: Callable[..., tuple[bool, Any, str, int]]
     count_crossings: Callable[[Any], int]
     score_routes: Callable[[Any, int], float]
@@ -85,7 +84,7 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
     if shaft_path is None:
         return _result(None, "Blocked: No path to shaft", started, context, 0, excluded_edges)
 
-    other_rooms = context.ordered_room_names(context.terminals, context.machine_center)
+    other_rooms = context.route_plan.small_routes
     strategy = coerce_routing_strategy(context.routing_strategy)
     flow_result = dispatch_flow_strategy(
         strategy,
@@ -112,7 +111,10 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
         return _result(routes, message, started, context, total_nodes, excluded_edges)
 
     if is_negotiated_strategy(strategy):
-        negotiated = context.run_negotiated(other_rooms, pin_node_map, global_pins, shaft_boundary_nodes, shaft_node_idx, strategy)
+        negotiated = context.run_negotiated(
+            context.route_plan, other_rooms, pin_node_map, global_pins,
+            shaft_boundary_nodes, shaft_node_idx, strategy,
+        )
         if negotiated.success:
             return _result(
                 negotiated.routes,
@@ -131,6 +133,7 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
     for room_order in sequential_room_orders(strategy, other_rooms):
         attempts += 1
         success, routes, _status, total_nodes = context.run_sequential(
+            context.route_plan,
             room_order,
             pin_node_map,
             global_pins,

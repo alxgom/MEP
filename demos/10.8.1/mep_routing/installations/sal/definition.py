@@ -13,6 +13,7 @@ from mep_routing.routing.search import SearchBackend
 from .catalog import SAL_OZEO_FLAT_MACHINE
 from .orchestration import SalRoutingStrategy
 from .routes import LARGE_DUCT_ROUTE_NAMES
+from .route_plan import SalRoutePlan, build_sal_route_plan
 
 
 SAL_GRAPH_MODES = (
@@ -68,6 +69,9 @@ class SalInstallationDefinition:
 
     def route_diameter_mm(self, route_name: str) -> int:
         return self.default_machine.route_diameter_mm(route_name)
+
+    def build_route_plan(self, terminals, machine_center) -> SalRoutePlan:
+        return build_sal_route_plan(terminals, machine_center)
 
 
 SAL_INSTALLATION = SalInstallationDefinition(

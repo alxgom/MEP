@@ -5,11 +5,12 @@ from dataclasses import dataclass
 from mep_routing.routing import (
     build_pin_min_cost_flow_network,
     min_cost_flow,
-    small_pin_target_specs,
+    pin_target_specs,
     trace_flow_path,
 )
 
 from .strategies import SalFlowContext, run_direct_small_pin_flow, run_small_flow_stage, search_large_route_candidates, select_two_stage_routing
+from .route_plan import SalRoutePlan
 
 
 @dataclass
@@ -17,6 +18,7 @@ class SalFlowRuntime:
     """Application callbacks and values required by Sal flow strategies."""
 
     env: object
+    route_plan: SalRoutePlan
     terminals: object
     small_diameter: int
     large_diameter: int
@@ -65,7 +67,7 @@ class SalFlowRuntime:
         return paths, targets, cost, flow
 
     def run_small_pin_flow(self, room_names, pin_node_map, edge_weights=None):
-        targets = small_pin_target_specs(room_names, pin_node_map)
+        targets = pin_target_specs(room_names, pin_node_map, self.route_plan.small_ports)
         starts = {name: self.route_start_nodes(name) for name in room_names}
         return self.run_pin_flow(room_names, targets, starts, edge_weights=edge_weights)
 
@@ -102,7 +104,8 @@ class SalFlowRuntime:
             add_route_clearance_weights=self.add_route_clearance_weights,
             add_route_interaction_weights=self.add_route_interaction_weights,
             route_diameter=self.route_diameter, count_crossings=self.count_crossings,
-            score_routes=self.score_routes, initial_edge_weights=edge_weights,
+            score_routes=self.score_routes, route_plan=self.route_plan,
+            initial_edge_weights=edge_weights,
         )
 
     def flow_context(self):
@@ -110,13 +113,13 @@ class SalFlowRuntime:
             env=self.env, small_diameter=self.small_diameter, large_diameter=self.large_diameter,
             build_routes=self.build_routes_from_paths, route_axis_records=self.route_axis_records,
             run_small_stage=self.run_small_stage, run_large_search=self.run_large_search,
-            build_weights=self.build_small_flow_weights,
+            build_weights=self.build_small_flow_weights, route_plan=self.route_plan,
         )
 
     def run_direct_small_pin_flow(self, room_names, pin_node_map, global_pins, chosen_pin, chosen_target, shaft_path, *, machine_angle):
         return run_direct_small_pin_flow(
             room_names, pin_node_map, global_pins, chosen_pin, chosen_target, shaft_path,
-            env=self.env, machine_angle=machine_angle, bend_cost=self.bend_cost,
+            route_plan=self.route_plan, env=self.env, machine_angle=machine_angle, bend_cost=self.bend_cost,
             route_start_nodes=self.route_start_nodes, route_segments_from_path=self.route_segments_from_path,
             route_axis_records=self.route_axis_records, add_route_clearance_weights=self.add_route_clearance_weights,
             add_route_interaction_weights=self.add_route_interaction_weights, route_diameter=self.route_diameter,

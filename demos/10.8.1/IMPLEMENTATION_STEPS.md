@@ -536,6 +536,11 @@ Manual validation milestones:
 
 ## Commit Checklist
 
+- Integrated `SalRoutePlan` as the single live owner of Sal shaft, kitchen, wet-room, and machine-port topology.
+- The Sal controller now builds one plan per solve and threads it through sequential, negotiated-congestion, and min-cost-flow execution; shared routing helpers receive the plan's shaft and port names explicitly.
+- Preserved existing small-room keyword filtering, distance ordering, large/small port tie-break order, and each strategy's missing-Kitchen behavior.
+- Validation: Python 3.11 `-m py_compile` on `main.py` and the changed Sal modules; Python 3.11 focused Sal/shared routing suite (50 passed); startup smoke completed without an exception.
+
 Before each commit:
 
 - `git status --short`

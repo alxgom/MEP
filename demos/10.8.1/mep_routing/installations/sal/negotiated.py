@@ -6,7 +6,7 @@ through a narrow context supplied by the application adapter.
 
 from dataclasses import dataclass
 
-from .routes import KITCHEN_ROUTE_NAME, SHAFT_ROUTE_NAME
+from .route_plan import SalRoutePlan
 
 
 @dataclass
@@ -45,6 +45,7 @@ def run_negotiated_congestion(
     shaft_boundary_nodes,
     shaft_node_idx,
     *,
+    route_plan: SalRoutePlan,
     context: SalNegotiatedContext,
     machine_angle,
     bend_cost,
@@ -59,7 +60,7 @@ def run_negotiated_congestion(
     history, and zero-crossing early success policy.  The caller owns elapsed
     time measurement and presentation of the resulting status text.
     """
-    nets = [SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME, *room_names]
+    nets = list(route_plan.all_routes)
     current_paths = {}
     current_pins = {}
     current_pin_targets = {}
@@ -71,15 +72,15 @@ def run_negotiated_congestion(
 
     for attempt in range(1, iterations + 1):
         for route_name in nets:
-            if route_name == SHAFT_ROUTE_NAME:
+            if route_name == route_plan.shaft_route:
                 start_nodes = shaft_boundary_nodes
-                target_pins = ["left_mid", "right_mid"]
-            elif route_name == KITCHEN_ROUTE_NAME:
-                start_nodes = context.route_start_nodes(KITCHEN_ROUTE_NAME)
+                target_pins = list(route_plan.large_ports)
+            elif route_name == route_plan.kitchen_route:
+                start_nodes = context.route_start_nodes(route_plan.kitchen_route)
                 if not start_nodes:
                     continue
-                shaft_pin = current_pins.get(SHAFT_ROUTE_NAME, "left_mid")
-                target_pins = ["right_mid" if shaft_pin == "left_mid" else "left_mid"]
+                shaft_pin = current_pins.get(route_plan.shaft_route, route_plan.large_ports[0])
+                target_pins = [route_plan.kitchen_port_for(shaft_pin)]
             else:
                 start_nodes = context.route_start_nodes(route_name)
                 if not start_nodes:
@@ -89,9 +90,9 @@ def run_negotiated_congestion(
                     for name in room_names
                     if name != route_name and name in current_pins
                 ]
-                target_pins = [pin for pin in ("tl", "tr", "bl", "br") if pin not in used_small_pins]
+                target_pins = [pin for pin in route_plan.small_ports if pin not in used_small_pins]
                 if not target_pins:
-                    target_pins = ["tl"]
+                    target_pins = [route_plan.small_ports[0]]
 
             current_paths[route_name] = None
             edge_usage, node_usage = _path_usage(current_paths.values())
@@ -105,6 +106,7 @@ def run_negotiated_congestion(
                 history_congestion,
                 node_history_congestion,
                 context,
+                route_plan,
                 favour_large,
                 present_penalty,
             )
@@ -153,6 +155,7 @@ def _weights_for_route(
     history_congestion,
     node_history_congestion,
     context,
+    route_plan,
     favour_large,
     present_penalty,
 ):
@@ -174,7 +177,7 @@ def _weights_for_route(
                 + max(node_usage.get(node, 0), node_usage.get(neighbour, 0)) * present_penalty
                 + max(node_history_congestion.get(node, 0.0), node_history_congestion.get(neighbour, 0.0))
             )
-            if favour_large and route_name in (SHAFT_ROUTE_NAME, KITCHEN_ROUTE_NAME):
+            if favour_large and route_name in route_plan.large_routes:
                 congestion *= 0.35
             weights[edge] = distance + congestion
 

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from mep_routing.installations.sal import run_sequential_routing
 from mep_routing.installations.sal import select_two_stage_routing
+from mep_routing.installations.sal.route_plan import build_sal_route_plan
 
 
 def test_sequential_strategy_routes_sal_large_routes_before_small_routes():
@@ -26,6 +27,7 @@ def test_sequential_strategy_routes_sal_large_routes_before_small_routes():
         "left_mid",
         {"pin": "left_mid"},
         [1, 2],
+        route_plan=build_sal_route_plan({"Kitchen": (1, 0), "Bathroom": (2, 0)}, (0, 0)),
         env=SimpleNamespace(adj={}),
         machine_angle=0,
         bend_cost=100,

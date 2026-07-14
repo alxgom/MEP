@@ -1,11 +1,13 @@
 from types import SimpleNamespace
 
 from mep_routing.installations.sal.flow_runtime import SalFlowRuntime
+from mep_routing.installations.sal.route_plan import build_sal_route_plan
 
 
 def test_small_pin_flow_returns_empty_result_without_route_names():
     runtime = SalFlowRuntime(
-        env=SimpleNamespace(adj={}), terminals={}, small_diameter=90, large_diameter=125,
+        env=SimpleNamespace(adj={}), route_plan=build_sal_route_plan({}, (0, 0)),
+        terminals={}, small_diameter=90, large_diameter=125,
         bend_cost=100, overlap_block_weight=1e9, source_start_nodes=lambda value: value,
         weighted_edge_cost=lambda *_args: 0, line_graph_direction=lambda *_args: 0,
         record_edge_weight_overlay=lambda *_args: None, route_start_nodes=lambda _name: [],
