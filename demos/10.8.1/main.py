@@ -85,12 +85,10 @@ from mep_routing.routing import (
     path_physical_length as _path_physical_length_for_env,
     route_conflict_summary as _route_conflict_summary,
     required_clearance_mm as _required_clearance_mm,
-    route_axis_records as _route_axis_records_for_policy,
     route_quality_warnings as _route_quality_warnings,
     route_segments_from_path as _route_segments_from_path_for_env,
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
-    set_block_weight as _set_block_weight,
     select_shaft_entry_nodes as _select_shaft_entry_nodes,
     shaft_entry_geometry as _shaft_entry_geometry_for_shaft,
     shaft_entry_segments as _shaft_entry_segments_for_geometry,
@@ -104,18 +102,11 @@ from mep_routing.routing import (
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
-from mep_routing.routing.search import run_super_sink_search as _run_super_sink_search_for_env
 from mep_routing.routing.weight_runtime import (
     EdgeWeightOverlay,
+    RoutingRuntime,
     RoutingWeightRuntimeContext,
     StaticClearanceCache,
-    add_machine_clearance_weights as _add_machine_clearance_weights_for_runtime,
-    add_route_clearance_weights as _add_route_clearance_weights_for_runtime,
-    add_route_interaction_weights as _add_route_interaction_weights_for_runtime,
-    add_static_clearance_weights as _add_static_clearance_weights_for_runtime,
-    record_weight_overlay as _record_weight_overlay,
-    refresh_weight_overlay as _refresh_weight_overlay,
-    route_axis_records_for_routes as _route_axis_records_for_runtime,
 )
 from mep_routing.ui import (
     cool_colormap as _cool_colormap_value,
@@ -930,11 +921,17 @@ def _edge_weight_overlay():
     return EdgeWeightOverlay(edge_weight_debug_map, edge_weight_overlay_excluded_edges)
 
 
-def _route_axis_records(route_name, route_segs):
-    if current_env is None:
-        return _route_axis_records_for_policy(route_name, route_segs, get_route_diameter)
-    return _route_axis_records_for_runtime(
-        route_name, route_segs, _routing_weight_runtime_context(current_env),
+def _routing_runtime(env, policy=None):
+    policy = policy or _sal_solver_policy()
+    return RoutingRuntime(
+        env,
+        _routing_weight_runtime_context(env, policy),
+        static_clearance_cache,
+        _edge_weight_overlay(),
+        search_backend=SAL_INSTALLATION.search_backends[router_backend_idx],
+        heuristic_mode=policy.heuristic_mode,
+        bend_cost=policy.bend_cost,
+        estimate_turns_fn=estimate_turns,
     )
 
 
@@ -950,84 +947,11 @@ def get_required_clearance_mm(diameter_a, diameter_b):
     return _required_clearance_mm(diameter_a, diameter_b, DUCT_BUFFER_RATIO)
 
 
-def add_static_clearance_weights(edge_weights, route_diameter, env, allow_shaft_entry=False, *, policy=None):
-    return _add_static_clearance_weights_for_runtime(
-        edge_weights,
-        route_diameter,
-        _routing_weight_runtime_context(env, policy),
-        static_clearance_cache,
-        allow_shaft_entry=allow_shaft_entry,
-    )
-
-
-def add_machine_clearance_weights(edge_weights, route_diameter, env, *, policy=None):
-    return _add_machine_clearance_weights_for_runtime(
-        edge_weights, route_diameter, _routing_weight_runtime_context(env, policy),
-    )
-
-
-def add_route_clearance_weights(edge_weights, route_name, env, *, shaft_route_name="Shaft", policy=None):
-    return _add_route_clearance_weights_for_runtime(
-        edge_weights, route_name, _routing_weight_runtime_context(env, policy), static_clearance_cache,
-        shaft_route_name=shaft_route_name,
-    )
-
-
-def add_route_interaction_weights(prior_axis_records, current_diameter, accumulated_weights, env, *, policy=None):
-    return _add_route_interaction_weights_for_runtime(
-        prior_axis_records, current_diameter, accumulated_weights, _routing_weight_runtime_context(env, policy),
-    )
-
-
-def _weighted_edge_cost(edge_weights, u, v, dist):
-    return _weighted_edge_cost_for_weights(edge_weights, u, v, dist)
-
-
-def set_terminal_block_weight(edge_weights, u, v, *, policy=None):
-    policy = policy or _sal_solver_policy()
-    edge = _set_block_weight(edge_weights, u, v, policy.overlap_block_weight)
-    edge_weight_overlay_excluded_edges.add(edge)
-
-
-def record_edge_weight_overlay(edge_weights, env, *, policy=None):
-    if edge_weights and env is not None:
-        _record_weight_overlay(edge_weights, _routing_weight_runtime_context(env, policy), _edge_weight_overlay())
-
-
 def refresh_edge_weight_view_overlay(routes):
     if current_env is None:
         return
     diameter = MACHINE_SMALL_DUCT_D if edge_weight_view_mode_idx == 0 else MACHINE_LARGE_DUCT_D
-    _refresh_weight_overlay(
-        routes,
-        diameter,
-        _routing_weight_runtime_context(current_env),
-        static_clearance_cache,
-        _edge_weight_overlay(),
-    )
-
-
-def _line_graph_dir_from_points(env, u, v):
-    return _line_graph_dir_from_points_for_env(env, u, v)
-
-def _path_physical_length(env, path):
-    return _path_physical_length_for_env(env, path)
-
-def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, *, policy=None):
-    policy = policy or _sal_solver_policy()
-    record_edge_weight_overlay(edge_weights, env, policy=policy)
-    return _run_super_sink_search_for_env(
-        SAL_INSTALLATION.search_backends[router_backend_idx],
-        env,
-        start_node_indices,
-        target_pin_names,
-        pin_node_map,
-        C_bend,
-        edge_weights=edge_weights,
-        heuristic_mode=policy.heuristic_mode,
-        machine_center=(machine_cx, machine_cy),
-        estimate_turns_fn=estimate_turns,
-    )
+    _routing_runtime(current_env).refresh_edge_weight_overlay(routes, diameter)
 
 def _room_polygon_by_name(room_name):
     return None if terminal_runtime is None else terminal_runtime.room_polygon(room_name)
@@ -1275,31 +1199,40 @@ def _build_routes_from_paths(route_order, paths, targets, global_pins, *, route_
 def _sal_flow_runtime(route_plan=None, policy=None):
     plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     policy = policy or _sal_solver_policy()
+    routing_runtime = _routing_runtime(current_env, policy)
     route_segments = lambda *args: _route_segments_from_path(*args, route_plan=plan)
-    route_clearance = lambda weights, name, env: add_route_clearance_weights(
-        weights, name, env, shaft_route_name=plan.shaft_route, policy=policy,
+    route_clearance = lambda weights, name, _env: routing_runtime.add_route_clearance_weights(
+        weights, name, shaft_route_name=plan.shaft_route,
     )
     return SalFlowRuntime(
         env=current_env, route_plan=plan, terminals=terminals, small_diameter=MACHINE_SMALL_DUCT_D,
         large_diameter=MACHINE_LARGE_DUCT_D, policy=policy,
-        source_start_nodes=_source_start_nodes, weighted_edge_cost=_weighted_edge_cost,
-        line_graph_direction=_line_graph_dir_from_points,
-        record_edge_weight_overlay=lambda weights, env: record_edge_weight_overlay(weights, env, policy=policy),
+        source_start_nodes=_source_start_nodes, weighted_edge_cost=_weighted_edge_cost_for_weights,
+        line_graph_direction=_line_graph_dir_from_points_for_env,
+        record_edge_weight_overlay=lambda weights, _env: routing_runtime.record_edge_weight_overlay(weights),
         route_start_nodes=get_route_start_nodes, route_segments_from_path=route_segments,
         build_routes_from_paths=lambda *args: _build_routes_from_paths(*args, route_plan=plan),
-        route_axis_records=_route_axis_records,
-        add_static_clearance_weights=lambda *args, **kwargs: add_static_clearance_weights(*args, **kwargs, policy=policy),
-        add_machine_clearance_weights=lambda *args: add_machine_clearance_weights(*args, policy=policy),
+        route_axis_records=routing_runtime.route_axis_records,
+        add_static_clearance_weights=lambda weights, diameter, _env, **kwargs: routing_runtime.add_static_clearance_weights(
+            weights, diameter, **kwargs,
+        ),
+        add_machine_clearance_weights=lambda weights, diameter, _env: routing_runtime.add_machine_clearance_weights(
+            weights, diameter,
+        ),
         add_route_clearance_weights=route_clearance,
-        add_route_interaction_weights=lambda *args: add_route_interaction_weights(*args, policy=policy),
+        add_route_interaction_weights=lambda axes, diameter, weights, _env: routing_runtime.add_route_interaction_weights(
+            axes, diameter, weights,
+        ),
         route_diameter=get_route_diameter,
-        run_search=lambda *args, **kwargs: run_super_sink_astar(*args, **kwargs, policy=policy),
+        run_search=lambda _env, starts, pins, pin_map, _global_pins, _angle, bend, **kwargs: routing_runtime.run_super_sink_search(
+            starts, pins, pin_map, bend_cost=bend, **kwargs,
+        ),
         count_crossings=count_segment_crossings,
         score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
         terminal_node_indices=lambda _pin_map, shaft_idx: _terminal_node_indices_for_kd(
             terminals, shaft_idx, grid_kd, shaft_route_name=plan.shaft_route,
         ),
-        set_terminal_block_weight=lambda *args: set_terminal_block_weight(*args, policy=policy),
+        set_terminal_block_weight=routing_runtime.set_terminal_block_weight,
     )
 
 def get_solution_score(routes, crossings, *, policy=None):
@@ -1521,7 +1454,6 @@ def run_auto_placement():
 def _sal_routing_controller_context():
     route_plan = SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     policy = _sal_solver_policy()
-    flow_runtime = _sal_flow_runtime(route_plan, policy)
 
     def preflight_error():
         global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
@@ -1550,26 +1482,25 @@ def _sal_routing_controller_context():
         )
 
     def add_shaft_clearance_weights(weights):
-        add_route_clearance_weights(
-            weights, route_plan.shaft_route, current_env,
-            shaft_route_name=route_plan.shaft_route, policy=policy,
+        _routing_runtime(current_env, policy).add_route_clearance_weights(
+            weights, route_plan.shaft_route, shaft_route_name=route_plan.shaft_route,
         )
 
     def run_shaft_search(boundary_nodes, pin_node_map, global_pins, bend_cost, weights):
-        return run_super_sink_astar(
-            current_env, boundary_nodes, list(route_plan.large_ports), pin_node_map,
-            global_pins, machine_angle, bend_cost, edge_weights=weights, policy=policy,
+        return _routing_runtime(current_env, policy).run_super_sink_search(
+            boundary_nodes, list(route_plan.large_ports), pin_node_map,
+            bend_cost=bend_cost, edge_weights=weights,
         )
 
     strategy_runtime = SalStrategyRuntime(
-        run_small_pin_flow=lambda prepared: flow_runtime.run_prepared_small_pin_flow(
+        run_small_pin_flow=lambda prepared: _sal_flow_runtime(route_plan, policy).run_prepared_small_pin_flow(
             prepared, machine_angle=machine_angle,
         ),
-        run_two_stage_flow=flow_runtime.run_prepared_two_stage,
-        run_negotiated=lambda prepared, favour_large: flow_runtime.run_prepared_negotiated(
+        run_two_stage_flow=lambda prepared: _sal_flow_runtime(route_plan, policy).run_prepared_two_stage(prepared),
+        run_negotiated=lambda prepared, favour_large: _sal_flow_runtime(route_plan, policy).run_prepared_negotiated(
             prepared, favour_large, machine_angle=machine_angle,
         ),
-        run_sequential=lambda prepared, room_order: flow_runtime.run_prepared_sequential(
+        run_sequential=lambda prepared, room_order: _sal_flow_runtime(route_plan, policy).run_prepared_sequential(
             prepared, room_order, machine_angle=machine_angle,
         ),
         count_crossings=count_segment_crossings,
@@ -1600,6 +1531,7 @@ def _sal_routing_controller_context():
 def solve_ventilation_routing():
     global edge_weight_debug_map, edge_weight_overlay_excluded_edges
     edge_weight_debug_map = {}
+    edge_weight_overlay_excluded_edges = set()
     result = _solve_sal_routing(_sal_routing_controller_context())
     edge_weight_overlay_excluded_edges = set(result.excluded_overlay_edges)
     return result.routes, result.status, result.elapsed_ms, result.total_nodes
@@ -1620,6 +1552,10 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     global machine_cx, machine_cy, machine_angle, _bnd_segs
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
     global terminal_runtime, graph_lifecycle, active_graph_runtime
+    global edge_weight_debug_map, edge_weight_overlay_excluded_edges, static_clearance_cache
+    edge_weight_debug_map = {}
+    edge_weight_overlay_excluded_edges = set()
+    static_clearance_cache = StaticClearanceCache()
     rooms = prepared.rooms
     columns = prepared.columns
     shafts = prepared.shafts

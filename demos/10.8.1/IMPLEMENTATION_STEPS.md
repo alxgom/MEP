@@ -572,6 +572,11 @@ Manual validation milestones:
 - Removed the duplicate sequential wrapper, negotiated-context factory, and controller-local strategy closures from `main.py`; no additional runtime abstraction was introduced.
 - Validation: focused Sal runtime/strategy/controller contracts plus dwelling-cycle and startup smoke.
 
+- Integrated the shared `RoutingRuntime` as the live owner of edge-clearance weights, overlays, and backend search dispatch.
+- Removed the duplicate weight/search adapters from `main.py`; Sal flow and shaft callbacks now construct their runtime only after graph refresh, preventing a solve from retaining the previous dwelling's graph.
+- Reset routing overlays and static-clearance cache when applying a dwelling and at solve start so cycled dwellings cannot retain stale edge identifiers.
+- Validation: Python compilation; 24 focused routing-runtime, Sal flow/controller/strategy tests; six solve events and eight dwelling/source-cycle events in one headless Pygame process; five-second startup smoke.
+
 Before each commit:
 
 - `git status --short`
