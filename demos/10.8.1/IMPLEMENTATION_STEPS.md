@@ -546,6 +546,10 @@ Manual validation milestones:
 - Preserved existing small-room keyword filtering, distance ordering, large/small port tie-break order, and each strategy's missing-Kitchen behavior.
 - Validation: Python 3.11 `-m py_compile` on `main.py` and the changed Sal modules; Python 3.11 focused Sal/shared routing suite (50 passed); startup smoke completed without an exception.
 
+- Integrated Sal min-cost-flow execution through the shared `RoutingProblem` / `SolverResult` pin-flow solver while preserving the existing tuple-return adapter for current strategies.
+- Exported the shared routing request/result and pin-flow payload contracts; Sal still owns terminal-to-node preparation, weight-overlay recording, and legacy incomplete-input outcomes.
+- Validation: Demo 10.7 Python 3.12 virtual environment compilation plus 11 shared routing-flow and 3 Sal flow-runtime contracts invoked directly because pytest is unavailable; the interactive app remained alive through a 10-second startup smoke.
+
 Before each commit:
 
 - `git status --short`

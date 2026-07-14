@@ -21,3 +21,64 @@ def test_small_pin_flow_returns_empty_result_without_route_names():
     )
 
     assert runtime.run_pin_flow([], {}, {}) == ({}, {}, 0.0, 0)
+
+
+def test_pin_flow_runtime_preserves_tuple_success_and_weight_overlay():
+    overlays = []
+    runtime = _runtime(
+        SimpleNamespace(adj={
+            0: [(1, 10.0, "H")],
+            1: [(0, 10.0, "H")],
+        }),
+        overlays,
+    )
+    target = {"pin": "tl", "node_idx": 1, "in_dir": "H"}
+
+    result = runtime.run_pin_flow(
+        ["Bathroom"],
+        {"Bathroom": [target]},
+        {"Bathroom": [0]},
+        edge_weights={(0, 1): 4.0},
+    )
+
+    assert result == (
+        {"Bathroom": [0, 1]},
+        {"Bathroom": target},
+        4.0,
+        1,
+    )
+    assert overlays == [({(0, 1): 4.0}, runtime.env)]
+
+
+def test_pin_flow_runtime_preserves_partial_flow_failure_count():
+    runtime = _runtime(SimpleNamespace(adj={0: [], 1: []}), [])
+    target = {"pin": "tl", "node_idx": 1, "in_dir": "H"}
+
+    assert runtime.run_pin_flow(
+        ["Bathroom"], {"Bathroom": [target]}, {"Bathroom": [0]}
+    ) == (None, None, 0.0, 0)
+    assert runtime.run_pin_flow(
+        ["Bathroom"], {"Bathroom": []}, {"Bathroom": [0]}
+    ) == (None, None, float("inf"), 0)
+    assert runtime.run_pin_flow(
+        ["Bathroom"], {"Bathroom": [target]}, {"Bathroom": []}
+    ) == (None, None, 0.0, 0)
+
+
+def _runtime(env, overlays):
+    return SalFlowRuntime(
+        env=env, route_plan=build_sal_route_plan({}, (0, 0)),
+        terminals={}, small_diameter=90, large_diameter=125,
+        policy=SalSolverPolicy(100, 5, 1.05, 200, 150, 1e9, 1.05, 0),
+        source_start_nodes=lambda value: value,
+        weighted_edge_cost=lambda weights, u, v, distance: weights.get((u, v), distance),
+        line_graph_direction=lambda _env, _u, _v: "H",
+        record_edge_weight_overlay=lambda weights, active_env: overlays.append((weights, active_env)),
+        route_start_nodes=lambda _name: [], route_segments_from_path=lambda *_args: [],
+        build_routes_from_paths=lambda *_args: ([], 0), route_axis_records=lambda *_args: [],
+        add_static_clearance_weights=lambda *_args, **_kwargs: None,
+        add_machine_clearance_weights=lambda *_args: None, add_route_clearance_weights=lambda *_args: None,
+        add_route_interaction_weights=lambda *_args: None, route_diameter=lambda _name: 90,
+        run_search=lambda *_args, **_kwargs: (None, None, None, None), count_crossings=lambda _routes: 0,
+        score_routes=lambda _routes, _crossings: 0,
+    )

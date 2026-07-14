@@ -51,14 +51,23 @@ from .weight_runtime import (
     refresh_weight_overlay,
 )
 from .flow import (
+    PinFlowRoute,
     add_edge,
     build_pin_min_cost_flow_network,
     min_cost_flow,
     pin_target_specs,
     positive_flow_edges,
     small_pin_target_specs,
+    solve_pin_flow,
     source_start_nodes,
     trace_flow_path,
+)
+from .contracts import (
+    RoutingProblem,
+    RoutingRequest,
+    SolvedRoute,
+    SolverFailure,
+    SolverResult,
 )
 from .scoring import (
     RouteScoreWeights,
@@ -90,9 +99,15 @@ from .shaft_entries import (
 from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
 
 __all__ = [
+    "PinFlowRoute",
     "RouteScoreWeights",
+    "RoutingProblem",
+    "RoutingRequest",
     "RoutingWeightRuntimeContext",
     "StaticClearanceCache",
+    "SolvedRoute",
+    "SolverFailure",
+    "SolverResult",
     "EdgeWeightOverlay",
     "add_edge",
     "add_machine_clearance_weights",
@@ -152,6 +167,7 @@ __all__ = [
     "shaft_representative_point",
     "source_start_nodes",
     "small_pin_target_specs",
+    "solve_pin_flow",
     "target_heuristic",
     "terminal_node_indices",
     "terminal_candidate_node_indices",

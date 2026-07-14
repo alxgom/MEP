@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 
 from mep_routing.routing import (
-    build_pin_min_cost_flow_network,
-    min_cost_flow,
+    RoutingProblem,
+    RoutingRequest,
     pin_target_specs,
-    trace_flow_path,
+    solve_pin_flow,
 )
 
 from .strategies import SalFlowContext, run_direct_small_pin_flow, run_small_flow_stage, search_large_route_candidates, select_two_stage_routing
@@ -46,25 +46,31 @@ class SalFlowRuntime:
             return {}, {}, 0.0, 0
         self.record_edge_weight_overlay(edge_weights, self.env)
         starts = {name: self.source_start_nodes(terminal_points_by_route[name]) for name in route_names}
-        network = build_pin_min_cost_flow_network(
-            route_names, target_specs_by_route, starts, self.env.adj,
-            lambda u, v, distance: self.weighted_edge_cost(edge_weights, u, v, distance),
-            lambda u, v: self.line_graph_direction(self.env, u, v),
-            self.policy.bend_cost, self.policy.overlap_block_weight,
-        )
-        if network is None:
+        if any(not target_specs_by_route.get(name) for name in route_names):
             return None, None, float("inf"), 0
-        graph, source, sink, route_nodes = network
-        flow, cost = min_cost_flow(graph, source, sink, len(route_names))
-        if flow < len(route_names):
-            return None, None, cost, flow
-        paths, targets = {}, {}
-        for name in route_names:
-            path, target = trace_flow_path(graph, route_nodes[name], sink)
-            if path is None:
-                return None, None, cost, flow
-            paths[name], targets[name] = path, target
-        return paths, targets, cost, flow
+        if any(not starts[name] for name in route_names):
+            return None, None, 0.0, 0
+        problem = RoutingProblem(
+            self.env,
+            tuple(RoutingRequest(
+                name,
+                tuple(starts[name]),
+                tuple(target_specs_by_route.get(name, ())),
+            ) for name in route_names),
+            edge_weights if edge_weights is not None else {},
+        )
+        result = solve_pin_flow(
+            problem,
+            edge_cost_fn=lambda weights, u, v, distance: self.weighted_edge_cost(weights, u, v, distance),
+            direction_fn=self.line_graph_direction,
+            bend_penalty=self.policy.bend_cost,
+            overlap_block_weight=self.policy.overlap_block_weight,
+        )
+        if not result.success:
+            return None, None, result.objective_cost, result.completed_request_count
+        paths = {route.request_key: list(route.route.path) for route in result.routes}
+        targets = {route.request_key: route.route.target for route in result.routes}
+        return paths, targets, result.objective_cost, result.completed_request_count
 
     def run_small_pin_flow(self, room_names, pin_node_map, edge_weights=None):
         targets = pin_target_specs(room_names, pin_node_map, self.route_plan.small_ports)
