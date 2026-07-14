@@ -591,6 +591,7 @@ Before each commit:
 - The active dwelling moved from machine placement into a canvas dropdown below the zoom controls, allowing direct selection of any configured real dwelling or a new synthetic dwelling.
 - Plot headers now format current values with metric-specific units and precision; the duplicated edge-weight row was removed from the solver card.
 - Plot text uses one Arial-compatible family: 16 px bold titles, 14 px bold current values, 13 px minimum labels, and 11 px annotations, all with lining figures.
+- Real dwelling choices are discovered from every row in the configured dwellings-export SQLite catalog; selection retains project identity and no longer depends on a hardcoded case list in `main.py`.
 
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.

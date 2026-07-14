@@ -22,6 +22,7 @@ from mep_routing.data_sources import (
     build_synthetic_dwelling as _build_synthetic_dwelling_for_layout,
     choose_initial_machine_position as _choose_initial_machine_position_for_dwelling,
     derive_room_boundary_walls as _derive_room_boundary_walls_for_dwelling,
+    discover_dwelling_cases as _discover_dwelling_cases,
     prepare_real_dwelling as _prepare_real_dwelling,
     prepare_synthetic_dwelling as _prepare_synthetic_dwelling,
 )
@@ -399,12 +400,13 @@ ROUTE_COLORS = {
 
 REAL_DWELLING_DB = _SALUBRIDAD_DEFAULTS.get_default("REAL_DWELLING_DB")
 PREFERRED_SHAFT_INSTALLATION = _SALUBRIDAD_DEFAULTS.get_default("PREFERRED_SHAFT_INSTALLATION")
-REAL_DWELLING_SCENARIOS = [
-    ("0002_real_c90", "A_A1_P00_V01"),
-    ("0004_real_7e4", "1_1_2_1"),
-    ("0001_real_2b2", "01_01_P04_V06"),
-    ("0001_real_2b2", "01_01_P01_V01"),
-]
+try:
+    REAL_DWELLING_SCENARIOS = _discover_dwelling_cases(REAL_DWELLING_DB)
+except (ImportError, OSError) as error:
+    print(f"Real dwelling catalog unavailable: {error}")
+    REAL_DWELLING_SCENARIOS = ()
+if not REAL_DWELLING_SCENARIOS:
+    dwelling_source_idx = DWELLING_SOURCE_MODES.index("Random Synthetic")
 ROUTING_FRAME_OPTIONS = [
     "dominant_walls",
     "area_inertia_allowed",
@@ -597,9 +599,7 @@ def draw_terminal_tool_buttons(screen, font_bold, font_small):
     terminal_tool_button_rects = _draw_terminal_tool_buttons(screen, font_bold, font_small, get_terminal_tool_buttons(), preferred_terminal_tool_mode, terminal_validity_overlay_enabled, text_color=COLOR_TEXT, muted_color=COLOR_MUTED, allowed_color=COLOR_TERMINAL_ALLOWED)
 
 def dwelling_selector_options():
-    return ("New random dwelling",) + tuple(
-        f"{execution} / {dwelling_id}" for execution, dwelling_id in REAL_DWELLING_SCENARIOS
-    )
+    return ("New random dwelling",) + tuple(case.label for case in REAL_DWELLING_SCENARIOS)
 
 
 def draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open=False):
@@ -1625,16 +1625,19 @@ def _load_real_dwelling():
     if not REAL_DWELLING_DB.exists():
         raise RuntimeError(f"Dwelling database not found: {REAL_DWELLING_DB}")
 
-    execution, dwelling_id = REAL_DWELLING_SCENARIOS[real_scenario_idx % len(REAL_DWELLING_SCENARIOS)]
+    if not REAL_DWELLING_SCENARIOS:
+        raise RuntimeError("Dwelling export database contains no cases.")
+    case = REAL_DWELLING_SCENARIOS[real_scenario_idx % len(REAL_DWELLING_SCENARIOS)]
     scenario = load_dwelling_scenario(
         db_path=REAL_DWELLING_DB,
-        execution=execution,
-        dwelling_id=dwelling_id,
+        execution=case.execution,
+        dwelling_id=case.dwelling_id,
+        project_guid=case.project_guid,
         scale_to_mm=True,
         frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx % len(ROUTING_FRAME_OPTIONS)],
         preferred_shaft_installation=PREFERRED_SHAFT_INSTALLATION,
     )
-    return scenario, f"{execution} / {dwelling_id}", scenario_summary(scenario) if scenario_summary else {}
+    return scenario, case.label, scenario_summary(scenario) if scenario_summary else {}
 
 def generate_new_dwelling():
     invalidate_room_start_node_cache()
