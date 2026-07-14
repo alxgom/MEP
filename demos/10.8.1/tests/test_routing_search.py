@@ -94,6 +94,7 @@ def test_terminal_node_indices_queries_kd_and_preserves_shaft_node():
         "Bath": 4,
         "Kitchen": 7,
     }
+    assert terminal_node_indices({}, 3, FakeKd(), shaft_route_name="Core") == {"Core": 3}
 
 
 def test_ordered_small_room_names_filters_and_sorts_by_machine_distance():

@@ -115,15 +115,20 @@ def source_start_nodes(source_spec, kd):
     return [int(start_idx)]
 
 
-def small_pin_target_specs(room_names, pin_node_map, small_pins=("tl", "tr", "bl", "br")):
+def pin_target_specs(route_names, pin_node_map, eligible_pins):
     return {
-        room_name: [
+        route_name: [
             target
-            for pin_name in small_pins
+            for pin_name in eligible_pins
             for target in pin_node_map.get(pin_name, [])
         ]
-        for room_name in room_names
+        for route_name in route_names
     }
+
+
+def small_pin_target_specs(room_names, pin_node_map, small_pins=("tl", "tr", "bl", "br")):
+    """Compatibility adapter for Sal's current small-port topology."""
+    return pin_target_specs(room_names, pin_node_map, small_pins)
 
 
 def build_pin_min_cost_flow_network(

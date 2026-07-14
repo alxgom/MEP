@@ -74,6 +74,12 @@ def test_route_clearance_allows_shaft_entry_only_for_shaft_route():
     assert room_weights[(0, 1)] == context.block_weight
     assert (0, 1) not in shaft_weights
 
+    core_weights = {}
+    add_route_clearance_weights(
+        core_weights, "Core", context, cache, shaft_route_name="Core",
+    )
+    assert (0, 1) not in core_weights
+
 
 def test_overlay_omits_excluded_blocks_and_normalizes_penalty_ratio():
     context = _context()

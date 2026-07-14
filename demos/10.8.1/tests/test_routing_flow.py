@@ -4,6 +4,7 @@ from mep_routing.routing import (
     add_edge,
     build_pin_min_cost_flow_network,
     min_cost_flow,
+    pin_target_specs,
     positive_flow_edges,
     small_pin_target_specs,
     source_start_nodes,
@@ -87,6 +88,9 @@ def test_small_pin_target_specs_collects_targets_for_each_room():
     assert specs == {
         "Bath": [{"pin": "tl", "node_idx": 1}, {"pin": "tr", "node_idx": 2}],
         "Toilet": [{"pin": "tl", "node_idx": 1}, {"pin": "tr", "node_idx": 2}],
+    }
+    assert pin_target_specs(["Supply"], pin_node_map, ("tr",)) == {
+        "Supply": [{"pin": "tr", "node_idx": 2}],
     }
 
 

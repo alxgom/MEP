@@ -114,6 +114,18 @@ def test_route_segments_from_path_adds_shaft_entry_path_edges_and_stub():
     ]
 
 
+def test_route_segments_from_path_accepts_installation_shaft_route_name():
+    segs = route_segments_from_path(
+        "Core",
+        [0, 1],
+        [(0, 0), (10, 0)],
+        shaft_entry_segments_fn=lambda out, _first: out.append(((-5.0, 0.0), (0.0, 0.0))),
+        shaft_route_name="Core",
+    )
+
+    assert segs[0] == ((-5.0, 0.0), (0.0, 0.0))
+
+
 def test_build_routes_from_paths_returns_routes_and_total_nodes():
     paths = {"Shaft": [0, 1], "Kitchen": [2, 3, 4]}
     targets = {"Shaft": {"pin": "left_mid"}, "Kitchen": {"pin": "right_mid"}}

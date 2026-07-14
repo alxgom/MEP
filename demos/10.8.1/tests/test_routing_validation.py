@@ -22,3 +22,15 @@ def test_allowed_region_warning_handles_missing_region_and_outside_segments():
         "existing",
         "1 segment(s) outside allowed",
     ]
+
+
+def test_allowed_region_warning_accepts_installation_shaft_route_name():
+    routes = [("Core", [((-2, 5), (2, 5))])]
+
+    assert append_allowed_region_warning(
+        [],
+        routes,
+        box(0, 0, 10, 10),
+        box(-3, 4, 1, 6),
+        shaft_route_name="Core",
+    ) == []

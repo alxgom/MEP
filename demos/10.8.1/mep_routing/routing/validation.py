@@ -29,10 +29,21 @@ def count_segments_outside_allowed_region(
     return outside_count
 
 
-def append_allowed_region_warning(warnings, routes, allowed_region, shaft_extraction=None):
+def append_allowed_region_warning(
+    warnings,
+    routes,
+    allowed_region,
+    shaft_extraction=None,
+    shaft_route_name="Shaft",
+):
     """Append the standard allowed-region warning when route geometry leaves the routing area."""
     result = list(warnings)
-    outside_count = count_segments_outside_allowed_region(routes, allowed_region, shaft_extraction)
+    outside_count = count_segments_outside_allowed_region(
+        routes,
+        allowed_region,
+        shaft_extraction,
+        shaft_route_name,
+    )
     if outside_count:
         result.append(f"{outside_count} segment(s) outside allowed")
     return result

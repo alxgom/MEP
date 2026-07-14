@@ -93,9 +93,10 @@ def route_segments_from_path(
     pin_name=None,
     global_pins=None,
     target=None,
+    shaft_route_name="Shaft",
 ):
     segs = []
-    if route_name == "Shaft" and path and shaft_entry_segments_fn is not None:
+    if route_name == shaft_route_name and path and shaft_entry_segments_fn is not None:
         shaft_entry_segments_fn(segs, path[0])
     for i in range(len(path) - 1):
         p1 = nodes[path[i]]

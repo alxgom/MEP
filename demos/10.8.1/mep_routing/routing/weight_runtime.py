@@ -154,6 +154,7 @@ def add_route_clearance_weights(
     route_name: str,
     context: RoutingWeightRuntimeContext,
     cache: StaticClearanceCache,
+    shaft_route_name: str = "Shaft",
 ) -> None:
     diameter = context.route_diameter(route_name)
     add_static_clearance_weights(
@@ -161,7 +162,7 @@ def add_route_clearance_weights(
         diameter,
         context,
         cache,
-        allow_shaft_entry=route_name == "Shaft",
+        allow_shaft_entry=route_name == shaft_route_name,
     )
     add_machine_clearance_weights(edge_weights, diameter, context)
 
