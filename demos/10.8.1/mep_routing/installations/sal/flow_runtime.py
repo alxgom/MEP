@@ -9,7 +9,15 @@ from mep_routing.routing import (
     solve_pin_flow,
 )
 
-from .strategies import SalFlowContext, run_direct_small_pin_flow, run_small_flow_stage, search_large_route_candidates, select_two_stage_routing
+from .negotiated import SalNegotiatedContext, run_negotiated_congestion
+from .strategies import (
+    SalFlowContext,
+    run_direct_small_pin_flow,
+    run_sequential_routing,
+    run_small_flow_stage,
+    search_large_route_candidates,
+    select_two_stage_routing,
+)
 from .route_plan import SalRoutePlan
 from .policy import SalSolverPolicy
 from .prepared import SalPreparedRoutingProblem
@@ -41,6 +49,8 @@ class SalFlowRuntime:
     run_search: object
     count_crossings: object
     score_routes: object
+    terminal_node_indices: object = None
+    set_terminal_block_weight: object = None
 
     def run_pin_flow(self, route_names, target_specs_by_route, terminal_points_by_route, edge_weights=None):
         if not route_names:
@@ -158,4 +168,58 @@ class SalFlowRuntime:
             prepared.pin_node_map,
             prepared.global_pins,
             prepared.shaft_path,
+        )
+
+    def run_prepared_sequential(self, prepared: SalPreparedRoutingProblem, room_order, *, machine_angle):
+        return run_sequential_routing(
+            room_order,
+            prepared.pin_node_map,
+            prepared.global_pins,
+            prepared.shaft_node_idx,
+            prepared.chosen_shaft_pin,
+            prepared.chosen_shaft_target,
+            prepared.shaft_path,
+            route_plan=prepared.route_plan,
+            env=self.env,
+            machine_angle=machine_angle,
+            bend_cost=prepared.policy.bend_cost,
+            route_start_nodes=self.route_start_nodes,
+            route_segments_from_path=self.route_segments_from_path,
+            run_search=self.run_search,
+            terminal_node_indices=self.terminal_node_indices,
+            set_terminal_block_weight=self.set_terminal_block_weight,
+            add_route_clearance_weights=self.add_route_clearance_weights,
+            add_route_interaction_weights=self.add_route_interaction_weights,
+            route_diameter=self.route_diameter,
+            route_axis_records=self.route_axis_records,
+        )
+
+    def negotiated_context(self):
+        return SalNegotiatedContext(
+            env=self.env,
+            route_start_nodes=self.route_start_nodes,
+            terminal_node_indices=self.terminal_node_indices,
+            set_terminal_block_weight=self.set_terminal_block_weight,
+            add_route_clearance_weights=self.add_route_clearance_weights,
+            add_route_interaction_weights=self.add_route_interaction_weights,
+            route_diameter=self.route_diameter,
+            route_segments_from_path=self.route_segments_from_path,
+            route_axis_records=self.route_axis_records,
+            run_search=self.run_search,
+            count_crossings=self.count_crossings,
+            score_routes=self.score_routes,
+        )
+
+    def run_prepared_negotiated(self, prepared: SalPreparedRoutingProblem, favour_large, *, machine_angle):
+        return run_negotiated_congestion(
+            prepared.route_plan.small_routes,
+            prepared.pin_node_map,
+            prepared.global_pins,
+            prepared.shaft_boundary_nodes,
+            prepared.shaft_node_idx,
+            route_plan=prepared.route_plan,
+            policy=prepared.policy,
+            context=self.negotiated_context(),
+            machine_angle=machine_angle,
+            favour_large=favour_large,
         )
