@@ -530,6 +530,10 @@ Manual validation milestones:
 - Validation: Python 3.11 `-m py_compile main.py mep_routing\\installations\\sal\\__init__.py mep_routing\\installations\\sal\\definition.py tests\\test_sal_definition.py`; Python 3.11 `-m pytest tests\\test_sal_definition.py tests\\test_machines.py tests\\test_sal_orchestration.py tests\\test_sal_controller.py` (15 passed).
 - Startup smoke: Demo 10.8.1 remained running after 8 seconds with definition-backed startup defaults.
 
+- Moved Sal's search-backend and heuristic selections into `SAL_INSTALLATION` and routed the live solver through the shared `SearchBackend` dispatcher.
+- Removed the parallel State A*, Line-Graph A*, and Line-Graph GBFS wrappers from `main.py`; the compatibility entrypoint still owns weight-overlay recording and supplies live heuristic inputs.
+- Validation: Demo 10.7 Python 3.12 virtual environment `-m py_compile` for the application, Sal definition, routing exports, and focused tests; eight direct backend/Sal/controller contracts passed because pytest is unavailable; the interactive app remained alive through a 10-second startup smoke.
+
 ## Commit Checklist
 
 Before each commit:

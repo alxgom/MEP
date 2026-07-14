@@ -98,8 +98,6 @@ from mep_routing.routing import (
     route_axis_records as _route_axis_records_for_policy,
     route_quality_warnings as _route_quality_warnings,
     route_segments_from_path as _route_segments_from_path_for_env,
-    run_super_sink_line_graph_search as _run_super_sink_line_graph_search_for_env,
-    run_super_sink_state_astar as _run_super_sink_state_astar_for_env,
     score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
     set_block_weight as _set_block_weight,
@@ -112,11 +110,11 @@ from mep_routing.routing import (
     source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
     terminal_validity_entries as _terminal_validity_entries,
-    target_heuristic as _target_heuristic_for_env,
     total_route_length_m as _total_route_length_m,
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
+from mep_routing.routing.search import run_super_sink_search as _run_super_sink_search_for_env
 from mep_routing.routing.weight_runtime import (
     EdgeWeightOverlay,
     RoutingWeightRuntimeContext,
@@ -305,20 +303,13 @@ routing_strategy_idx = SAL_INSTALLATION.routing_strategies.index(
     SAL_INSTALLATION.default_routing_strategy
 )
 
-ROUTER_BACKENDS = [
-    "State-expanded A*",
-    "Line graph L(G) A*",
-    "Line graph L(G) GBFS"
-]
-router_backend_idx = 0
+ROUTER_BACKENDS = SAL_INSTALLATION.search_backend_labels
+router_backend_idx = SAL_INSTALLATION.search_backends.index(
+    SAL_INSTALLATION.default_search_backend
+)
 
-HEURISTIC_MODES = [
-    "Pin + bends",
-    "Pin distance",
-    "Machine envelope",
-    "Zero",
-]
-heuristic_mode_idx = 0
+HEURISTIC_MODES = SAL_INSTALLATION.heuristic_mode_labels
+heuristic_mode_idx = HEURISTIC_MODES.index(SAL_INSTALLATION.default_heuristic_mode)
 
 AUTO_PLACEMENT_MODES = [
     "Manual",
@@ -1031,67 +1022,19 @@ def _line_graph_dir_from_points(env, u, v):
 def _path_physical_length(env, path):
     return _path_physical_length_for_env(env, path)
 
-def _target_heuristic(env, node_idx, incoming_dir, target_specs, C_bend):
-    return _target_heuristic_for_env(
-        env,
-        node_idx,
-        incoming_dir,
-        target_specs,
-        C_bend,
-        heuristic_mode_idx,
-        (machine_cx, machine_cy),
-        estimate_turns,
-    )
-
-def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
-    return _run_super_sink_state_astar_for_env(
-        env,
-        start_node_indices,
-        target_pin_names,
-        pin_node_map,
-        C_bend,
-        edge_weights=edge_weights,
-        heuristic_mode=heuristic_mode_idx,
-        machine_center=(machine_cx, machine_cy),
-        estimate_turns_fn=estimate_turns,
-    )
-
-def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, greedy=False):
-    return _run_super_sink_line_graph_search_for_env(
-        env,
-        start_node_indices,
-        target_pin_names,
-        pin_node_map,
-        C_bend,
-        edge_weights=edge_weights,
-        greedy=greedy,
-        heuristic_mode=heuristic_mode_idx,
-        machine_center=(machine_cx, machine_cy),
-        estimate_turns_fn=estimate_turns,
-    )
-
-def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
-    return _run_super_sink_line_graph_search(
-        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=False
-    )
-
-def _run_super_sink_line_graph_gbfs(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
-    return _run_super_sink_line_graph_search(
-        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=True
-    )
-
 def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     record_edge_weight_overlay(edge_weights, env)
-    if router_backend_idx == 1:
-        return _run_super_sink_line_graph_astar(
-            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
-        )
-    if router_backend_idx == 2:
-        return _run_super_sink_line_graph_gbfs(
-            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
-        )
-    return _run_super_sink_state_astar(
-        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
+    return _run_super_sink_search_for_env(
+        SAL_INSTALLATION.search_backends[router_backend_idx],
+        env,
+        start_node_indices,
+        target_pin_names,
+        pin_node_map,
+        C_bend,
+        edge_weights=edge_weights,
+        heuristic_mode=heuristic_mode_idx,
+        machine_center=(machine_cx, machine_cy),
+        estimate_turns_fn=estimate_turns,
     )
 
 def get_all_terminal_node_indices(pin_node_map, shaft_node_idx):
