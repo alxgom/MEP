@@ -2,9 +2,23 @@ from __future__ import annotations
 
 import math
 import heapq
+from enum import IntEnum
 from numbers import Integral
 
 from .clearance import weighted_edge_cost
+
+
+class SearchBackend(IntEnum):
+    """Stable selectors for the search backends exposed by the demo."""
+
+    STATE_ASTAR = 0
+    LINE_GRAPH_ASTAR = 1
+    LINE_GRAPH_GBFS = 2
+
+
+def coerce_search_backend(backend):
+    """Return a typed backend while retaining the current integer selectors."""
+    return SearchBackend(backend)
 
 
 def line_graph_dir_from_points(env, u, v):
@@ -312,3 +326,43 @@ def run_super_sink_line_graph_search(
     path = [states[0][0]]
     path.extend(state[1] for state in states)
     return path, path_physical_length(env, path), best_target["pin"], best_target
+
+
+def run_super_sink_search(
+    backend,
+    env,
+    start_node_indices,
+    target_pin_names,
+    pin_node_map,
+    bend_cost,
+    edge_weights=None,
+    heuristic_mode=0,
+    machine_center=(0.0, 0.0),
+    estimate_turns_fn=None,
+):
+    """Run one of the existing super-sink algorithms by stable selector."""
+    selected = coerce_search_backend(backend)
+    common = dict(
+        edge_weights=edge_weights,
+        heuristic_mode=heuristic_mode,
+        machine_center=machine_center,
+        estimate_turns_fn=estimate_turns_fn,
+    )
+    if selected is SearchBackend.STATE_ASTAR:
+        return run_super_sink_state_astar(
+            env,
+            start_node_indices,
+            target_pin_names,
+            pin_node_map,
+            bend_cost,
+            **common,
+        )
+    return run_super_sink_line_graph_search(
+        env,
+        start_node_indices,
+        target_pin_names,
+        pin_node_map,
+        bend_cost,
+        greedy=selected is SearchBackend.LINE_GRAPH_GBFS,
+        **common,
+    )
