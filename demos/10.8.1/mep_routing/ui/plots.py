@@ -16,10 +16,10 @@ def format_current_value(metric_index, value):
     return f"{value:.1f} ms"
 
 
-def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width, buffers, sample_count, event_markers, background, text_color, muted_color):
+def draw_routing_plots(screen, font_small, font_bold, font_value, font_minimum, window_width, panel_width, buffers, sample_count, event_markers, background, text_color, muted_color):
     import pygame
     x, width, height, gap = window_width - panel_width + 8, panel_width - 24, 104, 8
-    titles = ("DUCT LENGTH", "COST SCORE", "TURNS", "TURNS / METRE", "SOLVER TIME")
+    titles = ("DUCT LENGTH", "COST SCORE", "TURNS", "TURNS / M", "SOLVER TIME")
     colors = ((46, 204, 113), (241, 196, 15), (155, 89, 182), (26, 188, 156), (52, 152, 219))
     for index, (title, buffer, color) in enumerate(zip(titles, buffers, colors)):
         y = 50 + index * (height + gap)
@@ -32,7 +32,7 @@ def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width,
             current, minimum = values[-1], min(values)
             pct = "0.0%" if abs(minimum) < 1e-5 else f"+{max(0.0, (current - minimum) / minimum * 100):.1f}%"
             value_text = format_current_value(index, current)
-            current_label = font_bold.render(f"{value_text}  {pct}", True, text_color)
+            current_label = font_value.render(f"{value_text}  {pct}", True, text_color)
             screen.blit(current_label, (x + width - current_label.get_width(), y + 6))
         if count < 2:
             screen.blit(font_small.render("Move machine to trace…", True, muted_color), (x, chart_y + chart_h // 2 - 8)); continue
@@ -60,5 +60,5 @@ def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width,
             pygame.draw.polygon(screen, marker_color, diamond); pygame.draw.polygon(screen, (255, 255, 255), diamond, 1)
             marker_label = font_small.render(label, True, marker_color)
             screen.blit(marker_label, (marker_x + 8, max(chart_y, marker_y - 8)))
-        minimum_label = font_small.render(f"Min: {minimum:.1f}", True, (231, 76, 60))
+        minimum_label = font_minimum.render(f"Min: {minimum:.1f}", True, (231, 76, 60))
         screen.blit(minimum_label, (x + width - minimum_label.get_width(), chart_y + chart_h + 2))

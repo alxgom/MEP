@@ -1858,9 +1858,9 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
         muted_color=COLOR_MUTED,
     )
 
-def draw_plots(screen, font_small, font_bold):
+def draw_plots(screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum):
     return _draw_routing_plots(
-        screen, font_small, font_bold, WINDOW_WIDTH, PANEL_W,
+        screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum, WINDOW_WIDTH, PANEL_W,
         routing_history.buffers,
         routing_history.sample_count, routing_history.event_markers, COLOR_PLOT_BG, COLOR_TEXT, COLOR_MUTED,
     )
@@ -1980,6 +1980,11 @@ def main():
     font_title = pygame.font.SysFont("Outfit", 24, bold=True)
     font_bold = pygame.font.SysFont("Outfit", 18, bold=True)
     font_small = pygame.font.SysFont("Outfit", 15)
+    plot_font_family = "Arial, Liberation Sans, DejaVu Sans"
+    font_plot_small = pygame.font.SysFont(plot_font_family, 11)
+    font_plot_title = pygame.font.SysFont(plot_font_family, 16, bold=True)
+    font_plot_value = pygame.font.SysFont(plot_font_family, 14, bold=True)
+    font_plot_minimum = pygame.font.SysFont(plot_font_family, 13)
     
     generate_new_dwelling()
     
@@ -2746,7 +2751,7 @@ def main():
         pygame.draw.line(screen, (55, 55, 70), (panel_x, 0), (panel_x, WINDOW_HEIGHT))
         lbl_panel = font_bold.render("PLACEMENT EXPLORER", True, COLOR_MUTED)
         screen.blit(lbl_panel, (panel_x + PANEL_W // 2 - lbl_panel.get_width() // 2, 8))
-        draw_plots(screen, font_small, font_bold)
+        draw_plots(screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum)
         draw_solution_logs_panel(screen, font_small, font_bold)
         draw_help_popup(screen, font_small)
         draw_transient_message(screen, font_small)
