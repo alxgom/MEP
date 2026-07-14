@@ -25,8 +25,7 @@ from mep_routing.data_sources import (
     prepare_synthetic_dwelling as _prepare_synthetic_dwelling,
 )
 from mep_routing.installations.sal import (
-    LARGE_DUCT_ROUTE_NAMES,
-    SAL_OZEO_FLAT_MACHINE,
+    SAL_INSTALLATION,
     SalRoutingControllerContext,
     SalFlowContext,
     solve_routing as _solve_sal_routing,
@@ -260,7 +259,7 @@ HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Ha
 CORE_EPSILON_GRID_MM = _SALUBRIDAD_DEFAULTS.get_default("CORE_EPSILON_GRID_MM")
 GRID_SPACING = _SALUBRIDAD_DEFAULTS.get_default("GRID_SPACING")
 HANNAN_SCAFFOLD_SPACING = _SALUBRIDAD_DEFAULTS.get_default("HANNAN_SCAFFOLD_SPACING")
-MACHINE_SPEC = SAL_OZEO_FLAT_MACHINE
+MACHINE_SPEC = SAL_INSTALLATION.default_machine
 SMALL_PIN_STUB_LENGTH = MACHINE_SPEC.small_pin_stub_length_mm
 LARGE_PIN_STUB_LENGTH = MACHINE_SPEC.large_pin_stub_length_mm
 MACHINE_CLEARANCE = 0
@@ -298,23 +297,13 @@ SHORT_PIECE_SCORE_PENALTY = 2 * C_BEND
 min_piece_factor = MIN_PIECE_FACTOR_DEFAULT
 
 # Graph types
-GRAPH_TYPES = [
-    "Regular 200mm Grid",
-    "Hannan Grid (numpy)",
-    "Epsilon Grid (core-like numpy)",
-]
-graph_type_idx = 1
+GRAPH_TYPES = SAL_INSTALLATION.graph_modes
+graph_type_idx = GRAPH_TYPES.index(SAL_INSTALLATION.default_graph_mode)
 
-ROUTING_STRATEGIES = [
-    "Greedy (Dual-Sort)",
-    "First Fit",
-    "Best Fit",
-    "Negotiated Congestion",
-    "Negotiated Congestion (Favour Large)",
-    "Min-Cost Flow (Small Pins)",
-    "Min-Cost Flow (Two-Stage)"
-]
-routing_strategy_idx = 1
+ROUTING_STRATEGIES = SAL_INSTALLATION.strategy_labels
+routing_strategy_idx = SAL_INSTALLATION.routing_strategies.index(
+    SAL_INSTALLATION.default_routing_strategy
+)
 
 ROUTER_BACKENDS = [
     "State-expanded A*",
@@ -970,7 +959,7 @@ def _route_axis_records(route_name, route_segs):
 
 
 def get_route_diameter(route_name):
-    return MACHINE_SPEC.route_diameter_mm(route_name)
+    return SAL_INSTALLATION.route_diameter_mm(route_name)
 
 
 def get_buffered_radius_mm(diameter_mm):
@@ -1908,7 +1897,7 @@ def draw_edge_weight_colorbar(screen):
 def get_route_draw_width(route_name):
     if route_real_diameter_width_enabled:
         return max(1, int(round(get_route_diameter(route_name) * SCALE_PX_PER_MM)))
-    return 5 if route_name in LARGE_DUCT_ROUTE_NAMES else 3
+    return 5 if SAL_INSTALLATION.is_large_route(route_name) else 3
 
 def record_history(routes, crossings_count, elapsed_ms):
     """Append one solved-route observation to the app-owned history session."""

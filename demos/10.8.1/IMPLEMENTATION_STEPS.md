@@ -525,6 +525,11 @@ Manual validation milestones:
 - Restored missing startup defaults for the selected graph and grid visibility, restored the shared polygon iterator adapter, and routed canvas toolbar drawing through `mep_routing.ui.canvas_tools`.
 - Validation: Demo 10.7 Python 3.12 virtual environment kept the interactive application running through a 19-second startup smoke without an exception.
 
+- Added a compact `SalInstallationDefinition` and integrated it as the live owner of Sal's current machine catalog, route diameter classification, supported graph modes, supported solver strategies, and default selections.
+- Removed the duplicated machine, graph-label, strategy-label, default-index, and large-route policy declarations from `main.py` while preserving the existing UI labels and selector indices.
+- Validation: Python 3.11 `-m py_compile main.py mep_routing\\installations\\sal\\__init__.py mep_routing\\installations\\sal\\definition.py tests\\test_sal_definition.py`; Python 3.11 `-m pytest tests\\test_sal_definition.py tests\\test_machines.py tests\\test_sal_orchestration.py tests\\test_sal_controller.py` (15 passed).
+- Startup smoke: Demo 10.8.1 remained running after 8 seconds with definition-backed startup defaults.
+
 ## Commit Checklist
 
 Before each commit:
