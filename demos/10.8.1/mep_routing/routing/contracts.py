@@ -77,6 +77,8 @@ class SolverResult(Generic[Route]):
     failure: SolverFailure | None = None
     elapsed_ms: float = 0.0
     route_node_count: int = 0
+    objective_cost: float = 0.0
+    completed_request_count: int = 0
 
     def __post_init__(self) -> None:
         if self.routes and self.failure is not None:
@@ -85,6 +87,8 @@ class SolverResult(Generic[Route]):
             raise ValueError("solver elapsed time must not be negative")
         if self.route_node_count < 0:
             raise ValueError("solver route-node count must not be negative")
+        if self.completed_request_count < 0:
+            raise ValueError("completed-request count must not be negative")
 
     @property
     def success(self) -> bool:

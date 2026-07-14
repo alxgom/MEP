@@ -1,5 +1,8 @@
 import numpy as np
 
+from mep_routing.routing.contracts import RoutingProblem, RoutingRequest
+from mep_routing.routing.flow import solve_pin_flow
+
 from mep_routing.routing import (
     add_edge,
     build_pin_min_cost_flow_network,
@@ -128,3 +131,53 @@ def test_pin_min_cost_flow_network_returns_none_without_targets():
         bend_penalty=0.0,
         overlap_block_weight=1e9,
     ) is None
+
+
+def test_pin_flow_solver_returns_contract_routes_cost_and_node_count():
+    class Env:
+        adj = {
+            0: [(1, 10.0, "H")],
+            1: [(0, 10.0, "H")],
+        }
+
+    target = {"pin": "left_mid", "node_idx": 1, "in_dir": "H"}
+    problem = RoutingProblem(
+        Env(),
+        (RoutingRequest("Shaft", (0,), (target,)),),
+        {(0, 1): 4.0},
+    )
+
+    result = solve_pin_flow(
+        problem,
+        edge_cost_fn=lambda weights, u, v, distance: weights.get((u, v), distance),
+        direction_fn=lambda _env, _u, _v: "H",
+        bend_penalty=50.0,
+        overlap_block_weight=1e9,
+    )
+
+    assert result.success
+    assert result.objective_cost == 4.0
+    assert result.route_node_count == 2
+    assert result.completed_request_count == 1
+    assert result.routes[0].request_key == "Shaft"
+    assert result.routes[0].route.path == (0, 1)
+    assert result.routes[0].route.target is target
+
+
+def test_pin_flow_solver_returns_structured_failure_for_unroutable_requests():
+    class Env:
+        adj = {0: [], 1: []}
+
+    target = {"pin": "left_mid", "node_idx": 1, "in_dir": "H"}
+    result = solve_pin_flow(
+        RoutingProblem(Env(), (RoutingRequest("Shaft", (0,), (target,)),)),
+        edge_cost_fn=lambda _weights, _u, _v, distance: distance,
+        direction_fn=lambda _env, _u, _v: "H",
+        bend_penalty=0.0,
+        overlap_block_weight=1e9,
+    )
+
+    assert not result.success
+    assert result.failure.code == "insufficient_flow"
+    assert result.objective_cost == 0.0
+    assert result.completed_request_count == 0

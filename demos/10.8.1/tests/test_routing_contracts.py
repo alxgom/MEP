@@ -40,6 +40,8 @@ def test_result_has_structured_success_and_failure_outcomes():
         routes=(SolvedRoute("bathroom", (1, 3, 8)),),
         elapsed_ms=4.5,
         route_node_count=12,
+        objective_cost=18.0,
+        completed_request_count=1,
     )
     failure = SolverResult(
         failure=SolverFailure("no_path", "No route reaches a target", "bathroom")
@@ -48,6 +50,8 @@ def test_result_has_structured_success_and_failure_outcomes():
     assert success.success
     assert success.routes[0].route == (1, 3, 8)
     assert success.route_node_count == 12
+    assert success.objective_cost == 18.0
+    assert success.completed_request_count == 1
     assert not failure.success
     assert failure.failure.request_key == "bathroom"
     with pytest.raises(ValueError, match="both routes and a failure"):

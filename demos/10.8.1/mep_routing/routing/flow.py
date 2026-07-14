@@ -1,7 +1,22 @@
 from __future__ import annotations
 
 import heapq
+from dataclasses import dataclass
 from numbers import Integral
+from typing import Generic, TypeVar
+
+from .contracts import RoutingProblem, SolvedRoute, SolverFailure, SolverResult
+
+
+Target = TypeVar("Target")
+
+
+@dataclass(frozen=True)
+class PinFlowRoute(Generic[Target]):
+    """A routed graph path and the selected eligible pin target."""
+
+    path: tuple[int, ...]
+    target: Target
 
 
 def add_edge(graph, u, v, cap, cost, meta=None):
@@ -217,3 +232,81 @@ def build_pin_min_cost_flow_network(
                 add_edge(graph, state_out, spec_node, 1, final_penalty)
 
     return graph, source, sink, route_flow_nodes
+
+
+def solve_pin_flow(
+    problem: RoutingProblem,
+    *,
+    edge_cost_fn,
+    direction_fn,
+    bend_penalty,
+    overlap_block_weight,
+):
+    """Solve named pin-routing requests on a shared min-cost-flow network."""
+    if not problem.requests:
+        return SolverResult()
+
+    route_names = tuple(request.key for request in problem.requests)
+    target_specs = {
+        request.key: request.target_candidates
+        for request in problem.requests
+    }
+    start_nodes = {
+        request.key: request.source_nodes
+        for request in problem.requests
+    }
+    network = build_pin_min_cost_flow_network(
+        route_names,
+        target_specs,
+        start_nodes,
+        problem.graph.adj,
+        lambda u, v, distance: edge_cost_fn(
+            problem.edge_weights, u, v, distance
+        ),
+        lambda u, v: direction_fn(problem.graph, u, v),
+        bend_penalty,
+        overlap_block_weight,
+    )
+    if network is None:
+        return SolverResult(
+            failure=SolverFailure("no_targets", "No eligible pin targets"),
+            objective_cost=float("inf"),
+        )
+
+    graph, source, sink, route_nodes = network
+    flow, cost = min_cost_flow(graph, source, sink, len(route_names))
+    if flow < len(route_names):
+        return SolverResult(
+            failure=SolverFailure(
+                "insufficient_flow",
+                f"Routed {flow} of {len(route_names)} requests",
+            ),
+            objective_cost=cost,
+            completed_request_count=flow,
+        )
+
+    solved_routes = []
+    route_node_count = 0
+    for request in problem.requests:
+        path, target = trace_flow_path(graph, route_nodes[request.key], sink)
+        if path is None:
+            return SolverResult(
+                failure=SolverFailure(
+                    "invalid_flow_path",
+                    "Flow could not be reconstructed",
+                    request.key,
+                ),
+                objective_cost=cost,
+            )
+        route_node_count += len(path)
+        solved_routes.append(SolvedRoute(
+            request.key,
+            PinFlowRoute(tuple(path), target),
+        ))
+
+    return SolverResult(
+        routes=tuple(solved_routes),
+        route_node_count=route_node_count,
+        objective_cost=cost,
+        completed_request_count=flow,
+    )
