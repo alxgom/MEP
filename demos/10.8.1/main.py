@@ -4,6 +4,7 @@ import math
 import time
 import itertools
 import heapq
+import traceback
 from pathlib import Path
 from dataclasses import replace as _replace
 import numpy as np
@@ -1289,12 +1290,6 @@ def run_sequential_routing(route_plan, perm, pin_node_map, global_pins, shaft_no
 def _source_start_nodes(source_spec):
     return _source_start_nodes_for_kd(source_spec, grid_kd)
 
-def _run_pin_min_cost_flow(route_names, target_specs_by_route, terminal_points_by_route, edge_weights=None):
-    return _sal_flow_runtime().run_pin_flow(route_names, target_specs_by_route, terminal_points_by_route, edge_weights)
-
-def _run_small_pin_min_cost_flow(room_names, pin_node_map, edge_weights=None):
-    return _sal_flow_runtime().run_small_pin_flow(room_names, pin_node_map, edge_weights)
-
 def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None, *, route_plan=None):
     plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     return _route_segments_from_path_for_env(
@@ -1341,21 +1336,6 @@ def _sal_flow_runtime(route_plan=None, policy=None):
         score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
     )
 
-def _route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights=None):
-    return _sal_flow_runtime().route_one_pin_flow(route_name, target_pin, terminal_point, pin_node_map, edge_weights)
-
-def _run_large_pin_candidate_search(pin_node_map, shaft_boundary_nodes, edge_weights=None):
-    return _sal_flow_runtime().run_large_search(pin_node_map, shaft_boundary_nodes, edge_weights)
-
-def _build_small_flow_weights(prior_axis_records, small_diameter, env):
-    return _sal_flow_runtime().build_small_flow_weights(prior_axis_records, small_diameter, env)
-
-def _run_sal_small_flow(room_names, pin_node_map, global_pins, prior_axis_records):
-    return _sal_flow_runtime().run_small_stage(room_names, pin_node_map, global_pins, prior_axis_records)
-
-def _sal_flow_context():
-    return _sal_flow_runtime().flow_context()
-
 def _sal_negotiated_context(route_plan=None, policy=None):
     plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     policy = policy or _sal_solver_policy()
@@ -1377,18 +1357,6 @@ def _sal_negotiated_context(route_plan=None, policy=None):
         count_crossings=count_segment_crossings,
         score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
     )
-
-def run_small_pin_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_exhaust_pin, chosen_exhaust_target, shaft_path):
-    return _sal_flow_runtime().run_direct_small_pin_flow(room_names, pin_node_map, global_pins, chosen_exhaust_pin, chosen_exhaust_target, shaft_path, machine_angle=machine_angle)
-
-def _run_two_stage_big_first(room_names, pin_node_map, global_pins, shaft_path):
-    return _sal_flow_context().run_big_first(room_names, pin_node_map, global_pins, shaft_path)
-
-def _run_two_stage_small_first(room_names, pin_node_map, global_pins, shaft_path):
-    return _sal_flow_context().run_small_first(room_names, pin_node_map, global_pins, shaft_path)
-
-def run_two_stage_min_cost_flow_routing(room_names, pin_node_map, global_pins, shaft_path):
-    return _sal_flow_runtime().run_two_stage(room_names, pin_node_map, global_pins, shaft_path)
 
 def get_solution_score(routes, crossings, *, policy=None):
     policy = policy or _sal_solver_policy()
@@ -2920,4 +2888,10 @@ def main():
     pygame.quit()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        error_log = Path(__file__).with_name("runtime_stderr.log")
+        with error_log.open("a", encoding="utf-8") as stream:
+            traceback.print_exc(file=stream)
+        raise

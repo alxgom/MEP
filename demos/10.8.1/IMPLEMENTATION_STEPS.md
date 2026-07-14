@@ -565,6 +565,9 @@ Manual validation milestones:
 - Exported the shared routing request/result and pin-flow payload contracts; Sal still owns terminal-to-node preparation, weight-overlay recording, and legacy incomplete-input outcomes.
 - Validation: Demo 10.7 Python 3.12 virtual environment compilation plus 11 shared routing-flow and 3 Sal flow-runtime contracts invoked directly because pytest is unavailable; the interactive app remained alive through a 10-second startup smoke.
 
+- Removed unused Sal flow compatibility wrappers left behind after prepared-strategy integration and added persistent traceback capture for uncaught interactive crashes.
+- Validation: all four real dwellings loaded and routed; six dwelling-cycle events including wraparound and eight source-mode toggles completed in the headless Pygame loop without an exception.
+
 Before each commit:
 
 - `git status --short`
