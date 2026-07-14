@@ -3,10 +3,23 @@
 from __future__ import annotations
 
 
+def format_current_value(metric_index, value):
+    """Format a plot value with its metric-specific precision and unit."""
+    if metric_index == 0:
+        return f"{value:.1f} m"
+    if metric_index == 1:
+        return str(int(round(value)))
+    if metric_index == 2:
+        return str(int(round(value)))
+    if metric_index == 3:
+        return f"{value:.2f} turns/m"
+    return f"{value:.1f} ms"
+
+
 def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width, buffers, sample_count, event_markers, background, text_color, muted_color):
     import pygame
     x, width, height, gap = window_width - panel_width + 8, panel_width - 24, 104, 8
-    titles = ("DUCT LENGTH  (m)", "COST SCORE", "TURNS", "TURNS / METRE", "SOLVER TIME (ms)")
+    titles = ("DUCT LENGTH", "COST SCORE", "TURNS", "TURNS / METRE", "SOLVER TIME")
     colors = ((46, 204, 113), (241, 196, 15), (155, 89, 182), (26, 188, 156), (52, 152, 219))
     for index, (title, buffer, color) in enumerate(zip(titles, buffers, colors)):
         y = 50 + index * (height + gap)
@@ -18,7 +31,8 @@ def draw_routing_plots(screen, font_small, font_bold, window_width, panel_width,
             values = list(buffer)
             current, minimum = values[-1], min(values)
             pct = "0.0%" if abs(minimum) < 1e-5 else f"+{max(0.0, (current - minimum) / minimum * 100):.1f}%"
-            current_label = font_small.render(f"{current:.1f}  {pct}", True, text_color)
+            value_text = format_current_value(index, current)
+            current_label = font_bold.render(f"{value_text}  {pct}", True, text_color)
             screen.blit(current_label, (x + width - current_label.get_width(), y + 6))
         if count < 2:
             screen.blit(font_small.render("Move machine to trace…", True, muted_color), (x, chart_y + chart_h // 2 - 8)); continue

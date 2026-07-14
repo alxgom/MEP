@@ -48,7 +48,6 @@ class SolverCard:
     heuristic: str
     grid_type: str
     starts: str
-    edge_weights: str
     selected_route: str
     preferred_terminal_count: int
     bend_value: float
@@ -167,7 +166,7 @@ def draw_sidebar(
     )
     screen.blit(fonts.small.render(f"[U] Rotation: {view.auto_placement.rotation_mode}", True, colors.muted), (text_x, 195))
 
-    solver_card = pygame.Rect(15, 220, card_width, 250)
+    solver_card = pygame.Rect(15, 220, card_width, 230)
     pygame.draw.rect(screen, colors.card, solver_card, border_radius=6)
     screen.blit(fonts.bold.render("ROUTING PATH SOLVER", True, colors.text), (text_x, 230))
     draw_help_button("solver", solver_card, fonts.small)
@@ -177,42 +176,41 @@ def draw_sidebar(
         (f"Heuristic: {view.solver.heuristic}", 290),
         (f"Grid type: {view.solver.grid_type}", 310),
         (f"Starts: {view.solver.starts}", 330),
-        (f"Edge weights: {view.solver.edge_weights}", 350),
-        (format_selected_route(view.solver.selected_route, view.solver.preferred_terminal_count), 365),
+        (format_selected_route(view.solver.selected_route, view.solver.preferred_terminal_count), 350),
     )
     for label, y in solver_rows:
         screen.blit(fonts.small.render(label, True, colors.text), (text_x, y))
-    draw_min_piece_slider(screen, fonts.small, text_x, 385, canvas_left - 70)
+    draw_min_piece_slider(screen, fonts.small, text_x, 370, canvas_left - 70)
     draw_weight_slider(
-        screen, fonts.small, text_x, 420, canvas_left - 70, "Bend weight",
+        screen, fonts.small, text_x, 405, canvas_left - 70, "Bend weight",
         view.solver.bend_value, view.solver.bend_min, view.solver.bend_max,
         (155, 89, 182), "bend", "", True,
     )
     draw_weight_slider(
-        screen, fonts.small, text_x, 452, canvas_left - 70, "Cross x bend",
+        screen, fonts.small, text_x, 432, canvas_left - 70, "Cross x bend",
         view.solver.crossing_value, view.solver.crossing_min, view.solver.crossing_max,
         (230, 126, 34), "crossing", "x", False,
     )
 
-    machine_card = pygame.Rect(15, 480, card_width, 85)
+    machine_card = pygame.Rect(15, 460, card_width, 85)
     pygame.draw.rect(screen, colors.card, machine_card, border_radius=6)
-    screen.blit(fonts.bold.render("MACHINE PLACEMENT", True, colors.text), (text_x, 490))
+    screen.blit(fonts.bold.render("MACHINE PLACEMENT", True, colors.text), (text_x, 470))
     draw_help_button("machine", machine_card, fonts.small)
-    screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 510))
+    screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 490))
     machine_x, machine_y = view.machine.position_mm
-    screen.blit(fonts.small.render(f"Position: ({int(machine_x)}, {int(machine_y)}) mm", True, colors.text), (text_x, 530))
-    screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 550))
+    screen.blit(fonts.small.render(f"Position: ({int(machine_x)}, {int(machine_y)}) mm", True, colors.text), (text_x, 510))
+    screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 530))
 
-    status_card = pygame.Rect(15, 575, card_width, 170)
+    status_card = pygame.Rect(15, 555, card_width, 170)
     pygame.draw.rect(screen, colors.card, status_card, border_radius=6)
-    screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, 585))
+    screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, 565))
     draw_help_button("status", status_card, fonts.small)
     for index, line in enumerate(wrap_status_lines(view.execution.message)):
-        screen.blit(fonts.small.render(line, True, colors.text), (text_x, 605 + index * 18))
+        screen.blit(fonts.small.render(line, True, colors.text), (text_x, 585 + index * 18))
 
     warning_text = format_validation_warning(view.execution.validation_warnings)
     warning_color = colors.muted if not view.execution.validation_warnings else colors.warning
-    screen.blit(fonts.small.render(warning_text, True, warning_color), (text_x, 670))
-    screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, 700))
-    screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, 720))
-    screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, 740))
+    screen.blit(fonts.small.render(warning_text, True, warning_color), (text_x, 650))
+    screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, 680))
+    screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, 700))
+    screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, 720))

@@ -2673,12 +2673,6 @@ def main():
             heatmap_text = f"{palette_text} / {scale_text}"
         placement_weights_text = "Default" if weight_mode_idx == 0 else "Equal (1.0)"
         rotation_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
-        edge_weight_mode = "On" if edge_weight_heatmap_enabled else "Off"
-        diameter_mode = "Real" if route_real_diameter_width_enabled else "Fixed"
-        edge_weight_text = (
-            f"{edge_weight_mode}/{'Small' if edge_weight_view_mode_idx == 0 else 'Big'} "
-            f"| Pipes: {diameter_mode}"
-        )
         preferred_count = sum(
             len(points)
             for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values())
@@ -2707,7 +2701,6 @@ def main():
                 heuristic=HEURISTIC_MODES[heuristic_mode_idx],
                 grid_type=GRAPH_TYPES[graph_type_idx],
                 starts=ROOM_START_MODES[room_start_mode_idx],
-                edge_weights=edge_weight_text,
                 selected_route=selected_route_name,
                 preferred_terminal_count=preferred_count,
                 bend_value=C_BEND,
