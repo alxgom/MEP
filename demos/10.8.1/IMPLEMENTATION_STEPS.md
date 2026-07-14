@@ -539,6 +539,11 @@ Manual validation milestones:
 - Moved negotiated iteration, present/history congestion, and large-route favouring constants into explicit policy values.
 - Validation: Python 3.11 compilation and 42 focused Sal, weight, clearance, search, and scoring contracts passed. Demo 10.7 Python 3.12 virtual environment remained running after an 8-second startup/initial-solve smoke.
 
+- Moved negotiated-congestion iteration, congestion history, route rebuilding, scoring, and early-exit behavior into installation-neutral `mep_routing.routing.negotiated`.
+- Reduced `installations.sal.negotiated` to Sal route-start, port-eligibility, terminal-node, and large-route preference adaptation using `SalRoutePlan` and `SalSolverPolicy`.
+- Preserved Sal's public negotiated context/result names, deterministic port order, missing-Kitchen failure, and live controller/main signatures.
+- Validation: Python 3.11 compilation; focused neutral negotiated, Sal negotiated/controller, route-plan, and policy contracts; headless startup smoke.
+
 ## Commit Checklist
 
 - Integrated `SalRoutePlan` as the single live owner of Sal shaft, kitchen, wet-room, and machine-port topology.

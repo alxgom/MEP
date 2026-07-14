@@ -1,3 +1,4 @@
+from dataclasses import replace
 from types import SimpleNamespace
 
 from mep_routing.installations.sal.negotiated import (
@@ -52,3 +53,21 @@ def test_negotiated_routing_builds_sal_routes_and_stops_on_zero_crossings():
     assert result.total_nodes == 6
     assert [route_name for route_name, _ in result.routes] == ["Shaft", "Kitchen", "Bathroom"]
     assert calls == [([0], ("left_mid", "right_mid")), ([1], ("right_mid",)), ([2], ("tl", "tr", "bl", "br"))]
+
+    context.route_start_nodes = lambda route_name: [] if route_name == "Kitchen" else [2]
+    missing_kitchen = run_negotiated_congestion(
+        ["Bathroom"],
+        {"left_mid": [], "right_mid": [], "tl": [], "tr": [], "bl": [], "br": []},
+        {},
+        [0],
+        0,
+        route_plan=build_sal_route_plan({"Bathroom": (2, 0)}, (0, 0)),
+        context=context,
+        machine_angle=0,
+        policy=replace(
+            SalSolverPolicy(100, 5, 1.05, 200, 150, 1e9, 1.05, 0),
+            negotiated_iterations=2,
+        ),
+    )
+    assert not missing_kitchen.success
+    assert missing_kitchen.attempts == 2

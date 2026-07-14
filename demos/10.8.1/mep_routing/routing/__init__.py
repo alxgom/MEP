@@ -97,9 +97,13 @@ from .shaft_entries import (
     shaft_representative_point,
 )
 from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
+from .negotiated import NegotiatedProblem, NegotiatedResult, NegotiatedRuntime, solve_negotiated
 
 __all__ = [
     "PinFlowRoute",
+    "NegotiatedProblem",
+    "NegotiatedResult",
+    "NegotiatedRuntime",
     "RouteScoreWeights",
     "RoutingProblem",
     "RoutingRequest",
@@ -168,6 +172,7 @@ __all__ = [
     "source_start_nodes",
     "small_pin_target_specs",
     "solve_pin_flow",
+    "solve_negotiated",
     "target_heuristic",
     "terminal_node_indices",
     "terminal_candidate_node_indices",
