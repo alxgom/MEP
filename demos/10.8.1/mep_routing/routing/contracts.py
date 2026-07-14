@@ -12,33 +12,34 @@ from typing import Generic, Mapping, TypeVar
 
 
 Node = TypeVar("Node")
+Target = TypeVar("Target")
 Graph = TypeVar("Graph")
 Route = TypeVar("Route")
 
 
 @dataclass(frozen=True)
-class RoutingRequest(Generic[Node]):
-    """One named connection a solver must route between candidate nodes."""
+class RoutingRequest(Generic[Node, Target]):
+    """One named connection between source nodes and eligible targets."""
 
     key: str
     source_nodes: tuple[Node, ...]
-    target_nodes: tuple[Node, ...]
+    target_candidates: tuple[Target, ...]
 
     def __post_init__(self) -> None:
         if not self.key:
             raise ValueError("routing request key must not be empty")
         if not self.source_nodes:
             raise ValueError(f"routing request {self.key!r} requires a source node")
-        if not self.target_nodes:
-            raise ValueError(f"routing request {self.key!r} requires a target node")
+        if not self.target_candidates:
+            raise ValueError(f"routing request {self.key!r} requires a target candidate")
 
 
 @dataclass(frozen=True)
-class RoutingProblem(Generic[Node, Graph]):
+class RoutingProblem(Generic[Node, Target, Graph]):
     """Graph and connection requests supplied to one solver invocation."""
 
     graph: Graph
-    requests: tuple[RoutingRequest[Node], ...]
+    requests: tuple[RoutingRequest[Node, Target], ...]
     edge_weights: Mapping[tuple[Node, Node], float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -75,15 +76,15 @@ class SolverResult(Generic[Route]):
     routes: tuple[SolvedRoute[Route], ...] = ()
     failure: SolverFailure | None = None
     elapsed_ms: float = 0.0
-    explored_nodes: int = 0
+    route_node_count: int = 0
 
     def __post_init__(self) -> None:
         if self.routes and self.failure is not None:
             raise ValueError("solver result cannot contain both routes and a failure")
         if self.elapsed_ms < 0:
             raise ValueError("solver elapsed time must not be negative")
-        if self.explored_nodes < 0:
-            raise ValueError("solver explored-node count must not be negative")
+        if self.route_node_count < 0:
+            raise ValueError("solver route-node count must not be negative")
 
     @property
     def success(self) -> bool:
