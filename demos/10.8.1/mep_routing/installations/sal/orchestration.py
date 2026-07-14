@@ -5,9 +5,10 @@ only the mapping from the selected Sal strategy to its routing branch and
 candidate room order policy.
 """
 
-from dataclasses import dataclass
 from enum import IntEnum
 from itertools import permutations
+
+from .prepared import SalPreparedRoutingProblem
 
 
 class SalRoutingStrategy(IntEnum):
@@ -20,19 +21,6 @@ class SalRoutingStrategy(IntEnum):
     NEGOTIATED_CONGESTION_FAVOUR_LARGE = 4
     MIN_COST_FLOW_SMALL_PINS = 5
     MIN_COST_FLOW_TWO_STAGE = 6
-
-
-@dataclass(frozen=True)
-class SalFlowRoutingRequest:
-    """Inputs shared by Sal's two min-cost-flow strategy branches."""
-
-    room_names: tuple[str, ...]
-    pin_node_map: object
-    global_pins: object
-    shaft_node_idx: int
-    chosen_exhaust_pin: str
-    chosen_exhaust_target: object
-    shaft_path: object
 
 
 def coerce_routing_strategy(strategy: int | SalRoutingStrategy) -> SalRoutingStrategy:
@@ -84,7 +72,7 @@ def should_stop_after_sequential_candidate(strategy: int | SalRoutingStrategy, c
 
 def dispatch_flow_strategy(
     strategy: int | SalRoutingStrategy,
-    request: SalFlowRoutingRequest,
+    prepared: SalPreparedRoutingProblem,
     *,
     run_small_pin_flow,
     run_two_stage_flow,
@@ -96,20 +84,7 @@ def dispatch_flow_strategy(
     """
     selected = coerce_routing_strategy(strategy)
     if selected is SalRoutingStrategy.MIN_COST_FLOW_SMALL_PINS:
-        return run_small_pin_flow(
-            request.room_names,
-            request.pin_node_map,
-            request.global_pins,
-            request.shaft_node_idx,
-            request.chosen_exhaust_pin,
-            request.chosen_exhaust_target,
-            request.shaft_path,
-        )
+        return run_small_pin_flow(prepared)
     if selected is SalRoutingStrategy.MIN_COST_FLOW_TWO_STAGE:
-        return run_two_stage_flow(
-            request.room_names,
-            request.pin_node_map,
-            request.global_pins,
-            request.shaft_path,
-        )
+        return run_two_stage_flow(prepared)
     return None

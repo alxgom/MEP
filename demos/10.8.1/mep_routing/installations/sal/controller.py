@@ -7,7 +7,6 @@ from time import perf_counter
 from typing import Any, Callable, Mapping
 
 from .orchestration import (
-    SalFlowRoutingRequest,
     SalRoutingStrategy,
     coerce_routing_strategy,
     dispatch_flow_strategy,
@@ -17,6 +16,7 @@ from .orchestration import (
 )
 from .route_plan import SalRoutePlan
 from .policy import SalSolverPolicy
+from .prepared import SalPreparedRoutingProblem
 
 
 @dataclass
@@ -85,19 +85,23 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
     if shaft_path is None:
         return _result(None, "Blocked: No path to shaft", started, context, 0, excluded_edges)
 
-    other_rooms = context.route_plan.small_routes
+    prepared = SalPreparedRoutingProblem(
+        route_plan=context.route_plan,
+        policy=context.policy,
+        global_pins=global_pins,
+        pin_node_map=pin_node_map,
+        shaft_boundary_nodes=shaft_boundary_nodes,
+        shaft_node_idx=shaft_node_idx,
+        shaft_path=shaft_path,
+        chosen_shaft_pin=chosen_exhaust_pin,
+        chosen_shaft_target=chosen_exhaust_target,
+    )
+
+    other_rooms = prepared.route_plan.small_routes
     strategy = coerce_routing_strategy(context.routing_strategy)
     flow_result = dispatch_flow_strategy(
         strategy,
-        SalFlowRoutingRequest(
-            room_names=tuple(other_rooms),
-            pin_node_map=pin_node_map,
-            global_pins=global_pins,
-            shaft_node_idx=shaft_node_idx,
-            chosen_exhaust_pin=chosen_exhaust_pin,
-            chosen_exhaust_target=chosen_exhaust_target,
-            shaft_path=shaft_path,
-        ),
+        prepared,
         run_small_pin_flow=context.run_small_pin_flow,
         run_two_stage_flow=context.run_two_stage_flow,
     )
@@ -113,8 +117,8 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
 
     if is_negotiated_strategy(strategy):
         negotiated = context.run_negotiated(
-            context.route_plan, other_rooms, pin_node_map, global_pins,
-            shaft_boundary_nodes, shaft_node_idx, strategy,
+            prepared,
+            favour_large=strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE,
         )
         if negotiated.success:
             return _result(
@@ -133,16 +137,7 @@ def solve_routing(context: SalRoutingControllerContext) -> SalRoutingResult:
     attempts = 0
     for room_order in sequential_room_orders(strategy, other_rooms):
         attempts += 1
-        success, routes, _status, total_nodes = context.run_sequential(
-            context.route_plan,
-            room_order,
-            pin_node_map,
-            global_pins,
-            shaft_node_idx,
-            chosen_exhaust_pin,
-            chosen_exhaust_target,
-            shaft_path,
-        )
+        success, routes, _status, total_nodes = context.run_sequential(prepared, room_order)
         if not success:
             continue
         crossings = context.count_crossings(routes)

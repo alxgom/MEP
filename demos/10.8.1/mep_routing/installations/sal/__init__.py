@@ -6,6 +6,7 @@ from .definition import SAL_INSTALLATION, SalInstallationDefinition
 from .routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
 from .route_plan import SalRoutePlan, build_sal_route_plan
 from .policy import SalSolverPolicy
+from .prepared import SalPreparedRoutingProblem
 from .strategies import SalFlowContext, run_direct_small_pin_flow, run_sequential_routing, run_small_flow_stage, search_large_route_candidates, select_two_stage_routing
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "SalRoutingResult",
     "SalRoutePlan",
     "SalSolverPolicy",
+    "SalPreparedRoutingProblem",
     "SHAFT_ROUTE_NAME",
     "build_sal_route_plan",
     "run_sequential_routing",

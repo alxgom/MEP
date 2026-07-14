@@ -544,6 +544,11 @@ Manual validation milestones:
 - Preserved Sal's public negotiated context/result names, deterministic port order, missing-Kitchen failure, and live controller/main signatures.
 - Validation: Python 3.11 compilation; focused neutral negotiated, Sal negotiated/controller, route-plan, and policy contracts; headless startup smoke.
 
+- Integrated `SalPreparedRoutingProblem` as the single post-shaft handoff shared by sequential, flow, and negotiated solver dispatch.
+- Removed the duplicate `SalFlowRoutingRequest`; controller-facing callbacks now consume the prepared problem plus only a room order or large-route preference where required, while lower-level algorithms retain their established signatures.
+- Added thin prepared-problem entrypoints to `SalFlowRuntime` and kept graph/search callbacks in the existing runtime adapters.
+- Validation: Demo 10.7 Python 3.12 virtual environment compiled the application, prepared/controller/orchestration/flow modules, and focused tests; direct controller/flow contracts passed. Pytest remains unavailable in that environment. Startup and initial solve remained running after 8 seconds.
+
 ## Commit Checklist
 
 - Integrated `SalRoutePlan` as the single live owner of Sal shaft, kitchen, wet-room, and machine-port topology.

@@ -12,6 +12,7 @@ from mep_routing.routing import (
 from .strategies import SalFlowContext, run_direct_small_pin_flow, run_small_flow_stage, search_large_route_candidates, select_two_stage_routing
 from .route_plan import SalRoutePlan
 from .policy import SalSolverPolicy
+from .prepared import SalPreparedRoutingProblem
 
 
 @dataclass
@@ -132,10 +133,29 @@ class SalFlowRuntime:
             run_search=self.run_search, run_small_stage=self.run_small_stage,
         )
 
+    def run_prepared_small_pin_flow(self, prepared: SalPreparedRoutingProblem, *, machine_angle):
+        return self.run_direct_small_pin_flow(
+            prepared.route_plan.small_routes,
+            prepared.pin_node_map,
+            prepared.global_pins,
+            prepared.chosen_shaft_pin,
+            prepared.chosen_shaft_target,
+            prepared.shaft_path,
+            machine_angle=machine_angle,
+        )
+
     def run_two_stage(self, room_names, pin_node_map, global_pins, shaft_path):
         context = self.flow_context()
         return select_two_stage_routing(
             lambda: context.run_big_first(room_names, pin_node_map, global_pins, shaft_path),
             lambda: context.run_small_first(room_names, pin_node_map, global_pins, shaft_path),
             self.count_crossings, self.score_routes,
+        )
+
+    def run_prepared_two_stage(self, prepared: SalPreparedRoutingProblem):
+        return self.run_two_stage(
+            prepared.route_plan.small_routes,
+            prepared.pin_node_map,
+            prepared.global_pins,
+            prepared.shaft_path,
         )

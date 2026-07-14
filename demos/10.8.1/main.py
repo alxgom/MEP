@@ -36,9 +36,6 @@ from mep_routing.installations.sal import (
     search_large_route_candidates as _search_sal_large_route_candidates,
     select_two_stage_routing as _select_sal_two_stage_routing,
 )
-from mep_routing.installations.sal.orchestration import (
-    SalRoutingStrategy,
-)
 from mep_routing.installations.sal.negotiated import (
     SalNegotiatedContext,
     run_negotiated_congestion,
@@ -1651,18 +1648,31 @@ def _sal_routing_controller_context():
             global_pins, machine_angle, bend_cost, edge_weights=weights, policy=policy,
         )
 
-    def run_negotiated(plan, room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx, strategy):
+    def run_negotiated(prepared, *, favour_large):
         return run_negotiated_congestion(
-            room_names, pin_node_map, global_pins, boundary_nodes, shaft_node_idx,
-            route_plan=plan, policy=policy, context=_sal_negotiated_context(plan, policy),
+            prepared.route_plan.small_routes,
+            prepared.pin_node_map,
+            prepared.global_pins,
+            prepared.shaft_boundary_nodes,
+            prepared.shaft_node_idx,
+            route_plan=prepared.route_plan,
+            policy=prepared.policy,
+            context=_sal_negotiated_context(prepared.route_plan, prepared.policy),
             machine_angle=machine_angle,
-            favour_large=strategy is SalRoutingStrategy.NEGOTIATED_CONGESTION_FAVOUR_LARGE,
+            favour_large=favour_large,
         )
 
-    def run_small_flow(room_names, pin_node_map, global_pins, shaft_node_idx, chosen_pin, chosen_target, shaft_path):
-        return flow_runtime.run_direct_small_pin_flow(
-            room_names, pin_node_map, global_pins, chosen_pin, chosen_target,
-            shaft_path, machine_angle=machine_angle,
+    def run_sequential(prepared, room_order):
+        return run_sequential_routing(
+            prepared.route_plan,
+            room_order,
+            prepared.pin_node_map,
+            prepared.global_pins,
+            prepared.shaft_node_idx,
+            prepared.chosen_shaft_pin,
+            prepared.chosen_shaft_target,
+            prepared.shaft_path,
+            policy=prepared.policy,
         )
 
     return SalRoutingControllerContext(
@@ -1681,10 +1691,12 @@ def _sal_routing_controller_context():
         routing_strategy=routing_strategy_idx,
         policy=policy,
         route_plan=route_plan,
-        run_small_pin_flow=run_small_flow,
-        run_two_stage_flow=flow_runtime.run_two_stage,
+        run_small_pin_flow=lambda prepared: flow_runtime.run_prepared_small_pin_flow(
+            prepared, machine_angle=machine_angle,
+        ),
+        run_two_stage_flow=flow_runtime.run_prepared_two_stage,
         run_negotiated=run_negotiated,
-        run_sequential=lambda *args: run_sequential_routing(*args, policy=policy),
+        run_sequential=run_sequential,
         count_crossings=count_segment_crossings,
         score_routes=lambda routes, crossings: get_solution_score(routes, crossings, policy=policy),
         conflict_summary=get_route_conflict_summary,

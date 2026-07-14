@@ -1,7 +1,6 @@
 import pytest
 
 from mep_routing.installations.sal.orchestration import (
-    SalFlowRoutingRequest,
     SalRoutingStrategy,
     dispatch_flow_strategy,
     is_flow_strategy,
@@ -9,6 +8,9 @@ from mep_routing.installations.sal.orchestration import (
     sequential_room_orders,
     should_stop_after_sequential_candidate,
 )
+from mep_routing.installations.sal.policy import SalSolverPolicy
+from mep_routing.installations.sal.prepared import SalPreparedRoutingProblem
+from mep_routing.installations.sal.route_plan import build_sal_route_plan
 
 
 def test_sequential_room_orders_match_sal_strategy_policy():
@@ -28,13 +30,15 @@ def test_sequential_room_orders_match_sal_strategy_policy():
 
 
 def test_flow_dispatch_preserves_each_strategy_callback_signature():
-    request = SalFlowRoutingRequest(
-        room_names=("Bathroom",),
+    prepared = SalPreparedRoutingProblem(
+        route_plan=build_sal_route_plan({"Bathroom": (0, 0)}, (0, 0)),
+        policy=SalSolverPolicy(100, 5, 1.05, 200, 150, 1e9, 1.05, 0),
         pin_node_map={"tl": [1]},
         global_pins={"tl": (1, 2)},
+        shaft_boundary_nodes=[3],
         shaft_node_idx=3,
-        chosen_exhaust_pin="left_mid",
-        chosen_exhaust_target={"pin": "left_mid"},
+        chosen_shaft_pin="left_mid",
+        chosen_shaft_target={"pin": "left_mid"},
         shaft_path=[4, 5],
     )
     calls = []
@@ -47,12 +51,12 @@ def test_flow_dispatch_preserves_each_strategy_callback_signature():
         calls.append(("two-stage", args))
         return "two-stage-result"
 
-    assert dispatch_flow_strategy(5, request, run_small_pin_flow=run_small, run_two_stage_flow=run_two_stage) == "small-result"
-    assert dispatch_flow_strategy(6, request, run_small_pin_flow=run_small, run_two_stage_flow=run_two_stage) == "two-stage-result"
-    assert dispatch_flow_strategy(1, request, run_small_pin_flow=run_small, run_two_stage_flow=run_two_stage) is None
+    assert dispatch_flow_strategy(5, prepared, run_small_pin_flow=run_small, run_two_stage_flow=run_two_stage) == "small-result"
+    assert dispatch_flow_strategy(6, prepared, run_small_pin_flow=run_small, run_two_stage_flow=run_two_stage) == "two-stage-result"
+    assert dispatch_flow_strategy(1, prepared, run_small_pin_flow=run_small, run_two_stage_flow=run_two_stage) is None
     assert calls == [
-        ("small", (("Bathroom",), {"tl": [1]}, {"tl": (1, 2)}, 3, "left_mid", {"pin": "left_mid"}, [4, 5])),
-        ("two-stage", (("Bathroom",), {"tl": [1]}, {"tl": (1, 2)}, [4, 5])),
+        ("small", (prepared,)),
+        ("two-stage", (prepared,)),
     ]
 
 
