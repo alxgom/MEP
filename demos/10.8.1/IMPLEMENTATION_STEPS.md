@@ -551,6 +551,11 @@ Manual validation milestones:
 
 ## Commit Checklist
 
+- Added a concrete `SalApplicationAdapter` as the live boundary between interactive graph/session hooks and Sal policy, route-plan, flow-runtime, strategy-runtime, and controller assembly.
+- Removed direct Sal controller and flow wiring from `main.py`; the UI-facing solve wrapper now only resets overlays, invokes the adapter, and applies its result.
+- Kept graph lifecycle, routing weight runtime, scoring, and UI state in `main.py` for the next workspace/session boundary rather than introducing a generic installation framework.
+- Validation: compilation, two application-boundary contracts, six existing controller/flow contracts, and a 12-second headless startup/initial-solve smoke.
+
 - Integrated `SalStrategyRuntime` and `solve_prepared_strategy` as the single post-preparation strategy boundary used by the live Sal controller.
 - Replaced seven solver callback fields on `SalRoutingControllerContext` with one runtime object and removed duplicate flow, negotiated, and sequential branching from the controller.
 - Removed orchestration dispatch/category helpers made obsolete by the strategy dispatcher while retaining deterministic sequential-order policy helpers.
