@@ -52,6 +52,7 @@ from .weight_runtime import (
     refresh_weight_overlay,
 )
 from .workspace import RoutingWorkspace
+from .machine_session import MachineRoutingSession
 from .flow import (
     PinFlowRoute,
     add_edge,
@@ -112,6 +113,7 @@ __all__ = [
     "RoutingRequest",
     "RoutingWeightRuntimeContext",
     "RoutingWorkspace",
+    "MachineRoutingSession",
     "StaticClearanceCache",
     "SolvedRoute",
     "SolverFailure",

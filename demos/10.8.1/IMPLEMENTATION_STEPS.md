@@ -591,6 +591,10 @@ Manual validation milestones:
 - Kept graph rebuilds and UI state application in `main.py`; installation-specific machine dimensions continue to enter through the selected `MachineSpec` without adding a speculative placement framework.
 - Validation: Python compilation, 24 focused placement contracts, and a 12-second headless startup smoke through the default core-like placement path.
 
+- Added `MachineRoutingSession` as the live boundary between a selected machine and the routing workspace, owning preflight geometry, graph refresh behavior, and pin-access snapping.
+- Bound route diameters to the selected `MACHINE_SPEC` rather than Sal's default machine so alternate machine choices cannot mix geometry and duct sizes.
+- Validation: Python compilation, 11 focused machine-session and Sal application/runtime contracts, and a 12-second headless startup solve.
+
 Before each commit:
 
 - `git status --short`
