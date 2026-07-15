@@ -587,6 +587,10 @@ Manual validation milestones:
 - Reset routing overlays and static-clearance cache when applying a dwelling and at solve start so cycled dwellings cannot retain stale edge identifiers.
 - Validation: Python compilation; 24 focused routing-runtime, Sal flow/controller/strategy tests; six solve events and eight dwelling/source-cycle events in one headless Pygame process; five-second startup smoke.
 
+- Extracted machine-placement orchestration into `PlacementApplicationAdapter`: topological/core dispatch, candidate scoring, rotation-field scoring, and timing now run without mutating the interactive application.
+- Kept graph rebuilds and UI state application in `main.py`; installation-specific machine dimensions continue to enter through the selected `MachineSpec` without adding a speculative placement framework.
+- Validation: Python compilation, 24 focused placement contracts, and a 12-second headless startup smoke through the default core-like placement path.
+
 Before each commit:
 
 - `git status --short`

@@ -1,5 +1,6 @@
 """Machine placement helpers for the interactive routing workbench."""
 
+from .application import PlacementApplicationAdapter
 from .feasibility import candidate_machine_rooms, is_machine_placement_valid
 from .fields import compute_dijkstra_distance_field, placement_weights, topological_placement_scores
 from .rotation import (
@@ -26,6 +27,7 @@ from .scoring import (
 )
 
 __all__ = [
+    "PlacementApplicationAdapter",
     "area_out_percentage",
     "best_valid_rotation_for_point",
     "candidate_machine_rooms",

@@ -45,21 +45,9 @@ from mep_routing.graphs import (
     GraphLifecycle,
 )
 from mep_routing.placement import (
-    candidate_machine_rooms as _candidate_machine_rooms_for_placement,
-    candidate_room_points as _candidate_room_points_for_placement,
-    choose_core_like_machine_placement as _choose_core_like_machine_placement,
-    choose_topological_machine_placement as _choose_topological_machine_placement,
-    core_like_machine_candidate_score as _core_like_machine_candidate_score_for_placement,
+    PlacementApplicationAdapter,
     is_machine_placement_valid as _is_machine_placement_valid_for_placement,
     placement_weights as _placement_weights,
-    routing_frame_axes as _routing_frame_axes_for_placement,
-    score_rotation_field_at as _score_rotation_field_at_for_placement,
-    select_field_alignment_rotation as _select_field_alignment_rotation,
-    topological_placement_scores as _topological_placement_scores,
-)
-from mep_routing.placement.runtime import (
-    run_core_like_placement as _run_core_like_placement,
-    run_topological_placement as _run_topological_placement,
 )
 from mep_routing.routing import (
     RouteScoreWeights,
@@ -1224,13 +1212,27 @@ def is_machine_placement_valid(cx, cy, angle):
 def get_placement_weights():
     return _placement_weights(weight_mode_idx)
 
-def get_auto_placement_scores(env, shaft_boundary_nodes):
-    terminal_nodes = {}
-    for name, pt in terminals.items():
-        _, node_idx = routing_workspace.base_spatial_index.query(pt)
-        terminal_nodes[name] = int(node_idx)
+def _placement_application():
+    return PlacementApplicationAdapter(
+        rooms=tuple(rooms),
+        terminals=dict(terminals),
+        wet_room_names=tuple(wet_room_names),
+        routing_region=routing_region_base,
+        shaft=shaft_extraction,
+        machine_area=MACHINE_OVERALL_W * MACHINE_BODY_H,
+        weight_mode=weight_mode_idx,
+        weights=get_placement_weights(),
+        machine_pins=get_machine_pins,
+        is_valid=is_machine_placement_valid,
+        representative_point=get_representative_point,
+        route_room_polygon=get_route_room_polygon,
+        local_axis_to_world=_local_axis_to_world,
+    )
 
-    return _topological_placement_scores(env, shaft_boundary_nodes, terminal_nodes, get_placement_weights())
+def get_auto_placement_scores(env, shaft_boundary_nodes):
+    return _placement_application().topological_scores(
+        env, routing_workspace.base_spatial_index, shaft_boundary_nodes,
+    )
 
 def ensure_placement_heatmap_scores():
     global ap_scores, ap_fields
@@ -1239,72 +1241,14 @@ def ensure_placement_heatmap_scores():
     shaft_boundary_nodes, _ = get_shaft_entry_nodes(routing_workspace.base_env, routing_workspace.base_spatial_index)
     ap_scores, ap_fields = get_auto_placement_scores(routing_workspace.base_env, shaft_boundary_nodes)
 
-def _candidate_machine_rooms():
-    return _candidate_machine_rooms_for_placement(rooms, MACHINE_OVERALL_W * MACHINE_BODY_H)
-
-def _candidate_room_points(room):
-    return _candidate_room_points_for_placement(room, _routing_frame_axes_for_placement())
-
-def _distance_to_allowed_boundary(point):
-    if routing_region_base is None:
-        return 1e9
-    return Point(float(point[0]), float(point[1])).distance(routing_region_base.boundary)
-
-def _core_like_machine_candidate_score(cx, cy, angle, room):
-    pins = get_machine_pins(cx, cy, angle)
-
-    shaft_pt = get_representative_point(shaft_extraction) if shaft_extraction else (cx, cy)
-    kitchen_pt = terminals.get("Kitchen", (cx, cy))
-    return _core_like_machine_candidate_score_for_placement(
-        cx,
-        cy,
-        angle,
-        room.polygon,
-        pins,
-        shaft_pt,
-        kitchen_pt,
-        "Kitchen" in terminals,
-        _distance_to_allowed_boundary,
-        _local_axis_to_world,
-    )
-
-def _room_field_target_point(room_name):
-    room_poly = get_route_room_polygon(room_name)
-    if room_poly is None or room_poly.is_empty:
-        return terminals.get(room_name)
-    centroid = room_poly.centroid
-    if room_poly.contains(centroid):
-        return (float(centroid.x), float(centroid.y))
-    return get_representative_point(room_poly)
-
-def _score_rotation_field_at(cx, cy, angle):
-    pins = get_machine_pins(cx, cy, angle)
-    shaft_point = get_representative_point(shaft_extraction) if shaft_extraction else None
-    return _score_rotation_field_at_for_placement(
-        pins,
-        angle,
-        wet_room_names,
-        terminals.keys(),
-        shaft_point,
-        _room_field_target_point,
-        weight_mode_idx,
-        _local_axis_to_world,
-    )
-
 def apply_field_alignment_rotation():
     global machine_angle, rotation_field_scores
-    machine_angle, selected, scores = _select_field_alignment_rotation(
+    machine_angle, rotation_field_scores, scores = _placement_application().align_rotation(
+        (machine_cx, machine_cy),
         machine_angle,
-        lambda angle: is_machine_placement_valid(machine_cx, machine_cy, angle),
-        lambda angle: _score_rotation_field_at(machine_cx, machine_cy, angle),
         ROTATION_FIELD_EPS,
     )
-    rotation_field_scores = {
-        "H": 0.0 if not math.isfinite(scores.get("H", 0.0)) else float(scores.get("H", 0.0)),
-        "V": 0.0 if not math.isfinite(scores.get("V", 0.0)) else float(scores.get("V", 0.0)),
-        "selected": selected,
-    }
-    return selected, scores
+    return rotation_field_scores["selected"], scores
 
 def apply_rotation_mode_once():
     if rotation_mode_idx != 1:
@@ -1316,29 +1260,6 @@ def apply_rotation_mode_once():
         pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
         build_grid(machine_pins=pins)
 
-def run_core_workflow_machine_placement():
-    global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
-    t0 = time.perf_counter()
-    outcome = _run_core_like_placement(
-        _candidate_machine_rooms(),
-        _candidate_room_points,
-        (0, 90, 180, 270),
-        is_machine_placement_valid,
-        _core_like_machine_candidate_score,
-        _choose_core_like_machine_placement,
-    )
-    ap_scores = outcome.scores
-    ap_fields = outcome.fields
-    if outcome.position is None:
-        return
-
-    machine_cx, machine_cy = outcome.position
-    machine_angle = outcome.rotation
-    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    build_grid(machine_pins=pins)
-    elapsed_ms = (time.perf_counter() - t0) * 1000.0
-    print(f"[Core-like Machine Placement] tried {outcome.candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
-
 def run_auto_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
     if routing_workspace.base_env is None or not shaft_extraction:
@@ -1348,38 +1269,25 @@ def run_auto_placement():
         routing_workspace.base_env, routing_workspace.base_spatial_index,
     )
     
-    # Topological Distance Fields
-    if auto_placement_mode_idx == 1:
-        t0 = time.perf_counter()
-        
-        outcome = _run_topological_placement(
-            routing_workspace.base_env,
-            shaft_boundary_nodes,
-            (0, 90, 180, 270),
-            is_machine_placement_valid,
-            get_machine_pins,
-            lambda pt: int(routing_workspace.base_spatial_index.query(pt)[1]),
-            wet_room_names,
-            get_placement_weights(),
-            get_auto_placement_scores,
-            _choose_topological_machine_placement,
-        )
-        ap_scores = outcome.scores
-        ap_fields = outcome.fields
-        if outcome.position is None:
-            return
+    outcome, elapsed_ms = _placement_application().auto_place(
+        auto_placement_mode_idx,
+        routing_workspace.base_env,
+        routing_workspace.base_spatial_index,
+        shaft_boundary_nodes,
+    )
+    if outcome is None:
+        return
+    ap_scores, ap_fields = outcome.scores, outcome.fields
+    if outcome.position is None:
+        return
 
-        machine_cx, machine_cy = outcome.position
-        machine_angle = outcome.rotation
-        pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-        build_grid(machine_pins=pins)
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    machine_cx, machine_cy = outcome.position
+    machine_angle = outcome.rotation
+    build_grid(machine_pins=get_machine_pins(machine_cx, machine_cy, machine_angle))
+    if auto_placement_mode_idx == 2:
+        print(f"[Core-like Machine Placement] tried {outcome.candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
+    else:
         print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
-        return
-
-    elif auto_placement_mode_idx == 2:
-        run_core_workflow_machine_placement()
-        return
 
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 # MAIN SOLVER WRAPPER
