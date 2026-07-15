@@ -63,6 +63,7 @@ from mep_routing.placement.runtime import (
 )
 from mep_routing.routing import (
     RouteScoreWeights,
+    RoutingWorkspace,
     TerminalRuntime,
     block_terminal_node_edges as _block_terminal_node_edges,
     build_routes_from_paths as _build_routes_from_paths_for_env,
@@ -102,12 +103,7 @@ from mep_routing.routing import (
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
-from mep_routing.routing.weight_runtime import (
-    EdgeWeightOverlay,
-    RoutingRuntime,
-    RoutingWeightRuntimeContext,
-    StaticClearanceCache,
-)
+from mep_routing.routing.weight_runtime import RoutingRuntime, RoutingWeightRuntimeContext
 from mep_routing.ui import (
     cool_colormap as _cool_colormap_value,
     edge_weight_log_scale as _edge_weight_log_scale_for_values,
@@ -306,17 +302,13 @@ show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
-edge_weight_debug_map = {}
-edge_weight_overlay_excluded_edges = set()
-static_clearance_cache = StaticClearanceCache()
+routing_workspace = RoutingWorkspace()
 help_popup_card = None
 transient_message = None
 transient_message_until_ms = 0
 help_button_rects = {}
 preferred_terminal_tool_mode = None
 terminal_runtime = None
-graph_lifecycle = None
-active_graph_runtime = None
 terminal_tool_button_rects = {}
 terminal_validity_overlay_enabled = False
 terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
@@ -641,9 +633,6 @@ def invalidate_terminal_validity_cache():
 # Auto-placement cache
 ap_scores = {}
 ap_fields = {}
-base_regular_env = None
-base_regular_kd = None
-
 def get_representative_point(poly):
     centroid = poly.centroid
     if poly.contains(centroid):
@@ -734,7 +723,7 @@ def _shaft_entry_geometry_for_node(node_idx, env=None):
         return shaft_entry_geometry_by_node[node_idx]
     if shaft_extraction is None:
         return None
-    env = env or current_env
+    env = env or routing_workspace.env
     if env is None or node_idx is None:
         return None
 
@@ -759,74 +748,47 @@ def add_shaft_entry_segments(segs, first_node_idx):
     geom = _shaft_entry_geometry_for_node(first_node_idx)
     segs.extend(_shaft_entry_segments_for_geometry(geom))
 
-def _commit_grid(runtime):
-    global grid_nodes, grid_adj_base, grid_edge_list, grid_edge_coords, grid_kd, current_env
-    global static_clearance_cache, active_graph_runtime
-    grid_nodes       = runtime.nodes
-    grid_adj_base    = runtime.adjacency
-    grid_edge_list   = runtime.edge_list
-    grid_edge_coords = runtime.edge_coords
-    grid_kd          = runtime.spatial_index
-    current_env      = runtime.env
-    active_graph_runtime = runtime
-    static_clearance_cache = StaticClearanceCache()
-    if terminal_runtime is not None:
-        terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
-    invalidate_room_start_node_cache()
-    invalidate_terminal_validity_cache()
-
 def build_regular_grid():
-    if graph_lifecycle is None:
-        return
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = graph_lifecycle.build_selected(0, pins, machine_angle)
+    result = routing_workspace.build_selected(0, pins, machine_angle, terminal_runtime=terminal_runtime)
     if result is not None:
-        _commit_grid(result.runtime)
+        invalidate_room_start_node_cache()
+        invalidate_terminal_validity_cache()
 
 def build_base_regular_grid():
-    global base_regular_env, base_regular_kd
-    if graph_lifecycle is None:
-        return
     t0 = time.perf_counter()
-    runtime = graph_lifecycle.build_base_regular()
+    runtime = routing_workspace.build_base_regular()
     if runtime is None:
         return
-    base_regular_env = runtime.env
-    base_regular_kd = runtime.spatial_index
     print(f"[Base Regular Grid] Built {len(runtime.nodes)} nodes in {(time.perf_counter() - t0)*1000:.1f}ms")
 
 def update_dynamic_env(machine_poly):
-    global current_env
-    if graph_lifecycle is None or active_graph_runtime is None:
-        current_env = None
-        if terminal_runtime is not None:
-            terminal_runtime.set_graph(None, None, None)
+    if not routing_workspace.grid_available:
+        routing_workspace.apply_machine_obstacle(
+            machine_poly, {}, machine_angle, clearance_mm=MACHINE_CLEARANCE,
+            terminal_runtime=terminal_runtime,
+        )
         invalidate_room_start_node_cache()
         return
     t0 = time.perf_counter()
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = graph_lifecycle.apply_dynamic_obstacle(
-        active_graph_runtime,
-        machine_poly,
-        pins,
-        machine_angle,
-        clearance_mm=MACHINE_CLEARANCE,
+    result = routing_workspace.apply_machine_obstacle(
+        machine_poly, pins, machine_angle, clearance_mm=MACHINE_CLEARANCE,
+        terminal_runtime=terminal_runtime,
     )
-    current_env = result.env
-    if terminal_runtime is not None:
-        terminal_runtime.set_graph(current_env.nodes, current_env.adj, grid_kd)
     invalidate_room_start_node_cache()
     ms = (time.perf_counter() - t0) * 1000.0
     print(f"Grid update: {ms:.1f} ms  (blocked nodes={result.blocked_node_count}, edges={result.blocked_edge_count})")
 
 def build_hannan_grid(machine_pins=None, shift_walls=False):
-    if graph_lifecycle is None:
-        return
     pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = graph_lifecycle.build_selected(1, pins, machine_angle, shift_hannan_walls=shift_walls)
+    result = routing_workspace.build_selected(
+        1, pins, machine_angle, shift_hannan_walls=shift_walls, terminal_runtime=terminal_runtime,
+    )
     if result is None:
         return
-    _commit_grid(result.runtime)
+    invalidate_room_start_node_cache()
+    invalidate_terminal_validity_cache()
     if result.variant is not None and len(result.variant.nodes):
         print(
             f"[Hannan Simple] axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
@@ -835,13 +797,12 @@ def build_hannan_grid(machine_pins=None, shift_walls=False):
         )
 
 def build_epsilon_grid(machine_pins=None):
-    if graph_lifecycle is None:
-        return
     pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = graph_lifecycle.build_selected(2, pins, machine_angle)
+    result = routing_workspace.build_selected(2, pins, machine_angle, terminal_runtime=terminal_runtime)
     if result is None:
         return
-    _commit_grid(result.runtime)
+    invalidate_room_start_node_cache()
+    invalidate_terminal_validity_cache()
     if result.variant is not None and len(result.variant.nodes):
         print(
             f"[Epsilon Core-like] eps={CORE_EPSILON_GRID_MM:.0f} axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
@@ -862,11 +823,11 @@ def get_machine_pins(cx, cy, angle_deg):
     return _machine_pins(MACHINE_SPEC, cx, cy, angle_deg)
 
 def snap_pins_to_graph(global_pins):
-    if grid_kd is None:
+    if routing_workspace.spatial_index is None:
         return {}
     targets = {}
     for spec in get_port_access_specs(global_pins, machine_angle):
-        _, idx = grid_kd.query(spec["access_point"])
+        _, idx = routing_workspace.spatial_index.query(spec["access_point"])
         item = spec.copy()
         item["node_idx"] = int(idx)
         targets.setdefault(spec["pin"], []).append(item)
@@ -882,7 +843,7 @@ def get_port_access_specs(global_pins, machine_angle):
     return _port_access_specs(MACHINE_SPEC, global_pins, machine_angle)
 
 def add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, target_spec=None):
-    return _add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, current_env.nodes, target_spec)
+    return _add_port_stub_segment(segs, pin_name, target_node_idx, global_pins, routing_workspace.env.nodes, target_spec)
 
 def get_outward_vector(pin_name, machine_angle):
     return _outward_vector(pin_name, machine_angle)
@@ -908,8 +869,8 @@ def _sal_solver_policy():
 def _routing_weight_runtime_context(env, policy=None):
     policy = policy or _sal_solver_policy()
     return RoutingWeightRuntimeContext(
-        edge_list=grid_edge_list,
-        edge_coords=grid_edge_coords,
+        edge_list=routing_workspace.edge_list,
+        edge_coords=routing_workspace.edge_coords,
         nodes=env.nodes,
         routing_region=routing_region_base,
         room_polygons=[room.polygon for room in rooms],
@@ -930,17 +891,13 @@ def _routing_weight_runtime_context(env, policy=None):
     )
 
 
-def _edge_weight_overlay():
-    return EdgeWeightOverlay(edge_weight_debug_map, edge_weight_overlay_excluded_edges)
-
-
 def _routing_runtime(env, policy=None):
     policy = policy or _sal_solver_policy()
     return RoutingRuntime(
         env,
         _routing_weight_runtime_context(env, policy),
-        static_clearance_cache,
-        _edge_weight_overlay(),
+        routing_workspace.static_clearance_cache,
+        routing_workspace.overlay,
         search_backend=SAL_INSTALLATION.search_backends[router_backend_idx],
         heuristic_mode=policy.heuristic_mode,
         bend_cost=policy.bend_cost,
@@ -961,10 +918,10 @@ def get_required_clearance_mm(diameter_a, diameter_b):
 
 
 def refresh_edge_weight_view_overlay(routes):
-    if current_env is None:
+    if routing_workspace.env is None:
         return
     diameter = MACHINE_SMALL_DUCT_D if edge_weight_view_mode_idx == 0 else MACHINE_LARGE_DUCT_D
-    _routing_runtime(current_env).refresh_edge_weight_overlay(routes, diameter)
+    _routing_runtime(routing_workspace.env).refresh_edge_weight_overlay(routes, diameter)
 
 def _room_polygon_by_name(room_name):
     return None if terminal_runtime is None else terminal_runtime.room_polygon(room_name)
@@ -1003,20 +960,20 @@ def apply_preferred_terminal_area(start_world, end_world, remove=False):
     )
 
 def draw_preferred_terminal_areas(screen, selected_route_name=None):
-    if current_env is None or terminal_runtime is None:
+    if routing_workspace.env is None or terminal_runtime is None:
         return
     return _draw_preferred_terminal_areas(
         screen, terminal_runtime.preferred_areas, selected_route_name, ROUTE_COLORS,
-        terminal_runtime.candidate_nodes, current_env.nodes, to_screen,
+        terminal_runtime.candidate_nodes, routing_workspace.env.nodes, to_screen,
         max(3, _terminal_marker_side_px() // 2),
     )
 
 def draw_preferred_terminal_markers(screen, selected_route_name=None, routes=None):
-    if current_env is None or terminal_runtime is None:
+    if routing_workspace.env is None or terminal_runtime is None:
         return
     return _draw_preferred_terminal_markers(
         screen, terminals.keys(), terminal_runtime.preferred_points_by_room, selected_route_name, routes,
-        ROUTE_COLORS, COLOR_TEXT, terminal_runtime.candidate_nodes, current_env.nodes, to_screen,
+        ROUTE_COLORS, COLOR_TEXT, terminal_runtime.candidate_nodes, routing_workspace.env.nodes, to_screen,
         _terminal_marker_side_px(), PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
     )
 
@@ -1037,8 +994,8 @@ def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
 
 def _terminal_validity_cache_key():
     return (
-        id(current_env.nodes) if current_env is not None else None,
-        len(current_env.nodes) if current_env is not None else 0,
+        id(routing_workspace.env.nodes) if routing_workspace.env is not None else None,
+        len(routing_workspace.env.nodes) if routing_workspace.env is not None else 0,
         tuple(sorted(terminals.keys())),
         id(routing_region_base),
         len(rooms),
@@ -1048,7 +1005,7 @@ def _terminal_validity_cache_key():
     )
 
 def get_terminal_validity_entries():
-    if current_env is None:
+    if routing_workspace.env is None:
         return [], {}
 
     key = _terminal_validity_cache_key()
@@ -1056,8 +1013,8 @@ def get_terminal_validity_entries():
         return terminal_validity_cache["entries"], terminal_validity_cache["reasons_by_node"]
 
     entries, reasons_by_node = _terminal_validity_entries(
-        current_env.nodes,
-        current_env.adj,
+        routing_workspace.env.nodes,
+        routing_workspace.env.adj,
         terminals.keys(),
         routing_region_base,
         _room_polygon_by_name,
@@ -1090,12 +1047,12 @@ def draw_terminal_validity_overlay(screen):
     )
 
 def draw_terminal_validity_tooltip(screen, font_small):
-    if not terminal_validity_overlay_enabled or grid_kd is None or current_env is None:
+    if not terminal_validity_overlay_enabled or routing_workspace.spatial_index is None or routing_workspace.env is None:
         return
     _entries, reasons_by_node = get_terminal_validity_entries()
     return _draw_terminal_validity_tooltip(
         screen, font_small, pygame.mouse.get_pos(), (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H),
-        to_mm, lambda world_pt: int(grid_kd.query(world_pt)[1]), current_env.nodes,
+        to_mm, lambda world_pt: int(routing_workspace.spatial_index.query(world_pt)[1]), routing_workspace.env.nodes,
         reasons_by_node, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), COLOR_TEXT,
     )
 
@@ -1187,14 +1144,14 @@ def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
 def _source_start_nodes(source_spec):
-    return _source_start_nodes_for_kd(source_spec, grid_kd)
+    return _source_start_nodes_for_kd(source_spec, routing_workspace.spatial_index)
 
 def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None, *, route_plan=None):
     plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
     return _route_segments_from_path_for_env(
         route_name,
         path,
-        current_env.nodes,
+        routing_workspace.env.nodes,
         add_shaft_entry_segments if shaft_extraction else None,
         pin_name,
         global_pins,
@@ -1270,17 +1227,17 @@ def get_placement_weights():
 def get_auto_placement_scores(env, shaft_boundary_nodes):
     terminal_nodes = {}
     for name, pt in terminals.items():
-        _, node_idx = base_regular_kd.query(pt)
+        _, node_idx = routing_workspace.base_spatial_index.query(pt)
         terminal_nodes[name] = int(node_idx)
 
     return _topological_placement_scores(env, shaft_boundary_nodes, terminal_nodes, get_placement_weights())
 
 def ensure_placement_heatmap_scores():
     global ap_scores, ap_fields
-    if ap_scores or base_regular_env is None or base_regular_kd is None or shaft_extraction is None:
+    if ap_scores or routing_workspace.base_env is None or routing_workspace.base_spatial_index is None or shaft_extraction is None:
         return
-    shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
-    ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
+    shaft_boundary_nodes, _ = get_shaft_entry_nodes(routing_workspace.base_env, routing_workspace.base_spatial_index)
+    ap_scores, ap_fields = get_auto_placement_scores(routing_workspace.base_env, shaft_boundary_nodes)
 
 def _candidate_machine_rooms():
     return _candidate_machine_rooms_for_placement(rooms, MACHINE_OVERALL_W * MACHINE_BODY_H)
@@ -1384,22 +1341,24 @@ def run_core_workflow_machine_placement():
 
 def run_auto_placement():
     global machine_cx, machine_cy, machine_angle, ap_scores, ap_fields
-    if base_regular_env is None or not shaft_extraction:
+    if routing_workspace.base_env is None or not shaft_extraction:
         return
         
-    shaft_boundary_nodes, _shaft_node_idx = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
+    shaft_boundary_nodes, _shaft_node_idx = get_shaft_entry_nodes(
+        routing_workspace.base_env, routing_workspace.base_spatial_index,
+    )
     
     # Topological Distance Fields
     if auto_placement_mode_idx == 1:
         t0 = time.perf_counter()
         
         outcome = _run_topological_placement(
-            base_regular_env,
+            routing_workspace.base_env,
             shaft_boundary_nodes,
             (0, 90, 180, 270),
             is_machine_placement_valid,
             get_machine_pins,
-            lambda pt: int(base_regular_kd.query(pt)[1]),
+            lambda pt: int(routing_workspace.base_spatial_index.query(pt)[1]),
             wet_room_names,
             get_placement_weights(),
             get_auto_placement_scores,
@@ -1449,19 +1408,19 @@ def _sal_application_adapter():
 
     hooks = SalApplicationHooks(
         preflight_error=preflight_error,
-        grid_available=lambda: grid_nodes is not None,
+        grid_available=lambda: routing_workspace.grid_available,
         machine_pins=lambda: get_machine_pins(machine_cx, machine_cy, machine_angle),
         refresh_graph=refresh_graph,
-        current_env=lambda: current_env,
+        current_env=lambda: routing_workspace.env,
         snap_pins=snap_pins_to_graph,
-        shaft_entry_nodes=lambda: get_shaft_entry_nodes(current_env, grid_kd),
+        shaft_entry_nodes=lambda: get_shaft_entry_nodes(routing_workspace.env, routing_workspace.spatial_index),
         terminal_nodes=lambda _pin_map, shaft_idx, shaft_route: _terminal_node_indices_for_kd(
-            terminals, shaft_idx, grid_kd, shaft_route_name=shaft_route,
+            terminals, shaft_idx, routing_workspace.spatial_index, shaft_route_name=shaft_route,
         ),
         block_terminal_edges=lambda weights, terminal_map, block_weight: _block_terminal_node_edges(
-            weights, current_env.adj, terminal_map, block_weight,
+            weights, routing_workspace.env.adj, terminal_map, block_weight,
         ),
-        routing_runtime=lambda policy: _routing_runtime(current_env, policy),
+        routing_runtime=lambda policy: _routing_runtime(routing_workspace.env, policy),
         source_start_nodes=_source_start_nodes,
         weighted_edge_cost=_weighted_edge_cost_for_weights,
         line_graph_direction=_line_graph_dir_from_points_for_env,
@@ -1486,11 +1445,9 @@ def _sal_application_adapter():
 
 
 def solve_ventilation_routing():
-    global edge_weight_debug_map, edge_weight_overlay_excluded_edges
-    edge_weight_debug_map = {}
-    edge_weight_overlay_excluded_edges = set()
+    routing_workspace.overlay.reset()
     result = _sal_application_adapter().solve()
-    edge_weight_overlay_excluded_edges = set(result.excluded_overlay_edges)
+    routing_workspace.overlay.excluded_edges.update(result.excluded_overlay_edges)
     return result.routes, result.status, result.elapsed_ms, result.total_nodes
 
 def generate_synthetic_dwelling():
@@ -1508,11 +1465,7 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
-    global terminal_runtime, graph_lifecycle, active_graph_runtime
-    global edge_weight_debug_map, edge_weight_overlay_excluded_edges, static_clearance_cache
-    edge_weight_debug_map = {}
-    edge_weight_overlay_excluded_edges = set()
-    static_clearance_cache = StaticClearanceCache()
+    global terminal_runtime
     rooms = prepared.rooms
     columns = prepared.columns
     shafts = prepared.shafts
@@ -1532,8 +1485,7 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     shaft_core_entry_specs = prepared.shaft_core_entry_specs
     shaft_entry_geometry_by_node = {}
     _bnd_segs = None
-    active_graph_runtime = None
-    graph_lifecycle = GraphLifecycle(
+    lifecycle = GraphLifecycle(
         routing_region=routing_region_base,
         wall_polygons=wall_polys,
         covers=covers,
@@ -1561,6 +1513,7 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
         terminal_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
         remap_tolerance_mm=PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
     )
+    routing_workspace.replace_dwelling(lifecycle)
     build_base_regular_grid()
     if auto_place:
         run_auto_placement()
@@ -1636,16 +1589,16 @@ def _interpolate_regular_score(wx, wy, score_grid):
 
 def _build_heatmap_surface(node_scores):
     return _build_distance_heatmap_surface(
-        node_scores, base_regular_env.nodes, GRID_SPACING,
+        node_scores, routing_workspace.base_env.nodes, GRID_SPACING,
         (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), to_mm,
         _interpolate_regular_score, _score_to_heatmap_t, get_heatmap_color,
     )
 
 def draw_distance_heatmap(screen, node_scores):
-    if not node_scores or base_regular_env is None:
+    if not node_scores or routing_workspace.base_env is None:
         return
     key = (
-        id(base_regular_env),
+        id(routing_workspace.base_env),
         id(node_scores),
         len(node_scores),
         min(node_scores.values()),
@@ -1664,22 +1617,22 @@ def _cool_colormap(t):
     return _cool_colormap_value(t)
 
 def _edge_weight_log_scale():
-    return _edge_weight_log_scale_for_values(edge_weight_debug_map, OVERLAP_BLOCK_WEIGHT)
+    return _edge_weight_log_scale_for_values(routing_workspace.overlay.values, OVERLAP_BLOCK_WEIGHT)
 
 def draw_edge_weight_heatmap(screen):
-    if not edge_weight_heatmap_enabled or not edge_weight_debug_map or current_env is None:
+    if not edge_weight_heatmap_enabled or not routing_workspace.overlay.values or routing_workspace.env is None:
         return
     return _draw_edge_weight_heatmap(
-        screen, edge_weight_debug_map, current_env.nodes, current_env.adj, to_screen,
+        screen, routing_workspace.overlay.values, routing_workspace.env.nodes, routing_workspace.env.adj, to_screen,
         OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE, _cool_colormap, _edge_weight_log_scale_for_values,
     )
 
 def draw_edge_weight_colorbar(screen):
-    if not edge_weight_heatmap_enabled or not edge_weight_debug_map:
+    if not edge_weight_heatmap_enabled or not routing_workspace.overlay.values:
         return
 
     return _draw_edge_weight_colorbar(
-        screen, edge_weight_debug_map, (COLORBAR_LEFT, COLORBAR_W), CANVAS_TOP, CANVAS_H,
+        screen, routing_workspace.overlay.values, (COLORBAR_LEFT, COLORBAR_W), CANVAS_TOP, CANVAS_H,
         OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE, _cool_colormap, _edge_weight_log_scale_for_values,
         COLOR_TEXT,
     )
@@ -1903,9 +1856,11 @@ def apply_routing_key_command(event_key):
         build_grid(machine_pins=get_machine_pins(machine_cx, machine_cy, machine_angle))
     if transition.apply_rotation_mode:
         apply_rotation_mode_once()
-    if transition.refresh_placement_fields and base_regular_env is not None and shaft_extraction is not None:
-        shaft_boundary_nodes, _ = get_shaft_entry_nodes(base_regular_env, base_regular_kd)
-        ap_scores, ap_fields = get_auto_placement_scores(base_regular_env, shaft_boundary_nodes)
+    if transition.refresh_placement_fields and routing_workspace.base_env is not None and shaft_extraction is not None:
+        shaft_boundary_nodes, _ = get_shaft_entry_nodes(
+            routing_workspace.base_env, routing_workspace.base_spatial_index,
+        )
+        ap_scores, ap_fields = get_auto_placement_scores(routing_workspace.base_env, shaft_boundary_nodes)
     return transition
 
 def main():
@@ -2466,15 +2421,15 @@ def main():
 
         canvas_grid_edges = []
         canvas_grid_nodes = []
-        if show_grid_graph and current_env is not None:
+        if show_grid_graph and routing_workspace.env is not None:
             canvas_grid_edges = [
-                (to_screen(current_env.nodes[u][0], current_env.nodes[u][1]),
-                 to_screen(current_env.nodes[v][0], current_env.nodes[v][1]))
-                for u in current_env.adj
-                for v, _dist, _direction in current_env.adj[u]
+                (to_screen(routing_workspace.env.nodes[u][0], routing_workspace.env.nodes[u][1]),
+                 to_screen(routing_workspace.env.nodes[v][0], routing_workspace.env.nodes[v][1]))
+                for u in routing_workspace.env.adj
+                for v, _dist, _direction in routing_workspace.env.adj[u]
                 if u < v
             ]
-            canvas_grid_nodes = [to_screen(point[0], point[1]) for point in current_env.nodes]
+            canvas_grid_nodes = [to_screen(point[0], point[1]) for point in routing_workspace.env.nodes]
 
         canvas_terminals = []
         for route_name, point in terminals.items():
@@ -2532,8 +2487,8 @@ def main():
         guide_lines = []
         if auto_placement_mode_idx == 1 and ap_fields:
             shaft_point = get_representative_point(shaft_extraction)
-            _, left_index = grid_kd.query(global_pins["left_mid"])
-            _, right_index = grid_kd.query(global_pins["right_mid"])
+            _, left_index = routing_workspace.spatial_index.query(global_pins["left_mid"])
+            _, right_index = routing_workspace.spatial_index.query(global_pins["right_mid"])
             left_distance = ap_fields["Shaft"].get(int(left_index), 1e9)
             right_distance = ap_fields["Shaft"].get(int(right_index), 1e9)
             exhaust_pin = "left_mid" if left_distance < right_distance else "right_mid"
@@ -2553,7 +2508,7 @@ def main():
                 for pin_name in ("tl", "tr", "bl", "br"):
                     if pin_name in used_pins:
                         continue
-                    _, pin_index = grid_kd.query(global_pins[pin_name])
+                    _, pin_index = routing_workspace.spatial_index.query(global_pins[pin_name])
                     distance = ap_fields[route_name].get(int(pin_index), 1e9)
                     if distance < best_distance:
                         best_distance, best_pin = distance, pin_name

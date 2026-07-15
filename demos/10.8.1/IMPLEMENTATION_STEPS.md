@@ -551,6 +551,11 @@ Manual validation milestones:
 
 ## Commit Checklist
 
+- Added an installation-neutral `RoutingWorkspace` that owns the selected graph, dynamic environment, base placement graph, spatial index, static-clearance cache, and edge-weight overlay for one dwelling.
+- Removed the parallel graph/cache/overlay globals from `main.py`; dwelling replacement now atomically replaces the workspace before rebuilding placement and selected graphs.
+- Preserved the unfiltered committed graph separately from the dynamically filtered machine-obstacle environment and synchronized `TerminalRuntime` after both transitions.
+- Validation: compilation, eight focused workspace/lifecycle/Sal-application contracts, and a 12-second headless startup/initial-solve smoke.
+
 - Added a concrete `SalApplicationAdapter` as the live boundary between interactive graph/session hooks and Sal policy, route-plan, flow-runtime, strategy-runtime, and controller assembly.
 - Removed direct Sal controller and flow wiring from `main.py`; the UI-facing solve wrapper now only resets overlays, invokes the adapter, and applies its result.
 - Kept graph lifecycle, routing weight runtime, scoring, and UI state in `main.py` for the next workspace/session boundary rather than introducing a generic installation framework.
