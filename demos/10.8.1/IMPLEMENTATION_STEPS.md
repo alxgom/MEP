@@ -551,6 +551,11 @@ Manual validation milestones:
 
 ## Commit Checklist
 
+- Ported routing-core's sparse simple orthogonal grid into the installation-neutral graph subsystem with explicit required points, obstacles, axis policy, and blocked-edge cost inputs.
+- Added a fourth selectable Sal graph mode backed by a Sal-owned input adapter for terminal/access nodes and column, shaft, and machine obstacles; retained Hannan as the default and did not introduce Steiner behavior into Sal.
+- Replaced catch-all graph selection with an explicit `GraphMode` contract so unsupported integer modes fail instead of silently selecting epsilon.
+- Validation: Python compilation and the full 300-test Demo 10.8.1 suite.
+
 - Added an installation-neutral `RoutingWorkspace` that owns the selected graph, dynamic environment, base placement graph, spatial index, static-clearance cache, and edge-weight overlay for one dwelling.
 - Removed the parallel graph/cache/overlay globals from `main.py`; dwelling replacement now atomically replaces the workspace before rebuilding placement and selected graphs.
 - Preserved the unfiltered committed graph separately from the dynamically filtered machine-obstacle environment and synchronized `TerminalRuntime` after both transitions.

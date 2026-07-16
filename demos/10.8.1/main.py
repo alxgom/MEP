@@ -31,6 +31,7 @@ from mep_routing.installations.sal import (
     SalRouteMaterializer,
     SalSolverSettings,
 )
+from mep_routing.installations.sal.graph_inputs import build_sal_simple_graph_inputs
 from mep_routing.geometry import iter_polygons as _iter_polygons
 from mep_routing.graphs import (
     GraphLifecycle,
@@ -660,13 +661,30 @@ def build_epsilon_grid(machine_pins=None):
             f"(axes {result.variant.axes_ms:.1f}, nodes {result.variant.nodes_ms:.1f}, edges {result.variant.edges_ms:.1f})"
         )
 
+def build_core_simple_grid(machine_pins=None):
+    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
+    result = routing_workspace.build_selected(3, pins, machine_angle, terminal_runtime=terminal_runtime)
+    if result is None:
+        return
+    invalidate_room_start_node_cache()
+    invalidate_terminal_validity_cache()
+    if result.variant is not None and len(result.variant.nodes):
+        print(
+            f"[Routing-Core Simple Port] axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
+            f"nodes={len(result.variant.nodes)} edges={len(result.variant.edges)} in {result.elapsed_ms:.1f}ms"
+        )
+
 def build_grid(machine_pins=None):
     if graph_type_idx == 0:
         build_regular_grid()
     elif graph_type_idx == 1:
         build_hannan_grid(machine_pins=machine_pins, shift_walls=True)
-    else:
+    elif graph_type_idx == 2:
         build_epsilon_grid(machine_pins=machine_pins)
+    elif graph_type_idx == 3:
+        build_core_simple_grid(machine_pins=machine_pins)
+    else:
+        raise ValueError(f"unsupported graph mode index: {graph_type_idx}")
 
 # Machine representation helper
 def get_machine_pins(cx, cy, angle_deg):
@@ -1121,6 +1139,8 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
         wall_clearance_mm=ROUTING_WALL_CLEARANCE_MM,
         epsilon_mm=CORE_EPSILON_GRID_MM,
         port_access_specs=get_port_access_specs,
+        simple_input_builder=build_sal_simple_graph_inputs,
+        simple_axis_clearance_mm=MACHINE_SMALL_DUCT_D,
     )
     active_dwelling = ActiveDwellingSession.create(
         prepared,

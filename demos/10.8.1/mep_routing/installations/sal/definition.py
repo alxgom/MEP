@@ -20,6 +20,7 @@ SAL_GRAPH_MODES = (
     "Regular 200mm Grid",
     "Hannan Grid (numpy)",
     "Epsilon Grid (core-like numpy)",
+    "Routing-Core Port: Simple Grid",
 )
 
 SAL_STRATEGY_LABELS = (

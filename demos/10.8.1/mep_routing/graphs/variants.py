@@ -11,6 +11,7 @@ import numpy as np
 from .axis_grid import build_axis_grid
 from .axes import merge_close_values
 from .epsilon import build_axes as build_epsilon_axes
+from .simple import SimpleGraphInputs, build_simple_grid
 
 
 @dataclass(frozen=True)
@@ -125,3 +126,11 @@ def build_epsilon_variant(
         required_points,
     )
     return GraphVariantResult(nodes, edges, axes_x, axes_y, required_points, axes_ms, nodes_ms, edges_ms)
+
+
+def build_simple_variant(inputs: SimpleGraphInputs) -> GraphVariantResult:
+    result = build_simple_grid(inputs)
+    return GraphVariantResult(
+        result.nodes, result.edges, result.axes_x, result.axes_y,
+        result.required_points, result.axes_ms, result.nodes_ms, result.edges_ms,
+    )

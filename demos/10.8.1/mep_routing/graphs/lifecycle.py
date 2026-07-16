@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 from time import perf_counter
 from typing import Any, Callable, Mapping, Sequence
 
@@ -12,7 +13,14 @@ from .dynamic import filter_dynamic_machine_obstacle
 from .hannan import build_static_axes
 from .regular import build_regular_grid
 from .runtime import RuntimeGraph, append_shaft_runtime_node, create_runtime_graph, restrict_pin_access_edges
-from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant
+from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant
+
+
+class GraphMode(IntEnum):
+    REGULAR = 0
+    HANNAN = 1
+    EPSILON = 2
+    CORE_SIMPLE = 3
 
 
 @dataclass(frozen=True)
@@ -53,6 +61,8 @@ class GraphLifecycle:
     wall_clearance_mm: float
     epsilon_mm: float
     port_access_specs: Callable[[Mapping[str, Any], float], Sequence[Mapping[str, Any]]]
+    simple_input_builder: Callable[..., Any] | None = None
+    simple_axis_clearance_mm: float = 100.0
     _hannan_templates: dict[bool, Mapping[str, Any]] = field(default_factory=dict, init=False, repr=False)
 
     def node_region(self):
@@ -139,11 +149,15 @@ class GraphLifecycle:
         *,
         shift_hannan_walls: bool = True,
     ) -> GraphBuildResult | None:
-        """Build the selected regular, Hannan, or epsilon routing graph."""
+        """Build a supported routing graph, accepting its stable integer enum value."""
         if self.routing_region is None:
             return None
+        try:
+            mode = GraphMode(graph_type)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"unsupported graph mode: {graph_type!r}") from exc
         started = perf_counter()
-        if graph_type == 0:
+        if mode is GraphMode.REGULAR:
             nodes, edges = build_regular_grid(
                 self.routing_region,
                 self.node_region(),
@@ -152,10 +166,10 @@ class GraphLifecycle:
                 self.wall_thickness_mm,
             )
             runtime = self.commit_runtime(nodes, edges, machine_pins, machine_angle)
-            return GraphBuildResult(runtime, graph_type, (perf_counter() - started) * 1000.0)
+            return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0)
 
         access_points = [spec["access_point"] for spec in self.port_access_specs(machine_pins, machine_angle)]
-        if graph_type == 1:
+        if mode is GraphMode.HANNAN:
             variant = build_hannan_variant(
                 template=self.hannan_template(shift_walls=shift_hannan_walls),
                 allowed_region=self.routing_region,
@@ -166,7 +180,7 @@ class GraphLifecycle:
                 shaft_extraction=self.shaft_extraction,
                 machine_access_points=access_points,
             )
-        else:
+        elif mode is GraphMode.EPSILON:
             variant = build_epsilon_variant(
                 allowed_region=self.routing_region,
                 node_region=self.node_region(),
@@ -182,8 +196,21 @@ class GraphLifecycle:
                 epsilon_mm=self.epsilon_mm,
                 scaffold_spacing_mm=self.scaffold_spacing_mm,
             )
+        else:
+            if self.simple_input_builder is None:
+                raise ValueError("core-simple graph mode has no installation input builder")
+            variant = build_simple_variant(self.simple_input_builder(
+                routing_region=self.routing_region,
+                terminals=self.terminals,
+                columns=self.columns,
+                shafts=self.shafts,
+                machine_pins=machine_pins,
+                access_points=access_points,
+                epsilon_mm=self.epsilon_mm,
+                axis_clearance_mm=self.simple_axis_clearance_mm,
+            ))
         runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle)
-        return GraphBuildResult(runtime, graph_type, (perf_counter() - started) * 1000.0, variant)
+        return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0, variant)
 
     def apply_dynamic_obstacle(
         self,
