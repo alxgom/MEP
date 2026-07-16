@@ -14,13 +14,15 @@ from mep_routing.installations.sal import (
 def test_sal_ozeo_flat_machine_dimensions_match_demo_baseline():
     spec = SAL_OZEO_FLAT_MACHINE
 
-    assert spec.body_width_mm == 410
-    assert spec.body_height_mm == 460
-    assert spec.overall_width_mm == 511
-    assert spec.small_duct_diameter_mm == 90
+    assert spec.body_width_mm == 459
+    assert spec.body_height_mm == 459
+    assert spec.overall_width_mm == 512
+    assert spec.small_duct_diameter_mm == 80
     assert spec.large_duct_diameter_mm == 125
     assert spec.small_pin_stub_length_mm == 100
     assert spec.large_pin_stub_length_mm == 250
+    assert spec.installation_height_mm == 197.5035496888521
+    assert spec.installation_clearance_mm == 20.0
 
 
 def test_sal_ozeo_flat_route_diameter_policy_matches_baseline():
@@ -28,7 +30,7 @@ def test_sal_ozeo_flat_route_diameter_policy_matches_baseline():
 
     assert spec.route_diameter_mm(SHAFT_ROUTE_NAME) == 125
     assert spec.route_diameter_mm(KITCHEN_ROUTE_NAME) == 125
-    assert spec.route_diameter_mm("Bathroom") == 90
+    assert spec.route_diameter_mm("Bathroom") == 80
 
 
 def test_sal_ozeo_flat_pin_stub_policy_matches_baseline():
@@ -48,8 +50,8 @@ def test_machine_pins_match_baseline_unrotated_geometry():
 
     assert pins["left_mid"] == (-256, 0)
     assert pins["right_mid"] == (256, 0)
-    assert pins["tl"] == (-256, 185)
-    assert pins["br"] == (256, -185)
+    assert pins["tl"] == (-256, 190)
+    assert pins["br"] == (256, -190)
     assert pins["c_tl"] == (-256, 230)
     assert pins["c_br"] == (256, -230)
 
@@ -72,8 +74,8 @@ def test_port_access_specs_match_baseline_stub_policy():
         (spec["access_point"], spec["out_dir"], spec["in_dir"])
         for spec in by_pin["tl"]
     } == {
-        ((-356, 185), "W", "E"),
-        ((-256, 285), "N", "S"),
+        ((-356, 190), "W", "E"),
+        ((-256, 290), "N", "S"),
     }
 
 

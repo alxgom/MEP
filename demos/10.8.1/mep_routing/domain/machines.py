@@ -20,6 +20,8 @@ class MachineSpec:
     small_pin_stub_length_mm: int
     large_pin_stub_length_mm: int
     large_route_names: frozenset[str] = field(default_factory=frozenset)
+    installation_height_mm: float | None = None
+    installation_clearance_mm: float = 0.0
 
     def route_diameter_mm(self, route_name: str) -> int:
         if route_name in self.large_route_names:

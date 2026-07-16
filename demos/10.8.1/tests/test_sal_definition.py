@@ -35,7 +35,7 @@ def test_sal_definition_owns_current_route_classification_and_diameters():
     assert definition.is_large_route(KITCHEN_ROUTE_NAME)
     assert not definition.is_large_route("Bathroom")
     assert definition.route_diameter_mm(SHAFT_ROUTE_NAME) == 125
-    assert definition.route_diameter_mm("Bathroom") == 90
+    assert definition.route_diameter_mm("Bathroom") == 80
     assert definition.build_route_plan(
         {"Kitchen": (1, 0), "Bathroom": (2, 0)}, (0, 0),
     ).all_routes == ("Shaft", "Kitchen", "Bathroom")

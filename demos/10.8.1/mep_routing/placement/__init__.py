@@ -2,6 +2,7 @@
 
 from .application import PlacementApplicationAdapter
 from .feasibility import candidate_machine_rooms, is_machine_placement_valid
+from .vertical_clearance import insufficient_machine_clearance_regions
 from .fields import compute_dijkstra_distance_field, placement_weights, topological_placement_scores
 from .rotation import (
     field_alignment_pin_dirs,
@@ -42,6 +43,7 @@ __all__ = [
     "pin_nodes_from_pins",
     "point_angle_to_target",
     "is_machine_placement_valid",
+    "insufficient_machine_clearance_regions",
     "rotation_field_rooms_for_pin",
     "rotation_room_weight",
     "rotation_score_from_fields",

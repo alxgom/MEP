@@ -46,6 +46,7 @@ from mep_routing.graphs import (
 )
 from mep_routing.placement import (
     PlacementApplicationAdapter,
+    insufficient_machine_clearance_regions as _insufficient_machine_clearance_regions,
     is_machine_placement_valid as _is_machine_placement_valid_for_placement,
     placement_weights as _placement_weights,
 )
@@ -348,6 +349,7 @@ COLOR_SHAFT = (231, 76, 60)
 COLOR_SHAFT_BG = (231, 76, 60, 40)
 COLOR_SHAFT_INACTIVE = (154, 84, 82)
 COLOR_SHAFT_INACTIVE_HATCH = (92, 58, 58)
+COLOR_MACHINE_CLEARANCE_HATCH = (105, 105, 105)
 COLOR_DOOR = (220, 220, 220)
 COLOR_MACHINE = (127, 140, 141)
 COLOR_MACHINE_HOVER = (149, 165, 166)
@@ -621,6 +623,7 @@ def invalidate_terminal_validity_cache():
 # Auto-placement cache
 ap_scores = {}
 ap_fields = {}
+machine_vertical_clearance_blocks = ()
 def get_representative_point(poly):
     centroid = poly.centroid
     if poly.contains(centroid):
@@ -1179,7 +1182,11 @@ def is_machine_placement_valid(cx, cy, angle):
         walls,
         columns,
         shafts,
+        get_machine_vertical_clearance_blocks(),
     )
+
+def get_machine_vertical_clearance_blocks():
+    return machine_vertical_clearance_blocks
 
 def get_placement_weights():
     return _placement_weights(weight_mode_idx)
@@ -1275,6 +1282,7 @@ def _sal_application_adapter():
         graph_type=graph_type_idx,
         update_dynamic_env=update_dynamic_env,
         build_grid=build_grid,
+        blocked_vertical_regions=get_machine_vertical_clearance_blocks(),
     )
 
     callbacks = SalLiveRoutingCallbacks(
@@ -1319,8 +1327,11 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
-    global terminal_runtime
+    global terminal_runtime, machine_vertical_clearance_blocks
     rooms = prepared.rooms
+    machine_vertical_clearance_blocks = _insufficient_machine_clearance_regions(
+        rooms, MACHINE_SPEC.installation_height_mm, MACHINE_SPEC.installation_clearance_mm,
+    )
     columns = prepared.columns
     shafts = prepared.shafts
     covers = prepared.covers
@@ -1466,6 +1477,8 @@ def draw_distance_heatmap(screen, node_scores):
         heatmap_surface_cache["surface"] = _build_heatmap_surface(node_scores)
         heatmap_surface_cache["key"] = key
     screen.blit(heatmap_surface_cache["surface"], (CANVAS_LEFT, CANVAS_TOP))
+    for region in get_machine_vertical_clearance_blocks():
+        draw_polygon_hatch(screen, region, COLOR_MACHINE_CLEARANCE_HATCH, spacing=8)
 
 def _cool_colormap(t):
     return _cool_colormap_value(t)

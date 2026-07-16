@@ -22,6 +22,7 @@ class MachineRoutingSession:
     graph_type: int
     update_dynamic_env: object
     build_grid: object
+    blocked_vertical_regions: tuple = ()
 
     @property
     def pins(self):
@@ -37,6 +38,8 @@ class MachineRoutingSession:
             return "Blocked: Machine outside region"
         if any(machine_polygon.intersects(column) for column in self.columns):
             return "Blocked: Machine collides with column"
+        if any(machine_polygon.intersection(region).area > 1e-7 for region in self.blocked_vertical_regions):
+            return "Blocked: Insufficient vertical clearance for machine"
         return None
 
     def refresh_graph(self, pins):
