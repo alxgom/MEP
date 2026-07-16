@@ -1,6 +1,14 @@
 """Application-level runtime coordinators for the interactive router."""
 
 from .dwelling_session import ActiveDwellingSession
+from .dwelling_application import (
+    CommonGraphConfig,
+    InstallationGraphProfile,
+    TerminalRuntimeConfig,
+    create_active_dwelling,
+    load_real_dwelling,
+)
+from .graph_build_session import GraphBuildSession
 from .installation_ui import (
     InstallationMachineUi,
     InstallationUiSession,
@@ -24,6 +32,12 @@ from .interaction_runtime import (
 
 __all__ = [
     "ActiveDwellingSession",
+    "CommonGraphConfig",
+    "InstallationGraphProfile",
+    "TerminalRuntimeConfig",
+    "create_active_dwelling",
+    "load_real_dwelling",
+    "GraphBuildSession",
     "InstallationMachineUi",
     "InstallationUiSession",
     "MachineSelectionTransition",

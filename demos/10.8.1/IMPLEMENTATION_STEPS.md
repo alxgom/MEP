@@ -666,6 +666,12 @@ Before each commit:
 
 ## Open Items
 
+- Extracted dwelling source-frame normalization, routing-core shaft-entry specification parsing, and per-dwelling shaft-entry caches from `main.py`.
+- Added installation-scoped graph profiles plus shared graph/terminal runtime configuration, keeping Sal's port and simple-graph callbacks explicit for future Cli composition.
+- Added `GraphBuildSession` as the application facade for base, selected, and dynamic graph construction; `main.py` now retains only live machine inputs and compatibility aliases.
+- Centralized fresh `ActiveDwellingSession` construction and real-dwelling loader adaptation without moving UI fallback policy or compatibility-global mutation into reusable modules.
+- Validation: Python compilation, four focused source-frame/graph-session contracts, and the full Demo 10.8.1 suite (315 passed).
+
 - Added `InstallationUiSession` as the application-owned machine-selection boundary, with selected keys and dropdown state scoped per installation plus an explicit runtime-invalidation result for future interactive runtimes.
 - Cli is now activatable for configuration and exposes all seven PEAD machines in the sidebar while its routing switch remains unavailable; selecting a Cli machine persists across Sal/Cli switches, does not reroute, and reports that the interactive runtime is pending.
 - Sidebar projection no longer presents Sal placement, frame, or rotation as Cli state, and Pygame dropdown hits use the same bounds contract as rendering.

@@ -52,6 +52,7 @@ from .weight_runtime import (
     refresh_weight_overlay,
 )
 from .workspace import RoutingWorkspace
+from .shaft_entry_runtime import ShaftEntryRuntime
 from .machine_session import MachineRoutingSession
 from .flow import (
     PinFlowRoute,
@@ -120,6 +121,7 @@ __all__ = [
     "RoutingRequest",
     "RoutingWeightRuntimeContext",
     "RoutingWorkspace",
+    "ShaftEntryRuntime",
     "MachineRoutingSession",
     "StaticClearanceCache",
     "SolvedRoute",

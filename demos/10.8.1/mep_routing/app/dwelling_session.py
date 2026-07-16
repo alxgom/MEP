@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mep_routing.routing import RoutingWorkspace, TerminalRuntime
+from mep_routing.routing import RoutingWorkspace, ShaftEntryRuntime, TerminalRuntime
 
 
 @dataclass
@@ -14,6 +14,7 @@ class ActiveDwellingSession:
     prepared: object
     workspace: RoutingWorkspace
     terminals: TerminalRuntime
+    shaft_entries: ShaftEntryRuntime
 
     @classmethod
     def create(
@@ -38,7 +39,8 @@ class ActiveDwellingSession:
         )
         workspace = RoutingWorkspace()
         workspace.replace_dwelling(lifecycle)
-        return cls(prepared, workspace, terminal_runtime)
+        shaft_entries = ShaftEntryRuntime(prepared.shaft_extraction, tuple(prepared.shaft_core_entry_specs))
+        return cls(prepared, workspace, terminal_runtime, shaft_entries)
 
     @property
     def rooms(self):

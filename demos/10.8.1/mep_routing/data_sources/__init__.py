@@ -8,6 +8,7 @@ from .dwelling import (
 from .catalog import DwellingCase, discover_dwelling_cases, dwelling_cases_from_rows
 from .synthetic import SyntheticDwelling, build_synthetic_dwelling
 from .scenario import PreparedDwelling, prepare_real_dwelling, prepare_synthetic_dwelling, wet_room_outer_accents
+from .source_frame import build_core_shaft_entry_specs, transform_source_point
 
 __all__ = [
     "build_wall_polygons",
@@ -22,4 +23,6 @@ __all__ = [
     "prepare_real_dwelling",
     "prepare_synthetic_dwelling",
     "wet_room_outer_accents",
+    "build_core_shaft_entry_specs",
+    "transform_source_point",
 ]

@@ -1,19 +1,26 @@
 import sys
 import os
-import math
 import time
 import traceback
 from pathlib import Path
-import numpy as np
 import pygame
-from shapely.geometry import LineString, Point
+from shapely.geometry import Point
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
     machine_pins as _machine_pins,
     port_access_specs as _port_access_specs,
 )
 from mep_routing.config import SALUBRIDAD_DEFAULTS as _SALUBRIDAD_DEFAULTS
-from mep_routing.app import ActiveDwellingSession, InstallationMachineUi, InstallationUiSession
+from mep_routing.app import (
+    CommonGraphConfig,
+    GraphBuildSession,
+    InstallationGraphProfile,
+    InstallationMachineUi,
+    InstallationUiSession,
+    TerminalRuntimeConfig,
+    create_active_dwelling,
+    load_real_dwelling as _load_real_dwelling_source,
+)
 from mep_routing.installations.cli import CLI_INSTALLATION
 from mep_routing.data_sources import (
     build_wall_polygons as _build_wall_polygons_for_dwelling,
@@ -23,6 +30,7 @@ from mep_routing.data_sources import (
     discover_dwelling_cases as _discover_dwelling_cases,
     prepare_real_dwelling as _prepare_real_dwelling,
     prepare_synthetic_dwelling as _prepare_synthetic_dwelling,
+    build_core_shaft_entry_specs as _source_core_shaft_entry_specs,
 )
 from mep_routing.installations.sal import (
     SAL_INSTALLATION,
@@ -34,9 +42,6 @@ from mep_routing.installations.sal import (
 )
 from mep_routing.installations.sal.graph_inputs import build_sal_simple_graph_inputs
 from mep_routing.geometry import iter_polygons as _iter_polygons
-from mep_routing.graphs import (
-    GraphLifecycle,
-)
 from mep_routing.placement import (
     PlacementApplicationAdapter,
     available_machine_placement_region as _available_machine_placement_region,
@@ -46,7 +51,6 @@ from mep_routing.placement import (
     placement_weights as _placement_weights,
 )
 from mep_routing.routing import (
-    RoutingWorkspace,
     block_terminal_node_edges as _block_terminal_node_edges,
     count_segment_crossings as _count_segment_crossings,
     count_solution_turns as _count_solution_turns,
@@ -54,9 +58,6 @@ from mep_routing.routing import (
     find_route_hit_at_point as _find_route_hit_at_point,
     line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
     selected_pin_names as _selected_pin_names,
-    select_shaft_entry_nodes as _select_shaft_entry_nodes,
-    shaft_entry_geometry as _shaft_entry_geometry_for_shaft,
-    shaft_entry_segments as _shaft_entry_segments_for_geometry,
     terminal_node_indices as _terminal_node_indices_for_kd,
     terminal_validity_entries as _terminal_validity_entries,
     total_route_length_m as _total_route_length_m,
@@ -231,7 +232,8 @@ show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
-routing_workspace = RoutingWorkspace()
+routing_workspace = None
+graph_build_session = None
 active_dwelling = None
 help_popup_card = None
 transient_message = None
@@ -243,6 +245,16 @@ terminal_validity_overlay_enabled = False
 terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
 PREFERRED_TERMINAL_MARKER_SIZE_MM = 125.0
 PREFERRED_TERMINAL_REMAP_TOLERANCE_MM = 300.0
+
+COMMON_GRAPH_CONFIG = CommonGraphConfig(
+    GRID_SPACING, HANNAN_SCAFFOLD_SPACING, WALL_THICKNESS,
+    ROUTING_WALL_CLEARANCE_MM, CORE_EPSILON_GRID_MM,
+)
+TERMINAL_RUNTIME_CONFIG = TerminalRuntimeConfig(
+    TERMINAL_REGULATION_CLEARANCE_MM,
+    BUFFER_ROOM_TERMINALES_AIRE_MM,
+    PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+)
 
 ROOM_START_MODES = [
     "Room node set",
@@ -532,200 +544,37 @@ def get_representative_point(poly):
     rep = poly.representative_point()
     return (round(rep.x), round(rep.y))
 
-def _transform_source_xy_to_demo(point_xy, metadata):
-    if not point_xy or metadata is None:
-        return None
-    x = float(point_xy[0])
-    y = float(point_xy[1])
-    frame = metadata.get("routing_frame") or {}
-    rotation_degrees = float(frame.get("rotation_degrees", 0.0) or 0.0)
-    origin = (metadata.get("metadata") or {}).get("source_rotation_origin", [0.0, 0.0])
-    bounds_origin = (metadata.get("metadata") or {}).get("bounds_origin", [0.0, 0.0])
-
-    if abs(rotation_degrees) > 1e-9:
-        theta = math.radians(-rotation_degrees)
-        ox = float(origin[0])
-        oy = float(origin[1])
-        dx = x - ox
-        dy = y - oy
-        x = ox + dx * math.cos(theta) - dy * math.sin(theta)
-        y = oy + dx * math.sin(theta) + dy * math.cos(theta)
-
-    return (
-        round((x - float(bounds_origin[0])) * SCALE_TO_MM),
-        round((y - float(bounds_origin[1])) * SCALE_TO_MM),
-    )
-
 def _build_core_shaft_entry_specs(scenario):
-    metadata = scenario_summary(scenario) if scenario_summary else {"metadata": getattr(scenario, "metadata", {})}
-    raw_meta = metadata.get("metadata") or {}
-    candidates = raw_meta.get("shaft_candidates") or []
-    candidate_idx = raw_meta.get("shaft_candidate_index")
-    if candidate_idx is None or candidate_idx < 0 or candidate_idx >= len(candidates):
-        candidates = [candidate for candidate in candidates if candidate.get("candidate_for_living")]
-    else:
-        candidates = [candidates[candidate_idx]]
-
-    specs = []
-    for candidate in candidates:
-        for routing in candidate.get("routing") or []:
-            centroid = _transform_source_xy_to_demo(routing.get("centroid"), metadata)
-            if centroid is None:
-                continue
-            exit_walls = []
-            for wall in routing.get("exit_walls") or []:
-                if len(wall) < 2:
-                    continue
-                p1 = _transform_source_xy_to_demo(wall[0], metadata)
-                p2 = _transform_source_xy_to_demo(wall[1], metadata)
-                if p1 is not None and p2 is not None:
-                    exit_walls.append((p1, p2))
-            entry_points = routing.get("entry_points") or []
-            if not entry_points and routing.get("entry_point"):
-                entry_points = [routing.get("entry_point")]
-            for entry_raw in entry_points:
-                entry = _transform_source_xy_to_demo(entry_raw, metadata)
-                if entry is None:
-                    continue
-                normal = np.array([entry[0] - centroid[0], entry[1] - centroid[1]], dtype=np.float64)
-                norm = float(np.linalg.norm(normal))
-                if norm < 1e-6:
-                    continue
-                normal /= norm
-                entry_point = Point(float(entry[0]), float(entry[1]))
-                matching_wall = None
-                if exit_walls:
-                    matching_wall = min(
-                        exit_walls,
-                        key=lambda wall: LineString(wall).distance(entry_point),
-                    )
-                    if LineString(matching_wall).distance(entry_point) > CORE_EPSILON_GRID_MM * 0.75:
-                        matching_wall = None
-                specs.append({
-                    "centroid": (float(centroid[0]), float(centroid[1])),
-                    "entry": (float(entry[0]), float(entry[1])),
-                    "normal": (float(normal[0]), float(normal[1])),
-                    "exit_wall": matching_wall,
-                    "id": routing.get("id"),
-                })
-    return specs
+    return _source_core_shaft_entry_specs(
+        scenario, summarize=scenario_summary, scale_to_mm=SCALE_TO_MM,
+        match_tolerance_mm=CORE_EPSILON_GRID_MM * 0.75,
+    )
 
 def _shaft_entry_geometry_for_node(node_idx, env=None):
-    if node_idx in shaft_entry_geometry_by_node:
-        return shaft_entry_geometry_by_node[node_idx]
-    if shaft_extraction is None:
-        return None
     env = env or routing_workspace.env
-    if env is None or node_idx is None:
-        return None
-
-    return _shaft_entry_geometry_for_shaft(shaft_extraction, env.nodes[int(node_idx)])
+    return active_dwelling.shaft_entries.geometry(node_idx, env) if active_dwelling else None
 
 def get_shaft_entry_nodes(env, kd=None):
-    global shaft_entry_geometry_by_node
-    if shaft_extraction is None or env is None or len(env.nodes) == 0:
+    if active_dwelling is None:
         return [], None
-    candidates, chosen, shaft_entry_geometry_by_node = _select_shaft_entry_nodes(
-        env.nodes,
-        shaft_extraction,
-        search_radius_mm=SHAFT_ENTRY_SEARCH_MM,
-        grid_spacing_mm=GRID_SPACING,
-        max_candidates=SHAFT_ENTRY_MAX_CANDIDATES,
-        core_entry_specs=shaft_core_entry_specs,
-        spatial_index=kd,
+    return active_dwelling.shaft_entries.select(
+        env, spatial_index=kd, search_radius_mm=SHAFT_ENTRY_SEARCH_MM,
+        grid_spacing_mm=GRID_SPACING, max_candidates=SHAFT_ENTRY_MAX_CANDIDATES,
     )
-    return candidates, chosen
 
 def add_shaft_entry_segments(segs, first_node_idx):
-    geom = _shaft_entry_geometry_for_node(first_node_idx)
-    segs.extend(_shaft_entry_segments_for_geometry(geom))
-
-def build_regular_grid():
-    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = routing_workspace.build_selected(0, pins, machine_angle, terminal_runtime=terminal_runtime)
-    if result is not None:
-        invalidate_room_start_node_cache()
-        invalidate_terminal_validity_cache()
-
-def build_base_regular_grid():
-    t0 = time.perf_counter()
-    runtime = routing_workspace.build_base_regular()
-    if runtime is None:
-        return
-    print(f"[Base Regular Grid] Built {len(runtime.nodes)} nodes in {(time.perf_counter() - t0)*1000:.1f}ms")
+    if active_dwelling:
+        active_dwelling.shaft_entries.append_segments(segs, first_node_idx, routing_workspace.env)
 
 def update_dynamic_env(machine_poly):
-    if not routing_workspace.grid_available:
-        routing_workspace.apply_machine_obstacle(
-            machine_poly, {}, machine_angle, clearance_mm=MACHINE_CLEARANCE,
-            terminal_runtime=terminal_runtime,
-        )
-        invalidate_room_start_node_cache()
-        return
-    t0 = time.perf_counter()
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = routing_workspace.apply_machine_obstacle(
+    graph_build_session.apply_machine_obstacle(
         machine_poly, pins, machine_angle, clearance_mm=MACHINE_CLEARANCE,
-        terminal_runtime=terminal_runtime,
     )
-    invalidate_room_start_node_cache()
-    ms = (time.perf_counter() - t0) * 1000.0
-    print(f"Grid update: {ms:.1f} ms  (blocked nodes={result.blocked_node_count}, edges={result.blocked_edge_count})")
-
-def build_hannan_grid(machine_pins=None, shift_walls=False):
-    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = routing_workspace.build_selected(
-        1, pins, machine_angle, shift_hannan_walls=shift_walls, terminal_runtime=terminal_runtime,
-    )
-    if result is None:
-        return
-    invalidate_room_start_node_cache()
-    invalidate_terminal_validity_cache()
-    if result.variant is not None and len(result.variant.nodes):
-        print(
-            f"[Hannan Simple] axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
-            f"nodes={len(result.variant.nodes)} edges={len(result.variant.edges)} in {result.elapsed_ms:.1f}ms "
-            f"(axes {result.variant.axes_ms:.1f}, nodes {result.variant.nodes_ms:.1f}, edges {result.variant.edges_ms:.1f})"
-        )
-
-def build_epsilon_grid(machine_pins=None):
-    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = routing_workspace.build_selected(2, pins, machine_angle, terminal_runtime=terminal_runtime)
-    if result is None:
-        return
-    invalidate_room_start_node_cache()
-    invalidate_terminal_validity_cache()
-    if result.variant is not None and len(result.variant.nodes):
-        print(
-            f"[Epsilon Core-like] eps={CORE_EPSILON_GRID_MM:.0f} axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
-            f"nodes={len(result.variant.nodes)} edges={len(result.variant.edges)} in {result.elapsed_ms:.1f}ms "
-            f"(axes {result.variant.axes_ms:.1f}, nodes {result.variant.nodes_ms:.1f}, edges {result.variant.edges_ms:.1f})"
-        )
-
-def build_core_simple_grid(machine_pins=None):
-    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
-    result = routing_workspace.build_selected(3, pins, machine_angle, terminal_runtime=terminal_runtime)
-    if result is None:
-        return
-    invalidate_room_start_node_cache()
-    invalidate_terminal_validity_cache()
-    if result.variant is not None and len(result.variant.nodes):
-        print(
-            f"[Routing-Core Simple Port] axes={len(result.variant.axes_x)}x{len(result.variant.axes_y)} "
-            f"nodes={len(result.variant.nodes)} edges={len(result.variant.edges)} in {result.elapsed_ms:.1f}ms"
-        )
 
 def build_grid(machine_pins=None):
-    if graph_type_idx == 0:
-        build_regular_grid()
-    elif graph_type_idx == 1:
-        build_hannan_grid(machine_pins=machine_pins, shift_walls=True)
-    elif graph_type_idx == 2:
-        build_epsilon_grid(machine_pins=machine_pins)
-    elif graph_type_idx == 3:
-        build_core_simple_grid(machine_pins=machine_pins)
-    else:
-        raise ValueError(f"unsupported graph mode index: {graph_type_idx}")
+    pins = machine_pins or get_machine_pins(machine_cx, machine_cy, machine_angle)
+    return graph_build_session.build(graph_type_idx, pins, machine_angle, shift_hannan_walls=True)
 
 # Machine representation helper
 def get_machine_pins(cx, cy, angle_deg):
@@ -736,6 +585,10 @@ def get_machine_pins(cx, cy, angle_deg):
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 def get_port_access_specs(global_pins, machine_angle):
     return _port_access_specs(MACHINE_SPEC, global_pins, machine_angle)
+
+SAL_GRAPH_PROFILE = InstallationGraphProfile(
+    get_port_access_specs, build_sal_simple_graph_inputs, MACHINE_SMALL_DUCT_D,
+)
 
 def _sal_solver_settings():
     return SalSolverSettings(
@@ -1162,36 +1015,17 @@ def generate_synthetic_dwelling():
 def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs
-    global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
-    global terminal_runtime, machine_vertical_clearance_blocks, active_dwelling, routing_workspace
-    lifecycle = GraphLifecycle(
-        routing_region=prepared.routing_region_base,
-        wall_polygons=prepared.wall_polygons,
-        covers=prepared.covers,
-        columns=prepared.columns,
-        shafts=prepared.shafts,
-        walls=prepared.walls,
-        terminals=prepared.terminals,
-        shaft_extraction=prepared.shaft_extraction,
-        shaft_core_entry_specs=prepared.shaft_core_entry_specs,
-        grid_spacing_mm=GRID_SPACING,
-        scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
-        wall_thickness_mm=WALL_THICKNESS,
-        wall_clearance_mm=ROUTING_WALL_CLEARANCE_MM,
-        epsilon_mm=CORE_EPSILON_GRID_MM,
-        port_access_specs=get_port_access_specs,
-        simple_input_builder=build_sal_simple_graph_inputs,
-        simple_axis_clearance_mm=MACHINE_SMALL_DUCT_D,
-    )
-    active_dwelling = ActiveDwellingSession.create(
-        prepared,
-        lifecycle,
-        regulation_clearance_mm=TERMINAL_REGULATION_CLEARANCE_MM,
-        terminal_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
-        remap_tolerance_mm=PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, wet_room_outer_accents
+    global terminal_runtime, machine_vertical_clearance_blocks, active_dwelling, routing_workspace, graph_build_session
+    active_dwelling = create_active_dwelling(
+        prepared, COMMON_GRAPH_CONFIG, SAL_GRAPH_PROFILE, TERMINAL_RUNTIME_CONFIG,
     )
     routing_workspace = active_dwelling.workspace
     terminal_runtime = active_dwelling.terminals
+    graph_build_session = GraphBuildSession(
+        routing_workspace, terminal_runtime,
+        invalidate_room_start_node_cache, invalidate_terminal_validity_cache,
+    )
 
     # Compatibility aliases for UI code while consumers migrate to the session.
     rooms = active_dwelling.rooms
@@ -1211,36 +1045,26 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     current_scenario_label = prepared.label
     current_scenario_summary = prepared.summary
     shaft_core_entry_specs = active_dwelling.shaft_core_entry_specs
-    shaft_entry_geometry_by_node = {}
     _bnd_segs = None
     machine_vertical_clearance_blocks = _insufficient_machine_clearance_regions(
         rooms, MACHINE_SPEC.installation_height_mm, MACHINE_SPEC.installation_clearance_mm,
     )
-    build_base_regular_grid()
+    graph_build_session.build_base_regular()
     if auto_place:
         run_auto_placement()
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
     build_grid(machine_pins=pins)
 
 def _load_real_dwelling():
-    if load_dwelling_scenario is None:
-        raise RuntimeError("dwelling_export.demo_loader could not be imported.")
-    if not REAL_DWELLING_DB.exists():
-        raise RuntimeError(f"Dwelling database not found: {REAL_DWELLING_DB}")
-
     if not REAL_DWELLING_SCENARIOS:
         raise RuntimeError("Dwelling export database contains no cases.")
     case = REAL_DWELLING_SCENARIOS[real_scenario_idx % len(REAL_DWELLING_SCENARIOS)]
-    scenario = load_dwelling_scenario(
-        db_path=REAL_DWELLING_DB,
-        execution=case.execution,
-        dwelling_id=case.dwelling_id,
-        project_guid=case.project_guid,
-        scale_to_mm=True,
+    return _load_real_dwelling_source(
+        loader=load_dwelling_scenario, summarizer=scenario_summary,
+        db_path=REAL_DWELLING_DB, case=case,
         frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx % len(ROUTING_FRAME_OPTIONS)],
         preferred_shaft_installation=PREFERRED_SHAFT_INSTALLATION,
     )
-    return scenario, case.label, scenario_summary(scenario) if scenario_summary else {}
 
 def generate_new_dwelling():
     invalidate_room_start_node_cache()
