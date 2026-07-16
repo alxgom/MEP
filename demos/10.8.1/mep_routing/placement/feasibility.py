@@ -5,10 +5,27 @@ from shapely.geometry import Point
 from .scoring import machine_polygon_from_pins
 
 
-def is_machine_placement_valid(cx, cy, pins, routing_region, walls, columns, shafts, blocked_vertical_regions=()):
+def is_machine_placement_valid(
+    cx,
+    cy,
+    pins,
+    routing_region,
+    walls,
+    columns,
+    shafts,
+    blocked_vertical_regions=(),
+    room_regions=(),
+):
     machine_poly = machine_polygon_from_pins(pins)
 
-    if not routing_region or not routing_region.contains(Point(cx, cy)):
+    if (
+        routing_region is None
+        or routing_region.is_empty
+        or not routing_region.covers(Point(cx, cy))
+        or not routing_region.covers(machine_poly)
+    ):
+        return False
+    if room_regions and not any(room.covers(machine_poly) for room in room_regions if not room.is_empty):
         return False
     if any(machine_poly.intersects(w) for w in walls):
         return False

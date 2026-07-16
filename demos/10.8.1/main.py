@@ -1184,10 +1184,11 @@ def is_machine_placement_valid(cx, cy, angle):
         cy,
         global_pins,
         routing_region_base,
-        walls,
+        (*walls, *wall_polys),
         columns,
         shafts,
         get_machine_vertical_clearance_blocks(),
+        tuple(room.polygon for room in rooms if hasattr(room, "polygon")),
     )
 
 def get_machine_vertical_clearance_blocks():

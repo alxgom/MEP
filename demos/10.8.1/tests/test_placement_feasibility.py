@@ -53,3 +53,43 @@ def test_is_machine_placement_valid_checks_region_and_obstacles():
     assert not is_machine_placement_valid(0, 0, _pins(), region, [LineString([(-2, 0), (2, 0)])], [], [])
     assert not is_machine_placement_valid(0, 0, _pins(), region, [], [Polygon([(-2, -2), (0, -2), (0, 0), (-2, 0)])], [])
     assert not is_machine_placement_valid(0, 0, _pins(), region, [], [], [Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])])
+
+
+def test_machine_footprint_must_be_fully_inside_routing_region():
+    region = Polygon([(-1.5, -1.5), (1.5, -1.5), (1.5, 1.5), (-1.5, 1.5)])
+    partially_outside_pins = {
+        "c_tl": (0, 1),
+        "c_tr": (2, 1),
+        "c_br": (2, -1),
+        "c_bl": (0, -1),
+    }
+
+    assert not is_machine_placement_valid(
+        1, 0, partially_outside_pins, region, (), (), (),
+    )
+
+
+def test_machine_footprint_must_fit_inside_one_room():
+    region = Polygon([(-10, -10), (10, -10), (10, 10), (-10, 10)])
+    left_room = Polygon([(-10, -10), (0, -10), (0, 10), (-10, 10)])
+    right_room = Polygon([(0, -10), (10, -10), (10, 10), (0, 10)])
+    left_room_pins = {
+        "c_tl": (-6, 1),
+        "c_tr": (-4, 1),
+        "c_br": (-4, -1),
+        "c_bl": (-6, -1),
+    }
+
+    assert is_machine_placement_valid(
+        -5, 0, left_room_pins, region, (), (), (), room_regions=(left_room, right_room),
+    )
+    assert not is_machine_placement_valid(
+        0, 0, _pins(), region, (), (), (), room_regions=(left_room, right_room),
+    )
+
+
+def test_machine_footprint_cannot_intersect_buffered_wall_geometry():
+    region = Polygon([(-10, -10), (10, -10), (10, 10), (-10, 10)])
+    wall_polygon = Polygon([(-2, -0.5), (2, -0.5), (2, 0.5), (-2, 0.5)])
+
+    assert not is_machine_placement_valid(0, 0, _pins(), region, (wall_polygon,), (), ())
