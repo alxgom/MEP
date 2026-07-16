@@ -124,16 +124,17 @@ from mep_routing.observability import (
 from mep_routing.ui.canvas_tools import draw_canvas_tool_controls as _draw_canvas_tool_controls, draw_ruler_overlay as _draw_ruler_overlay, draw_terminal_tool_buttons as _draw_terminal_tool_buttons, terminal_tool_buttons as _terminal_tool_buttons
 from mep_routing.ui.canvas import (
     CanvasFonts,
-    CanvasPolygon,
     CanvasRenderHooks,
-    CanvasScene,
-    GuideLine,
-    MachinePinMarker,
-    MachineRender,
-    RouteStroke,
-    ShaftPolygon,
-    TerminalMarker,
     draw_canvas_scene as _draw_canvas_scene,
+)
+from mep_routing.ui.frame import (
+    CanvasFrameCallbacks,
+    CanvasFramePalette,
+    CanvasFrameState,
+    SidebarFrameState,
+    active_selected_route,
+    build_canvas_scene,
+    build_sidebar_view,
 )
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
@@ -141,13 +142,8 @@ from mep_routing.ui.overlays import (
 )
 from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
 from mep_routing.ui.sidebar import (
-    AutoPlacementCard,
-    ExecutionStatusCard,
-    MachineCard,
     SidebarColors,
     SidebarFonts,
-    SidebarView,
-    SolverCard,
     draw_sidebar as _draw_sidebar,
 )
 from mep_routing.ui.events import (
@@ -2222,150 +2218,10 @@ def main():
                         routing_history.add_marker(f"Pal:{'Vir' if heatmap_palette_idx==1 else 'Tur'}", (26, 188, 156))
                     
         # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ RENDERING ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
-        active_selection = bool(
-            selected_route_name and routes and any(name == selected_route_name for name, _ in routes)
-        )
-        if not active_selection:
-            selected_route_name = None
+        selected_route_name = active_selected_route(selected_route_name, routes)
         selected_room_poly = get_route_room_polygon(selected_route_name) if selected_route_name else None
-
-        canvas_rooms = []
-        for room in rooms:
-            if not hasattr(room, "polygon") or room.polygon.is_empty:
-                continue
-            room_name = getattr(room, "name", None)
-            is_selected_room = selected_route_name and (
-                room_name == selected_route_name
-                or (selected_room_poly is not None and room.polygon.equals(selected_room_poly))
-            )
-            room_color = (
-                COLOR_DESELECTED_ROOM if selected_route_name and not is_selected_room
-                else COLOR_ROOM_COVERED if room.has_cover else COLOR_ROOM
-            )
-            canvas_rooms.append(CanvasPolygon(
-                points=[to_screen(x, y) for x, y in room.polygon.exterior.coords],
-                color=room_color,
-            ))
-
-        canvas_doors = [
-            (to_screen(door["d1"][0], door["d1"][1]), to_screen(door["d2"][0], door["d2"][1]))
-            for door in doors
-        ]
-        canvas_columns = [
-            CanvasPolygon([to_screen(x, y) for x, y in column.exterior.coords], COLOR_COLUMN)
-            for column in columns
-        ]
-        canvas_shafts = []
-        for shaft in shafts:
-            is_active_shaft = shaft_extraction is not None and shaft.equals(shaft_extraction)
-            canvas_shafts.append(ShaftPolygon(
-                points=[to_screen(x, y) for x, y in shaft.exterior.coords],
-                color=COLOR_SHAFT if is_active_shaft else COLOR_SHAFT_INACTIVE,
-                source_geometry=shaft,
-                show_hatch=not is_active_shaft,
-            ))
-
-        canvas_grid_edges = []
-        canvas_grid_nodes = []
-        if show_grid_graph and routing_workspace.env is not None:
-            canvas_grid_edges = [
-                (to_screen(routing_workspace.env.nodes[u][0], routing_workspace.env.nodes[u][1]),
-                 to_screen(routing_workspace.env.nodes[v][0], routing_workspace.env.nodes[v][1]))
-                for u in routing_workspace.env.adj
-                for v, _dist, _direction in routing_workspace.env.adj[u]
-                if u < v
-            ]
-            canvas_grid_nodes = [to_screen(point[0], point[1]) for point in routing_workspace.env.nodes]
-
-        canvas_terminals = []
-        for route_name, point in terminals.items():
-            core_color = ROUTE_COLORS.get(route_name, (255, 255, 255))
-            if selected_route_name and route_name != selected_route_name:
-                core_color, ring_color, text_color = COLOR_DESELECTED_PIN, (70, 74, 78), (84, 88, 94)
-            else:
-                ring_color, text_color = (255, 255, 255), COLOR_PLAN_LABEL
-            canvas_terminals.append(TerminalMarker(
-                point=to_screen(point[0], point[1]),
-                core_color=core_color,
-                ring_color=ring_color,
-                text_color=text_color,
-                label=route_name.replace("Bathroom", "Bath").replace("Washroom", "Wash"),
-            ))
-
-        shaft_marker = None
-        if shaft_extraction:
-            shaft_point = get_representative_point(shaft_extraction)
-            shaft_marker = to_screen(shaft_point[0], shaft_point[1])
-
-        canvas_routes = []
-        for route_name, segments in routes or ():
-            route_color = ROUTE_COLORS.get(route_name, COLOR_TEXT)
-            if selected_route_name and selected_route_name != route_name:
-                route_color = COLOR_DESELECTED_ROUTE
-            canvas_routes.append(RouteStroke(
-                segments=[(to_screen(p1[0], p1[1]), to_screen(p2[0], p2[1])) for p1, p2 in segments],
-                width=get_route_draw_width(route_name),
-                color=route_color,
-                selected=selected_route_name == route_name,
-            ))
-
         global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-        machine_outline = [
-            to_screen(global_pins[name][0], global_pins[name][1])
-            for name in ("c_tl", "c_tr", "c_br", "c_bl")
-        ]
         selected_pins = get_selected_pin_names(selected_route_name, routes, global_pins) if selected_route_name else set()
-        machine_pins = []
-        for pin_name in ("tl", "tr", "bl", "br", "left_mid", "right_mid"):
-            is_large = pin_name in ("left_mid", "right_mid")
-            pin_color = (241, 196, 15) if is_large else (230, 126, 34)
-            ring_color = (255, 255, 255)
-            if selected_route_name and pin_name not in selected_pins:
-                pin_color, ring_color = COLOR_DESELECTED_PIN, (80, 84, 88)
-            point = global_pins[pin_name]
-            machine_pins.append(MachinePinMarker(
-                point=to_screen(point[0], point[1]),
-                color=pin_color,
-                ring_color=ring_color,
-                radius=5 if is_large else 4,
-            ))
-
-        guide_lines = []
-        if auto_placement_mode_idx == 1 and ap_fields:
-            shaft_point = get_representative_point(shaft_extraction)
-            _, left_index = routing_workspace.spatial_index.query(global_pins["left_mid"])
-            _, right_index = routing_workspace.spatial_index.query(global_pins["right_mid"])
-            left_distance = ap_fields["Shaft"].get(int(left_index), 1e9)
-            right_distance = ap_fields["Shaft"].get(int(right_index), 1e9)
-            exhaust_pin = "left_mid" if left_distance < right_distance else "right_mid"
-            kitchen_pin = "right_mid" if left_distance < right_distance else "left_mid"
-            guide_lines.append(GuideLine(
-                to_screen(*global_pins[exhaust_pin]), to_screen(*shaft_point), (46, 204, 113), 2,
-            ))
-            if "Kitchen" in terminals:
-                guide_lines.append(GuideLine(
-                    to_screen(*global_pins[kitchen_pin]), to_screen(*terminals["Kitchen"]), (241, 196, 15), 2,
-                ))
-            used_pins = set()
-            for route_name in (name for name in wet_room_names if name != "Kitchen"):
-                terminal_point = terminals[route_name]
-                best_pin = None
-                best_distance = 1e9
-                for pin_name in ("tl", "tr", "bl", "br"):
-                    if pin_name in used_pins:
-                        continue
-                    _, pin_index = routing_workspace.spatial_index.query(global_pins[pin_name])
-                    distance = ap_fields[route_name].get(int(pin_index), 1e9)
-                    if distance < best_distance:
-                        best_distance, best_pin = distance, pin_name
-                if best_pin:
-                    used_pins.add(best_pin)
-                    guide_lines.append(GuideLine(
-                        to_screen(*global_pins[best_pin]),
-                        to_screen(*terminal_point),
-                        ROUTE_COLORS.get(route_name, COLOR_TEXT),
-                        1,
-                    ))
 
         if show_heatmap:
             ensure_placement_heatmap_scores()
@@ -2375,33 +2231,28 @@ def main():
                 refresh_edge_weight_view_overlay(routes)
             draw_edge_weight_heatmap(screen)
 
-        canvas_scene = CanvasScene(
-            background_color=COLOR_BG,
-            rooms=canvas_rooms,
-            room_wall_color=COLOR_WALL,
+        canvas_scene = build_canvas_scene(CanvasFrameState(
+            rooms=rooms, doors=doors, columns=columns, shafts=shafts,
+            shaft_extraction=shaft_extraction, graph_env=routing_workspace.env,
+            show_grid_graph=show_grid_graph, terminals=terminals, routes=routes or (),
+            selected_route_name=selected_route_name, selected_room_polygon=selected_room_poly,
+            global_pins=global_pins, selected_pins=selected_pins,
+            auto_placement_mode=auto_placement_mode_idx, placement_fields=ap_fields,
+            wet_room_names=wet_room_names, route_colors=ROUTE_COLORS,
+            palette=CanvasFramePalette(
+                COLOR_BG, COLOR_WALL, COLOR_DOOR, COLOR_COLUMN, COLOR_SHAFT, COLOR_SHAFT_INACTIVE,
+                COLOR_GRAPH_EDGE, COLOR_GRAPH_NODE, COLOR_ROOM, COLOR_ROOM_COVERED,
+                COLOR_DESELECTED_ROOM, COLOR_DESELECTED_PIN, COLOR_DESELECTED_ROUTE,
+                COLOR_PLAN_LABEL, COLOR_TEXT, COLOR_SELECTION_HALO,
+            ),
+            callbacks=CanvasFrameCallbacks(
+                to_screen, get_representative_point, get_route_draw_width,
+                routing_workspace.spatial_index.query,
+            ),
             room_wall_width=WALL_DRAW_WIDTH,
-            doors=canvas_doors,
-            door_color=COLOR_DOOR,
-            columns=canvas_columns,
-            shafts=canvas_shafts,
-            grid_edges=canvas_grid_edges,
-            grid_nodes=canvas_grid_nodes,
-            grid_edge_color=COLOR_GRAPH_EDGE,
-            grid_node_color=COLOR_GRAPH_NODE,
-            terminals=canvas_terminals,
-            shaft_marker=shaft_marker,
-            routes=canvas_routes,
-            selection_halo_color=COLOR_SELECTION_HALO,
-            selected_route_name=selected_route_name,
             terminal_area_start=terminal_area_start_mm,
             terminal_area_end=terminal_area_end_mm if terminal_area_dragging else None,
-            machine=MachineRender(
-                outline=machine_outline,
-                fill_color=(230, 126, 34) if auto_placement_mode_idx > 0 else (127, 140, 141),
-                pins=machine_pins,
-            ),
-            guide_lines=guide_lines,
-        )
+        ))
         canvas_hooks = CanvasRenderHooks(
             draw_covers=lambda: draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY),
             draw_distance_heatmap=lambda: draw_distance_heatmap(screen, ap_scores) if show_heatmap and ap_scores else None,
@@ -2433,63 +2284,28 @@ def main():
         draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open)
         draw_terminal_tool_buttons(screen, font_bold, font_small)
 
-        heatmap_text = "Disabled"
-        if show_heatmap:
-            scale_text = "Linear" if heatmap_scale_mode == 0 else "Log"
-            palette_text = "Viridis" if heatmap_palette_idx == 1 else "Turbo"
-            heatmap_text = f"{palette_text} / {scale_text}"
-        placement_weights_text = "Default" if weight_mode_idx == 0 else "Equal (1.0)"
-        rotation_mode_short = "Field" if rotation_mode_idx == 1 else "Torque"
         preferred_count = sum(
             len(points)
             for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values())
         )
-        frame = current_scenario_summary.get("routing_frame") or {}
-        frame_name = str(frame.get("name") or ROUTING_FRAME_OPTIONS[routing_frame_idx]).replace("_", " ")
-        if rotation_mode_idx == 1:
-            h_score = rotation_field_scores.get("H", 0.0)
-            v_score = rotation_field_scores.get("V", 0.0)
-            selected = rotation_field_scores.get("selected") or "-"
-            rotation_text = f"Rot: {machine_angle}° {rotation_mode_short} {selected} H{h_score:.3f}/V{v_score:.3f}"
-        else:
-            rotation_text = f"Rotation: {machine_angle}° / {rotation_mode_short}"
-
         validation_warnings = get_route_validation_warnings(routes)
-        sidebar_view = SidebarView(
-            auto_placement=AutoPlacementCard(
-                mode=AUTO_PLACEMENT_MODES[auto_placement_mode_idx],
-                heatmap=heatmap_text,
-                placement_weights=placement_weights_text,
-                rotation_mode=rotation_mode_short,
-            ),
-            solver=SolverCard(
-                strategy=ROUTING_STRATEGIES[routing_strategy_idx],
-                router=ROUTER_BACKENDS[router_backend_idx],
-                heuristic=HEURISTIC_MODES[heuristic_mode_idx],
-                grid_type=GRAPH_TYPES[graph_type_idx],
-                starts=ROOM_START_MODES[room_start_mode_idx],
-                selected_route=selected_route_name,
-                preferred_terminal_count=preferred_count,
-                bend_value=C_BEND,
-                bend_min=C_BEND_MIN,
-                bend_max=C_BEND_MAX,
-                crossing_value=crossing_penalty_multiplier,
-                crossing_min=CROSSING_MULTIPLIER_MIN,
-                crossing_max=CROSSING_MULTIPLIER_MAX,
-            ),
-            machine=MachineCard(
-                frame=frame_name,
-                position_mm=(machine_cx, machine_cy),
-                rotation=rotation_text,
-            ),
-            execution=ExecutionStatusCard(
-                message=status,
-                validation_warnings=validation_warnings,
-                elapsed_ms=elapsed_ms,
-                total_nodes=total_nodes,
-                fps=clock.get_fps(),
-            ),
-        )
+        sidebar_view = build_sidebar_view(SidebarFrameState(
+            auto_placement_mode=AUTO_PLACEMENT_MODES[auto_placement_mode_idx],
+            show_heatmap=show_heatmap, heatmap_scale_mode=heatmap_scale_mode,
+            heatmap_palette_index=heatmap_palette_idx, weight_mode_index=weight_mode_idx,
+            rotation_mode_index=rotation_mode_idx, rotation_field_scores=rotation_field_scores,
+            machine_angle=machine_angle, strategy=ROUTING_STRATEGIES[routing_strategy_idx],
+            router=ROUTER_BACKENDS[router_backend_idx], heuristic=HEURISTIC_MODES[heuristic_mode_idx],
+            graph_type=GRAPH_TYPES[graph_type_idx], room_start_mode=ROOM_START_MODES[room_start_mode_idx],
+            selected_route_name=selected_route_name, preferred_terminal_count=preferred_count,
+            bend_value=C_BEND, bend_min=C_BEND_MIN, bend_max=C_BEND_MAX,
+            crossing_value=crossing_penalty_multiplier, crossing_min=CROSSING_MULTIPLIER_MIN,
+            crossing_max=CROSSING_MULTIPLIER_MAX, scenario_summary=current_scenario_summary,
+            fallback_frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx],
+            machine_position=(machine_cx, machine_cy), status=status,
+            validation_warnings=validation_warnings, elapsed_ms=elapsed_ms,
+            total_nodes=total_nodes, fps=clock.get_fps(),
+        ))
         _draw_sidebar(
             screen,
             canvas_left=CANVAS_LEFT,
