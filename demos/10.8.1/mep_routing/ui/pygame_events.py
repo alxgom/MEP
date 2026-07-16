@@ -150,6 +150,12 @@ class WorkbenchEventAdapter:
     def _left_down(self, pos):
         a, s = self.app, self.state
         mx, my = pos
+        handled, runtime_invalidation = a.handle_machine_selector_click(pos)
+        if handled:
+            if runtime_invalidation:
+                self._solve()
+                s.selected_route_name = None
+            return
         installation_hit = a._installation_header_hit(a.get_installation_header_layout(), pos)
         if installation_hit is not None:
             kind, key = installation_hit
@@ -328,6 +334,10 @@ class WorkbenchEventAdapter:
                 )
                 if not changed and s.installation_drag_key != a.installation_header_state.active:
                     a.set_transient_message(f"{s.installation_drag_key.title()} is not available yet")
+                elif changed:
+                    a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
+                    if not next(option for option in a.INSTALLATION_OPTIONS if option.key == s.installation_drag_key).available:
+                        a.set_transient_message(f"{s.installation_drag_key.title()} configuration available; routing runtime pending")
             s.installation_drag_key, s.installation_drag_moved = None, False
             return
         s.panel_interaction = end_panel_interaction(s.panel_interaction).state

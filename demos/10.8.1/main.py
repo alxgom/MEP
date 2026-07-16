@@ -13,7 +13,8 @@ from mep_routing.domain import (
     port_access_specs as _port_access_specs,
 )
 from mep_routing.config import SALUBRIDAD_DEFAULTS as _SALUBRIDAD_DEFAULTS
-from mep_routing.app import ActiveDwellingSession
+from mep_routing.app import ActiveDwellingSession, InstallationMachineUi, InstallationUiSession
+from mep_routing.installations.cli import CLI_INSTALLATION
 from mep_routing.data_sources import (
     build_wall_polygons as _build_wall_polygons_for_dwelling,
     build_synthetic_dwelling as _build_synthetic_dwelling_for_layout,
@@ -67,6 +68,7 @@ from mep_routing.ui.drawing import (
     draw_outlined_text as _draw_outlined_text,
 )
 from mep_routing.ui.controls import dwelling_selector_bounds as _dwelling_selector_bounds
+from mep_routing.ui.dropdown import dropdown_bounds as _dropdown_bounds
 from mep_routing.ui.solution_logs import (
     DEFAULT_BEST_METRICS,
     draw_solution_logs_panel as _draw_solution_logs_panel_widget,
@@ -256,7 +258,7 @@ dwelling_source_idx = 0
 
 INSTALLATION_OPTIONS = (
     InstallationOption("sal", "Sal", available=True),
-    InstallationOption("cli", "Cli"),
+    InstallationOption("cli", "Cli", configurable=True),
     InstallationOption("san", "San"),
     InstallationOption("coc", "Coc"),
 )
@@ -265,6 +267,15 @@ installation_header_state = InstallationHeaderState(
     enabled=frozenset({"sal"}),
     active="sal",
 )
+installation_ui_session = InstallationUiSession.create({
+    "sal": InstallationMachineUi(
+        SAL_INSTALLATION.machine_catalog, runtime_available=True,
+    ),
+    "cli": InstallationMachineUi(
+        CLI_INSTALLATION.machine_catalog,
+        runtime_available=CLI_INSTALLATION.interactive_runtime_available,
+    ),
+})
 
 # Pygame Window Config
 INSTALLATION_HEADER_TOP = 4
@@ -384,6 +395,36 @@ def set_min_piece_factor_from_slider_x(x):
     min_piece_factor = canvas_ui.slider_value(
         "min_piece", x, MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX, min_piece_factor,
     )
+
+def handle_machine_selector_click(pos):
+    """Handle the active installation's selector without owning runtime policy."""
+    global installation_ui_session
+    active = installation_header_state.active
+    if active not in installation_ui_session.installations:
+        return False, False
+    options = installation_ui_session.options(active)
+    if len(options) <= 1:
+        return False, False
+    state = installation_ui_session.dropdown_state(active)
+    control, option_bounds = _dropdown_bounds(
+        25, 548, canvas_ui.viewport.canvas_left - 70, len(options), height=24,
+    )
+    if pygame.Rect(control).collidepoint(pos):
+        installation_ui_session = installation_ui_session.toggle_dropdown(active)
+        return True, False
+    if state.open:
+        selected = next((
+            option.key for option, bounds in zip(options, option_bounds)
+            if pygame.Rect(bounds).collidepoint(pos)
+        ), None)
+        if selected is not None:
+            transition = installation_ui_session.choose(active, selected)
+            installation_ui_session = transition.session
+            if transition.changed and not transition.runtime_invalidation_required:
+                set_transient_message("Cli machine selected; interactive routing runtime pending")
+            return True, transition.runtime_invalidation_required
+        installation_ui_session = installation_ui_session.dismiss_dropdown()
+    return False, False
 
 def set_bend_weight_from_slider_x(x):
     global C_BEND
@@ -1505,6 +1546,7 @@ def main():
     global min_piece_factor, is_fullscreen
     global preferred_terminal_tool_mode
     global installation_header_state
+    global installation_ui_session
     
     pygame.init()
     pygame.font.init()
@@ -1621,6 +1663,10 @@ def main():
             for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values())
         )
         validation_warnings = get_route_validation_warnings(routes)
+        active_installation = installation_header_state.active
+        machine_options = installation_ui_session.options(active_installation)
+        machine_dropdown = installation_ui_session.dropdown_state(active_installation)
+        runtime_available = installation_ui_session.installations[active_installation].runtime_available
         sidebar_view = build_sidebar_view(SidebarFrameState(
             auto_placement_mode=AUTO_PLACEMENT_MODES[auto_placement_mode_idx],
             show_heatmap=show_heatmap, heatmap_scale_mode=heatmap_scale_mode,
@@ -1634,9 +1680,13 @@ def main():
             crossing_value=crossing_penalty_multiplier, crossing_min=CROSSING_MULTIPLIER_MIN,
             crossing_max=CROSSING_MULTIPLIER_MAX, scenario_summary=current_scenario_summary,
             fallback_frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx],
-            machine_position=(machine_cx, machine_cy), status=status,
+            machine_position=(machine_cx, machine_cy) if active_installation == "sal" else None,
+            status=status if runtime_available else "Cli configuration ready; interactive routing runtime pending",
             validation_warnings=validation_warnings, elapsed_ms=elapsed_ms,
             total_nodes=total_nodes, fps=clock.get_fps(),
+            machine_options=machine_options, selected_machine_key=machine_dropdown.selected_key,
+            machine_selector_open=machine_dropdown.open,
+            machine_runtime_available=runtime_available,
         ))
         _draw_sidebar(
             screen,

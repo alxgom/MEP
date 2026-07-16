@@ -11,7 +11,7 @@ from mep_routing.ui.installation_header import (
 
 OPTIONS = (
     InstallationOption("sal", "Sal", True),
-    InstallationOption("cli", "Cli"),
+    InstallationOption("cli", "Cli", configurable=True),
     InstallationOption("san", "San"),
     InstallationOption("coc", "Coc"),
 )
@@ -25,7 +25,10 @@ def test_header_keeps_active_and_enabled_as_separate_state():
 
 def test_unavailable_installation_cannot_be_enabled_or_activated():
     assert toggle_installation(STATE, "cli", OPTIONS) == (STATE, False)
-    assert activate_installation(STATE, "cli", OPTIONS) == (STATE, False)
+    activated, changed = activate_installation(STATE, "cli", OPTIONS)
+    assert changed and activated.active == "cli"
+    assert "cli" not in activated.enabled
+    assert activate_installation(STATE, "san", OPTIONS) == (STATE, False)
 
 
 def test_installations_can_be_reordered_independently_of_availability():

@@ -666,6 +666,11 @@ Before each commit:
 
 ## Open Items
 
+- Added `InstallationUiSession` as the application-owned machine-selection boundary, with selected keys and dropdown state scoped per installation plus an explicit runtime-invalidation result for future interactive runtimes.
+- Cli is now activatable for configuration and exposes all seven PEAD machines in the sidebar while its routing switch remains unavailable; selecting a Cli machine persists across Sal/Cli switches, does not reroute, and reports that the interactive runtime is pending.
+- Sidebar projection no longer presents Sal placement, frame, or rotation as Cli state, and Pygame dropdown hits use the same bounds contract as rendering.
+- Validation: Python compilation and focused installation-session/header/dropdown/sidebar/frame/Pygame-event contracts.
+
 - Added an immutable shared catalog contract and explicit Sal/Cli machine catalogs. Sal exposes its existing Ozeo machine as a one-entry, non-selectable catalog; Cli exposes the seven connector-rich Mitsubishi PEAD definitions from Demo 10.8_cli without adapting them to Sal's symmetric `MachineSpec` geometry.
 - Added pure shared dropdown state, transition, and layout contracts plus a thin Pygame renderer. The sidebar accepts machine selector data but suppresses the control for Sal's single option; Cli routing and installation activation remain disabled.
 - Added a minimal Cli installation definition that composes its PEAD catalog, core-simple supply graph mode, and shared Steiner solver while explicitly declaring that no interactive Cli runtime is available yet.

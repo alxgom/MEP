@@ -236,12 +236,16 @@ class SidebarFrameState:
     crossing_max: float
     scenario_summary: Mapping[str, Any]
     fallback_frame_name: str
-    machine_position: tuple[float, float]
+    machine_position: tuple[float, float] | None
     status: str
     validation_warnings: Sequence[str]
     elapsed_ms: float
     total_nodes: int
     fps: float
+    machine_options: tuple = ()
+    selected_machine_key: str = ""
+    machine_selector_open: bool = False
+    machine_runtime_available: bool = True
 
 
 def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
@@ -262,6 +266,9 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
         )
     else:
         rotation = f"Rotation: {state.machine_angle}° / {rotation_mode}"
+    if not state.machine_runtime_available:
+        frame_name = "Cli machine catalog"
+        rotation = "Rotation: interactive runtime pending"
     return SidebarView(
         AutoPlacementCard(state.auto_placement_mode, heatmap, weights, rotation_mode),
         SolverCard(
@@ -270,6 +277,9 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
             state.bend_value, state.bend_min, state.bend_max,
             state.crossing_value, state.crossing_min, state.crossing_max,
         ),
-        MachineCard(frame_name, state.machine_position, rotation),
+        MachineCard(
+            frame_name, state.machine_position, rotation, state.machine_options,
+            state.selected_machine_key, state.machine_selector_open,
+        ),
         ExecutionStatusCard(state.status, state.validation_warnings, state.elapsed_ms, state.total_nodes, state.fps),
     )

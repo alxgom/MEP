@@ -63,7 +63,7 @@ class SolverCard:
 @dataclass(frozen=True)
 class MachineCard:
     frame: str
-    position_mm: tuple[float, float]
+    position_mm: tuple[float, float] | None
     rotation: str
     machine_options: tuple[DropdownOption, ...] = ()
     selected_machine_key: str = ""
@@ -203,8 +203,12 @@ def draw_sidebar(
     screen.blit(fonts.bold.render("MACHINE PLACEMENT", True, colors.text), (text_x, 470))
     draw_help_button("machine", machine_card, fonts.small)
     screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 490))
-    machine_x, machine_y = view.machine.position_mm
-    screen.blit(fonts.small.render(f"Position: ({int(machine_x)}, {int(machine_y)}) mm", True, colors.text), (text_x, 510))
+    if view.machine.position_mm is None:
+        position_text = "Placement: interactive runtime pending"
+    else:
+        machine_x, machine_y = view.machine.position_mm
+        position_text = f"Position: ({int(machine_x)}, {int(machine_y)}) mm"
+    screen.blit(fonts.small.render(position_text, True, colors.text), (text_x, 510))
     screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 530))
     status_y = 590 if has_machine_selector else 555
     status_card = pygame.Rect(15, status_y, card_width, 170)

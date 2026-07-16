@@ -1,6 +1,11 @@
 """Application-level runtime coordinators for the interactive router."""
 
 from .dwelling_session import ActiveDwellingSession
+from .installation_ui import (
+    InstallationMachineUi,
+    InstallationUiSession,
+    MachineSelectionTransition,
+)
 
 from .interaction_runtime import (
     InteractionCallbacks,
@@ -19,6 +24,9 @@ from .interaction_runtime import (
 
 __all__ = [
     "ActiveDwellingSession",
+    "InstallationMachineUi",
+    "InstallationUiSession",
+    "MachineSelectionTransition",
     "InteractionCallbacks",
     "InteractionState",
     "RoutingRun",

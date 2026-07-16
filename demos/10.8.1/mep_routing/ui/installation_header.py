@@ -10,6 +10,7 @@ class InstallationOption:
     key: str
     label: str
     available: bool = False
+    configurable: bool = False
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,7 @@ def toggle_installation(state, key, options):
 
 def activate_installation(state, key, options):
     option = next((item for item in options if item.key == key), None)
-    if option is None or not option.available:
+    if option is None or not (option.available or option.configurable):
         return state, False
     return replace(state, active=key), state.active != key
 
@@ -123,7 +124,7 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
         fill = (58, 76, 104) if active else (48, 52, 60)
         if active and enabled:
             fill = (56, 86, 130)
-        if not option.available:
+        if not (option.available or option.configurable):
             fill = (43, 45, 50)
         border = (91, 149, 245) if active else (122, 128, 138)
         if dragged_key == key:
@@ -140,7 +141,7 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
         knob_x = switch.right - switch.height // 2 if enabled else switch.left + switch.height // 2
         pygame.draw.circle(screen, (238, 240, 244), (knob_x, switch.centery), knob_radius)
 
-        text_color = (225, 229, 236) if option.available else (112, 116, 124)
+        text_color = (225, 229, 236) if option.available or option.configurable else (112, 116, 124)
         label = font.render(option.label, True, text_color)
         label_x = switch.right + (rect.right - switch.right - label.get_width()) // 2
         screen.blit(label, (label_x, rect.centery - label.get_height() // 2))
