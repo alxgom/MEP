@@ -603,8 +603,9 @@ Manual validation milestones:
 
 - Added vertical machine-clearance feasibility from exported cover voids, using the Ozeo family's 197.504 mm `DimensionZ` plus Sal's 20 mm slab allowance.
 - Placement scoring remains unchanged in shallow covered zones, while machine candidates and routing preflight reject positive-area overlap; the placement heatmap marks those zones with a gray hatch.
+- Heatmap rendering now fills excluded zones opaque gray with dashed hatching and normalizes its palette/colorbar only across placeable graph nodes.
 - Aligned the active Ozeo plan and connector diameters with the AzureFile family JSON (459 x 512 x 197.504 mm, 80/125 mm ducts).
-- Validation: Python compilation, 19 focused machine/placement/Sal contracts, one real shallow-cover extraction check, and a 12-second headless startup solve.
+- Validation: Python compilation, focused machine/placement/Sal contracts, one real shallow-cover extraction check, and headless startup solves.
 
 Before each commit:
 

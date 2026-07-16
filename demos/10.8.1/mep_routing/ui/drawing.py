@@ -21,7 +21,7 @@ def draw_geometry_overlay(screen, geometries, color_rgba, world_to_screen, surfa
     screen.blit(overlay, (0, 0))
 
 
-def draw_polygon_hatch(screen, poly, color, world_to_screen, surface_size, spacing=10):
+def draw_polygon_hatch(screen, poly, color, world_to_screen, surface_size, spacing=10, dashed=False):
     if poly is None or poly.is_empty:
         return
     surface_width, surface_height = surface_size
@@ -37,7 +37,11 @@ def draw_polygon_hatch(screen, poly, color, world_to_screen, surface_size, spaci
         min_y = max(0, min(y for _, y in coords) - 20)
         max_y = min(surface_height, max(y for _, y in coords) + 20)
         for x in range(min_x - (max_y - min_y), max_x + spacing, spacing):
-            pygame.draw.line(hatch, color, (x, max_y), (x + (max_y - min_y), min_y), 1)
+            start, end = (x, max_y), (x + (max_y - min_y), min_y)
+            if dashed:
+                draw_dashed_polyline(hatch, (start, end), color, dash_len=6, gap_len=5)
+            else:
+                pygame.draw.line(hatch, color, start, end, 1)
         hatch.blit(clip, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
         screen.blit(hatch, (0, 0))
 

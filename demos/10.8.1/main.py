@@ -47,6 +47,7 @@ from mep_routing.graphs import (
 from mep_routing.placement import (
     PlacementApplicationAdapter,
     insufficient_machine_clearance_regions as _insufficient_machine_clearance_regions,
+    scores_outside_regions as _scores_outside_regions,
     is_machine_placement_valid as _is_machine_placement_valid_for_placement,
     placement_weights as _placement_weights,
 )
@@ -350,6 +351,7 @@ COLOR_SHAFT_BG = (231, 76, 60, 40)
 COLOR_SHAFT_INACTIVE = (154, 84, 82)
 COLOR_SHAFT_INACTIVE_HATCH = (92, 58, 58)
 COLOR_MACHINE_CLEARANCE_HATCH = (105, 105, 105)
+COLOR_MACHINE_CLEARANCE_FILL = (145, 145, 145, 235)
 COLOR_DOOR = (220, 220, 220)
 COLOR_MACHINE = (127, 140, 141)
 COLOR_MACHINE_HOVER = (149, 165, 166)
@@ -949,8 +951,10 @@ def draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name=No
 def draw_geometry_overlay(screen, geometries, color_rgba):
     return _draw_geometry_overlay(screen, geometries, color_rgba, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
-def draw_polygon_hatch(screen, poly, color, spacing=10):
-    return _draw_polygon_hatch(screen, poly, color, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), spacing)
+def draw_polygon_hatch(screen, poly, color, spacing=10, dashed=False):
+    return _draw_polygon_hatch(
+        screen, poly, color, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), spacing, dashed,
+    )
 
 def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
     return _draw_dashed_polyline(screen, points, color, width, dash_len, gap_len)
@@ -1459,26 +1463,37 @@ def _build_heatmap_surface(node_scores):
         _interpolate_regular_score, _score_to_heatmap_t, get_heatmap_color,
     )
 
+def get_placeable_heatmap_scores(node_scores):
+    if routing_workspace.base_env is None:
+        return {}
+    return _scores_outside_regions(
+        node_scores, routing_workspace.base_env.nodes, get_machine_vertical_clearance_blocks(),
+    )
+
 def draw_distance_heatmap(screen, node_scores):
-    if not node_scores or routing_workspace.base_env is None:
+    placeable_scores = get_placeable_heatmap_scores(node_scores)
+    if not placeable_scores or routing_workspace.base_env is None:
         return
     key = (
         id(routing_workspace.base_env),
         id(node_scores),
-        len(node_scores),
-        min(node_scores.values()),
-        max(node_scores.values()),
+        len(placeable_scores),
+        min(placeable_scores.values()),
+        max(placeable_scores.values()),
+        tuple(id(region) for region in get_machine_vertical_clearance_blocks()),
         heatmap_scale_mode,
         heatmap_palette_idx,
         CANVAS_W,
         CANVAS_H,
     )
     if heatmap_surface_cache["key"] != key:
-        heatmap_surface_cache["surface"] = _build_heatmap_surface(node_scores)
+        heatmap_surface_cache["surface"] = _build_heatmap_surface(placeable_scores)
         heatmap_surface_cache["key"] = key
     screen.blit(heatmap_surface_cache["surface"], (CANVAS_LEFT, CANVAS_TOP))
-    for region in get_machine_vertical_clearance_blocks():
-        draw_polygon_hatch(screen, region, COLOR_MACHINE_CLEARANCE_HATCH, spacing=8)
+    blocked_regions = get_machine_vertical_clearance_blocks()
+    draw_geometry_overlay(screen, blocked_regions, COLOR_MACHINE_CLEARANCE_FILL)
+    for region in blocked_regions:
+        draw_polygon_hatch(screen, region, COLOR_MACHINE_CLEARANCE_HATCH, spacing=9, dashed=True)
 
 def _cool_colormap(t):
     return _cool_colormap_value(t)
@@ -2426,7 +2441,7 @@ def main():
         canvas_hooks = CanvasRenderHooks(
             draw_covers=lambda: draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY),
             draw_distance_heatmap=lambda: draw_distance_heatmap(screen, ap_scores) if show_heatmap and ap_scores else None,
-            draw_distance_colorbar=lambda: draw_colorbar(screen, ap_scores) if show_heatmap and ap_scores and not edge_weight_heatmap_enabled else None,
+            draw_distance_colorbar=lambda: draw_colorbar(screen, get_placeable_heatmap_scores(ap_scores)) if show_heatmap and ap_scores and not edge_weight_heatmap_enabled else None,
             draw_edge_weight_heatmap=draw_edge_weight_overlay,
             draw_edge_weight_colorbar=lambda: draw_edge_weight_colorbar(screen),
             draw_terminal_validity_overlay=lambda: draw_terminal_validity_overlay(screen),

@@ -5,6 +5,7 @@ from shapely.geometry import box
 from mep_routing.placement import (
     insufficient_machine_clearance_regions,
     is_machine_placement_valid,
+    scores_outside_regions,
 )
 
 
@@ -41,3 +42,9 @@ def test_adequate_overlap_wins_and_boundary_touch_remains_valid():
     assert blocked[0].equals(box(0, 0, 10, 20))
     assert is_machine_placement_valid(15, 5, _pins(10, 0, 20, 10), box(-10, -10, 30, 30), (), (), (), blocked)
     assert not is_machine_placement_valid(5, 5, _pins(1, 1, 9, 9), box(-10, -10, 30, 30), (), (), (), blocked)
+
+
+def test_heatmap_normalization_excludes_blocked_nodes_only():
+    scores = {0: -100.0, 1: 10.0, 2: 20.0}
+    nodes = ((5, 5), (15, 5), (25, 5))
+    assert scores_outside_regions(scores, nodes, (box(0, 0, 10, 10),)) == {1: 10.0, 2: 20.0}
