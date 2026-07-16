@@ -47,8 +47,8 @@ def test_cli_machine_keeps_exported_connector_geometry():
     assert m140.connector("freon2").radius_mm == 7.95
 
 
-def test_cli_definition_composes_available_capabilities_without_enabling_runtime():
+def test_cli_definition_composes_available_interactive_capabilities():
     assert CLI_INSTALLATION.machine_catalog is CLI_MACHINE_CATALOG
     assert CLI_INSTALLATION.supply_graph_mode is GraphMode.CORE_SIMPLE
     assert CLI_INSTALLATION.default_machine.type_name == "M71JA"
-    assert CLI_INSTALLATION.interactive_runtime_available is False
+    assert CLI_INSTALLATION.interactive_runtime_available is True

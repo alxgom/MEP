@@ -666,6 +666,11 @@ Before each commit:
 
 ## Open Items
 
+- Added the first live Cli vertical slice without adapting it to Sal's interfaces: Cli owns its selected PEAD geometry, supply connector access, occupied-room terminal preparation, core-simple graph inputs, and Kou Steiner solve runtime.
+- Cli can now be enabled, activated, reordered, rerun after machine selection, and projected onto the canvas/sidebar independently of Sal; the shared application loop only sequences enabled installation runtimes and selects the active result.
+- Cli supply terminals currently represent accessible routing-region connection points near eligible rooms. Detailed grille placement, return-air routing, Cli-specific machine placement, duct sizing/materialization, scoring, and cross-installation collision feedback remain separate future capabilities.
+- Validation: Python compilation, 14 focused Cli/catalog/header/Pygame-event contracts, the full Demo 10.8.1 suite (329 passed), and a real exported dwelling Cli solve (two rooms, six Steiner edges).
+
 - Added `WorkbenchCommandController` as the UI application boundary for routing keyboard transitions, canvas toolbar actions, and solver-control slider/reset effects.
 - The Pygame event adapter retains the same module callback names through bound controller methods while `main.py` no longer owns command decoding or transition side effects.
 - Validation: Python compilation and focused workbench-command contracts; `main.py` reached 1,195 physical lines.

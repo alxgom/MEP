@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from collections.abc import Mapping
 
 import pygame
 from shapely.geometry import Point, Polygon
@@ -227,11 +228,15 @@ class WorkbenchEventAdapter:
         shift, ctrl = bool(mods & pygame.KMOD_SHIFT), bool(mods & pygame.KMOD_CTRL)
         hit, machine_center = CanvasHit(), None
         if not shift and not s.ruler_mode and a.preferred_terminal_tool_mode is None:
-            pins = a.get_machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
+            pins = a.get_active_machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
             machine = Polygon([pins[name] for name in ("c_tl", "c_tr", "c_br", "c_bl")])
             point = Point(*world)
             machine_hit = machine.contains(point) or machine.distance(point) < 200.0
-            route_names = {name for name, _ in s.routes} if s.routes else set()
+            route_names = (
+                set(s.routes)
+                if isinstance(s.routes, Mapping)
+                else ({name for name, _segments in s.routes} if s.routes else set())
+            )
             room_hit = a.find_room_route_at_point(world, route_names)
             route_hit = a.find_route_hit_at_point(s.routes, world)
             threshold = max(20.0, 4.0 / a.canvas_ui.viewport.scale)
@@ -336,8 +341,11 @@ class WorkbenchEventAdapter:
                     a.set_transient_message(f"{s.installation_drag_key.title()} is not available yet")
                 elif changed:
                     a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
-                    if not next(option for option in a.INSTALLATION_OPTIONS if option.key == s.installation_drag_key).available:
-                        a.set_transient_message(f"{s.installation_drag_key.title()} configuration available; routing runtime pending")
+                    self._solve()
+                    s.selected_route_name = None
+            else:
+                self._solve()
+                s.selected_route_name = None
             s.installation_drag_key, s.installation_drag_moved = None, False
             return
         s.panel_interaction = end_panel_interaction(s.panel_interaction).state

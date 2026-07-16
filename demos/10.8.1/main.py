@@ -20,7 +20,7 @@ from mep_routing.app import (
     create_active_dwelling,
     load_real_dwelling as _load_real_dwelling_source,
 )
-from mep_routing.installations.cli import CLI_INSTALLATION
+from mep_routing.installations.cli import CLI_INSTALLATION, CliInteractiveRuntime, cli_machine_pins
 from mep_routing.data_sources import (
     build_wall_polygons as _build_wall_polygons_for_dwelling,
     build_synthetic_dwelling as _build_synthetic_dwelling_for_layout,
@@ -236,7 +236,7 @@ dwelling_source_idx = 0
 
 INSTALLATION_OPTIONS = (
     InstallationOption("sal", "Sal", available=True),
-    InstallationOption("cli", "Cli", configurable=True),
+    InstallationOption("cli", "Cli", available=True),
     InstallationOption("san", "San"),
     InstallationOption("coc", "Coc"),
 )
@@ -254,6 +254,8 @@ installation_ui_session = InstallationUiSession.create({
         runtime_available=CLI_INSTALLATION.interactive_runtime_available,
     ),
 })
+cli_runtime = CliInteractiveRuntime(CLI_INSTALLATION, COMMON_GRAPH_CONFIG, TERMINAL_RUNTIME_CONFIG)
+installation_runs = {}
 
 # Pygame Window Config
 INSTALLATION_HEADER_TOP = 4
@@ -400,8 +402,6 @@ def handle_machine_selector_click(pos):
         if selected is not None:
             transition = installation_ui_session.choose(active, selected)
             installation_ui_session = transition.session
-            if transition.changed and not transition.runtime_invalidation_required:
-                set_transient_message("Cli machine selected; interactive routing runtime pending")
             return True, transition.runtime_invalidation_required
         installation_ui_session = installation_ui_session.dismiss_dropdown()
     return False, False
@@ -427,6 +427,9 @@ def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=
 
 def handle_terminal_tool_button_click(pos):
     global preferred_terminal_tool_mode, terminal_validity_overlay_enabled
+    if installation_header_state.active != "sal":
+        preferred_terminal_tool_mode = None
+        return None
     for mode, rect, _ in canvas_ui.terminal_buttons():
         if not rect.collidepoint(pos):
             continue
@@ -592,10 +595,20 @@ def get_route_start_nodes(route_name):
     return terminal_ui.route_start_nodes(route_name, use_nearest_terminal=(room_start_mode_idx == 1))
 
 def apply_preferred_terminal_point(world_pt, remove=False):
+    if installation_header_state.active != "sal":
+        return False, None
     return terminal_ui.apply_point_preference(world_pt, remove=remove)
 
 def apply_preferred_terminal_area(start_world, end_world, remove=False):
+    if installation_header_state.active != "sal":
+        return False, None
     return terminal_ui.apply_area_preference(start_world, end_world, remove=remove)
+
+def get_active_machine_pins(cx, cy, angle_deg):
+    if installation_header_state.active == "cli":
+        machine_key = installation_ui_session.selected_keys["cli"]
+        return cli_machine_pins(CLI_INSTALLATION.machine_catalog.value(machine_key), (cx, cy), angle_deg)
+    return get_machine_pins(cx, cy, angle_deg)
 
 def draw_wet_room_outer_accents(screen):
     return _draw_wet_room_outer_accents(screen, wet_room_outer_accents, to_screen, _iter_polygons, COLOR_WET_ROOM_ACCENT)
@@ -740,9 +753,30 @@ def _sal_interactive_solver():
 # MAIN SOLVER WRAPPER
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 def solve_ventilation_routing():
-    if "sal" not in installation_header_state.enabled:
-        return [], "Routing disabled: Sal", 0.0, 0
-    result = _sal_interactive_solver().solve()
+    global installation_runs
+    installation_runs = {}
+    for installation in installation_header_state.order:
+        if installation not in installation_header_state.enabled:
+            continue
+        if installation == "sal":
+            result = _sal_interactive_solver().solve()
+        elif installation == "cli":
+            machine_key = installation_ui_session.selected_keys["cli"]
+            result = cli_runtime.solve(
+                active_dwelling.prepared,
+                CLI_INSTALLATION.machine_catalog.value(machine_key),
+                (machine_cx, machine_cy),
+                machine_angle,
+            )
+        else:
+            continue
+        installation_runs[installation] = result
+    active = installation_header_state.active
+    if active not in installation_header_state.enabled:
+        return [], f"Routing disabled: {active.title()}", 0.0, 0
+    result = installation_runs.get(active)
+    if result is None:
+        return [], f"Routing unavailable: {active.title()}", 0.0, 0
     return result.routes, result.status, result.elapsed_ms, result.total_nodes
 
 def generate_synthetic_dwelling():
@@ -1015,7 +1049,7 @@ def main():
     viewport = canvas_ui.viewport
     canvas_ui.update_layout(viewport.window_width, viewport.window_height)
     screen = pygame.display.set_mode(viewport.window_size, pygame.RESIZABLE)
-    pygame.display.set_caption("Integrated Auto-Placement & Ventilation Router (Demo 10.8)")
+    pygame.display.set_caption("Integrated MEP Routing Workbench (Demo 10.8.1)")
     clock = pygame.time.Clock()
     
     font_title = pygame.font.SysFont("Outfit", 24, bold=True)
@@ -1055,8 +1089,20 @@ def main():
         selected_route_name = active_selected_route(selected_route_name, routes)
         events.state.selected_route_name = selected_route_name
         selected_room_poly = get_route_room_polygon(selected_route_name) if selected_route_name else None
-        global_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-        selected_pins = get_selected_pin_names(selected_route_name, routes, global_pins) if selected_route_name else set()
+        active_installation = installation_header_state.active
+        cli_result = cli_runtime.last_result
+        viewer_workspace = (
+            cli_result.workspace
+            if active_installation == "cli" and cli_result.workspace is not None
+            else routing_workspace
+        )
+        viewer_terminals = cli_result.terminals if active_installation == "cli" else terminals
+        global_pins = get_active_machine_pins(machine_cx, machine_cy, machine_angle)
+        selected_pins = (
+            ({"air_out"} if selected_route_name == "Supply Air Tree" else set())
+            if active_installation == "cli"
+            else (get_selected_pin_names(selected_route_name, routes, global_pins) if selected_route_name else set())
+        )
 
         if show_heatmap:
             ensure_placement_heatmap_scores()
@@ -1068,8 +1114,8 @@ def main():
 
         canvas_scene = build_canvas_scene(CanvasFrameState(
             rooms=rooms, doors=doors, columns=columns, shafts=shafts,
-            shaft_extraction=shaft_extraction, graph_env=routing_workspace.env,
-            show_grid_graph=show_grid_graph, terminals=terminals, routes=routes or (),
+            shaft_extraction=shaft_extraction, graph_env=viewer_workspace.env,
+            show_grid_graph=show_grid_graph, terminals=viewer_terminals, routes=routes or (),
             selected_route_name=selected_route_name, selected_room_polygon=selected_room_poly,
             global_pins=global_pins, selected_pins=selected_pins,
             auto_placement_mode=auto_placement_mode_idx, placement_fields=ap_fields,
@@ -1082,7 +1128,7 @@ def main():
             ),
             callbacks=CanvasFrameCallbacks(
                 to_screen, get_representative_point, get_route_draw_width,
-                routing_workspace.spatial_index.query,
+                viewer_workspace.spatial_index.query,
             ),
             room_wall_width=WALL_DRAW_WIDTH,
             terminal_area_start=terminal_area_start_mm,
@@ -1094,13 +1140,15 @@ def main():
             draw_distance_colorbar=lambda: draw_colorbar(screen, get_placeable_heatmap_scores(ap_scores)) if show_heatmap and ap_scores and not edge_weight_heatmap_enabled else None,
             draw_edge_weight_heatmap=draw_edge_weight_overlay,
             draw_edge_weight_colorbar=lambda: draw_edge_weight_colorbar(screen),
-            draw_terminal_validity_overlay=lambda: terminal_ui.draw_validity_overlay(screen, terminal_validity_overlay_enabled),
+            draw_terminal_validity_overlay=lambda: terminal_ui.draw_validity_overlay(
+                screen, terminal_validity_overlay_enabled and active_installation == "sal",
+            ),
             draw_wet_room_accents=lambda: draw_wet_room_outer_accents(screen),
             draw_polygon_hatch=lambda shaft: canvas_ui.draw_hatch(screen, shaft, COLOR_SHAFT_INACTIVE_HATCH, spacing=9),
             draw_outlined_text=lambda draw_screen, font, label, position, color: draw_outlined_text(draw_screen, font, label, position, color),
-            draw_preferred_terminal_areas=lambda selected: terminal_ui.draw_preferred_areas(screen, selected),
-            draw_routed_terminal_endpoints=lambda selected: terminal_ui.draw_routed_endpoints(screen, routes, selected),
-            draw_preferred_terminal_markers=lambda selected: terminal_ui.draw_preferred_markers(screen, selected, routes),
+            draw_preferred_terminal_areas=lambda selected: terminal_ui.draw_preferred_areas(screen, selected) if active_installation == "sal" else None,
+            draw_routed_terminal_endpoints=lambda selected: terminal_ui.draw_routed_endpoints(screen, routes, selected) if active_installation == "sal" else None,
+            draw_preferred_terminal_markers=lambda selected: terminal_ui.draw_preferred_markers(screen, selected, routes) if active_installation == "sal" else None,
             draw_terminal_area_drag=lambda start, end: draw_terminal_area_drag(screen, start, end),
         )
         _draw_canvas_scene(screen, scene=canvas_scene, fonts=CanvasFonts(small=font_small), hooks=canvas_hooks)
@@ -1117,32 +1165,35 @@ def main():
 
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
         draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open)
-        draw_terminal_tool_buttons(screen, font_bold, font_small)
+        if active_installation == "sal":
+            draw_terminal_tool_buttons(screen, font_bold, font_small)
 
         preferred_count = sum(
             len(points)
             for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values())
         )
-        validation_warnings = get_route_validation_warnings(routes)
-        active_installation = installation_header_state.active
+        validation_warnings = get_route_validation_warnings(routes) if active_installation == "sal" else []
         machine_options = installation_ui_session.options(active_installation)
         machine_dropdown = installation_ui_session.dropdown_state(active_installation)
         runtime_available = installation_ui_session.installations[active_installation].runtime_available
         sidebar_view = build_sidebar_view(SidebarFrameState(
-            auto_placement_mode=AUTO_PLACEMENT_MODES[auto_placement_mode_idx],
+            auto_placement_mode=(AUTO_PLACEMENT_MODES[auto_placement_mode_idx] if active_installation == "sal" else "Cli placement pending"),
             show_heatmap=show_heatmap, heatmap_scale_mode=heatmap_scale_mode,
             heatmap_palette_index=heatmap_palette_idx, weight_mode_index=weight_mode_idx,
             rotation_mode_index=rotation_mode_idx, rotation_field_scores=rotation_field_scores,
-            machine_angle=machine_angle, strategy=ROUTING_STRATEGIES[routing_strategy_idx],
-            router=ROUTER_BACKENDS[router_backend_idx], heuristic=HEURISTIC_MODES[heuristic_mode_idx],
-            graph_type=GRAPH_TYPES[graph_type_idx], room_start_mode=ROOM_START_MODES[room_start_mode_idx],
+            machine_angle=machine_angle,
+            strategy=(ROUTING_STRATEGIES[routing_strategy_idx] if active_installation == "sal" else "Kou Steiner tree"),
+            router=(ROUTER_BACKENDS[router_backend_idx] if active_installation == "sal" else "Cli supply runtime"),
+            heuristic=(HEURISTIC_MODES[heuristic_mode_idx] if active_installation == "sal" else "Directional scales"),
+            graph_type=(GRAPH_TYPES[graph_type_idx] if active_installation == "sal" else "Core Simple"),
+            room_start_mode=(ROOM_START_MODES[room_start_mode_idx] if active_installation == "sal" else "Supply terminals"),
             selected_route_name=selected_route_name, preferred_terminal_count=preferred_count,
             bend_value=C_BEND, bend_min=C_BEND_MIN, bend_max=C_BEND_MAX,
             crossing_value=crossing_penalty_multiplier, crossing_min=CROSSING_MULTIPLIER_MIN,
             crossing_max=CROSSING_MULTIPLIER_MAX, scenario_summary=current_scenario_summary,
             fallback_frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx],
-            machine_position=(machine_cx, machine_cy) if active_installation == "sal" else None,
-            status=status if runtime_available else "Cli configuration ready; interactive routing runtime pending",
+            machine_position=(machine_cx, machine_cy),
+            status=status,
             validation_warnings=validation_warnings, elapsed_ms=elapsed_ms,
             total_nodes=total_nodes, fps=clock.get_fps(),
             machine_options=machine_options, selected_machine_key=machine_dropdown.selected_key,
@@ -1176,9 +1227,10 @@ def main():
         draw_solution_logs_panel(screen, font_small, font_bold)
         draw_help_popup(screen, font_small)
         draw_transient_message(screen, font_small)
-        terminal_ui.draw_validity_tooltip(
-            screen, font_small, pygame.mouse.get_pos(), terminal_validity_overlay_enabled,
-        )
+        if active_installation == "sal":
+            terminal_ui.draw_validity_tooltip(
+                screen, font_small, pygame.mouse.get_pos(), terminal_validity_overlay_enabled,
+            )
 
         pygame.display.flip()
         clock.tick(FPS)
