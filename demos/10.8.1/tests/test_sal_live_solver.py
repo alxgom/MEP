@@ -42,6 +42,7 @@ def test_live_routing_session_uses_one_policy_machine_and_workspace_snapshot():
     assert runtime.context.machine_overall_width_mm == 350
     assert runtime.context.machine_body_height_mm == 200
     assert runtime.context.route_diameter("Shaft") == 140
+    assert session.route_analysis().route_diameter("Shaft") == 140
 
 
 def test_live_session_derives_adapter_machine_and_workspace_hooks():

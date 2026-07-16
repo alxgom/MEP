@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from mep_routing.routing import RoutingRuntime, RoutingWeightRuntimeContext
 
 from .application import SalApplicationAdapter, SalApplicationHooks, SalSolverSettings
+from .route_analysis import SalRouteAnalysis
 
 
 @dataclass(frozen=True)
@@ -114,4 +115,12 @@ class SalLiveRoutingSession:
             heuristic_mode=policy.heuristic_mode,
             bend_cost=policy.bend_cost,
             estimate_turns_fn=self.estimate_turns,
+        )
+
+    def route_analysis(self, shaft_extraction=None, policy=None):
+        return SalRouteAnalysis(
+            self.machine_spec,
+            policy or self.policy,
+            self.routing_region,
+            shaft_extraction,
         )

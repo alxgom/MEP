@@ -53,22 +53,17 @@ from mep_routing.placement import (
     placement_weights as _placement_weights,
 )
 from mep_routing.routing import (
-    RouteScoreWeights,
     MachineRoutingSession,
     RoutingWorkspace,
     TerminalRuntime,
     block_terminal_node_edges as _block_terminal_node_edges,
     build_routes_from_paths as _build_routes_from_paths_for_env,
-    buffered_radius_mm as _buffered_radius_mm,
     count_ordered_route_turns as _count_ordered_route_turns,
     count_route_short_pieces as _count_route_short_pieces,
-    count_segment_clearance_conflicts as _count_segment_clearance_conflicts,
     count_segment_crossings as _count_segment_crossings,
     count_segment_overlaps as _count_segment_overlaps,
-    count_solution_short_pieces as _count_solution_short_pieces,
     count_solution_turns as _count_solution_turns,
     add_port_stub_segment as _add_port_stub_segment,
-    append_allowed_region_warning as _append_allowed_region_warning,
     build_pin_min_cost_flow_network as _build_pin_min_cost_flow_network,
     find_route_at_point as _find_route_at_point,
     find_route_hit_at_point as _find_route_hit_at_point,
@@ -76,11 +71,7 @@ from mep_routing.routing import (
     merged_route_piece_lengths as _merged_route_piece_lengths,
     ordered_small_room_names as _ordered_small_room_names,
     path_physical_length as _path_physical_length_for_env,
-    route_conflict_summary as _route_conflict_summary,
-    required_clearance_mm as _required_clearance_mm,
-    route_quality_warnings as _route_quality_warnings,
     route_segments_from_path as _route_segments_from_path_for_env,
-    score_routes as _score_routes,
     selected_pin_names as _selected_pin_names,
     select_shaft_entry_nodes as _select_shaft_entry_nodes,
     shaft_entry_geometry as _shaft_entry_geometry_for_shaft,
@@ -849,6 +840,10 @@ def _sal_solver_policy():
     return _sal_solver_settings().policy()
 
 
+def _sal_route_analysis(policy=None):
+    return _sal_live_routing_session().route_analysis(shaft_extraction, policy)
+
+
 def _sal_live_routing_session():
     return SalLiveRoutingSession(
         installation=SAL_INSTALLATION,
@@ -872,15 +867,15 @@ def _routing_runtime(env, policy=None):
 
 
 def get_route_diameter(route_name):
-    return MACHINE_SPEC.route_diameter_mm(route_name)
+    return _sal_route_analysis().route_diameter(route_name)
 
 
 def get_buffered_radius_mm(diameter_mm):
-    return _buffered_radius_mm(diameter_mm, DUCT_BUFFER_RATIO)
+    return _sal_route_analysis().buffered_radius(diameter_mm)
 
 
 def get_required_clearance_mm(diameter_a, diameter_b):
-    return _required_clearance_mm(diameter_a, diameter_b, DUCT_BUFFER_RATIO)
+    return _sal_route_analysis().required_clearance(diameter_a, diameter_b)
 
 
 def refresh_edge_weight_view_overlay(routes):
@@ -1037,7 +1032,7 @@ def count_segment_crossings(routes):
     return _count_segment_crossings(routes)
 
 def count_segment_clearance_conflicts(routes):
-    return _count_segment_clearance_conflicts(routes, get_route_diameter, get_required_clearance_mm)
+    return _sal_route_analysis().count_clearance_conflicts(routes)
 
 def count_segment_overlaps(routes):
     return _count_segment_overlaps(routes)
@@ -1049,10 +1044,7 @@ def count_solution_turns(routes):
     return _count_solution_turns(routes)
 
 def get_min_piece_length(route_name, terminal_segment=False, *, policy=None):
-    policy = policy or _sal_solver_policy()
-    diameter = get_route_diameter(route_name)
-    multiplier = 1.0 if terminal_segment else 2.0
-    return diameter * multiplier * policy.min_piece_factor
+    return _sal_route_analysis(policy).min_piece_length(route_name, terminal_segment)
 
 def merged_route_piece_lengths(route_name, segs):
     return _merged_route_piece_lengths(route_name, segs)
@@ -1061,7 +1053,7 @@ def count_route_short_pieces(route_name, segs):
     return _count_route_short_pieces(route_name, segs, get_min_piece_length)
 
 def count_solution_short_pieces(routes):
-    return _count_solution_short_pieces(routes, get_min_piece_length)
+    return _sal_route_analysis().count_short_pieces(routes)
 
 def find_route_at_point(routes, world_pt):
     return _find_route_at_point(routes, world_pt, max(40.0, 8.0 / SCALE_PX_PER_MM))
@@ -1135,44 +1127,16 @@ def _build_routes_from_paths(route_order, paths, targets, global_pins, *, route_
     )
 
 def get_solution_score(routes, crossings, *, policy=None):
-    policy = policy or _sal_solver_policy()
-    weights = RouteScoreWeights(
-        bend=policy.bend_cost,
-        crossing=policy.crossing_penalty,
-        overlap=policy.overlap_score_penalty,
-        clearance=policy.clearance_penalty,
-        short_piece=policy.short_piece_score_penalty,
-    )
-    return _score_routes(
-        routes,
-        weights,
-        get_route_diameter,
-        get_required_clearance_mm,
-        lambda *args, **kwargs: get_min_piece_length(*args, **kwargs, policy=policy),
-        crossings=crossings,
-    )
+    return _sal_route_analysis(policy).score(routes, crossings)
 
 def get_route_validation_warnings(routes):
-    if not routes:
-        return []
-    warnings = _route_quality_warnings(
-        routes,
-        get_route_diameter,
-        get_required_clearance_mm,
-        get_min_piece_length,
-    )
-    warnings = _append_allowed_region_warning(warnings, routes, routing_region_base, shaft_extraction)
+    warnings = _sal_route_analysis().quality_warnings(routes)
     if shaft_extraction is not None and DWELLING_SOURCE_MODES[dwelling_source_idx] == "Real DB" and not shaft_core_entry_specs:
         warnings.append("missing core shaft entry metadata")
     return warnings
 
 def get_route_conflict_summary(routes):
-    return _route_conflict_summary(
-        routes,
-        get_route_diameter,
-        get_required_clearance_mm,
-        get_min_piece_length,
-    )
+    return _sal_route_analysis().conflict_summary(routes)
 
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 # TOPOLOGICAL DISTANCE FIELDS AUTO-PLACEMENT ALGORITHMS
@@ -1296,6 +1260,8 @@ def _sal_application_adapter():
         blocked_vertical_regions=get_machine_vertical_clearance_blocks(),
     )
 
+    live_session = _sal_live_routing_session()
+    route_analysis = live_session.route_analysis(shaft_extraction)
     callbacks = SalLiveRoutingCallbacks(
         shaft_entry_nodes=lambda: get_shaft_entry_nodes(routing_workspace.env, routing_workspace.spatial_index),
         terminal_nodes=lambda _pin_map, shaft_idx, shaft_route: _terminal_node_indices_for_kd(
@@ -1311,10 +1277,10 @@ def _sal_application_adapter():
         route_segments_from_path=lambda plan, *args: _route_segments_from_path(*args, route_plan=plan),
         build_routes_from_paths=lambda plan, *args: _build_routes_from_paths(*args, route_plan=plan),
         count_crossings=count_segment_crossings,
-        score_routes=lambda routes, crossings, policy: get_solution_score(routes, crossings, policy=policy),
-        conflict_summary=get_route_conflict_summary,
+        score_routes=lambda routes, crossings, policy: route_analysis.score(routes, crossings),
+        conflict_summary=route_analysis.conflict_summary,
     )
-    return _sal_live_routing_session().application_adapter(machine_session, terminals, callbacks)
+    return live_session.application_adapter(machine_session, terminals, callbacks)
 
 
 def solve_ventilation_routing():

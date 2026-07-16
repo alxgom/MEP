@@ -607,6 +607,14 @@ Manual validation milestones:
 - Aligned the active Ozeo plan and connector diameters with the AzureFile family JSON (459 x 512 x 197.504 mm, 80/125 mm ducts).
 - Validation: Python compilation, focused machine/placement/Sal contracts, one real shallow-cover extraction check, and headless startup solves.
 
+- Aligned both automatic-placement modes with machine-only vertical-clearance exclusions and made no-feasible placement outcomes explicit.
+- Tightened shared placement feasibility so the full machine footprint must remain inside the routing envelope, fit within one room, and avoid wall centerlines and buffered wall geometry.
+- Validation: Python compilation and 24 focused placement contracts.
+
+- Extracted `SalRouteAnalysis` as the installation-owned route-quality boundary for selected-machine diameters, clearance, minimum-piece policy, scoring, warnings, and conflict summaries.
+- The live Sal session now produces the analysis snapshot used by solver callbacks and UI compatibility functions; shared routing metrics remain installation-neutral.
+- Validation: Python compilation and 20 focused Sal policy/application/live-session and routing metric/scoring contracts.
+
 Before each commit:
 
 - `git status --short`

@@ -7,6 +7,7 @@ from .live_solver import SalLiveRoutingCallbacks, SalLiveRoutingSession
 from .definition import SAL_INSTALLATION, SalInstallationDefinition
 from .routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
 from .route_plan import SalRoutePlan, build_sal_route_plan
+from .route_analysis import SalRouteAnalysis
 from .policy import SalSolverPolicy
 from .prepared import SalPreparedRoutingProblem
 from .strategy_dispatch import SalStrategyOutcome, SalStrategyRuntime, solve_prepared_strategy
@@ -27,6 +28,7 @@ __all__ = [
     "SalLiveRoutingCallbacks",
     "SalRoutingResult",
     "SalRoutePlan",
+    "SalRouteAnalysis",
     "SalSolverPolicy",
     "SalPreparedRoutingProblem",
     "SalStrategyOutcome",
