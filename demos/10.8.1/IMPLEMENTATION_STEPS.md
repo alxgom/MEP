@@ -619,6 +619,10 @@ Manual validation milestones:
 - `main.py` now supplies the current graph nodes, spatial index, and shaft-entry callback without owning Sal route-materialization policy.
 - Validation: Python compilation and 28 focused Sal materializer/application/session/strategy and shared routing-segment contracts.
 
+- Added `SalInteractiveSolver` as the installation-owned interactive solve facade, including live machine-session construction, callback adaptation, overlay lifecycle, and result application.
+- Removed the obsolete source-node and path-materialization wrappers from `main.py`; the entrypoint now supplies one explicit live callback snapshot and consumes the solver result.
+- Validation: Python compilation and 14 focused Sal interactive/live-session/application/materialization/analysis and machine-session contracts.
+
 Before each commit:
 
 - `git status --short`
