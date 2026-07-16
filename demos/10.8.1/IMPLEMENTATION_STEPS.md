@@ -669,6 +669,8 @@ Before each commit:
 - Extracted ordered multi-installation execution from `main.py`: capability-specific callbacks remain concrete, while a small coordinator owns enabled/order traversal, prior-result obstacle projection, active-result selection, and result storage.
 - Extracted non-active canvas layer projection into a pure UI module. `main.py` now supplies installation visuals instead of assembling `CanvasContextLayer` instances inline and is 1,179 physical lines.
 - Validation: Python compilation and two direct focused execution-order/context and active/context projection contracts.
+- Final smoke correction: Cli grille routing points now land 300 mm inside the routable region, avoiding isolated boundary nodes on synthetic dwellings. If prior 2D route obstacles disconnect the entire Cli supply graph, Cli explicitly reports a context-relaxation warning and retains both installations' visible results rather than erasing the later run.
+- Final validation: 12-second headless startup/initial-solve smoke, direct supply/return solve on a generated dwelling, and dual-installation execution in both routing orders.
 
 - Cli now solves and materializes separate supply and return-air trees with connector/grille dimensions, machine stubs, and explicit duct segment roles.
 - Enabled installations execute in header order and receive earlier machine footprints and buffered routes as contextual obstacles; Cli placement also follows the selected PEAD footprint on dwelling and machine changes.

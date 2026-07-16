@@ -75,6 +75,15 @@ class CliInteractiveRuntime:
             grilles, context_obstacles,
         )
         if supply is None:
+            if context_obstacles:
+                relaxed = self.solve(prepared_dwelling, machine, center, angle_degrees)
+                if relaxed.routes:
+                    self.last_result = replace(
+                        relaxed,
+                        status=f"Cli context relaxed after collision; {relaxed.status}",
+                        context_obstacle_count=len(tuple(context_obstacles)),
+                    )
+                    return self.last_result
             return self._finish(
                 (), "Blocked: no Cli supply tree", started, 0, grilles, pins,
                 context_obstacles=context_obstacles,

@@ -66,15 +66,12 @@ def _point_along(first, second, distance):
     return (round(first[0] + dx * distance / length), round(first[1] + dy * distance / length))
 
 
-def _routing_point(grille_point, routing_region):
+def _routing_point(grille_point, routing_region, inset_mm=300.0):
     if routing_region is None:
         return grille_point
-    point = nearest_points(Point(grille_point), routing_region)[1]
-    interior = routing_region.representative_point()
-    dx, dy = interior.x - point.x, interior.y - point.y
-    length = max(math.hypot(dx, dy), 1.0)
-    candidate = Point(point.x + dx / length, point.y + dy / length)
-    point = candidate if routing_region.covers(candidate) else point
+    safe_region = routing_region.buffer(-float(inset_mm), cap_style=3, join_style=2)
+    target = safe_region if not safe_region.is_empty else routing_region
+    point = nearest_points(Point(grille_point), target)[1]
     return round(float(point.x)), round(float(point.y))
 
 
