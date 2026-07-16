@@ -661,6 +661,9 @@ Before each commit:
 
 ## Open Items
 
+- Added an installation-neutral Kou-style multi-terminal Steiner solver under shared routing, with immutable results, input validation, deterministic traversal, and no module-global graph state. It is exported for future Cli use but deliberately has no Sal integration.
+- Validation: Python compilation and focused shared Steiner routing contracts.
+
 - The redundant routing KPI sidebar card was removed; live plot values now share each plot header, while crossing counts remain execution warnings.
 - The active dwelling moved from machine placement into a canvas dropdown below the zoom controls, allowing direct selection of any configured real dwelling or a new synthetic dwelling.
 - Plot headers now format current values with metric-specific units and precision; the duplicated edge-weight row was removed from the solver card.

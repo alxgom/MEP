@@ -101,6 +101,13 @@ from .shaft_entries import (
 )
 from .validation import append_allowed_region_warning, count_segments_outside_allowed_region
 from .negotiated import NegotiatedProblem, NegotiatedResult, NegotiatedRuntime, solve_negotiated
+from .steiner import (
+    DEFAULT_HEURISTIC_DIRECTIONS,
+    SteinerScore,
+    SteinerTreeResult,
+    segments_from_edges,
+    solve_steiner_tree,
+)
 
 __all__ = [
     "PinFlowRoute",
@@ -118,6 +125,8 @@ __all__ = [
     "SolvedRoute",
     "SolverFailure",
     "SolverResult",
+    "SteinerScore",
+    "SteinerTreeResult",
     "EdgeWeightOverlay",
     "add_edge",
     "add_machine_clearance_weights",
@@ -179,6 +188,9 @@ __all__ = [
     "small_pin_target_specs",
     "solve_pin_flow",
     "solve_negotiated",
+    "solve_steiner_tree",
+    "segments_from_edges",
+    "DEFAULT_HEURISTIC_DIRECTIONS",
     "target_heuristic",
     "terminal_node_indices",
     "terminal_candidate_node_indices",
