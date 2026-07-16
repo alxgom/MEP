@@ -28,6 +28,7 @@ def test_interactive_solver_owns_machine_adapter_and_overlay_lifecycle():
         return SimpleNamespace(solve=lambda: result)
 
     live_session = SimpleNamespace(
+        installation=SimpleNamespace(build_route_plan=lambda terminals, center: object()),
         machine_spec=object(),
         machine_center=(10, 20),
         machine_angle=90,
@@ -38,11 +39,16 @@ def test_interactive_solver_owns_machine_adapter_and_overlay_lifecycle():
     )
     callback = lambda *_args, **_kwargs: None
     callbacks = SalInteractiveCallbacks(*([callback] * 9))
-    materializer = SimpleNamespace(
-        source_start_nodes=callback,
-        route_segments=callback,
-        build_routes=callback,
-    )
+    materializers = []
+
+    def materializer_factory(_route_plan):
+        materializer = SimpleNamespace(
+            source_start_nodes=lambda source: (len(materializers), source),
+            route_segments=callback,
+            build_routes=callback,
+        )
+        materializers.append(materializer)
+        return materializer
 
     actual = SalInteractiveSolver(
         live_session,
@@ -50,7 +56,7 @@ def test_interactive_solver_owns_machine_adapter_and_overlay_lifecycle():
         2,
         (object(),),
         (object(),),
-        materializer,
+        materializer_factory,
         object(),
         callbacks,
     ).solve()
@@ -61,5 +67,6 @@ def test_interactive_solver_owns_machine_adapter_and_overlay_lifecycle():
     assert captured["terminals"] == {"Kitchen": (1, 2)}
     assert captured["machine"].center == (10, 20)
     assert captured["machine"].graph_type == 2
-    assert captured["callbacks"].source_start_nodes is materializer.source_start_nodes
+    assert captured["callbacks"].source_start_nodes("source") == (1, "source")
+    assert captured["callbacks"].source_start_nodes("next") == (2, "next")
     assert captured["callbacks"].score_routes([], 0, object()) == 42

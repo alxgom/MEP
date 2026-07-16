@@ -623,6 +623,12 @@ Manual validation milestones:
 - Removed the obsolete source-node and path-materialization wrappers from `main.py`; the entrypoint now supplies one explicit live callback snapshot and consumes the solver result.
 - Validation: Python compilation and 14 focused Sal interactive/live-session/application/materialization/analysis and machine-session contracts.
 
+- Completed the Sal solver-composition boundary: `main.py` retains only live settings/session snapshots, low-level dwelling/graph callbacks, UI metrics, and the single `solve_ventilation_routing` entrypoint.
+- Made Sal route materialization lazy so paths always use the graph produced by the solver's machine-aware refresh rather than a pre-solve graph snapshot.
+- Removed residual flow/search imports and dead solver compatibility wrappers from `main.py`; strategy dispatch, flow algorithms, route planning, scoring policy, materialization, machine routing, and overlay lifecycle now remain under shared routing or `installations.sal`.
+- Deliberately rejected a large application-state DTO: the two small live factories are clearer until a concrete second installation reveals the shared runtime contract.
+- Validation: Python compilation, 114 focused Sal/shared-routing contracts, and a headless startup/initial-solve smoke that remained alive without an exception.
+
 Before each commit:
 
 - `git status --short`
