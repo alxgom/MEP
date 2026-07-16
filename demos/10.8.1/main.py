@@ -30,6 +30,7 @@ from mep_routing.installations.sal import (
     SAL_INSTALLATION,
     SalApplicationAdapter,
     SalApplicationHooks,
+    SalLiveRoutingSession,
     SalSolverSettings,
     SalSolverPolicy,
 )
@@ -92,7 +93,6 @@ from mep_routing.routing import (
     trace_flow_path as _trace_flow_path,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
-from mep_routing.routing.weight_runtime import RoutingRuntime, RoutingWeightRuntimeContext
 from mep_routing.ui import (
     cool_colormap as _cool_colormap_value,
     edge_weight_log_scale as _edge_weight_log_scale_for_values,
@@ -844,43 +844,26 @@ def _sal_solver_policy():
     return _sal_solver_settings().policy()
 
 
-def _routing_weight_runtime_context(env, policy=None):
-    policy = policy or _sal_solver_policy()
-    return RoutingWeightRuntimeContext(
-        edge_list=routing_workspace.edge_list,
-        edge_coords=routing_workspace.edge_coords,
-        nodes=env.nodes,
+def _sal_live_routing_session():
+    return SalLiveRoutingSession(
+        installation=SAL_INSTALLATION,
+        machine_spec=MACHINE_SPEC,
+        workspace=routing_workspace,
         routing_region=routing_region_base,
-        room_polygons=[room.polygon for room in rooms],
-        walls=walls,
-        wall_polygons=wall_polys,
-        shafts=shafts,
+        rooms=tuple(rooms),
+        walls=tuple(walls),
+        wall_polygons=tuple(wall_polys),
+        shafts=tuple(shafts),
         machine_center=(machine_cx, machine_cy),
-        machine_angle_deg=machine_angle,
-        machine_overall_width_mm=MACHINE_OVERALL_W,
-        machine_body_height_mm=MACHINE_BODY_H,
-        buffer_ratio=policy.duct_buffer_ratio,
-        shaft_clearance_mm=policy.shaft_clearance_mm,
-        machine_soft_margin_mm=policy.machine_clearance_soft_margin_mm,
-        crossing_penalty=policy.crossing_penalty,
-        clearance_penalty=policy.clearance_penalty,
-        block_weight=policy.overlap_block_weight,
-        route_diameter=get_route_diameter,
+        machine_angle=machine_angle,
+        settings=_sal_solver_settings(),
+        search_backend_index=router_backend_idx,
+        estimate_turns=estimate_turns,
     )
 
 
 def _routing_runtime(env, policy=None):
-    policy = policy or _sal_solver_policy()
-    return RoutingRuntime(
-        env,
-        _routing_weight_runtime_context(env, policy),
-        routing_workspace.static_clearance_cache,
-        routing_workspace.overlay,
-        search_backend=SAL_INSTALLATION.search_backends[router_backend_idx],
-        heuristic_mode=policy.heuristic_mode,
-        bend_cost=policy.bend_cost,
-        estimate_turns_fn=estimate_turns,
-    )
+    return _sal_live_routing_session().routing_runtime(env, policy)
 
 
 def get_route_diameter(route_name):
