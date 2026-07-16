@@ -1,5 +1,5 @@
 import pytest
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 
 from mep_routing.placement import (
     area_out_percentage,
@@ -26,6 +26,25 @@ def test_candidate_room_points_returns_centroid_and_axis_offsets_without_duplica
         (200, 300),
         (200, 100),
     ]
+
+
+def test_candidate_room_points_uses_only_the_placeable_part_of_room():
+    room = Room(Polygon([(0, 0), (400, 0), (400, 400), (0, 400)]))
+    placeable_region = Polygon([(200, 0), (400, 0), (400, 400), (200, 400)])
+
+    points = candidate_room_points(
+        room, axes=routing_frame_axes(), translation=50.0, placeable_region=placeable_region,
+    )
+
+    assert points[0] == (300, 200)
+    assert all(placeable_region.covers(Point(point)) for point in points)
+
+
+def test_candidate_room_points_returns_empty_without_placeable_area():
+    room = Room(Polygon([(0, 0), (100, 0), (100, 100), (0, 100)]))
+    elsewhere = Polygon([(200, 0), (300, 0), (300, 100), (200, 100)])
+
+    assert candidate_room_points(room, placeable_region=elsewhere) == []
 
 
 def test_machine_polygon_from_pins_and_area_out_percentage():

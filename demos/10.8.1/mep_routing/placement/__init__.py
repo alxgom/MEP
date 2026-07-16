@@ -2,7 +2,11 @@
 
 from .application import PlacementApplicationAdapter
 from .feasibility import candidate_machine_rooms, is_machine_placement_valid
-from .vertical_clearance import insufficient_machine_clearance_regions, scores_outside_regions
+from .vertical_clearance import (
+    available_machine_placement_region,
+    insufficient_machine_clearance_regions,
+    scores_outside_regions,
+)
 from .fields import compute_dijkstra_distance_field, placement_weights, topological_placement_scores
 from .rotation import (
     field_alignment_pin_dirs,
@@ -30,6 +34,7 @@ from .scoring import (
 __all__ = [
     "PlacementApplicationAdapter",
     "area_out_percentage",
+    "available_machine_placement_region",
     "best_valid_rotation_for_point",
     "candidate_machine_rooms",
     "candidate_room_points",

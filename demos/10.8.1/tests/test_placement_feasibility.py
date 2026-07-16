@@ -35,6 +35,16 @@ def test_candidate_machine_rooms_falls_back_to_any_polygon_room():
     assert candidate_machine_rooms([empty, valid, missing_polygon], min_area=100) == [valid]
 
 
+def test_candidate_machine_rooms_excludes_rooms_without_placeable_area():
+    blocked = Room(Polygon([(0, 0), (10, 0), (10, 10), (0, 10)]), has_cover=True)
+    available = Room(Polygon([(20, 0), (30, 0), (30, 10), (20, 10)]), has_cover=False)
+    placeable_region = Polygon([(20, 0), (30, 0), (30, 10), (20, 10)])
+
+    assert candidate_machine_rooms(
+        [blocked, available], min_area=200, placeable_region=placeable_region,
+    ) == [available]
+
+
 def test_is_machine_placement_valid_checks_region_and_obstacles():
     region = Polygon([(-10, -10), (10, -10), (10, 10), (-10, 10)])
 

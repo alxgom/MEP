@@ -33,6 +33,7 @@ class PlacementApplicationAdapter:
     representative_point: object
     route_room_polygon: object
     local_axis_to_world: object
+    placeable_region: object = None
     rotations: tuple = (0, 90, 180, 270)
 
     def topological_scores(self, env, spatial_index, shaft_nodes):
@@ -41,6 +42,18 @@ class PlacementApplicationAdapter:
             for name, point in self.terminals.items()
         }
         return topological_placement_scores(env, shaft_nodes, terminal_nodes, self.weights)
+
+    def placement_scores(self, env, spatial_index, shaft_nodes):
+        scores, fields = self.topological_scores(env, spatial_index, shaft_nodes)
+        if self.placeable_region is None:
+            return scores, fields
+        scores = {
+            index: score
+            for index, score in scores.items()
+            if index < len(env.nodes)
+            and self.placeable_region.covers(Point(env.nodes[index][0], env.nodes[index][1]))
+        }
+        return scores, fields
 
     def auto_place(self, mode, env, spatial_index, shaft_nodes):
         started = time.perf_counter()
@@ -54,15 +67,17 @@ class PlacementApplicationAdapter:
                 lambda point: int(spatial_index.query(point)[1]),
                 self.wet_room_names,
                 self.weights,
-                lambda current_env, current_shaft_nodes: self.topological_scores(
+                lambda current_env, current_shaft_nodes: self.placement_scores(
                     current_env, spatial_index, current_shaft_nodes,
                 ),
                 choose_topological_machine_placement,
             )
         elif mode == 2:
             outcome = run_core_like_placement(
-                candidate_machine_rooms(self.rooms, self.machine_area),
-                lambda room: candidate_room_points(room, routing_frame_axes()),
+                candidate_machine_rooms(self.rooms, self.machine_area, self.placeable_region),
+                lambda room: candidate_room_points(
+                    room, routing_frame_axes(), placeable_region=self.placeable_region,
+                ),
                 self.rotations,
                 self.is_valid,
                 self._core_candidate_score,

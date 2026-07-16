@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import math
 
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 
 
 def routing_frame_axes():
     return ((1.0, 0.0), (0.0, 1.0))
 
 
-def candidate_room_points(room, axes=None, translation=100.0):
+def candidate_room_points(room, axes=None, translation=100.0, placeable_region=None):
     axes = axes or routing_frame_axes()
-    point = room.polygon.representative_point()
-    centroid = room.polygon.centroid
-    if room.polygon.contains(centroid):
+    candidate_region = room.polygon
+    if placeable_region is not None:
+        candidate_region = candidate_region.intersection(placeable_region)
+    if candidate_region.is_empty:
+        return []
+    point = candidate_region.representative_point()
+    centroid = candidate_region.centroid
+    if candidate_region.contains(centroid):
         point = centroid
     base = (round(point.x), round(point.y))
     points = [base]
@@ -24,6 +29,8 @@ def candidate_room_points(room, axes=None, translation=100.0):
     result = []
     for pt in points:
         if pt in seen:
+            continue
+        if placeable_region is not None and not placeable_region.covers(Point(pt)):
             continue
         seen.add(pt)
         result.append(pt)

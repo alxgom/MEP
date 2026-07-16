@@ -21,17 +21,25 @@ def is_machine_placement_valid(cx, cy, pins, routing_region, walls, columns, sha
     return True
 
 
-def candidate_machine_rooms(rooms, min_area):
+def candidate_machine_rooms(rooms, min_area, placeable_region=None):
+    def available_area(room):
+        polygon = getattr(room, "polygon", None)
+        if polygon is None or polygon.is_empty:
+            return 0.0
+        return polygon.area if placeable_region is None else polygon.intersection(placeable_region).area
+
     candidates = [
         room
         for room in rooms
         if getattr(room, "has_cover", False)
         and hasattr(room, "polygon")
         and not room.polygon.is_empty
-        and room.polygon.area >= min_area
+        and available_area(room) >= min_area
     ]
     return candidates or [
         room
         for room in rooms
-        if hasattr(room, "polygon") and not room.polygon.is_empty
+        if hasattr(room, "polygon")
+        and not room.polygon.is_empty
+        and available_area(room) > 1e-7
     ]

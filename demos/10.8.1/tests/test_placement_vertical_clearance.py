@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from shapely.geometry import box
 
 from mep_routing.placement import (
+    available_machine_placement_region,
     insufficient_machine_clearance_regions,
     is_machine_placement_valid,
     scores_outside_regions,
@@ -33,6 +34,14 @@ def test_insufficient_regions_use_height_plus_clearance_and_ignore_unknowns():
     regions = insufficient_machine_clearance_regions([_room(low, exact, unknown)], 200, 20)
     assert len(regions) == 1
     assert regions[0].equals(box(0, 0, 10, 10))
+
+
+def test_available_machine_region_subtracts_clearance_blocks():
+    available = available_machine_placement_region(
+        box(0, 0, 20, 10), (box(0, 0, 5, 10),),
+    )
+
+    assert available.equals(box(5, 0, 20, 10))
 
 
 def test_adequate_overlap_wins_and_boundary_touch_remains_valid():

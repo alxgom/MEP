@@ -43,3 +43,10 @@ def scores_outside_regions(node_scores, nodes, blocked_regions):
         if index < len(nodes)
         and not any(region.covers(Point(nodes[index][0], nodes[index][1])) for region in blocked_regions)
     }
+
+
+def available_machine_placement_region(routing_region, blocked_regions):
+    """Subtract machine-only clearance exclusions from the routing region."""
+    if routing_region is None or not blocked_regions:
+        return routing_region
+    return routing_region.difference(unary_union(blocked_regions))

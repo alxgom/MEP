@@ -46,6 +46,7 @@ from mep_routing.graphs import (
 )
 from mep_routing.placement import (
     PlacementApplicationAdapter,
+    available_machine_placement_region as _available_machine_placement_region,
     insufficient_machine_clearance_regions as _insufficient_machine_clearance_regions,
     scores_outside_regions as _scores_outside_regions,
     is_machine_placement_valid as _is_machine_placement_valid_for_placement,
@@ -1196,6 +1197,9 @@ def get_placement_weights():
     return _placement_weights(weight_mode_idx)
 
 def _placement_application():
+    placeable_region = _available_machine_placement_region(
+        routing_region_base, get_machine_vertical_clearance_blocks(),
+    )
     return PlacementApplicationAdapter(
         rooms=tuple(rooms),
         terminals=dict(terminals),
@@ -1210,6 +1214,7 @@ def _placement_application():
         representative_point=get_representative_point,
         route_room_polygon=get_route_room_polygon,
         local_axis_to_world=_local_axis_to_world,
+        placeable_region=placeable_region,
     )
 
 def get_auto_placement_scores(env, shaft_boundary_nodes):
@@ -1262,6 +1267,7 @@ def run_auto_placement():
         return
     ap_scores, ap_fields = outcome.scores, outcome.fields
     if outcome.position is None:
+        print("[Auto-Placement] No feasible machine placement satisfies the active restrictions")
         return
 
     machine_cx, machine_cy = outcome.position
