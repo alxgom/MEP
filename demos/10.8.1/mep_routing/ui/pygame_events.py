@@ -195,7 +195,7 @@ class WorkbenchEventAdapter:
             return
 
         help_card = next(
-            (card for card, rect in a.help_button_rects.items() if rect.collidepoint(pos)), None,
+            (card for card, rect in a.workbench_chrome.help_button_rects.items() if rect.collidepoint(pos)), None,
         )
         controls = a.canvas_ui.controls
         panel_hit = PanelHit(
@@ -249,7 +249,7 @@ class WorkbenchEventAdapter:
     def _panel_command(self, command):
         a, s = self.app, self.state
         if command.name == "toggle_help":
-            a.help_popup_card = None if a.help_popup_card == command.value else command.value
+            a.workbench_chrome.toggle_help(command.value)
         elif command.name == "set_slider":
             name, x = command.value
             label, color = self._set_slider(name, x)

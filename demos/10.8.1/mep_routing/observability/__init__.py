@@ -2,10 +2,12 @@
 
 from .history import clear_history_buffers, history_sample
 from .session import RoutingHistory, SolutionLogSession
+from .runtime import RoutingObservationRuntime
 from .snapshots import restored_snapshot_state, solution_snapshot
 
 __all__ = [
     "RoutingHistory",
+    "RoutingObservationRuntime",
     "SolutionLogSession",
     "clear_history_buffers",
     "history_sample",

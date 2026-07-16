@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added `RoutingObservationRuntime` as the application-facing owner of routing history, snapshots, manual logs, and automatic-best markers; `main.py` now only supplies the live UI state mapping and restore application.
+- Added `WorkbenchChromeRuntime` for solution-log hit state, help controls, transient messages, and viewer legend rendering, and routed the Pygame event adapter through that state owner.
+- Validation: Python compilation, focused observation/chrome contracts, and the Demo 10.8.1 test suite.
+
 - Added `TerminalUiRuntime` as the bound adapter for terminal interaction, preferred-terminal rendering, room/shaft hit testing, and validity-cache ownership.
 - Removed terminal geometry and drawing pass-through wrappers from `main.py`; the entrypoint now binds the active dwelling once and supplies the runtime directly to canvas hooks.
 - Validation: Python compilation and focused terminal-runtime contracts.

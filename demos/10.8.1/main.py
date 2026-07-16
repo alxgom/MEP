@@ -68,29 +68,18 @@ from mep_routing.ui.controls import dwelling_selector_bounds as _dwelling_select
 from mep_routing.ui.dropdown import dropdown_bounds as _dropdown_bounds
 from mep_routing.ui.solution_logs import (
     DEFAULT_BEST_METRICS,
-    draw_solution_logs_panel as _draw_solution_logs_panel_widget,
     metric_value_for_log as _metric_value_for_log_entry,
-    solution_log_action as _solution_log_action,
     solution_kpis as _solution_kpis,
 )
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
-from mep_routing.ui.help import (
-    draw_card_help_button as _draw_card_help_button,
-    draw_help_popup as _draw_help_popup,
-    draw_transient_message as _draw_transient_message,
-    draw_viewer_legend as _draw_viewer_legend,
-    help_lines as _help_lines,
-)
 from mep_routing.observability import (
-    RoutingHistory,
-    SolutionLogSession,
-    history_sample as _history_sample,
+    RoutingObservationRuntime,
     restored_snapshot_state as _restored_snapshot_state,
-    solution_snapshot as _solution_snapshot,
 )
+from mep_routing.ui.workbench_chrome import WorkbenchChromeRuntime
 from mep_routing.ui.canvas import (
     CanvasFonts,
     CanvasRenderHooks,
@@ -221,10 +210,6 @@ route_real_diameter_width_enabled = False
 routing_workspace = None
 graph_build_session = None
 active_dwelling = None
-help_popup_card = None
-transient_message = None
-transient_message_until_ms = 0
-help_button_rects = {}
 preferred_terminal_tool_mode = None
 terminal_runtime = None
 terminal_validity_overlay_enabled = False
@@ -337,6 +322,13 @@ terminal_ui = TerminalUiRuntime(canvas_ui, TerminalUiStyle(
     regulation_clearance_mm=TERMINAL_REGULATION_CLEARANCE_MM,
     room_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
 ))
+workbench_chrome = WorkbenchChromeRuntime(
+    canvas_ui.viewport, terminal_ui, PANEL_W,
+    {
+        "plot_background": COLOR_PLOT_BG, "text": COLOR_TEXT, "muted": COLOR_MUTED,
+        "plan_label": COLOR_PLAN_LABEL, "wet_room": COLOR_WET_ROOM_ACCENT, "wall": COLOR_WALL,
+    },
+)
 
 REAL_DWELLING_DB = _SALUBRIDAD_DEFAULTS.get_default("REAL_DWELLING_DB")
 PREFERRED_SHAFT_INSTALLATION = _SALUBRIDAD_DEFAULTS.get_default("PREFERRED_SHAFT_INSTALLATION")
@@ -359,10 +351,6 @@ current_scenario_summary = {}
 
 # Observation state for the right-side plots and solution-log panel.
 HIST_MAXLEN = 400
-routing_history = RoutingHistory(maxlen=HIST_MAXLEN)
-solution_log_session = SolutionLogSession()
-log_button_rect = pygame.Rect(0, 0, 1, 1)
-log_row_rects = []
 weight_mode_idx = 0                             # 0 for Default, 1 for Equal Weights
 heatmap_scale_mode = 0                          # 0 for Linear (75% Saturation), 1 for Log Scale
 heatmap_palette_idx = 0                         # 0 for Turbo, 1 for Viridis
@@ -970,17 +958,6 @@ def get_route_draw_width(route_name):
         return max(1, int(round(get_route_diameter(route_name) * canvas_ui.viewport.scale)))
     return 5 if SAL_INSTALLATION.is_large_route(route_name) else 3
 
-def record_history(routes, crossings_count, elapsed_ms):
-    """Append one solved-route observation to the app-owned history session."""
-    sample = _history_sample(routes, crossings_count, elapsed_ms, _total_route_length_m, count_solution_turns, get_solution_score)
-    routing_history.append(sample)
-    if routes:
-        update_auto_best_logs(routes, "Auto best", elapsed_ms, 0)
-
-
-def clear_history_buffers():
-    routing_history.clear()
-
 def _routes_total_length_m(routes):
     return _total_route_length_m(routes)
 
@@ -995,9 +972,19 @@ def get_current_kpis(routes, elapsed_ms):
         get_solution_score,
     )
 
-def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
-    kpis = get_current_kpis(routes, elapsed_ms)
-    return _solution_snapshot({
+observation_runtime = RoutingObservationRuntime(
+    route_length_m=_total_route_length_m,
+    route_turns=count_solution_turns,
+    route_score=get_solution_score,
+    solution_kpis=get_current_kpis,
+    metric_value=_metric_value_for_log_entry,
+    best_metrics=DEFAULT_BEST_METRICS,
+)
+routing_history = observation_runtime.history
+solution_log_session = observation_runtime.logs
+
+def current_solution_state():
+    return {
         "source_mode_idx": dwelling_source_idx,
         "real_scenario_idx": real_scenario_idx,
         "routing_frame_idx": routing_frame_idx,
@@ -1019,33 +1006,22 @@ def snapshot_current_state(routes, status, elapsed_ms, total_nodes):
             {} if terminal_runtime is None else terminal_runtime.preferred_points_by_room
         ),
         "preferred_terminal_areas": [] if terminal_runtime is None else terminal_runtime.preferred_areas,
-    }, kpis, status, total_nodes)
+    }
+
+def record_history(routes, crossings_count, elapsed_ms):
+    observation_runtime.record(routes, crossings_count, elapsed_ms)
+    if routes:
+        observation_runtime.update_auto_bests(
+            current_solution_state(), routes, "Auto best", elapsed_ms, 0,
+        )
+
+def clear_history_buffers():
+    observation_runtime.clear()
 
 def log_current_solution(routes, status, elapsed_ms, total_nodes):
-    if not routes:
-        return False
-    record_history(routes, count_segment_crossings(routes), elapsed_ms)
-    entry = solution_log_session.add_manual(
-        snapshot_current_state(routes, status, elapsed_ms, total_nodes),
-        routing_history.latest_index,
+    return observation_runtime.log_manual(
+        current_solution_state(), routes, status, elapsed_ms, total_nodes,
     )
-    routing_history.add_marker(f"L{entry['id']}", (255, 255, 255))
-    return True
-
-def _metric_value_for_log(entry, metric):
-    return _metric_value_for_log_entry(entry, metric)
-
-def update_auto_best_logs(routes, status, elapsed_ms, total_nodes):
-    if not routes:
-        return
-    entry_base = snapshot_current_state(routes, status, elapsed_ms, total_nodes)
-    for _metric, _entry, label, color in solution_log_session.update_auto_bests(
-        entry_base,
-        routing_history.latest_index,
-        DEFAULT_BEST_METRICS,
-        _metric_value_for_log_entry,
-    ):
-        routing_history.replace_marker(label, routing_history.latest_index, color)
 
 def restore_solution_log(log_entry):
     global machine_cx, machine_cy, machine_angle
@@ -1071,24 +1047,10 @@ def restore_solution_log(log_entry):
     return solve_ventilation_routing()
 
 def handle_solution_log_click(pos):
-    return _solution_log_action(pos, log_button_rect, log_row_rects)
+    return workbench_chrome.solution_log_action(pos)
 
 def draw_solution_logs_panel(screen, font_small, font_bold):
-    global log_button_rect, log_row_rects
-    log_button_rect, log_row_rects = _draw_solution_logs_panel_widget(
-        screen,
-        font_small,
-        font_bold,
-        window_width=canvas_ui.viewport.window_width,
-        window_height=canvas_ui.viewport.window_height,
-        panel_width=PANEL_W,
-        solution_logs=solution_log_session.manual_logs,
-        auto_best_logs=solution_log_session.auto_best_logs,
-        selected_log_id=solution_log_session.selected_log_id,
-        plot_background_color=COLOR_PLOT_BG,
-        text_color=COLOR_TEXT,
-        muted_color=COLOR_MUTED,
-    )
+    workbench_chrome.draw_solution_logs(screen, font_small, font_bold, solution_log_session)
 
 def draw_plots(screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum):
     return _draw_routing_plots(
@@ -1099,31 +1061,19 @@ def draw_plots(screen, font_plot_small, font_plot_title, font_plot_value, font_p
     )
 
 def draw_card_help_button(screen, card_id, rect, font_small):
-    global help_button_rects
-    help_button_rects[card_id] = _draw_card_help_button(screen, card_id, rect, font_small, help_popup_card == card_id, COLOR_MUTED, COLOR_TEXT)
+    workbench_chrome.draw_help_button(screen, card_id, rect, font_small)
 
 def draw_help_popup(screen, font_small):
-    viewport = canvas_ui.viewport
-    return _draw_help_popup(screen, font_small, _help_lines(help_popup_card), (viewport.canvas_left + 16, viewport.canvas_top + 58), COLOR_TEXT)
+    return workbench_chrome.draw_help_popup(screen, font_small)
 
 def set_transient_message(text, duration_ms=2400):
-    global transient_message, transient_message_until_ms
-    transient_message = str(text)
-    transient_message_until_ms = pygame.time.get_ticks() + int(duration_ms)
+    workbench_chrome.show_message(text, duration_ms)
 
 def draw_transient_message(screen, font_small):
-    if not transient_message or pygame.time.get_ticks() > transient_message_until_ms:
-        return
-    return _draw_transient_message(
-        screen, font_small, transient_message,
-        (canvas_ui.viewport.canvas_left, canvas_ui.viewport.canvas_top), COLOR_TEXT,
-    )
+    return workbench_chrome.draw_transient(screen, font_small)
 
 def draw_viewer_legend(screen, font_small):
-    return _draw_viewer_legend(
-        screen, font_small, canvas_ui.viewport.canvas_rect, terminal_validity_overlay_enabled,
-        COLOR_PLAN_LABEL, COLOR_WET_ROOM_ACCENT, COLOR_WALL, terminal_ui.draw_validity_square,
-    )
+    return workbench_chrome.draw_viewer_legend(screen, font_small, terminal_validity_overlay_enabled)
 
 
 def apply_routing_key_command(event_key):
@@ -1202,7 +1152,6 @@ def main():
     global real_scenario_idx, routing_frame_idx, dwelling_source_idx, room_start_mode_idx
     global edge_weight_heatmap_enabled, edge_weight_view_mode_idx, route_real_diameter_width_enabled
     global rotation_mode_idx
-    global help_popup_card
     global min_piece_factor, is_fullscreen
     global preferred_terminal_tool_mode
     global installation_header_state
