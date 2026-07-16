@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Fixed the first live Cli activation crash by normalizing Cli routes to the canvas sequence contract and making machine-pin rendering accept installation-specific connector sets instead of Sal's six fixed pins.
+- Cli canvas projection now disables Sal placement guides while retaining the Cli body and air/freon connector markers.
+- Validation: Python compilation, full Demo suite (330 passed), and a timed headless Pygame activation/render smoke that selected Cli and exited cleanly.
+
 - Added the first live Cli vertical slice without adapting it to Sal's interfaces: Cli owns its selected PEAD geometry, supply connector access, occupied-room terminal preparation, core-simple graph inputs, and Kou Steiner solve runtime.
 - Cli can now be enabled, activated, reordered, rerun after machine selection, and projected onto the canvas/sidebar independently of Sal; the shared application loop only sequences enabled installation runtimes and selects the active result.
 - Cli supply terminals currently represent accessible routing-region connection points near eligible rooms. Detailed grille placement, return-air routing, Cli-specific machine placement, duct sizing/materialization, scoring, and cross-installation collision feedback remain separate future capabilities.

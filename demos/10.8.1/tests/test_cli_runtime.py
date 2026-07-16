@@ -55,7 +55,8 @@ def test_cli_runtime_builds_core_simple_supply_tree():
     result = runtime.solve(
         _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
     )
-    assert result.routes["Supply Air Tree"]
+    assert result.routes[0][0] == "Supply Air Tree"
+    assert result.routes[0][1]
     assert result.total_nodes > 0
     assert result.status.startswith("Cli supply tree solved")
     assert result.workspace.env is not None

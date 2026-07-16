@@ -74,6 +74,28 @@ def test_canvas_builder_derives_selection_graph_machine_and_guides():
     assert scene.guide_lines[2].color == (50, 60, 70)
 
 
+def test_canvas_builder_accepts_cli_connector_schema():
+    pins = {
+        "c_tl": (0, 2), "c_tr": (4, 2), "c_br": (4, 0), "c_bl": (0, 0),
+        "air_out": (2, 3), "air_in": (2, -1), "freon1": (0, 1), "freon2": (0, 0),
+    }
+    state = CanvasFrameState(
+        rooms=(), doors=(), columns=(), shafts=(), shaft_extraction=None,
+        graph_env=None, show_grid_graph=False, terminals={"Living Supply": (6, 3)},
+        routes=(("Supply Air Tree", (((2, 3), (6, 3)),)),), selected_route_name=None,
+        selected_room_polygon=None, global_pins=pins, selected_pins=set(),
+        auto_placement_mode=0, placement_fields={}, wet_room_names=(),
+        route_colors={"Supply Air Tree": (52, 152, 219)}, palette=_palette(),
+        callbacks=CanvasFrameCallbacks(lambda x, y: (x, y), lambda shape: (0, 0), lambda name: 3, lambda point: (0, 0)),
+        room_wall_width=2, terminal_area_start=None, terminal_area_end=None,
+    )
+
+    scene = build_canvas_scene(state)
+
+    assert len(scene.machine.pins) == 4
+    assert scene.routes[0].segments == [((2, 3), (6, 3))]
+
+
 def test_sidebar_builder_formats_display_modes_and_frame_name():
     state = SidebarFrameState(
         auto_placement_mode="Topological", show_heatmap=True, heatmap_scale_mode=1,

@@ -17,7 +17,7 @@ from .terminals import prepare_cli_supply_terminals
 
 @dataclass(frozen=True)
 class CliRoutingResult:
-    routes: dict[str, list]
+    routes: tuple[tuple[str, list], ...]
     status: str
     elapsed_ms: float
     total_nodes: int
@@ -33,7 +33,7 @@ class CliInteractiveRuntime:
         self.definition = definition
         self.graph_config = graph_config
         self.terminal_config = terminal_config
-        self.last_result = CliRoutingResult({}, "Cli has not run", 0.0, 0, {}, {})
+        self.last_result = CliRoutingResult((), "Cli has not run", 0.0, 0, {}, {})
 
     def solve(self, prepared_dwelling, machine, center, angle_degrees=0):
         started = perf_counter()
@@ -45,7 +45,7 @@ class CliInteractiveRuntime:
         pins = cli_machine_pins(machine, center, angle_degrees)
         access_specs = cli_supply_access_specs(machine, pins, angle_degrees)
         if not terminals:
-            return self._finish({}, "Blocked: no Cli supply rooms", started, 0, terminals, pins)
+            return self._finish((), "Blocked: no Cli supply rooms", started, 0, terminals, pins)
 
         cli_prepared = replace(prepared_dwelling, terminals=dict(terminals), wet_room_names=[])
         profile = InstallationGraphProfile(
@@ -59,7 +59,7 @@ class CliInteractiveRuntime:
         )
         build = dwelling.workspace.build_selected(GraphMode.CORE_SIMPLE, pins, angle_degrees)
         if build is None or not len(build.runtime.nodes):
-            return self._finish({}, "Blocked: Cli graph is empty", started, 0, terminals, pins)
+            return self._finish((), "Blocked: Cli graph is empty", started, 0, terminals, pins)
 
         runtime = build.runtime
         required_points = [access_specs[0]["access_point"], *terminals.values()]
@@ -67,7 +67,7 @@ class CliInteractiveRuntime:
         tree = self.definition.supply_tree_solver(runtime.nodes, runtime.adjacency, terminal_nodes)
         if tree is None:
             return self._finish(
-                {}, "Blocked: no Cli supply tree", started, len(runtime.nodes), terminals, pins,
+                (), "Blocked: no Cli supply tree", started, len(runtime.nodes), terminals, pins,
                 dwelling.workspace,
             )
         segments = list(segments_from_edges(runtime.nodes, tree.tree_edges))
@@ -76,7 +76,7 @@ class CliInteractiveRuntime:
             segments.insert(0, ((float(pin[0]), float(pin[1])), (float(access[0]), float(access[1]))))
         status = f"Cli supply tree solved: {len(terminals)} rooms, {len(tree.tree_edges)} edges"
         return self._finish(
-            {"Supply Air Tree": segments}, status, started, len(runtime.nodes), terminals, pins,
+            (("Supply Air Tree", segments),), status, started, len(runtime.nodes), terminals, pins,
             dwelling.workspace,
         )
 

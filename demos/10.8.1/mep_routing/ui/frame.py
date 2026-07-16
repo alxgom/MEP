@@ -159,9 +159,15 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
 
     outline = [to_screen(*state.global_pins[name]) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
     pin_markers = []
-    for pin_name in ("tl", "tr", "bl", "br", "left_mid", "right_mid"):
+    connector_names = tuple(
+        name for name in ("tl", "tr", "bl", "br", "left_mid", "right_mid", "air_out", "air_in", "freon1", "freon2")
+        if name in state.global_pins
+    )
+    for pin_name in connector_names:
         large = pin_name in ("left_mid", "right_mid")
-        color, ring = ((241, 196, 15) if large else (230, 126, 34)), (255, 255, 255)
+        supply = pin_name == "air_out"
+        color = (52, 152, 219) if supply else ((241, 196, 15) if large else (230, 126, 34))
+        ring = (255, 255, 255)
         if state.selected_route_name and pin_name not in state.selected_pins:
             color, ring = palette.deselected_pin, (80, 84, 88)
         pin_markers.append(MachinePinMarker(to_screen(*state.global_pins[pin_name]), color, ring, 5 if large else 4))

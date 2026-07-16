@@ -1118,7 +1118,8 @@ def main():
             show_grid_graph=show_grid_graph, terminals=viewer_terminals, routes=routes or (),
             selected_route_name=selected_route_name, selected_room_polygon=selected_room_poly,
             global_pins=global_pins, selected_pins=selected_pins,
-            auto_placement_mode=auto_placement_mode_idx, placement_fields=ap_fields,
+            auto_placement_mode=(auto_placement_mode_idx if active_installation == "sal" else 0),
+            placement_fields=(ap_fields if active_installation == "sal" else {}),
             wet_room_names=wet_room_names, route_colors=ROUTE_COLORS,
             palette=CanvasFramePalette(
                 COLOR_BG, COLOR_WALL, COLOR_DOOR, COLOR_COLUMN, COLOR_SHAFT, COLOR_SHAFT_INACTIVE,
