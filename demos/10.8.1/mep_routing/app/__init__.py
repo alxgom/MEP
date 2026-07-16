@@ -15,6 +15,7 @@ from .installation_ui import (
     MachineSelectionTransition,
 )
 from .installation_context import installation_context_obstacles
+from .installation_execution import InstallationRunSpec, execute_installations
 
 from .interaction_runtime import (
     InteractionCallbacks,
@@ -42,6 +43,8 @@ __all__ = [
     "InstallationMachineUi",
     "InstallationUiSession",
     "installation_context_obstacles",
+    "InstallationRunSpec",
+    "execute_installations",
     "MachineSelectionTransition",
     "InteractionCallbacks",
     "InteractionState",

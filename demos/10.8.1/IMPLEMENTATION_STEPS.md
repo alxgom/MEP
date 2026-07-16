@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Extracted ordered multi-installation execution from `main.py`: capability-specific callbacks remain concrete, while a small coordinator owns enabled/order traversal, prior-result obstacle projection, active-result selection, and result storage.
+- Extracted non-active canvas layer projection into a pure UI module. `main.py` now supplies installation visuals instead of assembling `CanvasContextLayer` instances inline and is 1,179 physical lines.
+- Validation: Python compilation and two direct focused execution-order/context and active/context projection contracts.
+
 - Cli now solves and materializes separate supply and return-air trees with connector/grille dimensions, machine stubs, and explicit duct segment roles.
 - Enabled installations execute in header order and receive earlier machine footprints and buffered routes as contextual obstacles; Cli placement also follows the selected PEAD footprint on dwelling and machine changes.
 - Validation: Python compilation and five direct focused Cli materialization, placement, grille, runtime-context, and installation-context contracts (the available project environments do not contain pytest).
