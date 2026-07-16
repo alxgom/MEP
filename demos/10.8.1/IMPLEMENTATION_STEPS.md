@@ -635,6 +635,11 @@ Manual validation milestones:
 - Reserved a responsive header band above the plan so installation controls do not cover dwelling geometry or existing canvas tools.
 - Validation: Python compilation, 11 focused installation-header/Sal/UI-event contracts, and an eight-second headless startup/initial-solve smoke.
 
+- Added `ActiveDwellingSession` as the shared application boundary pairing one immutable `PreparedDwelling` with fresh `RoutingWorkspace` and `TerminalRuntime` instances.
+- Sal live solving, route analysis, materialization, and callback construction now consume the active dwelling session rather than assembling their own geometry/runtime view from parallel globals.
+- Existing UI readers temporarily receive aliases from the session; this keeps the migration reviewable while allowing Cli to start from one coherent dwelling contract.
+- Validation: Python compilation, 12 focused dwelling-session/scenario/workspace/Sal/machine-session contracts, and a headless startup/initial-solve smoke.
+
 Before each commit:
 
 - `git status --short`

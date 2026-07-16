@@ -1,5 +1,7 @@
 """Application-level runtime coordinators for the interactive router."""
 
+from .dwelling_session import ActiveDwellingSession
+
 from .interaction_runtime import (
     InteractionCallbacks,
     InteractionState,
@@ -16,6 +18,7 @@ from .interaction_runtime import (
 )
 
 __all__ = [
+    "ActiveDwellingSession",
     "InteractionCallbacks",
     "InteractionState",
     "RoutingRun",

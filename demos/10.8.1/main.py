@@ -14,6 +14,7 @@ from mep_routing.domain import (
     port_access_specs as _port_access_specs,
 )
 from mep_routing.config import SALUBRIDAD_DEFAULTS as _SALUBRIDAD_DEFAULTS
+from mep_routing.app import ActiveDwellingSession
 from mep_routing.data_sources import (
     build_wall_polygons as _build_wall_polygons_for_dwelling,
     build_synthetic_dwelling as _build_synthetic_dwelling_for_layout,
@@ -45,7 +46,6 @@ from mep_routing.placement import (
 )
 from mep_routing.routing import (
     RoutingWorkspace,
-    TerminalRuntime,
     block_terminal_node_edges as _block_terminal_node_edges,
     count_segment_crossings as _count_segment_crossings,
     count_solution_turns as _count_solution_turns,
@@ -269,6 +269,7 @@ edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
 routing_workspace = RoutingWorkspace()
+active_dwelling = None
 help_popup_card = None
 transient_message = None
 transient_message_until_ms = 0
@@ -843,15 +844,16 @@ def _sal_route_analysis(policy=None):
 
 
 def _sal_live_routing_session():
+    dwelling = active_dwelling
     return SalLiveRoutingSession(
         installation=SAL_INSTALLATION,
         machine_spec=MACHINE_SPEC,
-        workspace=routing_workspace,
-        routing_region=routing_region_base,
-        rooms=tuple(rooms),
-        walls=tuple(walls),
-        wall_polygons=tuple(wall_polys),
-        shafts=tuple(shafts),
+        workspace=dwelling.workspace,
+        routing_region=dwelling.routing_region,
+        rooms=tuple(dwelling.rooms),
+        walls=tuple(dwelling.walls),
+        wall_polygons=tuple(dwelling.wall_polygons),
+        shafts=tuple(dwelling.shafts),
         machine_center=(machine_cx, machine_cy),
         machine_angle=machine_angle,
         settings=_sal_solver_settings(),
@@ -1076,9 +1078,10 @@ def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
 def _sal_route_materializer(route_plan):
+    workspace = active_dwelling.workspace
     return SalRouteMaterializer(
-        routing_workspace.env.nodes,
-        routing_workspace.spatial_index,
+        workspace.env.nodes,
+        workspace.spatial_index,
         route_plan,
         add_shaft_entry_segments if shaft_extraction else None,
     )
@@ -1198,15 +1201,17 @@ def run_auto_placement():
 
 
 def _sal_interactive_solver():
+    dwelling = active_dwelling
+    workspace = dwelling.workspace
     callbacks = SalInteractiveCallbacks(
         update_dynamic_env=update_dynamic_env,
         build_grid=build_grid,
-        shaft_entry_nodes=lambda: get_shaft_entry_nodes(routing_workspace.env, routing_workspace.spatial_index),
+        shaft_entry_nodes=lambda: get_shaft_entry_nodes(workspace.env, workspace.spatial_index),
         terminal_nodes=lambda _pin_map, shaft_idx, shaft_route: _terminal_node_indices_for_kd(
-            terminals, shaft_idx, routing_workspace.spatial_index, shaft_route_name=shaft_route,
+            dwelling.terminal_points, shaft_idx, workspace.spatial_index, shaft_route_name=shaft_route,
         ),
         block_terminal_edges=lambda weights, terminal_map, block_weight: _block_terminal_node_edges(
-            weights, routing_workspace.env.adj, terminal_map, block_weight,
+            weights, workspace.env.adj, terminal_map, block_weight,
         ),
         weighted_edge_cost=_weighted_edge_cost_for_weights,
         line_graph_direction=_line_graph_dir_from_points_for_env,
@@ -1215,9 +1220,9 @@ def _sal_interactive_solver():
     )
     return SalInteractiveSolver(
         live_session=_sal_live_routing_session(),
-        terminals=terminals,
+        terminals=dwelling.terminal_points,
         graph_type=graph_type_idx,
-        columns=tuple(columns),
+        columns=tuple(dwelling.columns),
         blocked_vertical_regions=get_machine_vertical_clearance_blocks(),
         route_materializer_factory=_sal_route_materializer,
         shaft_extraction=shaft_extraction,
@@ -1248,39 +1253,17 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
     global machine_cx, machine_cy, machine_angle, _bnd_segs
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, shaft_entry_geometry_by_node, wet_room_outer_accents
-    global terminal_runtime, machine_vertical_clearance_blocks
-    rooms = prepared.rooms
-    machine_vertical_clearance_blocks = _insufficient_machine_clearance_regions(
-        rooms, MACHINE_SPEC.installation_height_mm, MACHINE_SPEC.installation_clearance_mm,
-    )
-    columns = prepared.columns
-    shafts = prepared.shafts
-    covers = prepared.covers
-    doors = prepared.doors
-    walls = prepared.walls
-    wall_polys = prepared.wall_polygons
-    routing_region_base = prepared.routing_region_base
-    shaft_extraction = prepared.shaft_extraction
-    terminals = prepared.terminals
-    wet_room_names = prepared.wet_room_names
-    wet_room_outer_accents = prepared.wet_room_outer_accents
-    machine_cx, machine_cy = prepared.machine_position
-    machine_angle = 0
-    current_scenario_label = prepared.label
-    current_scenario_summary = prepared.summary
-    shaft_core_entry_specs = prepared.shaft_core_entry_specs
-    shaft_entry_geometry_by_node = {}
-    _bnd_segs = None
+    global terminal_runtime, machine_vertical_clearance_blocks, active_dwelling, routing_workspace
     lifecycle = GraphLifecycle(
-        routing_region=routing_region_base,
-        wall_polygons=wall_polys,
-        covers=covers,
-        columns=columns,
-        shafts=shafts,
-        walls=walls,
-        terminals=terminals,
-        shaft_extraction=shaft_extraction,
-        shaft_core_entry_specs=shaft_core_entry_specs,
+        routing_region=prepared.routing_region_base,
+        wall_polygons=prepared.wall_polygons,
+        covers=prepared.covers,
+        columns=prepared.columns,
+        shafts=prepared.shafts,
+        walls=prepared.walls,
+        terminals=prepared.terminals,
+        shaft_extraction=prepared.shaft_extraction,
+        shaft_core_entry_specs=prepared.shaft_core_entry_specs,
         grid_spacing_mm=GRID_SPACING,
         scaffold_spacing_mm=HANNAN_SCAFFOLD_SPACING,
         wall_thickness_mm=WALL_THICKNESS,
@@ -1288,18 +1271,39 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
         epsilon_mm=CORE_EPSILON_GRID_MM,
         port_access_specs=get_port_access_specs,
     )
-    terminal_runtime = TerminalRuntime(
-        terminals=terminals,
-        room_polygons={room.name: room.polygon for room in rooms},
-        routing_region=routing_region_base,
-        covers=covers,
-        walls=walls,
-        wall_polygons=wall_polys,
+    active_dwelling = ActiveDwellingSession.create(
+        prepared,
+        lifecycle,
         regulation_clearance_mm=TERMINAL_REGULATION_CLEARANCE_MM,
         terminal_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
         remap_tolerance_mm=PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
     )
-    routing_workspace.replace_dwelling(lifecycle)
+    routing_workspace = active_dwelling.workspace
+    terminal_runtime = active_dwelling.terminals
+
+    # Compatibility aliases for UI code while consumers migrate to the session.
+    rooms = active_dwelling.rooms
+    columns = active_dwelling.columns
+    shafts = active_dwelling.shafts
+    covers = active_dwelling.covers
+    doors = active_dwelling.doors
+    walls = active_dwelling.walls
+    wall_polys = active_dwelling.wall_polygons
+    routing_region_base = active_dwelling.routing_region
+    shaft_extraction = active_dwelling.shaft_extraction
+    terminals = active_dwelling.terminal_points
+    wet_room_names = active_dwelling.wet_room_names
+    wet_room_outer_accents = prepared.wet_room_outer_accents
+    machine_cx, machine_cy = prepared.machine_position
+    machine_angle = 0
+    current_scenario_label = prepared.label
+    current_scenario_summary = prepared.summary
+    shaft_core_entry_specs = active_dwelling.shaft_core_entry_specs
+    shaft_entry_geometry_by_node = {}
+    _bnd_segs = None
+    machine_vertical_clearance_blocks = _insufficient_machine_clearance_regions(
+        rooms, MACHINE_SPEC.installation_height_mm, MACHINE_SPEC.installation_clearance_mm,
+    )
     build_base_regular_grid()
     if auto_place:
         run_auto_placement()
