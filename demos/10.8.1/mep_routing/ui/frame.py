@@ -50,6 +50,14 @@ class CanvasFrameCallbacks:
 
 
 @dataclass(frozen=True)
+class CanvasContextLayer:
+    installation: str
+    terminals: Mapping[str, tuple[float, float]]
+    routes: Sequence[tuple[str, Sequence]]
+    global_pins: Mapping[str, tuple[float, float]]
+
+
+@dataclass(frozen=True)
 class CanvasFrameState:
     rooms: Sequence[Any]
     doors: Sequence[Mapping[str, Any]]
@@ -64,6 +72,7 @@ class CanvasFrameState:
     selected_room_polygon: Any
     global_pins: Mapping[str, tuple[float, float]]
     selected_pins: set[str]
+    context_layers: Sequence[CanvasContextLayer]
     auto_placement_mode: int
     placement_fields: Mapping[str, Mapping[int, float]]
     wet_room_names: Sequence[str]
@@ -131,6 +140,24 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         grid_nodes = [to_screen(*point[:2]) for point in env.nodes]
 
     terminal_markers = []
+    route_strokes = []
+    context_machines = []
+    for layer in state.context_layers:
+        for route_name, point in layer.terminals.items():
+            terminal_markers.append(TerminalMarker(
+                to_screen(*point), (116, 124, 134), (82, 88, 96), (92, 98, 106),
+                f"{route_name} [{layer.installation.title()}]",
+            ))
+        for route_name, segments in layer.routes:
+            route_strokes.append(RouteStroke(
+                [(to_screen(*p1), to_screen(*p2)) for p1, p2 in segments],
+                max(2, callbacks.route_draw_width(route_name) - 1), (105, 113, 124), False,
+            ))
+        if all(name in layer.global_pins for name in ("c_tl", "c_tr", "c_br", "c_bl")):
+            context_machines.append(MachineRender(
+                [to_screen(*layer.global_pins[name]) for name in ("c_tl", "c_tr", "c_br", "c_bl")],
+                (96, 102, 110), (),
+            ))
     for route_name, point in state.terminals.items():
         core = state.route_colors.get(route_name, (255, 255, 255))
         if state.selected_route_name and route_name != state.selected_route_name:
@@ -146,7 +173,6 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
     if state.shaft_extraction is not None:
         shaft_marker = to_screen(*callbacks.representative_point(state.shaft_extraction))
 
-    route_strokes = []
     for route_name, segments in state.routes or ():
         color = state.route_colors.get(route_name, palette.text)
         if state.selected_route_name and state.selected_route_name != route_name:
@@ -179,7 +205,9 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         grid_edges, grid_nodes, palette.graph_edge, palette.graph_node,
         terminal_markers, shaft_marker, route_strokes, palette.selection_halo,
         state.selected_route_name, state.terminal_area_start, state.terminal_area_end,
-        MachineRender(outline, (230, 126, 34) if state.auto_placement_mode > 0 else (127, 140, 141), pin_markers),
+        (*context_machines, MachineRender(
+            outline, (230, 126, 34) if state.auto_placement_mode > 0 else (127, 140, 141), pin_markers,
+        )),
         guides,
     )
 

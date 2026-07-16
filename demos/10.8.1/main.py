@@ -83,6 +83,7 @@ from mep_routing.ui.canvas import (
 )
 from mep_routing.ui.frame import (
     CanvasFrameCallbacks,
+    CanvasContextLayer,
     CanvasFramePalette,
     CanvasFrameState,
     SidebarFrameState,
@@ -309,7 +310,8 @@ ROUTE_COLORS = {
     "Bathroom 1": (52, 152, 219), # Blue
     "Bathroom 2": (155, 89, 182), # Purple
     "Toilet": (230, 126, 34),     # Orange
-    "Washroom": (26, 188, 156)    # Turquoise
+    "Washroom": (26, 188, 156),   # Turquoise
+    "Supply Air Tree": (52, 152, 219),
 }
 terminal_ui = TerminalUiRuntime(canvas_ui, TerminalUiStyle(
     route_colors=ROUTE_COLORS, text_color=COLOR_TEXT,
@@ -604,6 +606,26 @@ def apply_preferred_terminal_area(start_world, end_world, remove=False):
         return False, None
     return terminal_ui.apply_area_preference(start_world, end_world, remove=remove)
 
+def get_active_machine_pose():
+    if installation_header_state.active == "cli":
+        return cli_machine_cx, cli_machine_cy, cli_machine_angle
+    return machine_cx, machine_cy, machine_angle
+
+def move_active_machine(position):
+    global machine_cx, machine_cy, cli_machine_cx, cli_machine_cy
+    if installation_header_state.active == "cli":
+        cli_machine_cx, cli_machine_cy = position
+    else:
+        machine_cx, machine_cy = position
+
+def rotate_active_machine(delta_degrees):
+    global machine_angle, cli_machine_angle
+    if installation_header_state.active == "cli":
+        cli_machine_angle = (cli_machine_angle + delta_degrees) % 360
+        return cli_machine_angle
+    machine_angle = (machine_angle + delta_degrees) % 360
+    return machine_angle
+
 def get_active_machine_pins(cx, cy, angle_deg):
     if installation_header_state.active == "cli":
         machine_key = installation_ui_session.selected_keys["cli"]
@@ -765,8 +787,8 @@ def solve_ventilation_routing():
             result = cli_runtime.solve(
                 active_dwelling.prepared,
                 CLI_INSTALLATION.machine_catalog.value(machine_key),
-                (machine_cx, machine_cy),
-                machine_angle,
+                (cli_machine_cx, cli_machine_cy),
+                cli_machine_angle,
             )
         else:
             continue
@@ -792,7 +814,7 @@ def generate_synthetic_dwelling():
 
 def _apply_prepared_dwelling(prepared, *, auto_place):
     global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
-    global machine_cx, machine_cy, machine_angle, _bnd_segs
+    global machine_cx, machine_cy, machine_angle, cli_machine_cx, cli_machine_cy, cli_machine_angle, _bnd_segs
     global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, wet_room_outer_accents
     global terminal_runtime, machine_vertical_clearance_blocks, active_dwelling, routing_workspace, graph_build_session
     active_dwelling = create_active_dwelling(
@@ -821,6 +843,9 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     wet_room_outer_accents = prepared.wet_room_outer_accents
     machine_cx, machine_cy = prepared.machine_position
     machine_angle = 0
+    cli_point = prepared.routing_region_base.representative_point()
+    cli_machine_cx, cli_machine_cy = round(float(cli_point.x)), round(float(cli_point.y))
+    cli_machine_angle = 0
     current_scenario_label = prepared.label
     current_scenario_summary = prepared.summary
     shaft_core_entry_specs = active_dwelling.shaft_core_entry_specs
@@ -1097,12 +1122,35 @@ def main():
             else routing_workspace
         )
         viewer_terminals = cli_result.terminals if active_installation == "cli" else terminals
-        global_pins = get_active_machine_pins(machine_cx, machine_cy, machine_angle)
+        active_machine_pose = get_active_machine_pose()
+        global_pins = get_active_machine_pins(*active_machine_pose)
         selected_pins = (
             ({"air_out"} if selected_route_name == "Supply Air Tree" else set())
             if active_installation == "cli"
             else (get_selected_pin_names(selected_route_name, routes, global_pins) if selected_route_name else set())
         )
+        context_layers = []
+        for installation in installation_header_state.order:
+            if installation == active_installation or installation not in installation_header_state.enabled:
+                continue
+            run = installation_runs.get(installation)
+            if run is None:
+                continue
+            if installation == "sal":
+                layer_terminals = terminals
+                layer_pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+            elif installation == "cli":
+                layer_terminals = cli_result.terminals
+                machine_key = installation_ui_session.selected_keys["cli"]
+                layer_pins = cli_machine_pins(
+                    CLI_INSTALLATION.machine_catalog.value(machine_key),
+                    (cli_machine_cx, cli_machine_cy), cli_machine_angle,
+                )
+            else:
+                continue
+            context_layers.append(CanvasContextLayer(
+                installation, layer_terminals, run.routes or (), layer_pins,
+            ))
 
         if show_heatmap:
             ensure_placement_heatmap_scores()
@@ -1118,6 +1166,7 @@ def main():
             show_grid_graph=show_grid_graph, terminals=viewer_terminals, routes=routes or (),
             selected_route_name=selected_route_name, selected_room_polygon=selected_room_poly,
             global_pins=global_pins, selected_pins=selected_pins,
+            context_layers=tuple(context_layers),
             auto_placement_mode=(auto_placement_mode_idx if active_installation == "sal" else 0),
             placement_fields=(ap_fields if active_installation == "sal" else {}),
             wet_room_names=wet_room_names, route_colors=ROUTE_COLORS,
@@ -1182,7 +1231,7 @@ def main():
             show_heatmap=show_heatmap, heatmap_scale_mode=heatmap_scale_mode,
             heatmap_palette_index=heatmap_palette_idx, weight_mode_index=weight_mode_idx,
             rotation_mode_index=rotation_mode_idx, rotation_field_scores=rotation_field_scores,
-            machine_angle=machine_angle,
+            machine_angle=active_machine_pose[2],
             strategy=(ROUTING_STRATEGIES[routing_strategy_idx] if active_installation == "sal" else "Kou Steiner tree"),
             router=(ROUTER_BACKENDS[router_backend_idx] if active_installation == "sal" else "Cli supply runtime"),
             heuristic=(HEURISTIC_MODES[heuristic_mode_idx] if active_installation == "sal" else "Directional scales"),
@@ -1193,7 +1242,7 @@ def main():
             crossing_value=crossing_penalty_multiplier, crossing_min=CROSSING_MULTIPLIER_MIN,
             crossing_max=CROSSING_MULTIPLIER_MAX, scenario_summary=current_scenario_summary,
             fallback_frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx],
-            machine_position=(machine_cx, machine_cy),
+            machine_position=active_machine_pose[:2],
             status=status,
             validation_warnings=validation_warnings, elapsed_ms=elapsed_ms,
             total_nodes=total_nodes, fps=clock.get_fps(),

@@ -4,6 +4,7 @@ from shapely.geometry import Polygon
 
 from mep_routing.ui.frame import (
     CanvasFrameCallbacks,
+    CanvasContextLayer,
     CanvasFramePalette,
     CanvasFrameState,
     SidebarFrameState,
@@ -55,7 +56,7 @@ def test_canvas_builder_derives_selection_graph_machine_and_guides():
         shafts=(shaft,), shaft_extraction=shaft, graph_env=env, show_grid_graph=True,
         terminals={"Kitchen": (3, 3), "Bathroom": (6, 3)},
         routes=(("Kitchen", (((0, 0), (3, 3)),)),), selected_route_name="Kitchen",
-        selected_room_polygon=room.polygon, global_pins=_pins(), selected_pins={"right_mid"},
+        selected_room_polygon=room.polygon, global_pins=_pins(), selected_pins={"right_mid"}, context_layers=(),
         auto_placement_mode=1, placement_fields=fields, wet_room_names=("Kitchen", "Bathroom"),
         route_colors={"Kitchen": (20, 30, 40), "Bathroom": (50, 60, 70)},
         palette=_palette(), callbacks=callbacks, room_wall_width=4,
@@ -84,6 +85,9 @@ def test_canvas_builder_accepts_cli_connector_schema():
         graph_env=None, show_grid_graph=False, terminals={"Living Supply": (6, 3)},
         routes=(("Supply Air Tree", (((2, 3), (6, 3)),)),), selected_route_name=None,
         selected_room_polygon=None, global_pins=pins, selected_pins=set(),
+        context_layers=(CanvasContextLayer(
+            "sal", {"Kitchen": (8, 3)}, (("Kitchen", (((1, 1), (8, 3)),)),), _pins(),
+        ),),
         auto_placement_mode=0, placement_fields={}, wet_room_names=(),
         route_colors={"Supply Air Tree": (52, 152, 219)}, palette=_palette(),
         callbacks=CanvasFrameCallbacks(lambda x, y: (x, y), lambda shape: (0, 0), lambda name: 3, lambda point: (0, 0)),
@@ -92,8 +96,10 @@ def test_canvas_builder_accepts_cli_connector_schema():
 
     scene = build_canvas_scene(state)
 
+    assert len(scene.machines) == 2
     assert len(scene.machine.pins) == 4
-    assert scene.routes[0].segments == [((2, 3), (6, 3))]
+    assert scene.routes[0].color == (105, 113, 124)
+    assert scene.routes[1].segments == [((2, 3), (6, 3))]
 
 
 def test_sidebar_builder_formats_display_modes_and_frame_name():

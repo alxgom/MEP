@@ -144,9 +144,9 @@ class WorkbenchEventAdapter:
             self.state.last_wheel_rotate_ms = now
             self.app.auto_placement_mode_idx = 0
             delta = 90 if event.button == 4 else -90
-            self.app.machine_angle = (self.app.machine_angle + delta) % 360
+            angle = self.app.rotate_active_machine(delta)
             self._solve()
-            self._record(f"Rot:{self.app.machine_angle}", (46, 204, 113))
+            self._record(f"Rot:{angle}", (46, 204, 113))
 
     def _left_down(self, pos):
         a, s = self.app, self.state
@@ -228,7 +228,8 @@ class WorkbenchEventAdapter:
         shift, ctrl = bool(mods & pygame.KMOD_SHIFT), bool(mods & pygame.KMOD_CTRL)
         hit, machine_center = CanvasHit(), None
         if not shift and not s.ruler_mode and a.preferred_terminal_tool_mode is None:
-            pins = a.get_active_machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
+            pose = a.get_active_machine_pose()
+            pins = a.get_active_machine_pins(*pose)
             machine = Polygon([pins[name] for name in ("c_tl", "c_tr", "c_br", "c_bl")])
             point = Point(*world)
             machine_hit = machine.contains(point) or machine.distance(point) < 200.0
@@ -242,7 +243,7 @@ class WorkbenchEventAdapter:
             threshold = max(20.0, 4.0 / a.canvas_ui.viewport.scale)
             direct = route_hit[0] if route_hit and (not room_hit or route_hit[1] <= threshold) else None
             hit = CanvasHit(machine_hit, direct, room_hit)
-            machine_center = (a.machine_cx, a.machine_cy) if machine_hit else None
+            machine_center = pose[:2] if machine_hit else None
         transition = begin_canvas_gesture(
             self._gesture(), world_point=world, screen_point=pos, shift=shift, ctrl=ctrl,
             hit=hit, machine_center_mm=machine_center,
@@ -256,10 +257,16 @@ class WorkbenchEventAdapter:
         if command.name == "toggle_help":
             a.workbench_chrome.toggle_help(command.value)
         elif command.name == "set_slider":
+            if a.installation_header_state.active != "sal":
+                a.set_transient_message("This control belongs to Sal")
+                return
             name, x = command.value
             label, color = self._set_slider(name, x)
             self._solve(); self._record(label, color)
         elif command.name == "reset_slider":
+            if a.installation_header_state.active != "sal":
+                a.set_transient_message("This control belongs to Sal")
+                return
             if command.value == "bend":
                 a.reset_bend_weight(); marker = ("B:reset", (155, 89, 182))
             else:
@@ -326,7 +333,7 @@ class WorkbenchEventAdapter:
         elif command.name == "clear_route_selection": s.selected_route_name = None
         elif command.name == "pan_by": a.canvas_ui.pan_by(*command.value)
         elif command.name == "move_machine":
-            a.machine_cx, a.machine_cy = command.value
+            a.move_active_machine(command.value)
             self._solve(); self._record()
 
     def _mouse_up(self, event):
@@ -401,6 +408,14 @@ class WorkbenchEventAdapter:
             if a.DWELLING_SOURCE_MODES[a.dwelling_source_idx] == "Real DB":
                 a.real_scenario_idx = (a.real_scenario_idx + 1) % len(a.REAL_DWELLING_SCENARIOS)
             self._change_dwelling(clear_history=True)
+        elif a.installation_header_state.active == "cli" and key == pygame.K_r:
+            angle = a.rotate_active_machine(90)
+            self._solve(); self._record(f"Rot:{angle}", (46, 204, 113))
+        elif a.installation_header_state.active == "cli" and key in {
+            pygame.K_c, pygame.K_t, pygame.K_l, pygame.K_y, pygame.K_TAB,
+            pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,
+        }:
+            a.set_transient_message("This command belongs to Sal")
         elif transition := a.apply_routing_key_command(key):
             s.needs_auto_placement |= transition.needs_auto_placement
             self._solve()

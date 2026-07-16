@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Split canvas projection into one active installation layer plus subdued context layers for every other enabled installation. Each layer contributes its own routes, terminals, and machine outline; the active layer alone contributes selection, connector emphasis, placement guides, and editing interactions.
+- Added independent Sal and Cli machine poses. Mouse drag, wheel rotation, and Cli `R` rotation now mutate only the active machine; Sal-only sliders and routing commands are rejected while Cli is active instead of changing hidden context state.
+- Validation: Python compilation, full Demo suite (330 passed), and a timed Pygame smoke that enabled Cli beside Sal, rendered both runs, activated Cli, and exited cleanly.
+
 - Fixed the first live Cli activation crash by normalizing Cli routes to the canvas sequence contract and making machine-pin rendering accept installation-specific connector sets instead of Sal's six fixed pins.
 - Cli canvas projection now disables Sal placement guides while retaining the Cli body and air/freon connector markers.
 - Validation: Python compilation, full Demo suite (330 passed), and a timed headless Pygame activation/render smoke that selected Cli and exited cleanly.

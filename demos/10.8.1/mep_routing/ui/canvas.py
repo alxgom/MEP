@@ -97,8 +97,13 @@ class CanvasScene:
     selected_route_name: str | None
     terminal_area_start: WorldPoint | None
     terminal_area_end: WorldPoint | None
-    machine: MachineRender
+    machines: Sequence[MachineRender]
     guide_lines: Sequence[GuideLine]
+
+    @property
+    def machine(self) -> MachineRender:
+        """Compatibility accessor for the active machine, rendered last."""
+        return self.machines[-1]
 
 
 @dataclass(frozen=True)
@@ -193,11 +198,13 @@ def draw_canvas_scene(
     hooks.draw_preferred_terminal_markers(scene.selected_route_name)
     hooks.draw_terminal_area_drag(scene.terminal_area_start, scene.terminal_area_end)
 
-    pygame.draw.polygon(screen, scene.machine.fill_color, scene.machine.outline)
-    pygame.draw.polygon(screen, (255, 255, 255), scene.machine.outline, 2)
-    for pin in scene.machine.pins:
-        pygame.draw.circle(screen, pin.color, pin.point, pin.radius)
-        pygame.draw.circle(screen, pin.ring_color, pin.point, pin.radius, 1)
+    for index, machine in enumerate(scene.machines):
+        pygame.draw.polygon(screen, machine.fill_color, machine.outline)
+        border = (255, 255, 255) if index == len(scene.machines) - 1 else (150, 156, 164)
+        pygame.draw.polygon(screen, border, machine.outline, 2 if index == len(scene.machines) - 1 else 1)
+        for pin in machine.pins:
+            pygame.draw.circle(screen, pin.color, pin.point, pin.radius)
+            pygame.draw.circle(screen, pin.ring_color, pin.point, pin.radius, 1)
 
     for guide in scene.guide_lines:
         pygame.draw.line(screen, guide.color, guide.start, guide.end, guide.width)
