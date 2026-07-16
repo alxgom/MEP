@@ -163,6 +163,16 @@ from mep_routing.ui.events import (
     move_panel_interaction as _move_panel_interaction,
     routing_key_transition as _routing_key_transition,
 )
+from mep_routing.ui.installation_header import (
+    InstallationHeaderState,
+    InstallationOption,
+    activate_installation as _activate_installation,
+    draw_installation_header as _draw_installation_header,
+    installation_header_hit as _installation_header_hit,
+    installation_header_layout as _installation_header_layout,
+    reorder_installation_at_x as _reorder_installation_at_x,
+    toggle_installation as _toggle_installation,
+)
 
 # Add relative paths to sys.path so we can import modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -283,10 +293,23 @@ DWELLING_SOURCE_MODES = [
 ]
 dwelling_source_idx = 0
 
+INSTALLATION_OPTIONS = (
+    InstallationOption("sal", "Sal", available=True),
+    InstallationOption("cli", "Cli"),
+    InstallationOption("san", "San"),
+    InstallationOption("coc", "Coc"),
+)
+installation_header_state = InstallationHeaderState(
+    order=tuple(option.key for option in INSTALLATION_OPTIONS),
+    enabled=frozenset({"sal"}),
+    active="sal",
+)
+
 # Pygame Window Config
 WINDOW_WIDTH, WINDOW_HEIGHT = 1700, 930
 CANVAS_LEFT = 320
-CANVAS_TOP = 40
+INSTALLATION_HEADER_TOP = 4
+CANVAS_TOP = 78
 PANEL_W = 280          # right-side plot panel
 COLORBAR_W = 56        # reserved lane between drawing canvas and right-side plots
 CANVAS_W = WINDOW_WIDTH - CANVAS_LEFT - PANEL_W - COLORBAR_W - 10
@@ -440,6 +463,20 @@ def get_canvas_tool_buttons():
         (action, pygame.Rect(bounds), label)
         for action, bounds, label in _canvas_tool_button_bounds(CANVAS_LEFT, CANVAS_TOP)
     ]
+
+
+def get_installation_header_layout():
+    count = len(installation_header_state.order)
+    available_width = max(420, CANVAS_W - 28)
+    pill_width = min(126, max(92, (available_width - (count - 1) * 30) // count))
+    gap = min(42, max(24, (available_width - count * pill_width) // max(1, count - 1)))
+    return _installation_header_layout(
+        CANVAS_LEFT,
+        INSTALLATION_HEADER_TOP,
+        installation_header_state.order,
+        pill_width=pill_width,
+        gap=gap,
+    )
 
 def handle_canvas_tool_button_click(pos):
     global route_real_diameter_width_enabled
@@ -1191,6 +1228,8 @@ def _sal_interactive_solver():
 # MAIN SOLVER WRAPPER
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 def solve_ventilation_routing():
+    if "sal" not in installation_header_state.enabled:
+        return [], "Routing disabled: Sal", 0.0, 0
     result = _sal_interactive_solver().solve()
     return result.routes, result.status, result.elapsed_ms, result.total_nodes
 
@@ -1634,6 +1673,7 @@ def main():
     global help_popup_card
     global min_piece_factor, is_fullscreen
     global preferred_terminal_tool_mode
+    global installation_header_state
     
     pygame.init()
     pygame.font.init()
@@ -1646,6 +1686,7 @@ def main():
     font_title = pygame.font.SysFont("Outfit", 24, bold=True)
     font_bold = pygame.font.SysFont("Outfit", 18, bold=True)
     font_small = pygame.font.SysFont("Outfit", 15)
+    font_micro = pygame.font.SysFont("Outfit", 11, bold=True)
     plot_font_family = "Arial, Liberation Sans, DejaVu Sans"
     font_plot_small = pygame.font.SysFont(plot_font_family, 11)
     font_plot_title = pygame.font.SysFont(plot_font_family, 16, bold=True)
@@ -1673,6 +1714,8 @@ def main():
     selected_route_name = None
     dwelling_selector_open = False
     last_wheel_rotate_ms = 0
+    installation_drag_key = None
+    installation_drag_moved = False
     canvas_gesture = _CanvasGestureState()
     panel_interaction = _PanelInteractionState()
 
@@ -1736,6 +1779,24 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     mx, my = event.pos
+                    installation_hit = _installation_header_hit(
+                        get_installation_header_layout(), (mx, my),
+                    )
+                    if installation_hit is not None:
+                        hit_kind, installation_key = installation_hit
+                        if hit_kind == "switch":
+                            installation_header_state, changed = _toggle_installation(
+                                installation_header_state, installation_key, INSTALLATION_OPTIONS,
+                            )
+                            if changed:
+                                routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
+                                selected_route_name = None
+                            else:
+                                set_transient_message(f"{installation_key.title()} is not available yet")
+                        else:
+                            installation_drag_key = installation_key
+                            installation_drag_moved = False
+                        continue
                     selector_bounds, option_bounds = _dwelling_selector_bounds(
                         CANVAS_LEFT, CANVAS_TOP, len(dwelling_selector_options())
                     )
@@ -1979,6 +2040,16 @@ def main():
                         
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button in (1, 2):
+                    if event.button == 1 and installation_drag_key is not None:
+                        if not installation_drag_moved:
+                            installation_header_state, changed = _activate_installation(
+                                installation_header_state, installation_drag_key, INSTALLATION_OPTIONS,
+                            )
+                            if not changed and installation_drag_key != installation_header_state.active:
+                                set_transient_message(f"{installation_drag_key.title()} is not available yet")
+                        installation_drag_key = None
+                        installation_drag_moved = False
+                        continue
                     apply_panel_interaction(_end_panel_interaction(panel_interaction).state)
                     canvas_transition = _end_canvas_gesture(
                         current_canvas_gesture(),
@@ -2000,6 +2071,17 @@ def main():
                     set_ruler_cursor(ruler_mode or bool(preferred_terminal_tool_mode))
                     
             elif event.type == pygame.MOUSEMOTION:
+                if installation_drag_key is not None:
+                    reordered = _reorder_installation_at_x(
+                        installation_header_state,
+                        installation_drag_key,
+                        event.pos[0],
+                        get_installation_header_layout(),
+                    )
+                    if reordered.order != installation_header_state.order:
+                        installation_header_state = reordered
+                        installation_drag_moved = True
+                    continue
                 panel_transition = _move_panel_interaction(panel_interaction, screen_x=event.pos[0])
                 apply_panel_interaction(panel_transition.state)
                 if panel_transition.commands:
@@ -2332,6 +2414,16 @@ def main():
             draw_terminal_area_drag=lambda start, end: draw_terminal_area_drag(screen, start, end),
         )
         _draw_canvas_scene(screen, scene=canvas_scene, fonts=CanvasFonts(small=font_small), hooks=canvas_hooks)
+
+        _draw_installation_header(
+            screen,
+            font_small,
+            font_micro,
+            installation_header_state,
+            INSTALLATION_OPTIONS,
+            get_installation_header_layout(),
+            dragged_key=installation_drag_key,
+        )
 
         draw_ruler_overlay(screen, font_small, ruler_start_mm, ruler_end_mm)
         draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open)

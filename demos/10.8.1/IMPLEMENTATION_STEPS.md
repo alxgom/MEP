@@ -629,6 +629,12 @@ Manual validation milestones:
 - Deliberately rejected a large application-state DTO: the two small live factories are clearer until a concrete second installation reveals the shared runtime contract.
 - Validation: Python compilation, 114 focused Sal/shared-routing contracts, and a headless startup/initial-solve smoke that remained alive without an exception.
 
+- Added an installation routing-order header above the canvas with separate state for routing participation, active UI installation, and execution order.
+- Sal is the only available runtime today; Cli, San, and Coc are visible reorderable placeholders but cannot be enabled or selected until their runtime boundaries exist.
+- Switch clicks toggle participation, pill clicks select the active installation, and pill drags reorder future multi-installation execution. Disabling Sal now suppresses routing without discarding its active UI context.
+- Reserved a responsive header band above the plan so installation controls do not cover dwelling geometry or existing canvas tools.
+- Validation: Python compilation, 11 focused installation-header/Sal/UI-event contracts, and an eight-second headless startup/initial-solve smoke.
+
 Before each commit:
 
 - `git status --short`
