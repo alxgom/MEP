@@ -1,5 +1,7 @@
 """Shared MEP routing domain models and geometry policies."""
 
+from .catalog import Catalog, CatalogEntry
+
 from .machines import (
     MachineSpec,
     local_axis_to_world,
@@ -9,6 +11,8 @@ from .machines import (
 )
 
 __all__ = [
+    "Catalog",
+    "CatalogEntry",
     "MachineSpec",
     "local_axis_to_world",
     "machine_pins",

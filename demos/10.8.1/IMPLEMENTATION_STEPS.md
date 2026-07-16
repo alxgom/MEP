@@ -666,6 +666,11 @@ Before each commit:
 
 ## Open Items
 
+- Added an immutable shared catalog contract and explicit Sal/Cli machine catalogs. Sal exposes its existing Ozeo machine as a one-entry, non-selectable catalog; Cli exposes the seven connector-rich Mitsubishi PEAD definitions from Demo 10.8_cli without adapting them to Sal's symmetric `MachineSpec` geometry.
+- Added pure shared dropdown state, transition, and layout contracts plus a thin Pygame renderer. The sidebar accepts machine selector data but suppresses the control for Sal's single option; Cli routing and installation activation remain disabled.
+- Added a minimal Cli installation definition that composes its PEAD catalog, core-simple supply graph mode, and shared Steiner solver while explicitly declaring that no interactive Cli runtime is available yet.
+- Validation: Python compilation and focused machine-catalog/dropdown/sidebar contracts.
+
 - Added an installation-neutral Kou-style multi-terminal Steiner solver under shared routing, with immutable results, input validation, deterministic traversal, and no module-global graph state. It is exported for future Cli use but deliberately has no Sal integration.
 - Validation: Python compilation and focused shared Steiner routing contracts.
 

@@ -1,6 +1,6 @@
 """Machine catalog for the current Sal ventilation installation."""
 
-from mep_routing.domain import MachineSpec
+from mep_routing.domain import Catalog, CatalogEntry, MachineSpec
 
 from .routes import LARGE_DUCT_ROUTE_NAMES
 
@@ -18,4 +18,14 @@ SAL_OZEO_FLAT_MACHINE = MachineSpec(
     large_route_names=LARGE_DUCT_ROUTE_NAMES,
     installation_height_mm=197.5035496888521,
     installation_clearance_mm=20.0,
+)
+
+SAL_MACHINE_CATALOG = Catalog(
+    entries=(CatalogEntry(
+        key="ozeo-flat",
+        label=SAL_OZEO_FLAT_MACHINE.name,
+        value=SAL_OZEO_FLAT_MACHINE,
+        detail="459 x 459 x 197.504 mm",
+    ),),
+    default_key="ozeo-flat",
 )

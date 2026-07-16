@@ -1,6 +1,6 @@
 """Sal ventilation catalog and route policy."""
 
-from .catalog import SAL_OZEO_FLAT_MACHINE
+from .catalog import SAL_MACHINE_CATALOG, SAL_OZEO_FLAT_MACHINE
 from .controller import SalRoutingControllerContext, SalRoutingResult, solve_routing
 from .application import SalApplicationAdapter, SalApplicationHooks, SalSolverSettings
 from .live_solver import SalLiveRoutingCallbacks, SalLiveRoutingSession
@@ -19,6 +19,7 @@ __all__ = [
     "KITCHEN_ROUTE_NAME",
     "LARGE_DUCT_ROUTE_NAMES",
     "SAL_OZEO_FLAT_MACHINE",
+    "SAL_MACHINE_CATALOG",
     "SAL_INSTALLATION",
     "SalInstallationDefinition",
     "SalFlowContext",

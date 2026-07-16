@@ -7,10 +7,10 @@ single seam for selecting Sal machines, graphs, and solver strategies.
 
 from dataclasses import dataclass
 
-from mep_routing.domain import MachineSpec
+from mep_routing.domain import Catalog, MachineSpec
 from mep_routing.routing.search import SearchBackend
 
-from .catalog import SAL_OZEO_FLAT_MACHINE
+from .catalog import SAL_MACHINE_CATALOG, SAL_OZEO_FLAT_MACHINE
 from .orchestration import SalRoutingStrategy
 from .routes import LARGE_DUCT_ROUTE_NAMES
 from .route_plan import SalRoutePlan, build_sal_route_plan
@@ -64,6 +64,7 @@ class SalInstallationDefinition:
     default_routing_strategy: SalRoutingStrategy
     default_search_backend: SearchBackend
     default_heuristic_mode: str
+    machine_catalog: Catalog[MachineSpec] = SAL_MACHINE_CATALOG
 
     def is_large_route(self, route_name: str) -> bool:
         return route_name in self.large_route_names

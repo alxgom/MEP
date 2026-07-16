@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
+from .dropdown import DropdownOption, DropdownState, draw_dropdown
+
 
 Color = tuple[int, int, int]
 HelpButtonDrawer = Callable[[str, Any, Any], None]
@@ -63,6 +65,9 @@ class MachineCard:
     frame: str
     position_mm: tuple[float, float]
     rotation: str
+    machine_options: tuple[DropdownOption, ...] = ()
+    selected_machine_key: str = ""
+    machine_selector_open: bool = False
 
 
 @dataclass(frozen=True)
@@ -192,7 +197,8 @@ def draw_sidebar(
         (230, 126, 34), "crossing", "x", False,
     )
 
-    machine_card = pygame.Rect(15, 460, card_width, 85)
+    has_machine_selector = len(view.machine.machine_options) > 1
+    machine_card = pygame.Rect(15, 460, card_width, 120 if has_machine_selector else 85)
     pygame.draw.rect(screen, colors.card, machine_card, border_radius=6)
     screen.blit(fonts.bold.render("MACHINE PLACEMENT", True, colors.text), (text_x, 470))
     draw_help_button("machine", machine_card, fonts.small)
@@ -200,17 +206,24 @@ def draw_sidebar(
     machine_x, machine_y = view.machine.position_mm
     screen.blit(fonts.small.render(f"Position: ({int(machine_x)}, {int(machine_y)}) mm", True, colors.text), (text_x, 510))
     screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 530))
-
-    status_card = pygame.Rect(15, 555, card_width, 170)
+    status_y = 590 if has_machine_selector else 555
+    status_card = pygame.Rect(15, status_y, card_width, 170)
     pygame.draw.rect(screen, colors.card, status_card, border_radius=6)
-    screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, 565))
+    screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, status_y + 10))
     draw_help_button("status", status_card, fonts.small)
     for index, line in enumerate(wrap_status_lines(view.execution.message)):
-        screen.blit(fonts.small.render(line, True, colors.text), (text_x, 585 + index * 18))
+        screen.blit(fonts.small.render(line, True, colors.text), (text_x, status_y + 30 + index * 18))
 
     warning_text = format_validation_warning(view.execution.validation_warnings)
     warning_color = colors.muted if not view.execution.validation_warnings else colors.warning
-    screen.blit(fonts.small.render(warning_text, True, warning_color), (text_x, 650))
-    screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, 680))
-    screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, 700))
-    screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, 720))
+    screen.blit(fonts.small.render(warning_text, True, warning_color), (text_x, status_y + 95))
+    screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, status_y + 125))
+    screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, status_y + 145))
+    screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, status_y + 165))
+    if has_machine_selector:
+        draw_dropdown(
+            screen, fonts.small, bounds=(text_x, 548, canvas_left - 70, 24),
+            options=view.machine.machine_options,
+            state=DropdownState(view.machine.selected_machine_key, view.machine.machine_selector_open),
+            text_color=colors.text, muted_color=colors.muted,
+        )
