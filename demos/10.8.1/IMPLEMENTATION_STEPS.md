@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added `TerminalUiRuntime` as the bound adapter for terminal interaction, preferred-terminal rendering, room/shaft hit testing, and validity-cache ownership.
+- Removed terminal geometry and drawing pass-through wrappers from `main.py`; the entrypoint now binds the active dwelling once and supplies the runtime directly to canvas hooks.
+- Validation: Python compilation and focused terminal-runtime contracts.
+
 - Extracted dwelling source-frame normalization, routing-core shaft-entry specification parsing, and per-dwelling shaft-entry caches from `main.py`.
 - Added installation-scoped graph profiles plus shared graph/terminal runtime configuration, keeping Sal's port and simple-graph callbacks explicit for future Cli composition.
 - Added `GraphBuildSession` as the application facade for base, selected, and dynamic graph construction; `main.py` now retains only live machine inputs and compatibility aliases.

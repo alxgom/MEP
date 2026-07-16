@@ -4,7 +4,6 @@ import time
 import traceback
 from pathlib import Path
 import pygame
-from shapely.geometry import Point
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
     machine_pins as _machine_pins,
@@ -59,15 +58,12 @@ from mep_routing.routing import (
     line_graph_dir_from_points as _line_graph_dir_from_points_for_env,
     selected_pin_names as _selected_pin_names,
     terminal_node_indices as _terminal_node_indices_for_kd,
-    terminal_validity_entries as _terminal_validity_entries,
     total_route_length_m as _total_route_length_m,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
 from mep_routing.ui.runtime import CanvasUiRuntime
-from mep_routing.ui.drawing import (
-    draw_dashed_polyline as _draw_dashed_polyline,
-    draw_outlined_text as _draw_outlined_text,
-)
+from mep_routing.ui.terminal_runtime import TerminalUiRuntime, TerminalUiStyle
+from mep_routing.ui.drawing import draw_outlined_text as _draw_outlined_text
 from mep_routing.ui.controls import dwelling_selector_bounds as _dwelling_selector_bounds
 from mep_routing.ui.dropdown import dropdown_bounds as _dropdown_bounds
 from mep_routing.ui.solution_logs import (
@@ -76,16 +72,6 @@ from mep_routing.ui.solution_logs import (
     metric_value_for_log as _metric_value_for_log_entry,
     solution_log_action as _solution_log_action,
     solution_kpis as _solution_kpis,
-)
-from mep_routing.ui.terminal_selection import (
-    draw_preferred_terminal_areas as _draw_preferred_terminal_areas,
-    draw_preferred_terminal_markers as _draw_preferred_terminal_markers,
-    draw_routed_terminal_endpoint_markers as _draw_routed_terminal_endpoint_markers,
-)
-from mep_routing.ui.terminal_validity import (
-    draw_terminal_validity_overlay as _draw_terminal_validity_overlay,
-    draw_terminal_validity_square as _draw_terminal_validity_square,
-    draw_terminal_validity_tooltip as _draw_terminal_validity_tooltip,
 )
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
@@ -242,7 +228,6 @@ help_button_rects = {}
 preferred_terminal_tool_mode = None
 terminal_runtime = None
 terminal_validity_overlay_enabled = False
-terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
 PREFERRED_TERMINAL_MARKER_SIZE_MM = 125.0
 PREFERRED_TERMINAL_REMAP_TOLERANCE_MM = 300.0
 
@@ -343,6 +328,15 @@ ROUTE_COLORS = {
     "Toilet": (230, 126, 34),     # Orange
     "Washroom": (26, 188, 156)    # Turquoise
 }
+terminal_ui = TerminalUiRuntime(canvas_ui, TerminalUiStyle(
+    route_colors=ROUTE_COLORS, text_color=COLOR_TEXT,
+    allowed_color=COLOR_TERMINAL_ALLOWED, blocked_color=COLOR_TERMINAL_BLOCKED,
+    blocked_hatch_color=COLOR_TERMINAL_BLOCKED_HATCH,
+    marker_size_mm=PREFERRED_TERMINAL_MARKER_SIZE_MM,
+    remap_tolerance_mm=PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
+    regulation_clearance_mm=TERMINAL_REGULATION_CLEARANCE_MM,
+    room_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
+))
 
 REAL_DWELLING_DB = _SALUBRIDAD_DEFAULTS.get_default("REAL_DWELLING_DB")
 PREFERRED_SHAFT_INSTALLATION = _SALUBRIDAD_DEFAULTS.get_default("PREFERRED_SHAFT_INSTALLATION")
@@ -530,8 +524,7 @@ def invalidate_room_start_node_cache():
         terminal_runtime.invalidate_candidates()
 
 def invalidate_terminal_validity_cache():
-    global terminal_validity_cache
-    terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
+    terminal_ui.invalidate()
 
 # Auto-placement cache
 ap_scores = {}
@@ -641,138 +634,14 @@ def refresh_edge_weight_view_overlay(routes):
     diameter = MACHINE_SMALL_DUCT_D if edge_weight_view_mode_idx == 0 else MACHINE_LARGE_DUCT_D
     _routing_runtime(routing_workspace.env).refresh_edge_weight_overlay(routes, diameter)
 
-def _room_polygon_by_name(room_name):
-    return None if terminal_runtime is None else terminal_runtime.room_polygon(room_name)
-
-def _room_cover_geometry(room_name):
-    return None if terminal_runtime is None else terminal_runtime.room_cover(room_name)
-
-def _room_terminal_valid_region(room_name):
-    return None if terminal_runtime is None else terminal_runtime.valid_region(room_name)
-
-def _room_terminal_boundary_segments(room_name):
-    return None if terminal_runtime is None else terminal_runtime.boundary_segments(room_name)
-
-def get_room_candidate_start_nodes(route_name):
-    return [] if terminal_runtime is None else terminal_runtime.candidate_nodes(route_name)
-
 def get_route_start_nodes(route_name):
-    return [] if terminal_runtime is None else terminal_runtime.route_start_nodes(
-        route_name, use_nearest_terminal=(room_start_mode_idx == 1),
-    )
-
-def _terminal_marker_side_px():
-    return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * canvas_ui.viewport.scale)))
-
-def find_room_candidate_node_at_world(world_pt):
-    return None if terminal_runtime is None else terminal_runtime.find_candidate_at(world_pt)
+    return terminal_ui.route_start_nodes(route_name, use_nearest_terminal=(room_start_mode_idx == 1))
 
 def apply_preferred_terminal_point(world_pt, remove=False):
-    return (False, None) if terminal_runtime is None else terminal_runtime.apply_point_preference(
-        world_pt, remove=remove,
-    )
+    return terminal_ui.apply_point_preference(world_pt, remove=remove)
 
 def apply_preferred_terminal_area(start_world, end_world, remove=False):
-    return (False, None) if terminal_runtime is None else terminal_runtime.apply_area_preference(
-        start_world, end_world, remove=remove,
-    )
-
-def draw_preferred_terminal_areas(screen, selected_route_name=None):
-    if routing_workspace.env is None or terminal_runtime is None:
-        return
-    return _draw_preferred_terminal_areas(
-        screen, terminal_runtime.preferred_areas, selected_route_name, ROUTE_COLORS,
-        terminal_runtime.candidate_nodes, routing_workspace.env.nodes, to_screen,
-        max(3, _terminal_marker_side_px() // 2),
-    )
-
-def draw_preferred_terminal_markers(screen, selected_route_name=None, routes=None):
-    if routing_workspace.env is None or terminal_runtime is None:
-        return
-    return _draw_preferred_terminal_markers(
-        screen, terminals.keys(), terminal_runtime.preferred_points_by_room, selected_route_name, routes,
-        ROUTE_COLORS, COLOR_TEXT, terminal_runtime.candidate_nodes, routing_workspace.env.nodes, to_screen,
-        _terminal_marker_side_px(), PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
-    )
-
-def draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name=None):
-    return _draw_routed_terminal_endpoint_markers(
-        screen, routes, terminals.keys(), selected_route_name, ROUTE_COLORS, COLOR_TEXT,
-        to_screen, _terminal_marker_side_px(),
-    )
-
-def draw_geometry_overlay(screen, geometries, color_rgba):
-    return canvas_ui.draw_geometry(screen, geometries, color_rgba)
-
-def draw_polygon_hatch(screen, poly, color, spacing=10, dashed=False):
-    return canvas_ui.draw_hatch(screen, poly, color, spacing, dashed)
-
-def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
-    return _draw_dashed_polyline(screen, points, color, width, dash_len, gap_len)
-
-def _terminal_validity_cache_key():
-    return (
-        id(routing_workspace.env.nodes) if routing_workspace.env is not None else None,
-        len(routing_workspace.env.nodes) if routing_workspace.env is not None else 0,
-        tuple(sorted(terminals.keys())),
-        id(routing_region_base),
-        len(rooms),
-        len(walls),
-        len(wall_polys),
-        tuple(id(cover) for cover in covers),
-    )
-
-def get_terminal_validity_entries():
-    if routing_workspace.env is None:
-        return [], {}
-
-    key = _terminal_validity_cache_key()
-    if terminal_validity_cache.get("key") == key:
-        return terminal_validity_cache["entries"], terminal_validity_cache["reasons_by_node"]
-
-    entries, reasons_by_node = _terminal_validity_entries(
-        routing_workspace.env.nodes,
-        routing_workspace.env.adj,
-        terminals.keys(),
-        routing_region_base,
-        _room_polygon_by_name,
-        _room_terminal_valid_region,
-        _room_terminal_boundary_segments,
-        TERMINAL_REGULATION_CLEARANCE_MM,
-        BUFFER_ROOM_TERMINALES_AIRE_MM,
-    )
-
-    terminal_validity_cache["key"] = key
-    terminal_validity_cache["entries"] = entries
-    terminal_validity_cache["reasons_by_node"] = reasons_by_node
-    return entries, reasons_by_node
-
-def draw_terminal_validity_square(screen, center, side, allowed):
-    return _draw_terminal_validity_square(
-        screen, center, side, allowed, COLOR_TERMINAL_ALLOWED, COLOR_TERMINAL_BLOCKED,
-        COLOR_TERMINAL_BLOCKED_HATCH, draw_dashed_polyline,
-    )
-
-def draw_terminal_validity_overlay(screen):
-    if not terminal_validity_overlay_enabled:
-        return
-    entries, _ = get_terminal_validity_entries()
-    marker_side = max(4, min(13, int(round(70 * canvas_ui.viewport.scale))))
-    return _draw_terminal_validity_overlay(
-        screen, entries, to_screen, canvas_ui.viewport.canvas_rect, marker_side,
-        COLOR_TERMINAL_ALLOWED, COLOR_TERMINAL_BLOCKED, COLOR_TERMINAL_BLOCKED_HATCH,
-        draw_dashed_polyline,
-    )
-
-def draw_terminal_validity_tooltip(screen, font_small):
-    if not terminal_validity_overlay_enabled or routing_workspace.spatial_index is None or routing_workspace.env is None:
-        return
-    _entries, reasons_by_node = get_terminal_validity_entries()
-    return _draw_terminal_validity_tooltip(
-        screen, font_small, pygame.mouse.get_pos(), canvas_ui.viewport.canvas_rect,
-        to_mm, lambda world_pt: int(routing_workspace.spatial_index.query(world_pt)[1]), routing_workspace.env.nodes,
-        reasons_by_node, to_screen, canvas_ui.viewport.window_size, COLOR_TEXT,
-    )
+    return terminal_ui.apply_area_preference(start_world, end_world, remove=remove)
 
 def draw_wet_room_outer_accents(screen):
     return _draw_wet_room_outer_accents(screen, wet_room_outer_accents, to_screen, _iter_polygons, COLOR_WET_ROOM_ACCENT)
@@ -798,44 +667,10 @@ def find_route_at_point(routes, world_pt):
 def find_route_hit_at_point(routes, world_pt):
     return _find_route_hit_at_point(routes, world_pt, max(40.0, 8.0 / canvas_ui.viewport.scale))
 
-def get_route_room_polygon(route_name):
-    terminal_pt = terminals.get(route_name)
-    if terminal_pt is None:
-        return None
-    terminal_point = Point(float(terminal_pt[0]), float(terminal_pt[1]))
-    containing = [
-        room.polygon
-        for room in rooms
-        if hasattr(room, "polygon")
-        and not room.polygon.is_empty
-        and (room.polygon.contains(terminal_point) or room.polygon.distance(terminal_point) < 1e-7)
-    ]
-    if not containing:
-        return None
-    return min(containing, key=lambda poly: poly.area)
+get_route_room_polygon = terminal_ui.route_room_polygon
 
 def find_room_route_at_point(world_pt, route_names):
-    click_pt = Point(float(world_pt[0]), float(world_pt[1]))
-    if "Shaft" in route_names and shaft_extraction is not None:
-        if shaft_extraction.contains(click_pt) or shaft_extraction.distance(click_pt) < max(40.0, 8.0 / canvas_ui.viewport.scale):
-            return "Shaft"
-
-    candidates = []
-    for route_name in route_names:
-        room_poly = get_route_room_polygon(route_name)
-        if room_poly is not None and (room_poly.contains(click_pt) or room_poly.distance(click_pt) < 1e-7):
-            candidates.append((room_poly.area, route_name))
-    if candidates:
-        candidates.sort()
-        return candidates[0][1]
-
-    for room in rooms:
-        if not hasattr(room, "polygon") or room.polygon.is_empty:
-            continue
-        room_name = getattr(room, "name", None)
-        if room_name in route_names and room.polygon.contains(click_pt):
-            return room_name
-    return None
+    return terminal_ui.find_room_route(world_pt, route_names, shaft_extraction)
 
 def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
@@ -1022,6 +857,7 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     )
     routing_workspace = active_dwelling.workspace
     terminal_runtime = active_dwelling.terminals
+    terminal_ui.bind(active_dwelling)
     graph_build_session = GraphBuildSession(
         routing_workspace, terminal_runtime,
         invalidate_room_start_node_cache, invalidate_terminal_validity_cache,
@@ -1286,7 +1122,7 @@ def draw_transient_message(screen, font_small):
 def draw_viewer_legend(screen, font_small):
     return _draw_viewer_legend(
         screen, font_small, canvas_ui.viewport.canvas_rect, terminal_validity_overlay_enabled,
-        COLOR_PLAN_LABEL, COLOR_WET_ROOM_ACCENT, COLOR_WALL, draw_terminal_validity_square,
+        COLOR_PLAN_LABEL, COLOR_WET_ROOM_ACCENT, COLOR_WALL, terminal_ui.draw_validity_square,
     )
 
 
@@ -1452,18 +1288,18 @@ def main():
             terminal_area_end=terminal_area_end_mm if terminal_area_dragging else None,
         ))
         canvas_hooks = CanvasRenderHooks(
-            draw_covers=lambda: draw_geometry_overlay(screen, covers, COLOR_COVER_OVERLAY),
+            draw_covers=lambda: canvas_ui.draw_geometry(screen, covers, COLOR_COVER_OVERLAY),
             draw_distance_heatmap=lambda: draw_distance_heatmap(screen, ap_scores) if show_heatmap and ap_scores else None,
             draw_distance_colorbar=lambda: draw_colorbar(screen, get_placeable_heatmap_scores(ap_scores)) if show_heatmap and ap_scores and not edge_weight_heatmap_enabled else None,
             draw_edge_weight_heatmap=draw_edge_weight_overlay,
             draw_edge_weight_colorbar=lambda: draw_edge_weight_colorbar(screen),
-            draw_terminal_validity_overlay=lambda: draw_terminal_validity_overlay(screen),
+            draw_terminal_validity_overlay=lambda: terminal_ui.draw_validity_overlay(screen, terminal_validity_overlay_enabled),
             draw_wet_room_accents=lambda: draw_wet_room_outer_accents(screen),
-            draw_polygon_hatch=lambda shaft: draw_polygon_hatch(screen, shaft, COLOR_SHAFT_INACTIVE_HATCH, spacing=9),
+            draw_polygon_hatch=lambda shaft: canvas_ui.draw_hatch(screen, shaft, COLOR_SHAFT_INACTIVE_HATCH, spacing=9),
             draw_outlined_text=lambda draw_screen, font, label, position, color: draw_outlined_text(draw_screen, font, label, position, color),
-            draw_preferred_terminal_areas=lambda selected: draw_preferred_terminal_areas(screen, selected),
-            draw_routed_terminal_endpoints=lambda selected: draw_routed_terminal_endpoint_markers(screen, routes, selected),
-            draw_preferred_terminal_markers=lambda selected: draw_preferred_terminal_markers(screen, selected, routes),
+            draw_preferred_terminal_areas=lambda selected: terminal_ui.draw_preferred_areas(screen, selected),
+            draw_routed_terminal_endpoints=lambda selected: terminal_ui.draw_routed_endpoints(screen, routes, selected),
+            draw_preferred_terminal_markers=lambda selected: terminal_ui.draw_preferred_markers(screen, selected, routes),
             draw_terminal_area_drag=lambda start, end: draw_terminal_area_drag(screen, start, end),
         )
         _draw_canvas_scene(screen, scene=canvas_scene, fonts=CanvasFonts(small=font_small), hooks=canvas_hooks)
@@ -1539,7 +1375,9 @@ def main():
         draw_solution_logs_panel(screen, font_small, font_bold)
         draw_help_popup(screen, font_small)
         draw_transient_message(screen, font_small)
-        draw_terminal_validity_tooltip(screen, font_small)
+        terminal_ui.draw_validity_tooltip(
+            screen, font_small, pygame.mouse.get_pos(), terminal_validity_overlay_enabled,
+        )
 
         pygame.display.flip()
         clock.tick(FPS)
