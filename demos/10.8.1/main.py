@@ -61,29 +61,12 @@ from mep_routing.routing import (
     total_route_length_m as _total_route_length_m,
     weighted_edge_cost as _weighted_edge_cost_for_weights,
 )
-from mep_routing.ui import (
-    cool_colormap as _cool_colormap_value,
-    edge_weight_log_scale as _edge_weight_log_scale_for_values,
-    heatmap_color as _heatmap_color,
-    interpolate_regular_score as _interpolate_regular_score_for_grid,
-    score_to_heatmap_t as _score_to_heatmap_t_value,
-    turbo_color as _turbo_color,
-    viridis_color as _viridis_color,
-)
+from mep_routing.ui.runtime import CanvasUiRuntime
 from mep_routing.ui.drawing import (
     draw_dashed_polyline as _draw_dashed_polyline,
-    draw_geometry_overlay as _draw_geometry_overlay,
     draw_outlined_text as _draw_outlined_text,
-    draw_polygon_hatch as _draw_polygon_hatch,
 )
-from mep_routing.ui.controls import (
-    canvas_tool_button_bounds as _canvas_tool_button_bounds,
-    dwelling_selector_bounds as _dwelling_selector_bounds,
-    draw_min_piece_slider as _draw_min_piece_slider_widget,
-    draw_weight_slider as _draw_weight_slider_widget,
-    slider_value_from_x as _slider_value_from_x,
-    weight_view_switch_bounds as _weight_view_switch_bounds,
-)
+from mep_routing.ui.controls import dwelling_selector_bounds as _dwelling_selector_bounds
 from mep_routing.ui.solution_logs import (
     DEFAULT_BEST_METRICS,
     draw_solution_logs_panel as _draw_solution_logs_panel_widget,
@@ -101,11 +84,9 @@ from mep_routing.ui.terminal_validity import (
     draw_terminal_validity_square as _draw_terminal_validity_square,
     draw_terminal_validity_tooltip as _draw_terminal_validity_tooltip,
 )
-from mep_routing.ui.heatmaps import (
-    build_distance_heatmap_surface as _build_distance_heatmap_surface,
-    draw_distance_colorbar as _draw_distance_colorbar,
-    draw_edge_weight_colorbar as _draw_edge_weight_colorbar,
-    draw_edge_weight_heatmap as _draw_edge_weight_heatmap,
+from mep_routing.ui.overlays import (
+    draw_terminal_area_drag as _draw_terminal_area_drag,
+    draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
 from mep_routing.ui.help import (
     draw_card_help_button as _draw_card_help_button,
@@ -121,7 +102,6 @@ from mep_routing.observability import (
     restored_snapshot_state as _restored_snapshot_state,
     solution_snapshot as _solution_snapshot,
 )
-from mep_routing.ui.canvas_tools import draw_canvas_tool_controls as _draw_canvas_tool_controls, draw_ruler_overlay as _draw_ruler_overlay, draw_terminal_tool_buttons as _draw_terminal_tool_buttons, terminal_tool_buttons as _terminal_tool_buttons
 from mep_routing.ui.canvas import (
     CanvasFonts,
     CanvasRenderHooks,
@@ -135,10 +115,6 @@ from mep_routing.ui.frame import (
     active_selected_route,
     build_canvas_scene,
     build_sidebar_view,
-)
-from mep_routing.ui.overlays import (
-    draw_terminal_area_drag as _draw_terminal_area_drag,
-    draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
 )
 from mep_routing.ui.plots import draw_routing_plots as _draw_routing_plots
 from mep_routing.ui.sidebar import (
@@ -272,7 +248,6 @@ transient_message_until_ms = 0
 help_button_rects = {}
 preferred_terminal_tool_mode = None
 terminal_runtime = None
-terminal_tool_button_rects = {}
 terminal_validity_overlay_enabled = False
 terminal_validity_cache = {"key": None, "entries": [], "reasons_by_node": {}}
 PREFERRED_TERMINAL_MARKER_SIZE_MM = 125.0
@@ -303,21 +278,11 @@ installation_header_state = InstallationHeaderState(
 )
 
 # Pygame Window Config
-WINDOW_WIDTH, WINDOW_HEIGHT = 1700, 930
-CANVAS_LEFT = 320
 INSTALLATION_HEADER_TOP = 4
-CANVAS_TOP = 78
 PANEL_W = 280          # right-side plot panel
 COLORBAR_W = 56        # reserved lane between drawing canvas and right-side plots
-CANVAS_W = WINDOW_WIDTH - CANVAS_LEFT - PANEL_W - COLORBAR_W - 10
-CANVAS_H = WINDOW_HEIGHT - CANVAS_TOP - 40
-COLORBAR_LEFT = CANVAS_LEFT + CANVAS_W + 10
+canvas_ui = CanvasUiRuntime()
 is_fullscreen = False
-min_piece_slider_rect = pygame.Rect(0, 0, 1, 1)
-bend_weight_slider_rect = pygame.Rect(0, 0, 1, 1)
-crossing_weight_slider_rect = pygame.Rect(0, 0, 1, 1)
-bend_weight_reset_rect = pygame.Rect(0, 0, 1, 1)
-crossing_weight_reset_rect = pygame.Rect(0, 0, 1, 1)
 preference_reset_rect = pygame.Rect(0, 0, 1, 1)
 
 # Color Scheme
@@ -386,14 +351,6 @@ routing_frame_idx = 0
 current_scenario_label = "synthetic"
 current_scenario_summary = {}
 
-BASE_SCALE_PX_PER_MM = min(CANVAS_W / 15000.0, CANVAS_H / 11000.0)
-zoom_level = 1.0
-view_pan_x_px = 0.0
-view_pan_y_px = 0.0
-SCALE_PX_PER_MM = BASE_SCALE_PX_PER_MM
-OFFSET_X = CANVAS_LEFT + (CANVAS_W - 15000.0 * SCALE_PX_PER_MM) / 2
-OFFSET_Y = CANVAS_TOP + (CANVAS_H - 11000.0 * SCALE_PX_PER_MM) / 2
-
 # Observation state for the right-side plots and solution-log panel.
 HIST_MAXLEN = 400
 routing_history = RoutingHistory(maxlen=HIST_MAXLEN)
@@ -403,72 +360,17 @@ log_row_rects = []
 weight_mode_idx = 0                             # 0 for Default, 1 for Equal Weights
 heatmap_scale_mode = 0                          # 0 for Linear (75% Saturation), 1 for Log Scale
 heatmap_palette_idx = 0                         # 0 for Turbo, 1 for Viridis
-heatmap_surface_cache = {"key": None, "surface": None}
-
-def to_screen(x, y):
-    sx = OFFSET_X + x * SCALE_PX_PER_MM
-    sy = OFFSET_Y + (11000.0 - y) * SCALE_PX_PER_MM
-    return int(sx), int(sy)
-
-def to_mm(sx, sy):
-    x = (sx - OFFSET_X) / SCALE_PX_PER_MM
-    y = 11000.0 - (sy - OFFSET_Y) / SCALE_PX_PER_MM
-    return x, y
-
-def update_view_transform():
-    global SCALE_PX_PER_MM, OFFSET_X, OFFSET_Y, heatmap_surface_cache
-    SCALE_PX_PER_MM = BASE_SCALE_PX_PER_MM * zoom_level
-    center_x = CANVAS_LEFT + CANVAS_W / 2.0
-    center_y = CANVAS_TOP + CANVAS_H / 2.0
-    OFFSET_X = center_x - 7500.0 * SCALE_PX_PER_MM + view_pan_x_px
-    OFFSET_Y = center_y - 5500.0 * SCALE_PX_PER_MM + view_pan_y_px
-    heatmap_surface_cache = {"key": None, "surface": None}
-
-def update_window_layout(width, height):
-    global WINDOW_WIDTH, WINDOW_HEIGHT, CANVAS_W, CANVAS_H, COLORBAR_LEFT, BASE_SCALE_PX_PER_MM
-    WINDOW_WIDTH = max(1200, int(width))
-    WINDOW_HEIGHT = max(720, int(height))
-    CANVAS_W = max(320, WINDOW_WIDTH - CANVAS_LEFT - PANEL_W - COLORBAR_W - 10)
-    CANVAS_H = max(320, WINDOW_HEIGHT - CANVAS_TOP - 40)
-    COLORBAR_LEFT = CANVAS_LEFT + CANVAS_W + 10
-    BASE_SCALE_PX_PER_MM = min(CANVAS_W / 15000.0, CANVAS_H / 11000.0)
-    update_view_transform()
-
-def set_zoom_level(new_zoom):
-    global zoom_level
-    zoom_level = max(0.5, min(6.0, float(new_zoom)))
-    update_view_transform()
-
-def zoom_at_screen_point(new_zoom, screen_pos):
-    global view_pan_x_px, view_pan_y_px
-    before = to_mm(screen_pos[0], screen_pos[1])
-    set_zoom_level(new_zoom)
-    after_sx, after_sy = to_screen(before[0], before[1])
-    view_pan_x_px += screen_pos[0] - after_sx
-    view_pan_y_px += screen_pos[1] - after_sy
-    update_view_transform()
-
-def reset_view_transform():
-    global zoom_level, view_pan_x_px, view_pan_y_px
-    zoom_level = 1.0
-    view_pan_x_px = 0.0
-    view_pan_y_px = 0.0
-    update_view_transform()
-
-def get_canvas_tool_buttons():
-    return [
-        (action, pygame.Rect(bounds), label)
-        for action, bounds, label in _canvas_tool_button_bounds(CANVAS_LEFT, CANVAS_TOP)
-    ]
+to_screen = canvas_ui.viewport.to_screen
+to_mm = canvas_ui.viewport.to_world
 
 
 def get_installation_header_layout():
     count = len(installation_header_state.order)
-    available_width = max(420, CANVAS_W - 28)
+    available_width = max(420, canvas_ui.viewport.canvas_width - 28)
     pill_width = min(126, max(92, (available_width - (count - 1) * 30) // count))
     gap = min(42, max(24, (available_width - count * pill_width) // max(1, count - 1)))
     return _installation_header_layout(
-        CANVAS_LEFT,
+        canvas_ui.viewport.canvas_left,
         INSTALLATION_HEADER_TOP,
         installation_header_state.order,
         pill_width=pill_width,
@@ -477,51 +379,33 @@ def get_installation_header_layout():
 
 def handle_canvas_tool_button_click(pos):
     global route_real_diameter_width_enabled
-    for action, rect, _ in get_canvas_tool_buttons():
+    for action, rect, _ in canvas_ui.toolbar_buttons():
         if not rect.collidepoint(pos):
             continue
-        if action == "in":
-            set_zoom_level(zoom_level * 1.25)
-        elif action == "out":
-            set_zoom_level(zoom_level / 1.25)
-        elif action == "reset":
-            reset_view_transform()
-        elif action == "diameter":
+        canvas_ui.apply_view_action(action)
+        if action == "diameter":
             route_real_diameter_width_enabled = not route_real_diameter_width_enabled
         return action
-    if get_weight_view_switch_rect().collidepoint(pos):
+    if canvas_ui.weight_switch_rect().collidepoint(pos):
         return "weight_view"
     return None
 
-def get_weight_view_switch_rect(weights_rect=None):
-    if weights_rect is None:
-        weights_rect = next(rect for action, rect, _ in get_canvas_tool_buttons() if action == "weights")
-    return pygame.Rect(_weight_view_switch_bounds((weights_rect.x, weights_rect.y, weights_rect.width, weights_rect.height)))
-
-def min_piece_factor_from_slider_x(x):
-    if min_piece_slider_rect.width <= 0:
-        return min_piece_factor
-    return _slider_value_from_x(x, min_piece_slider_rect, MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX)
-
 def set_min_piece_factor_from_slider_x(x):
     global min_piece_factor
-    min_piece_factor = min_piece_factor_from_slider_x(x)
-
-def slider_value_from_x(x, rect, min_value, max_value):
-    return _slider_value_from_x(x, rect, min_value, max_value)
+    min_piece_factor = canvas_ui.slider_value(
+        "min_piece", x, MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX, min_piece_factor,
+    )
 
 def set_bend_weight_from_slider_x(x):
     global C_BEND
-    raw_value = slider_value_from_x(x, bend_weight_slider_rect, C_BEND_MIN, C_BEND_MAX)
+    raw_value = canvas_ui.slider_value("bend", x, C_BEND_MIN, C_BEND_MAX, C_BEND)
     C_BEND = float(round(raw_value / 100.0) * 100)
 
 def set_crossing_weight_from_slider_x(x):
     global crossing_penalty_multiplier
-    crossing_penalty_multiplier = slider_value_from_x(
-        x,
-        crossing_weight_slider_rect,
-        CROSSING_MULTIPLIER_MIN,
-        CROSSING_MULTIPLIER_MAX,
+    crossing_penalty_multiplier = canvas_ui.slider_value(
+        "crossing", x, CROSSING_MULTIPLIER_MIN, CROSSING_MULTIPLIER_MAX,
+        crossing_penalty_multiplier,
     )
 
 def reset_bend_weight():
@@ -533,24 +417,16 @@ def reset_crossing_weight():
     crossing_penalty_multiplier = CROSSING_MULTIPLIER_DEFAULT
 
 def draw_min_piece_slider(screen, font_small, x, y, width):
-    global min_piece_slider_rect
-    min_piece_slider_rect = _draw_min_piece_slider_widget(
+    canvas_ui.draw_min_piece_slider(
         screen, font_small, x, y, width, min_piece_factor,
         MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX, COLOR_TEXT, COLOR_MUTED,
     )
 
 def draw_weight_slider(screen, font_small, x, y, width, label, value, min_value, max_value, color, rect_name, suffix="", integer=False):
-    global bend_weight_slider_rect, crossing_weight_slider_rect, bend_weight_reset_rect, crossing_weight_reset_rect
-    rect, reset_rect = _draw_weight_slider_widget(
+    canvas_ui.draw_weight_slider(
         screen, font_small, x, y, width, label, value, min_value, max_value,
-        COLOR_TEXT, COLOR_MUTED, suffix=suffix, integer=integer,
+        COLOR_TEXT, COLOR_MUTED, name=rect_name, suffix=suffix, integer=integer,
     )
-    if rect_name == "bend":
-        bend_weight_slider_rect = rect
-        bend_weight_reset_rect = reset_rect
-    else:
-        crossing_weight_slider_rect = rect
-        crossing_weight_reset_rect = reset_rect
 
 def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
     if routes:
@@ -559,12 +435,9 @@ def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=
         if marker_label:
             routing_history.add_marker(marker_label, marker_color)
 
-def get_terminal_tool_buttons():
-    return _terminal_tool_buttons(CANVAS_LEFT, CANVAS_TOP, CANVAS_W)
-
 def handle_terminal_tool_button_click(pos):
     global preferred_terminal_tool_mode, terminal_validity_overlay_enabled
-    for mode, rect, _ in get_terminal_tool_buttons():
+    for mode, rect, _ in canvas_ui.terminal_buttons():
         if not rect.collidepoint(pos):
             continue
         if mode == "reset":
@@ -578,32 +451,28 @@ def handle_terminal_tool_button_click(pos):
     return None
 
 def draw_terminal_tool_buttons(screen, font_bold, font_small):
-    global terminal_tool_button_rects
-    terminal_tool_button_rects = _draw_terminal_tool_buttons(screen, font_bold, font_small, get_terminal_tool_buttons(), preferred_terminal_tool_mode, terminal_validity_overlay_enabled, text_color=COLOR_TEXT, muted_color=COLOR_MUTED, allowed_color=COLOR_TERMINAL_ALLOWED)
+    canvas_ui.draw_terminal_tools(
+        screen, font_bold, font_small, active_mode=preferred_terminal_tool_mode,
+        overlay_enabled=terminal_validity_overlay_enabled,
+        colors=(COLOR_TEXT, COLOR_MUTED, COLOR_TERMINAL_ALLOWED),
+    )
 
 def dwelling_selector_options():
     return ("New random dwelling",) + tuple(case.label for case in REAL_DWELLING_SCENARIOS)
 
 
 def draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open=False):
-    return _draw_canvas_tool_controls(
-        screen,
-        font_small,
-        get_canvas_tool_buttons(),
-        get_weight_view_switch_rect(),
-        ruler_enabled=ruler_mode,
-        edge_weights_enabled=edge_weight_heatmap_enabled,
-        diameter_width_enabled=route_real_diameter_width_enabled,
-        small_weight_view=edge_weight_view_mode_idx == 0,
-        zoom_level=zoom_level,
-        dwelling_label=current_scenario_label,
-        dwelling_options=dwelling_selector_options(),
-        dwelling_selector_open=dwelling_selector_open,
-        canvas_left=CANVAS_LEFT,
-        canvas_top=CANVAS_TOP,
-        active_terminal_mode=preferred_terminal_tool_mode,
-        text_color=COLOR_TEXT,
-    )
+    return canvas_ui.draw_toolbar(screen, font_small, state={
+        "ruler_enabled": ruler_mode,
+        "edge_weights_enabled": edge_weight_heatmap_enabled,
+        "diameter_width_enabled": route_real_diameter_width_enabled,
+        "small_weight_view": edge_weight_view_mode_idx == 0,
+        "dwelling_label": current_scenario_label,
+        "dwelling_options": dwelling_selector_options(),
+        "dwelling_selector_open": dwelling_selector_open,
+        "active_terminal_mode": preferred_terminal_tool_mode,
+        "text_color": COLOR_TEXT,
+    })
 
 def set_ruler_cursor(enabled):
     try:
@@ -612,7 +481,7 @@ def set_ruler_cursor(enabled):
         pass
 
 def draw_ruler_overlay(screen, font_small, start_mm, end_mm):
-    return _draw_ruler_overlay(screen, font_small, start_mm, end_mm, to_screen, text_color=COLOR_TEXT)
+    return canvas_ui.draw_ruler(screen, font_small, start_mm, end_mm, COLOR_TEXT)
 
 def invalidate_room_start_node_cache():
     if terminal_runtime is not None:
@@ -893,7 +762,7 @@ def get_route_start_nodes(route_name):
     )
 
 def _terminal_marker_side_px():
-    return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * SCALE_PX_PER_MM)))
+    return max(4, int(round(PREFERRED_TERMINAL_MARKER_SIZE_MM * canvas_ui.viewport.scale)))
 
 def find_room_candidate_node_at_world(world_pt):
     return None if terminal_runtime is None else terminal_runtime.find_candidate_at(world_pt)
@@ -933,12 +802,10 @@ def draw_routed_terminal_endpoint_markers(screen, routes, selected_route_name=No
     )
 
 def draw_geometry_overlay(screen, geometries, color_rgba):
-    return _draw_geometry_overlay(screen, geometries, color_rgba, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT))
+    return canvas_ui.draw_geometry(screen, geometries, color_rgba)
 
 def draw_polygon_hatch(screen, poly, color, spacing=10, dashed=False):
-    return _draw_polygon_hatch(
-        screen, poly, color, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), spacing, dashed,
-    )
+    return canvas_ui.draw_hatch(screen, poly, color, spacing, dashed)
 
 def draw_dashed_polyline(screen, points, color, width=1, dash_len=8, gap_len=5):
     return _draw_dashed_polyline(screen, points, color, width, dash_len, gap_len)
@@ -990,9 +857,9 @@ def draw_terminal_validity_overlay(screen):
     if not terminal_validity_overlay_enabled:
         return
     entries, _ = get_terminal_validity_entries()
-    marker_side = max(4, min(13, int(round(70 * SCALE_PX_PER_MM))))
+    marker_side = max(4, min(13, int(round(70 * canvas_ui.viewport.scale))))
     return _draw_terminal_validity_overlay(
-        screen, entries, to_screen, (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), marker_side,
+        screen, entries, to_screen, canvas_ui.viewport.canvas_rect, marker_side,
         COLOR_TERMINAL_ALLOWED, COLOR_TERMINAL_BLOCKED, COLOR_TERMINAL_BLOCKED_HATCH,
         draw_dashed_polyline,
     )
@@ -1002,9 +869,9 @@ def draw_terminal_validity_tooltip(screen, font_small):
         return
     _entries, reasons_by_node = get_terminal_validity_entries()
     return _draw_terminal_validity_tooltip(
-        screen, font_small, pygame.mouse.get_pos(), (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H),
+        screen, font_small, pygame.mouse.get_pos(), canvas_ui.viewport.canvas_rect,
         to_mm, lambda world_pt: int(routing_workspace.spatial_index.query(world_pt)[1]), routing_workspace.env.nodes,
-        reasons_by_node, to_screen, (WINDOW_WIDTH, WINDOW_HEIGHT), COLOR_TEXT,
+        reasons_by_node, to_screen, canvas_ui.viewport.window_size, COLOR_TEXT,
     )
 
 def draw_wet_room_outer_accents(screen):
@@ -1026,10 +893,10 @@ def count_solution_short_pieces(routes):
     return _sal_route_analysis().count_short_pieces(routes)
 
 def find_route_at_point(routes, world_pt):
-    return _find_route_at_point(routes, world_pt, max(40.0, 8.0 / SCALE_PX_PER_MM))
+    return _find_route_at_point(routes, world_pt, max(40.0, 8.0 / canvas_ui.viewport.scale))
 
 def find_route_hit_at_point(routes, world_pt):
-    return _find_route_hit_at_point(routes, world_pt, max(40.0, 8.0 / SCALE_PX_PER_MM))
+    return _find_route_hit_at_point(routes, world_pt, max(40.0, 8.0 / canvas_ui.viewport.scale))
 
 def get_route_room_polygon(route_name):
     terminal_pt = terminals.get(route_name)
@@ -1050,7 +917,7 @@ def get_route_room_polygon(route_name):
 def find_room_route_at_point(world_pt, route_names):
     click_pt = Point(float(world_pt[0]), float(world_pt[1]))
     if "Shaft" in route_names and shaft_extraction is not None:
-        if shaft_extraction.contains(click_pt) or shaft_extraction.distance(click_pt) < max(40.0, 8.0 / SCALE_PX_PER_MM):
+        if shaft_extraction.contains(click_pt) or shaft_extraction.distance(click_pt) < max(40.0, 8.0 / canvas_ui.viewport.scale):
             return "Shaft"
 
     candidates = []
@@ -1352,32 +1219,9 @@ def generate_new_dwelling():
     )
     _apply_prepared_dwelling(prepared, auto_place=True)
 
-def get_turbo_color(t):
-    return _turbo_color(t)
-
-def get_viridis_color(t):
-    return _viridis_color(t)
-
-def get_heatmap_color(t):
-    return _heatmap_color(t, heatmap_palette_idx)
-
 def draw_colorbar(screen, node_scores):
-    return _draw_distance_colorbar(
-        screen, bool(node_scores), (COLORBAR_LEFT, COLORBAR_W), CANVAS_TOP, CANVAS_H,
-        heatmap_scale_mode, heatmap_palette_idx, get_heatmap_color, COLOR_TEXT,
-    )
-
-def _score_to_heatmap_t(score, min_s, max_s):
-    return _score_to_heatmap_t_value(score, min_s, max_s, heatmap_scale_mode)
-
-def _interpolate_regular_score(wx, wy, score_grid):
-    return _interpolate_regular_score_for_grid(wx, wy, score_grid, GRID_SPACING)
-
-def _build_heatmap_surface(node_scores):
-    return _build_distance_heatmap_surface(
-        node_scores, routing_workspace.base_env.nodes, GRID_SPACING,
-        (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), to_mm,
-        _interpolate_regular_score, _score_to_heatmap_t, get_heatmap_color,
+    return canvas_ui.draw_distance_colorbar(
+        screen, bool(node_scores), heatmap_scale_mode, heatmap_palette_idx, COLOR_TEXT,
     )
 
 def get_placeable_heatmap_scores(node_scores):
@@ -1389,56 +1233,32 @@ def get_placeable_heatmap_scores(node_scores):
 
 def draw_distance_heatmap(screen, node_scores):
     placeable_scores = get_placeable_heatmap_scores(node_scores)
-    if not placeable_scores or routing_workspace.base_env is None:
-        return
-    key = (
-        id(routing_workspace.base_env),
-        id(node_scores),
-        len(placeable_scores),
-        min(placeable_scores.values()),
-        max(placeable_scores.values()),
-        tuple(id(region) for region in get_machine_vertical_clearance_blocks()),
-        heatmap_scale_mode,
-        heatmap_palette_idx,
-        CANVAS_W,
-        CANVAS_H,
+    return canvas_ui.draw_distance_heatmap(
+        screen, placeable_scores, base_env=routing_workspace.base_env,
+        grid_spacing=GRID_SPACING,
+        blocked_regions=get_machine_vertical_clearance_blocks(),
+        scale_mode=heatmap_scale_mode, palette_index=heatmap_palette_idx,
+        fill_color=COLOR_MACHINE_CLEARANCE_FILL,
+        hatch_color=COLOR_MACHINE_CLEARANCE_HATCH,
     )
-    if heatmap_surface_cache["key"] != key:
-        heatmap_surface_cache["surface"] = _build_heatmap_surface(placeable_scores)
-        heatmap_surface_cache["key"] = key
-    screen.blit(heatmap_surface_cache["surface"], (CANVAS_LEFT, CANVAS_TOP))
-    blocked_regions = get_machine_vertical_clearance_blocks()
-    draw_geometry_overlay(screen, blocked_regions, COLOR_MACHINE_CLEARANCE_FILL)
-    for region in blocked_regions:
-        draw_polygon_hatch(screen, region, COLOR_MACHINE_CLEARANCE_HATCH, spacing=9, dashed=True)
-
-def _cool_colormap(t):
-    return _cool_colormap_value(t)
-
-def _edge_weight_log_scale():
-    return _edge_weight_log_scale_for_values(routing_workspace.overlay.values, OVERLAP_BLOCK_WEIGHT)
 
 def draw_edge_weight_heatmap(screen):
-    if not edge_weight_heatmap_enabled or not routing_workspace.overlay.values or routing_workspace.env is None:
-        return
-    return _draw_edge_weight_heatmap(
-        screen, routing_workspace.overlay.values, routing_workspace.env.nodes, routing_workspace.env.adj, to_screen,
-        OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE, _cool_colormap, _edge_weight_log_scale_for_values,
-    )
+    if edge_weight_heatmap_enabled:
+        return canvas_ui.draw_edge_heatmap(
+            screen, routing_workspace.overlay.values, routing_workspace.env,
+            OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE,
+        )
 
 def draw_edge_weight_colorbar(screen):
-    if not edge_weight_heatmap_enabled or not routing_workspace.overlay.values:
-        return
-
-    return _draw_edge_weight_colorbar(
-        screen, routing_workspace.overlay.values, (COLORBAR_LEFT, COLORBAR_W), CANVAS_TOP, CANVAS_H,
-        OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE, _cool_colormap, _edge_weight_log_scale_for_values,
-        COLOR_TEXT,
-    )
+    if edge_weight_heatmap_enabled:
+        return canvas_ui.draw_edge_colorbar(
+            screen, routing_workspace.overlay.values, OVERLAP_BLOCK_WEIGHT,
+            COLOR_BLOCKED_EDGE, COLOR_TEXT,
+        )
 
 def get_route_draw_width(route_name):
     if route_real_diameter_width_enabled:
-        return max(1, int(round(get_route_diameter(route_name) * SCALE_PX_PER_MM)))
+        return max(1, int(round(get_route_diameter(route_name) * canvas_ui.viewport.scale)))
     return 5 if SAL_INSTALLATION.is_large_route(route_name) else 3
 
 def record_history(routes, crossings_count, elapsed_ms):
@@ -1550,8 +1370,8 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
         screen,
         font_small,
         font_bold,
-        window_width=WINDOW_WIDTH,
-        window_height=WINDOW_HEIGHT,
+        window_width=canvas_ui.viewport.window_width,
+        window_height=canvas_ui.viewport.window_height,
         panel_width=PANEL_W,
         solution_logs=solution_log_session.manual_logs,
         auto_best_logs=solution_log_session.auto_best_logs,
@@ -1563,7 +1383,8 @@ def draw_solution_logs_panel(screen, font_small, font_bold):
 
 def draw_plots(screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum):
     return _draw_routing_plots(
-        screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum, WINDOW_WIDTH, PANEL_W,
+        screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum,
+        canvas_ui.viewport.window_width, PANEL_W,
         routing_history.buffers,
         routing_history.sample_count, routing_history.event_markers, COLOR_PLOT_BG, COLOR_TEXT, COLOR_MUTED,
     )
@@ -1573,7 +1394,8 @@ def draw_card_help_button(screen, card_id, rect, font_small):
     help_button_rects[card_id] = _draw_card_help_button(screen, card_id, rect, font_small, help_popup_card == card_id, COLOR_MUTED, COLOR_TEXT)
 
 def draw_help_popup(screen, font_small):
-    return _draw_help_popup(screen, font_small, _help_lines(help_popup_card), (CANVAS_LEFT + 16, CANVAS_TOP + 58), COLOR_TEXT)
+    viewport = canvas_ui.viewport
+    return _draw_help_popup(screen, font_small, _help_lines(help_popup_card), (viewport.canvas_left + 16, viewport.canvas_top + 58), COLOR_TEXT)
 
 def set_transient_message(text, duration_ms=2400):
     global transient_message, transient_message_until_ms
@@ -1583,11 +1405,14 @@ def set_transient_message(text, duration_ms=2400):
 def draw_transient_message(screen, font_small):
     if not transient_message or pygame.time.get_ticks() > transient_message_until_ms:
         return
-    return _draw_transient_message(screen, font_small, transient_message, (CANVAS_LEFT, CANVAS_TOP), COLOR_TEXT)
+    return _draw_transient_message(
+        screen, font_small, transient_message,
+        (canvas_ui.viewport.canvas_left, canvas_ui.viewport.canvas_top), COLOR_TEXT,
+    )
 
 def draw_viewer_legend(screen, font_small):
     return _draw_viewer_legend(
-        screen, font_small, (CANVAS_LEFT, CANVAS_TOP, CANVAS_W, CANVAS_H), terminal_validity_overlay_enabled,
+        screen, font_small, canvas_ui.viewport.canvas_rect, terminal_validity_overlay_enabled,
         COLOR_PLAN_LABEL, COLOR_WET_ROOM_ACCENT, COLOR_WALL, draw_terminal_validity_square,
     )
 
@@ -1668,8 +1493,6 @@ def main():
     global real_scenario_idx, routing_frame_idx, dwelling_source_idx, room_start_mode_idx
     global edge_weight_heatmap_enabled, edge_weight_view_mode_idx, route_real_diameter_width_enabled
     global rotation_mode_idx
-    global view_pan_x_px, view_pan_y_px
-    global zoom_level
     global help_popup_card
     global min_piece_factor, is_fullscreen
     global preferred_terminal_tool_mode
@@ -1678,8 +1501,9 @@ def main():
     pygame.init()
     pygame.font.init()
     
-    update_window_layout(WINDOW_WIDTH, WINDOW_HEIGHT)
-    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
+    viewport = canvas_ui.viewport
+    canvas_ui.update_layout(viewport.window_width, viewport.window_height)
+    screen = pygame.display.set_mode(viewport.window_size, pygame.RESIZABLE)
     pygame.display.set_caption("Integrated Auto-Placement & Ventilation Router (Demo 10.8)")
     clock = pygame.time.Clock()
     
@@ -1773,8 +1597,8 @@ def main():
                 running = False
 
             elif event.type == pygame.VIDEORESIZE and not is_fullscreen:
-                update_window_layout(event.w, event.h)
-                screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
+                canvas_ui.update_layout(event.w, event.h)
+                screen = pygame.display.set_mode(viewport.window_size, pygame.RESIZABLE)
                 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -1798,7 +1622,7 @@ def main():
                             installation_drag_moved = False
                         continue
                     selector_bounds, option_bounds = _dwelling_selector_bounds(
-                        CANVAS_LEFT, CANVAS_TOP, len(dwelling_selector_options())
+                        viewport.canvas_left, viewport.canvas_top, len(dwelling_selector_options())
                     )
                     if pygame.Rect(selector_bounds).collidepoint((mx, my)):
                         dwelling_selector_open = not dwelling_selector_open
@@ -1828,11 +1652,11 @@ def main():
                         (card_id for card_id, rect in help_button_rects.items() if rect.collidepoint((mx, my))),
                         None,
                     )
-                    min_piece_hit = min_piece_slider_rect.collidepoint((mx, my))
-                    bend_slider_hit = bend_weight_slider_rect.collidepoint((mx, my))
-                    bend_reset_hit = bend_weight_reset_rect.collidepoint((mx, my))
-                    crossing_slider_hit = crossing_weight_slider_rect.collidepoint((mx, my))
-                    crossing_reset_hit = crossing_weight_reset_rect.collidepoint((mx, my))
+                    min_piece_hit = canvas_ui.controls.min_piece.collidepoint((mx, my))
+                    bend_slider_hit = canvas_ui.controls.bend.collidepoint((mx, my))
+                    bend_reset_hit = canvas_ui.controls.bend_reset.collidepoint((mx, my))
+                    crossing_slider_hit = canvas_ui.controls.crossing.collidepoint((mx, my))
+                    crossing_reset_hit = canvas_ui.controls.crossing_reset.collidepoint((mx, my))
                     panel_target_found = any((
                         help_card is not None,
                         min_piece_hit,
@@ -1947,7 +1771,7 @@ def main():
                         route_names = {name for name, _ in routes} if routes else set()
                         room_hit = find_room_route_at_point((world_x, world_y), route_names)
                         route_hit = find_route_hit_at_point(routes, (world_x, world_y))
-                        direct_duct_click_mm = max(20.0, 4.0 / SCALE_PX_PER_MM)
+                        direct_duct_click_mm = max(20.0, 4.0 / viewport.scale)
                         direct_route_name = route_hit[0] if route_hit and (not room_hit or route_hit[1] <= direct_duct_click_mm) else None
                         canvas_hit = _CanvasHit(
                             machine_hit=machine_hit,
@@ -2008,7 +1832,7 @@ def main():
                 elif event.button == 4: # Scroll Up (CCW)
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_SHIFT:
-                        zoom_at_screen_point(zoom_level * 1.12, event.pos)
+                        canvas_ui.zoom_at(viewport.zoom * 1.12, event.pos)
                         continue
                     now_ms = pygame.time.get_ticks()
                     if now_ms - last_wheel_rotate_ms < WHEEL_ROTATE_COOLDOWN_MS:
@@ -2024,7 +1848,7 @@ def main():
                 elif event.button == 5: # Scroll Down (CW)
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_SHIFT:
-                        zoom_at_screen_point(zoom_level / 1.12, event.pos)
+                        canvas_ui.zoom_at(viewport.zoom / 1.12, event.pos)
                         continue
                     now_ms = pygame.time.get_ticks()
                     if now_ms - last_wheel_rotate_ms < WHEEL_ROTATE_COOLDOWN_MS:
@@ -2106,9 +1930,7 @@ def main():
                 for canvas_command in canvas_transition.commands:
                     if canvas_command.name == "pan_by":
                         dx, dy = canvas_command.value
-                        view_pan_x_px += dx
-                        view_pan_y_px += dy
-                        update_view_transform()
+                        canvas_ui.pan_by(dx, dy)
                     elif canvas_command.name == "move_machine":
                         machine_cx, machine_cy = canvas_command.value
                         routes, status, elapsed_ms, total_nodes = solve_ventilation_routing()
@@ -2122,10 +1944,10 @@ def main():
                     if is_fullscreen:
                         info = pygame.display.Info()
                         screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
-                        update_window_layout(screen.get_width(), screen.get_height())
+                        canvas_ui.update_layout(screen.get_width(), screen.get_height())
                     else:
-                        update_window_layout(1700, 930)
-                        screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
+                        canvas_ui.update_layout(1700, 930)
+                        screen = pygame.display.set_mode(viewport.window_size, pygame.RESIZABLE)
 
                 elif event.key == pygame.K_ESCAPE:
                     if ruler_mode:
@@ -2308,8 +2130,8 @@ def main():
         ))
         _draw_sidebar(
             screen,
-            canvas_left=CANVAS_LEFT,
-            window_height=WINDOW_HEIGHT,
+            canvas_left=viewport.canvas_left,
+            window_height=viewport.window_height,
             fonts=SidebarFonts(title=font_title, bold=font_bold, small=font_small),
             colors=SidebarColors(
                 panel=COLOR_PANEL,
@@ -2324,9 +2146,9 @@ def main():
         )
         draw_viewer_legend(screen, font_small)
 
-        panel_x = WINDOW_WIDTH - PANEL_W
-        pygame.draw.rect(screen, COLOR_PANEL, (panel_x, 0, PANEL_W, WINDOW_HEIGHT))
-        pygame.draw.line(screen, (55, 55, 70), (panel_x, 0), (panel_x, WINDOW_HEIGHT))
+        panel_x = viewport.window_width - PANEL_W
+        pygame.draw.rect(screen, COLOR_PANEL, (panel_x, 0, PANEL_W, viewport.window_height))
+        pygame.draw.line(screen, (55, 55, 70), (panel_x, 0), (panel_x, viewport.window_height))
         lbl_panel = font_bold.render("PLACEMENT EXPLORER", True, COLOR_MUTED)
         screen.blit(lbl_panel, (panel_x + PANEL_W // 2 - lbl_panel.get_width() // 2, 8))
         draw_plots(screen, font_plot_small, font_plot_title, font_plot_value, font_plot_minimum)

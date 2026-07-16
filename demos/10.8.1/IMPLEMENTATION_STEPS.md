@@ -623,6 +623,10 @@ Manual validation milestones:
 - Removed the obsolete source-node and path-materialization wrappers from `main.py`; the entrypoint now supplies one explicit live callback snapshot and consumes the solver result.
 - Validation: Python compilation and 14 focused Sal interactive/live-session/application/materialization/analysis and machine-session contracts.
 
+- Added `CanvasUiRuntime` as the live owner of viewport transforms, responsive canvas layout, zoom/pan state, canvas control hit rectangles, and distance/edge heatmap caches and rendering.
+- Kept routing choices and domain toggles in `main.py`; the runtime delegates to the existing focused Pygame renderers rather than duplicating drawing behavior.
+- Validation: Python compilation, six focused viewport/frame contracts, and a 16-second headless startup/initial-solve smoke without an exception.
+
 - Completed the Sal solver-composition boundary: `main.py` retains only live settings/session snapshots, low-level dwelling/graph callbacks, UI metrics, and the single `solve_ventilation_routing` entrypoint.
 - Made Sal route materialization lazy so paths always use the graph produced by the solver's machine-aware refresh rather than a pre-solve graph snapshot.
 - Removed residual flow/search imports and dead solver compatibility wrappers from `main.py`; strategy dispatch, flow algorithms, route planning, scoring policy, materialization, machine routing, and overlay lifecycle now remain under shared routing or `installations.sal`.
