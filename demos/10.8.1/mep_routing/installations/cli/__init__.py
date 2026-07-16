@@ -4,12 +4,16 @@ from .catalog import CLI_MACHINE_CATALOG, CLI_PEAD_MACHINES, CliConnector, CliMa
 from .definition import CLI_INSTALLATION, CliInstallationDefinition
 from .geometry import cli_machine_pins, cli_supply_access_specs
 from .graph_inputs import build_cli_simple_graph_inputs
+from .grilles import CliGrilleConnection, CliGrillePlan, prepare_cli_grilles
+from .placement import CliPlacementResult, CliPlacementRuntime
 from .runtime import CliInteractiveRuntime, CliRoutingResult
 from .terminals import is_cli_supply_room, prepare_cli_supply_terminals
 
 __all__ = [
     "CLI_INSTALLATION", "CLI_MACHINE_CATALOG", "CLI_PEAD_MACHINES",
     "CliConnector", "CliInstallationDefinition", "CliInteractiveRuntime", "CliMachine",
+    "CliGrilleConnection", "CliGrillePlan", "CliPlacementResult", "CliPlacementRuntime",
     "CliRoutingResult", "build_cli_simple_graph_inputs", "cli_machine_pins",
     "cli_supply_access_specs", "is_cli_supply_room", "prepare_cli_supply_terminals",
+    "prepare_cli_grilles",
 ]

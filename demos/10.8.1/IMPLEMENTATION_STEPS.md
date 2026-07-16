@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added Cli-owned grille preparation with paired supply/return wall grilles, routing-region connection points, dimensions, roles, and room identity.
+- Added Cli-owned PEAD placement using the selected machine footprint, routing-region feasibility, fixed obstacles, contextual obstacles, and grille-distance scoring; it does not consume Sal placement fields or weights.
+- Validation: Python compilation and five focused Cli grille, placement, geometry, terminal, and runtime contracts.
+
 - Split canvas projection into one active installation layer plus subdued context layers for every other enabled installation. Each layer contributes its own routes, terminals, and machine outline; the active layer alone contributes selection, connector emphasis, placement guides, and editing interactions.
 - Added independent Sal and Cli machine poses. Mouse drag, wheel rotation, and Cli `R` rotation now mutate only the active machine; Sal-only sliders and routing commands are rejected while Cli is active instead of changing hidden context state.
 - Validation: Python compilation, full Demo suite (330 passed), and a timed Pygame smoke that enabled Cli beside Sal, rendered both runs, activated Cli, and exited cleanly.

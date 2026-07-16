@@ -1,13 +1,15 @@
 from types import SimpleNamespace
 
-from shapely.geometry import box
+from shapely.geometry import Point, box
 
 from mep_routing.app import CommonGraphConfig, TerminalRuntimeConfig
 from mep_routing.data_sources.scenario import PreparedDwelling
 from mep_routing.installations.cli import (
     CLI_INSTALLATION,
     CliInteractiveRuntime,
+    CliPlacementRuntime,
     cli_machine_pins,
+    prepare_cli_grilles,
     prepare_cli_supply_terminals,
 )
 
@@ -60,3 +62,22 @@ def test_cli_runtime_builds_core_simple_supply_tree():
     assert result.total_nodes > 0
     assert result.status.startswith("Cli supply tree solved")
     assert result.workspace.env is not None
+
+
+def test_cli_grilles_prepare_supply_and_return_per_occupied_room():
+    prepared = _prepared()
+    plan = prepare_cli_grilles(prepared.rooms, prepared.routing_region_base)
+    assert {item.role for item in plan.connections} == {"supply", "return"}
+    assert len(plan.supply) == 2
+    assert len(plan.returns) == 2
+    assert all(item.route_name.endswith(("Supply", "Return")) for item in plan.connections)
+
+
+def test_cli_placement_uses_selected_machine_footprint():
+    prepared = _prepared()
+    plan = prepare_cli_grilles(prepared.rooms, prepared.routing_region_base)
+    placement = CliPlacementRuntime(spacing_mm=600)
+    small = placement.place(prepared, CLI_INSTALLATION.machine_catalog.value("pead-m35ja"), plan)
+    large = placement.place(prepared, CLI_INSTALLATION.machine_catalog.value("pead-m140ja"), plan)
+    assert small.feasible_candidates >= large.feasible_candidates > 0
+    assert prepared.routing_region_base.covers(Point(small.center))
