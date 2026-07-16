@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added `WorkbenchCommandController` as the UI application boundary for routing keyboard transitions, canvas toolbar actions, and solver-control slider/reset effects.
+- The Pygame event adapter retains the same module callback names through bound controller methods while `main.py` no longer owns command decoding or transition side effects.
+- Validation: Python compilation and focused workbench-command contracts; `main.py` reached 1,195 physical lines.
+
 - Added `PlacementSession` as the bound owner of active-dwelling placement feasibility, vertical-clearance exclusions, weight policy, cached topological fields, automatic placement, and field-alignment rotation.
 - `main.py` now applies placement outcomes to live machine coordinates while the reusable session owns calculation state; selected-machine and dwelling inputs remain explicit at the binding seam.
 - Validation: Python compilation and focused placement-session contracts.

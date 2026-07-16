@@ -96,7 +96,7 @@ from mep_routing.ui.sidebar import (
     SidebarFonts,
     draw_sidebar as _draw_sidebar,
 )
-from mep_routing.ui.events import routing_key_transition as _routing_key_transition
+from mep_routing.ui.commands import WorkbenchCommandController
 from mep_routing.ui.installation_header import (
     InstallationHeaderState,
     InstallationOption,
@@ -367,24 +367,14 @@ def get_installation_header_layout():
         gap=gap,
     )
 
-def handle_canvas_tool_button_click(pos):
-    global route_real_diameter_width_enabled
-    for action, rect, _ in canvas_ui.toolbar_buttons():
-        if not rect.collidepoint(pos):
-            continue
-        canvas_ui.apply_view_action(action)
-        if action == "diameter":
-            route_real_diameter_width_enabled = not route_real_diameter_width_enabled
-        return action
-    if canvas_ui.weight_switch_rect().collidepoint(pos):
-        return "weight_view"
-    return None
-
-def set_min_piece_factor_from_slider_x(x):
-    global min_piece_factor
-    min_piece_factor = canvas_ui.slider_value(
-        "min_piece", x, MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX, min_piece_factor,
-    )
+workbench_commands = WorkbenchCommandController(sys.modules[__name__], pygame)
+handle_canvas_tool_button_click = workbench_commands.handle_canvas_tool_button_click
+set_min_piece_factor_from_slider_x = workbench_commands.set_min_piece_factor_from_slider_x
+set_bend_weight_from_slider_x = workbench_commands.set_bend_weight_from_slider_x
+set_crossing_weight_from_slider_x = workbench_commands.set_crossing_weight_from_slider_x
+reset_bend_weight = workbench_commands.reset_bend_weight
+reset_crossing_weight = workbench_commands.reset_crossing_weight
+apply_routing_key_command = workbench_commands.apply_routing_key_command
 
 def handle_machine_selector_click(pos):
     """Handle the active installation's selector without owning runtime policy."""
@@ -415,26 +405,6 @@ def handle_machine_selector_click(pos):
             return True, transition.runtime_invalidation_required
         installation_ui_session = installation_ui_session.dismiss_dropdown()
     return False, False
-
-def set_bend_weight_from_slider_x(x):
-    global C_BEND
-    raw_value = canvas_ui.slider_value("bend", x, C_BEND_MIN, C_BEND_MAX, C_BEND)
-    C_BEND = float(round(raw_value / 100.0) * 100)
-
-def set_crossing_weight_from_slider_x(x):
-    global crossing_penalty_multiplier
-    crossing_penalty_multiplier = canvas_ui.slider_value(
-        "crossing", x, CROSSING_MULTIPLIER_MIN, CROSSING_MULTIPLIER_MAX,
-        crossing_penalty_multiplier,
-    )
-
-def reset_bend_weight():
-    global C_BEND
-    C_BEND = C_BEND_DEFAULT
-
-def reset_crossing_weight():
-    global crossing_penalty_multiplier
-    crossing_penalty_multiplier = CROSSING_MULTIPLIER_DEFAULT
 
 def draw_min_piece_slider(screen, font_small, x, y, width):
     canvas_ui.draw_min_piece_slider(
@@ -1027,76 +997,6 @@ def draw_transient_message(screen, font_small):
 def draw_viewer_legend(screen, font_small):
     return workbench_chrome.draw_viewer_legend(screen, font_small, terminal_validity_overlay_enabled)
 
-
-def apply_routing_key_command(event_key):
-    """Apply a pure routing-key transition through the live Pygame adapters."""
-    global machine_angle, auto_placement_mode_idx, routing_strategy_idx, room_start_mode_idx
-    global router_backend_idx, heuristic_mode_idx, graph_type_idx, rotation_mode_idx, weight_mode_idx
-    global ap_scores, ap_fields
-
-    command = {
-        pygame.K_r: "rotate_machine",
-        pygame.K_c: "cycle_strategy",
-        pygame.K_t: "cycle_room_start",
-        pygame.K_l: "cycle_router_backend",
-        pygame.K_y: "cycle_heuristic",
-        pygame.K_TAB: "cycle_graph",
-        pygame.K_a: "toggle_auto_placement",
-        pygame.K_p: "cycle_auto_placement",
-        pygame.K_u: "cycle_rotation_mode",
-        pygame.K_w: "cycle_weight_mode",
-    }.get(event_key)
-    if command is None:
-        return None
-
-    transition = _routing_key_transition(
-        command,
-        {
-            "machine_angle": machine_angle,
-            "auto_placement_mode_idx": auto_placement_mode_idx,
-            "routing_strategy_idx": routing_strategy_idx,
-            "room_start_mode_idx": room_start_mode_idx,
-            "router_backend_idx": router_backend_idx,
-            "heuristic_mode_idx": heuristic_mode_idx,
-            "graph_type_idx": graph_type_idx,
-            "rotation_mode_idx": rotation_mode_idx,
-            "weight_mode_idx": weight_mode_idx,
-        },
-        {
-            "routing_strategy": len(ROUTING_STRATEGIES),
-            "room_start": len(ROOM_START_MODES),
-            "router_backend": len(ROUTER_BACKENDS),
-            "heuristic": len(HEURISTIC_MODES),
-            "graph": len(GRAPH_TYPES),
-            "rotation_mode": len(ROTATION_MODES),
-            "auto_placement": len(AUTO_PLACEMENT_MODES),
-            "weight_mode": 2,
-        },
-    )
-    if transition is None:
-        return None
-
-    state = transition.state
-    machine_angle = state["machine_angle"]
-    auto_placement_mode_idx = state["auto_placement_mode_idx"]
-    routing_strategy_idx = state["routing_strategy_idx"]
-    room_start_mode_idx = state["room_start_mode_idx"]
-    router_backend_idx = state["router_backend_idx"]
-    heuristic_mode_idx = state["heuristic_mode_idx"]
-    graph_type_idx = state["graph_type_idx"]
-    rotation_mode_idx = state["rotation_mode_idx"]
-    weight_mode_idx = state["weight_mode_idx"]
-
-    if transition.rebuild_graph:
-        build_grid(machine_pins=get_machine_pins(machine_cx, machine_cy, machine_angle))
-    if transition.apply_rotation_mode:
-        apply_rotation_mode_once()
-    if transition.refresh_placement_fields and routing_workspace.base_env is not None and shaft_extraction is not None:
-        shaft_boundary_nodes, _ = get_shaft_entry_nodes(
-            routing_workspace.base_env, routing_workspace.base_spatial_index,
-        )
-        ap_scores, ap_fields = get_auto_placement_scores(routing_workspace.base_env, shaft_boundary_nodes)
-    return transition
 
 def main():
     global machine_cx, machine_cy, machine_angle, show_grid_graph, graph_type_idx, routing_strategy_idx
