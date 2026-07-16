@@ -11,7 +11,7 @@ def count_segments_outside_allowed_region(
     shaft_extraction_tolerance_mm=1.0,
 ):
     """Count route segments outside the allowed region, excluding shaft-entry geometry."""
-    if allowed_region is None:
+    if not routes or allowed_region is None:
         return 0
 
     outside_count = 0

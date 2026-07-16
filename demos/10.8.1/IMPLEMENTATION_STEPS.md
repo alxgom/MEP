@@ -631,6 +631,9 @@ Manual validation milestones:
 - Reduced `main.py` to the outer loop, domain composition, and rendering; each frame now synchronizes one compact event-state snapshot from the adapter.
 - Validation: Python compilation, focused UI transition/event-adapter contracts, and a headless startup/initial-solve smoke.
 
+- Made shared allowed-region validation accept blocked solver results with `routes=None`, so dwellings with no feasible route remain visible with their blocked execution status instead of crashing during frame rendering.
+- Validation: Python compilation and focused routing-validation/Sal route-analysis contracts.
+
 - Completed the Sal solver-composition boundary: `main.py` retains only live settings/session snapshots, low-level dwelling/graph callbacks, UI metrics, and the single `solve_ventilation_routing` entrypoint.
 - Made Sal route materialization lazy so paths always use the graph produced by the solver's machine-aware refresh rather than a pre-solve graph snapshot.
 - Removed residual flow/search imports and dead solver compatibility wrappers from `main.py`; strategy dispatch, flow algorithms, route planning, scoring policy, materialization, machine routing, and overlay lifecycle now remain under shared routing or `installations.sal`.

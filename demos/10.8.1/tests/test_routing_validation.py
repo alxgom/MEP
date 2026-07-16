@@ -24,6 +24,11 @@ def test_allowed_region_warning_handles_missing_region_and_outside_segments():
     ]
 
 
+def test_allowed_region_warning_handles_blocked_run_without_routes():
+    assert count_segments_outside_allowed_region(None, box(0, 0, 10, 10)) == 0
+    assert append_allowed_region_warning([], None, box(0, 0, 10, 10)) == []
+
+
 def test_allowed_region_warning_accepts_installation_shaft_route_name():
     routes = [("Core", [((-2, 5), (2, 5))])]
 
