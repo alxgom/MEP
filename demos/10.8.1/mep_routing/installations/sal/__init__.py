@@ -8,6 +8,7 @@ from .definition import SAL_INSTALLATION, SalInstallationDefinition
 from .routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
 from .route_plan import SalRoutePlan, build_sal_route_plan
 from .route_analysis import SalRouteAnalysis
+from .route_materializer import SalRouteMaterializer
 from .policy import SalSolverPolicy
 from .prepared import SalPreparedRoutingProblem
 from .strategy_dispatch import SalStrategyOutcome, SalStrategyRuntime, solve_prepared_strategy
@@ -29,6 +30,7 @@ __all__ = [
     "SalRoutingResult",
     "SalRoutePlan",
     "SalRouteAnalysis",
+    "SalRouteMaterializer",
     "SalSolverPolicy",
     "SalPreparedRoutingProblem",
     "SalStrategyOutcome",

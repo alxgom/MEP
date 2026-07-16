@@ -30,6 +30,7 @@ from mep_routing.installations.sal import (
     SAL_INSTALLATION,
     SalLiveRoutingCallbacks,
     SalLiveRoutingSession,
+    SalRouteMaterializer,
     SalSolverSettings,
     SalSolverPolicy,
 )
@@ -57,7 +58,6 @@ from mep_routing.routing import (
     RoutingWorkspace,
     TerminalRuntime,
     block_terminal_node_edges as _block_terminal_node_edges,
-    build_routes_from_paths as _build_routes_from_paths_for_env,
     count_ordered_route_turns as _count_ordered_route_turns,
     count_route_short_pieces as _count_route_short_pieces,
     count_segment_crossings as _count_segment_crossings,
@@ -71,7 +71,6 @@ from mep_routing.routing import (
     merged_route_piece_lengths as _merged_route_piece_lengths,
     ordered_small_room_names as _ordered_small_room_names,
     path_physical_length as _path_physical_length_for_env,
-    route_segments_from_path as _route_segments_from_path_for_env,
     selected_pin_names as _selected_pin_names,
     select_shaft_entry_nodes as _select_shaft_entry_nodes,
     shaft_entry_geometry as _shaft_entry_geometry_for_shaft,
@@ -79,7 +78,6 @@ from mep_routing.routing import (
     min_cost_flow as _min_cost_flow,
     positive_flow_edges as _positive_flow_edges,
     small_pin_target_specs as _small_pin_target_specs,
-    source_start_nodes as _source_start_nodes_for_kd,
     terminal_node_indices as _terminal_node_indices_for_kd,
     terminal_validity_entries as _terminal_validity_entries,
     total_route_length_m as _total_route_length_m,
@@ -1104,26 +1102,26 @@ def get_selected_pin_names(selected_route_name, routes, global_pins):
     return _selected_pin_names(selected_route_name, routes, global_pins)
 
 def _source_start_nodes(source_spec):
-    return _source_start_nodes_for_kd(source_spec, routing_workspace.spatial_index)
+    return _sal_route_materializer().source_start_nodes(source_spec)
+
+
+def _sal_route_materializer(route_plan=None):
+    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
+    return SalRouteMaterializer(
+        routing_workspace.env.nodes,
+        routing_workspace.spatial_index,
+        plan,
+        add_shaft_entry_segments if shaft_extraction else None,
+    )
 
 def _route_segments_from_path(route_name, path, pin_name=None, global_pins=None, target=None, *, route_plan=None):
-    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
-    return _route_segments_from_path_for_env(
-        route_name,
-        path,
-        routing_workspace.env.nodes,
-        add_shaft_entry_segments if shaft_extraction else None,
-        pin_name,
-        global_pins,
-        target,
-        shaft_route_name=plan.shaft_route,
+    return _sal_route_materializer(route_plan).route_segments(
+        route_name, path, pin_name, global_pins, target,
     )
 
 def _build_routes_from_paths(route_order, paths, targets, global_pins, *, route_plan=None):
-    plan = route_plan or SAL_INSTALLATION.build_route_plan(terminals, (machine_cx, machine_cy))
-    return _build_routes_from_paths_for_env(
+    return _sal_route_materializer(route_plan).build_routes(
         route_order, paths, targets, global_pins,
-        lambda *args: _route_segments_from_path(*args, route_plan=plan),
     )
 
 def get_solution_score(routes, crossings, *, policy=None):

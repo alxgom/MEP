@@ -615,6 +615,10 @@ Manual validation milestones:
 - The live Sal session now produces the analysis snapshot used by solver callbacks and UI compatibility functions; shared routing metrics remain installation-neutral.
 - Validation: Python compilation and 20 focused Sal policy/application/live-session and routing metric/scoring contracts.
 
+- Extracted `SalRouteMaterializer` as the live path-to-geometry boundary for source-node lookup, shaft-entry segments, machine-pin stubs, and multi-route assembly.
+- `main.py` now supplies the current graph nodes, spatial index, and shaft-entry callback without owning Sal route-materialization policy.
+- Validation: Python compilation and 28 focused Sal materializer/application/session/strategy and shared routing-segment contracts.
+
 Before each commit:
 
 - `git status --short`
