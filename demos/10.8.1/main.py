@@ -4,6 +4,7 @@ import time
 import traceback
 from pathlib import Path
 import pygame
+from shapely.ops import unary_union
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
     machine_pins as _machine_pins,
@@ -18,6 +19,7 @@ from mep_routing.app import (
     InstallationUiSession,
     TerminalRuntimeConfig,
     create_active_dwelling,
+    installation_context_obstacles,
     load_real_dwelling as _load_real_dwelling_source,
 )
 from mep_routing.installations.cli import CLI_INSTALLATION, CliInteractiveRuntime, cli_machine_pins
@@ -312,6 +314,7 @@ ROUTE_COLORS = {
     "Toilet": (230, 126, 34),     # Orange
     "Washroom": (26, 188, 156),   # Turquoise
     "Supply Air Tree": (52, 152, 219),
+    "Return Air Tree": (155, 89, 182),
 }
 terminal_ui = TerminalUiRuntime(canvas_ui, TerminalUiStyle(
     route_colors=ROUTE_COLORS, text_color=COLOR_TEXT,
@@ -382,7 +385,7 @@ apply_routing_key_command = workbench_commands.apply_routing_key_command
 
 def handle_machine_selector_click(pos):
     """Handle the active installation's selector without owning runtime policy."""
-    global installation_ui_session
+    global installation_ui_session, cli_machine_cx, cli_machine_cy, cli_machine_angle
     active = installation_header_state.active
     if active not in installation_ui_session.installations:
         return False, False
@@ -404,6 +407,13 @@ def handle_machine_selector_click(pos):
         if selected is not None:
             transition = installation_ui_session.choose(active, selected)
             installation_ui_session = transition.session
+            if active == "cli" and transition.changed and active_dwelling is not None:
+                placement = cli_runtime.place_machine(
+                    active_dwelling.prepared,
+                    CLI_INSTALLATION.machine_catalog.value(selected),
+                )
+                cli_machine_cx, cli_machine_cy = placement.center
+                cli_machine_angle = placement.angle_degrees
             return True, transition.runtime_invalidation_required
         installation_ui_session = installation_ui_session.dismiss_dropdown()
     return False, False
@@ -518,10 +528,11 @@ def add_shaft_entry_segments(segs, first_node_idx):
     if active_dwelling:
         active_dwelling.shaft_entries.append_segments(segs, first_node_idx, routing_workspace.env)
 
-def update_dynamic_env(machine_poly):
+def update_dynamic_env(machine_poly, context_obstacles=()):
     pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
+    obstacle = unary_union((machine_poly, *context_obstacles)) if context_obstacles else machine_poly
     graph_build_session.apply_machine_obstacle(
-        machine_poly, pins, machine_angle, clearance_mm=MACHINE_CLEARANCE,
+        obstacle, pins, machine_angle, clearance_mm=MACHINE_CLEARANCE,
     )
 
 def build_grid(machine_pins=None):
@@ -742,11 +753,11 @@ def run_auto_placement():
         print(f"[Auto-Placement] Solved position ({machine_cx}, {machine_cy}) at rotation {machine_angle} in {elapsed_ms:.2f}ms")
 
 
-def _sal_interactive_solver():
+def _sal_interactive_solver(context_obstacles=()):
     dwelling = active_dwelling
     workspace = dwelling.workspace
     callbacks = SalInteractiveCallbacks(
-        update_dynamic_env=update_dynamic_env,
+        update_dynamic_env=lambda machine_poly: update_dynamic_env(machine_poly, context_obstacles),
         build_grid=build_grid,
         shaft_entry_nodes=lambda: get_shaft_entry_nodes(workspace.env, workspace.spatial_index),
         terminal_nodes=lambda _pin_map, shaft_idx, shaft_route: _terminal_node_indices_for_kd(
@@ -764,7 +775,7 @@ def _sal_interactive_solver():
         live_session=_sal_live_routing_session(),
         terminals=dwelling.terminal_points,
         graph_type=graph_type_idx,
-        columns=tuple(dwelling.columns),
+        columns=(*dwelling.columns, *context_obstacles),
         blocked_vertical_regions=get_machine_vertical_clearance_blocks(),
         route_materializer_factory=_sal_route_materializer,
         shaft_extraction=shaft_extraction,
@@ -777,11 +788,13 @@ def _sal_interactive_solver():
 def solve_ventilation_routing():
     global installation_runs
     installation_runs = {}
+    completed_results = []
     for installation in installation_header_state.order:
         if installation not in installation_header_state.enabled:
             continue
+        context_obstacles = installation_context_obstacles(completed_results)
         if installation == "sal":
-            result = _sal_interactive_solver().solve()
+            result = _sal_interactive_solver(context_obstacles).solve()
         elif installation == "cli":
             machine_key = installation_ui_session.selected_keys["cli"]
             result = cli_runtime.solve(
@@ -789,10 +802,12 @@ def solve_ventilation_routing():
                 CLI_INSTALLATION.machine_catalog.value(machine_key),
                 (cli_machine_cx, cli_machine_cy),
                 cli_machine_angle,
+                context_obstacles=context_obstacles,
             )
         else:
             continue
         installation_runs[installation] = result
+        completed_results.append(result)
     active = installation_header_state.active
     if active not in installation_header_state.enabled:
         return [], f"Routing disabled: {active.title()}", 0.0, 0
@@ -843,9 +858,12 @@ def _apply_prepared_dwelling(prepared, *, auto_place):
     wet_room_outer_accents = prepared.wet_room_outer_accents
     machine_cx, machine_cy = prepared.machine_position
     machine_angle = 0
-    cli_point = prepared.routing_region_base.representative_point()
-    cli_machine_cx, cli_machine_cy = round(float(cli_point.x)), round(float(cli_point.y))
-    cli_machine_angle = 0
+    cli_machine = CLI_INSTALLATION.machine_catalog.value(
+        installation_ui_session.selected_keys["cli"]
+    )
+    cli_placement = cli_runtime.place_machine(prepared, cli_machine)
+    cli_machine_cx, cli_machine_cy = cli_placement.center
+    cli_machine_angle = cli_placement.angle_degrees
     current_scenario_label = prepared.label
     current_scenario_summary = prepared.summary
     shaft_core_entry_specs = active_dwelling.shaft_core_entry_specs

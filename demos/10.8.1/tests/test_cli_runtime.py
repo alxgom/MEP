@@ -60,8 +60,26 @@ def test_cli_runtime_builds_core_simple_supply_tree():
     assert result.routes[0][0] == "Supply Air Tree"
     assert result.routes[0][1]
     assert result.total_nodes > 0
-    assert result.status.startswith("Cli supply tree solved")
+    assert result.status.startswith("Cli supply/return solved")
     assert result.workspace.env is not None
+    assert [name for name, _segments in result.routes] == ["Supply Air Tree", "Return Air Tree"]
+    assert {segment.kind for segment in result.supply_segments} >= {"tree", "machine_stub"}
+    assert result.return_segments
+    assert all(segment.width_mm > 0 and segment.height_mm > 0 for segment in result.supply_segments)
+
+
+def test_cli_runtime_tracks_ordered_context_obstacles():
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION,
+        CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        context_obstacles=(box(50, 50, 100, 100),),
+    )
+    assert result.context_obstacle_count == 1
+    assert result.routes
 
 
 def test_cli_grilles_prepare_supply_and_return_per_occupied_room():

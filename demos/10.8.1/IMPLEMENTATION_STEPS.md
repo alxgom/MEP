@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Cli now solves and materializes separate supply and return-air trees with connector/grille dimensions, machine stubs, and explicit duct segment roles.
+- Enabled installations execute in header order and receive earlier machine footprints and buffered routes as contextual obstacles; Cli placement also follows the selected PEAD footprint on dwelling and machine changes.
+- Validation: Python compilation and five direct focused Cli materialization, placement, grille, runtime-context, and installation-context contracts (the available project environments do not contain pytest).
+
 - Added Cli-owned grille preparation with paired supply/return wall grilles, routing-region connection points, dimensions, roles, and room identity.
 - Added Cli-owned PEAD placement using the selected machine footprint, routing-region feasibility, fixed obstacles, contextual obstacles, and grille-distance scoring; it does not consume Sal placement fields or weights.
 - Validation: Python compilation and five focused Cli grille, placement, geometry, terminal, and runtime contracts.

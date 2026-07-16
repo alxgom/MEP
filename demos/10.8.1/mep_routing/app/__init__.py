@@ -14,6 +14,7 @@ from .installation_ui import (
     InstallationUiSession,
     MachineSelectionTransition,
 )
+from .installation_context import installation_context_obstacles
 
 from .interaction_runtime import (
     InteractionCallbacks,
@@ -40,6 +41,7 @@ __all__ = [
     "GraphBuildSession",
     "InstallationMachineUi",
     "InstallationUiSession",
+    "installation_context_obstacles",
     "MachineSelectionTransition",
     "InteractionCallbacks",
     "InteractionState",

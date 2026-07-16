@@ -33,8 +33,8 @@ def cli_machine_pins(machine, center, angle_degrees):
     return pins
 
 
-def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=20):
-    connector = machine.connector("air_out")
+def cli_air_access_spec(machine, pins, angle_degrees, connector_key, stub_length_mm=20):
+    connector = machine.connector(connector_key)
     world_normal = local_axis_to_world(connector.normal_xy, angle_degrees)
     pin = pins[connector.key]
     access = (
@@ -42,10 +42,18 @@ def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=20):
         round(pin[1] + world_normal[1] * stub_length_mm),
     )
     out_direction = dir_from_axis(world_normal)
-    return ({
+    return {
         "pin": connector.key,
         "pin_point": pin,
         "access_point": access,
         "out_dir": out_direction,
         "in_dir": DIR_REV[out_direction],
-    },)
+    }
+
+
+def cli_air_access_specs(machine, pins, angle_degrees, connector_keys=("air_out", "air_in")):
+    return tuple(cli_air_access_spec(machine, pins, angle_degrees, key) for key in connector_keys)
+
+
+def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=20):
+    return (cli_air_access_spec(machine, pins, angle_degrees, "air_out", stub_length_mm),)
