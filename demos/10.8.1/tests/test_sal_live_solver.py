@@ -1,7 +1,11 @@
 from types import SimpleNamespace
 
 from mep_routing.domain import MachineSpec
-from mep_routing.installations.sal import SalLiveRoutingSession, SalSolverSettings
+from mep_routing.installations.sal import (
+    SalLiveRoutingCallbacks,
+    SalLiveRoutingSession,
+    SalSolverSettings,
+)
 
 
 def test_live_routing_session_uses_one_policy_machine_and_workspace_snapshot():
@@ -38,3 +42,30 @@ def test_live_routing_session_uses_one_policy_machine_and_workspace_snapshot():
     assert runtime.context.machine_overall_width_mm == 350
     assert runtime.context.machine_body_height_mm == 200
     assert runtime.context.route_diameter("Shaft") == 140
+
+
+def test_live_session_derives_adapter_machine_and_workspace_hooks():
+    workspace = SimpleNamespace(grid_available=True, env=object())
+    machine = SimpleNamespace(
+        center=(10, 20), angle=90, pins={"pin": (1, 2)},
+        preflight_error=lambda: None, refresh_graph=lambda _pins: None,
+        snap_pins=lambda _pins: {},
+    )
+    spec = SimpleNamespace(
+        small_duct_diameter_mm=80, large_duct_diameter_mm=140,
+        route_diameter_mm=lambda _name: 80,
+    )
+    settings = SalSolverSettings(1, 1, 0, 0, 0, 99, 1, 0, 0)
+    session = SimpleNamespace(
+        installation=object(), machine_spec=spec, workspace=workspace,
+        machine_center=(10, 20), machine_angle=90, settings=settings,
+        routing_runtime=lambda _env, _policy: object(),
+    )
+    callback = lambda *_args, **_kwargs: None
+    callbacks = SalLiveRoutingCallbacks(*([callback] * 12))
+
+    adapter = SalLiveRoutingSession.application_adapter(session, machine, {}, callbacks)
+    assert adapter.machine_center == (10, 20) and adapter.machine_angle == 90
+    assert adapter.small_diameter == 80 and adapter.large_diameter == 140
+    assert adapter.hooks.grid_available() is True
+    assert adapter.hooks.machine_pins() == {"pin": (1, 2)}

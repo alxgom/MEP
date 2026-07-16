@@ -598,6 +598,9 @@ Manual validation milestones:
 - Extracted Sal's live weight/search runtime composition into `SalLiveRoutingSession`, keeping one policy snapshot aligned with the selected machine, graph backend, cache, and overlay.
 - Validation: Python compilation, 12 focused machine/Sal contracts, and a 12-second headless startup solve.
 
+- Moved Sal application-hook and adapter assembly behind the existing live session; `main.py` now supplies only a compact bundle of demo-specific route callbacks.
+- Validation: Python compilation, 13 focused machine/Sal contracts, and a 12-second headless startup solve.
+
 Before each commit:
 
 - `git status --short`

@@ -28,8 +28,7 @@ from mep_routing.data_sources import (
 )
 from mep_routing.installations.sal import (
     SAL_INSTALLATION,
-    SalApplicationAdapter,
-    SalApplicationHooks,
+    SalLiveRoutingCallbacks,
     SalLiveRoutingSession,
     SalSolverSettings,
     SalSolverPolicy,
@@ -1278,13 +1277,7 @@ def _sal_application_adapter():
         build_grid=build_grid,
     )
 
-    hooks = SalApplicationHooks(
-        preflight_error=machine_session.preflight_error,
-        grid_available=lambda: routing_workspace.grid_available,
-        machine_pins=lambda: machine_session.pins,
-        refresh_graph=machine_session.refresh_graph,
-        current_env=lambda: routing_workspace.env,
-        snap_pins=machine_session.snap_pins,
+    callbacks = SalLiveRoutingCallbacks(
         shaft_entry_nodes=lambda: get_shaft_entry_nodes(routing_workspace.env, routing_workspace.spatial_index),
         terminal_nodes=lambda _pin_map, shaft_idx, shaft_route: _terminal_node_indices_for_kd(
             terminals, shaft_idx, routing_workspace.spatial_index, shaft_route_name=shaft_route,
@@ -1292,28 +1285,17 @@ def _sal_application_adapter():
         block_terminal_edges=lambda weights, terminal_map, block_weight: _block_terminal_node_edges(
             weights, routing_workspace.env.adj, terminal_map, block_weight,
         ),
-        routing_runtime=lambda policy: _routing_runtime(routing_workspace.env, policy),
         source_start_nodes=_source_start_nodes,
         weighted_edge_cost=_weighted_edge_cost_for_weights,
         line_graph_direction=_line_graph_dir_from_points_for_env,
         route_start_nodes=get_route_start_nodes,
         route_segments_from_path=lambda plan, *args: _route_segments_from_path(*args, route_plan=plan),
         build_routes_from_paths=lambda plan, *args: _build_routes_from_paths(*args, route_plan=plan),
-        route_diameter=get_route_diameter,
         count_crossings=count_segment_crossings,
         score_routes=lambda routes, crossings, policy: get_solution_score(routes, crossings, policy=policy),
         conflict_summary=get_route_conflict_summary,
     )
-    return SalApplicationAdapter(
-        installation=SAL_INSTALLATION,
-        terminals=terminals,
-        machine_center=(machine_cx, machine_cy),
-        machine_angle=machine_angle,
-        small_diameter=MACHINE_SMALL_DUCT_D,
-        large_diameter=MACHINE_LARGE_DUCT_D,
-        settings=_sal_solver_settings(),
-        hooks=hooks,
-    )
+    return _sal_live_routing_session().application_adapter(machine_session, terminals, callbacks)
 
 
 def solve_ventilation_routing():

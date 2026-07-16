@@ -6,7 +6,23 @@ from dataclasses import dataclass
 
 from mep_routing.routing import RoutingRuntime, RoutingWeightRuntimeContext
 
-from .application import SalSolverSettings
+from .application import SalApplicationAdapter, SalApplicationHooks, SalSolverSettings
+
+
+@dataclass(frozen=True)
+class SalLiveRoutingCallbacks:
+    shaft_entry_nodes: object
+    terminal_nodes: object
+    block_terminal_edges: object
+    source_start_nodes: object
+    weighted_edge_cost: object
+    line_graph_direction: object
+    route_start_nodes: object
+    route_segments_from_path: object
+    build_routes_from_paths: object
+    count_crossings: object
+    score_routes: object
+    conflict_summary: object
 
 
 @dataclass(frozen=True)
@@ -24,6 +40,40 @@ class SalLiveRoutingSession:
     settings: SalSolverSettings
     search_backend_index: int
     estimate_turns: object
+
+    def application_adapter(self, machine_session, terminals, callbacks):
+        hooks = SalApplicationHooks(
+            preflight_error=machine_session.preflight_error,
+            grid_available=lambda: self.workspace.grid_available,
+            machine_pins=lambda: machine_session.pins,
+            refresh_graph=machine_session.refresh_graph,
+            current_env=lambda: self.workspace.env,
+            snap_pins=machine_session.snap_pins,
+            shaft_entry_nodes=callbacks.shaft_entry_nodes,
+            terminal_nodes=callbacks.terminal_nodes,
+            block_terminal_edges=callbacks.block_terminal_edges,
+            routing_runtime=lambda policy: self.routing_runtime(self.workspace.env, policy),
+            source_start_nodes=callbacks.source_start_nodes,
+            weighted_edge_cost=callbacks.weighted_edge_cost,
+            line_graph_direction=callbacks.line_graph_direction,
+            route_start_nodes=callbacks.route_start_nodes,
+            route_segments_from_path=callbacks.route_segments_from_path,
+            build_routes_from_paths=callbacks.build_routes_from_paths,
+            route_diameter=self.machine_spec.route_diameter_mm,
+            count_crossings=callbacks.count_crossings,
+            score_routes=callbacks.score_routes,
+            conflict_summary=callbacks.conflict_summary,
+        )
+        return SalApplicationAdapter(
+            installation=self.installation,
+            terminals=terminals,
+            machine_center=self.machine_center,
+            machine_angle=self.machine_angle,
+            small_diameter=self.machine_spec.small_duct_diameter_mm,
+            large_diameter=self.machine_spec.large_duct_diameter_mm,
+            settings=self.settings,
+            hooks=hooks,
+        )
 
     @property
     def policy(self):

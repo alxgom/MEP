@@ -3,7 +3,7 @@
 from .catalog import SAL_OZEO_FLAT_MACHINE
 from .controller import SalRoutingControllerContext, SalRoutingResult, solve_routing
 from .application import SalApplicationAdapter, SalApplicationHooks, SalSolverSettings
-from .live_solver import SalLiveRoutingSession
+from .live_solver import SalLiveRoutingCallbacks, SalLiveRoutingSession
 from .definition import SAL_INSTALLATION, SalInstallationDefinition
 from .routes import KITCHEN_ROUTE_NAME, LARGE_DUCT_ROUTE_NAMES, SHAFT_ROUTE_NAME
 from .route_plan import SalRoutePlan, build_sal_route_plan
@@ -24,6 +24,7 @@ __all__ = [
     "SalApplicationHooks",
     "SalSolverSettings",
     "SalLiveRoutingSession",
+    "SalLiveRoutingCallbacks",
     "SalRoutingResult",
     "SalRoutePlan",
     "SalSolverPolicy",
