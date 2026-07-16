@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added `PlacementSession` as the bound owner of active-dwelling placement feasibility, vertical-clearance exclusions, weight policy, cached topological fields, automatic placement, and field-alignment rotation.
+- `main.py` now applies placement outcomes to live machine coordinates while the reusable session owns calculation state; selected-machine and dwelling inputs remain explicit at the binding seam.
+- Validation: Python compilation and focused placement-session contracts.
+
 - Added `RoutingObservationRuntime` as the application-facing owner of routing history, snapshots, manual logs, and automatic-best markers; `main.py` now only supplies the live UI state mapping and restore application.
 - Added `WorkbenchChromeRuntime` for solution-log hit state, help controls, transient messages, and viewer legend rendering, and routed the Pygame event adapter through that state owner.
 - Validation: Python compilation, focused observation/chrome contracts, and the Demo 10.8.1 test suite.

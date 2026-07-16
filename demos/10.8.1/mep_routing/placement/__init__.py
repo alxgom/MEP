@@ -1,6 +1,7 @@
 """Machine placement helpers for the interactive routing workbench."""
 
 from .application import PlacementApplicationAdapter
+from .session import PlacementSession
 from .feasibility import candidate_machine_rooms, is_machine_placement_valid
 from .vertical_clearance import (
     available_machine_placement_region,
@@ -33,6 +34,7 @@ from .scoring import (
 
 __all__ = [
     "PlacementApplicationAdapter",
+    "PlacementSession",
     "area_out_percentage",
     "available_machine_placement_region",
     "best_valid_rotation_for_point",
