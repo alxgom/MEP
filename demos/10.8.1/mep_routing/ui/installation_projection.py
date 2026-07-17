@@ -37,6 +37,7 @@ class InstallationProjection:
     terminals: Mapping
     pose: tuple
     pins: Mapping
+    color: tuple[int, int, int] = (105, 113, 124)
 
     @property
     def routes(self):
@@ -54,7 +55,7 @@ class WorkbenchProjection:
     @property
     def context_layers(self):
         return tuple(
-            CanvasContextLayer(item.key, item.terminals, item.routes, item.pins)
+            CanvasContextLayer(item.key, item.terminals, item.routes, item.pins, item.color)
             for item in self.visible if not item.active
         )
 
@@ -94,6 +95,9 @@ def project_workbench(app):
         items.append(InstallationProjection(
             key, key == active_key, projected, result, workspace, terminals,
             state.pose.as_tuple(), runtime.machine_pins(state),
+            getattr(app, "theme", SimpleNamespace(installation_colors={})).installation_colors.get(
+                key, (105, 113, 124),
+            ),
         ))
     active = next((item for item in items if item.active), None)
     if active is None:
@@ -103,7 +107,9 @@ def project_workbench(app):
             active_key, True, ProjectedCapabilities(),
             SimpleNamespace(routes=(), status=f"Routing disabled: {active_key.title()}", elapsed_ms=0.0, total_nodes=0),
             dwelling.workspace, app.terminals, state.pose.as_tuple(),
-            {},
+            {}, getattr(app, "theme", SimpleNamespace(installation_colors={})).installation_colors.get(
+                active_key, (105, 113, 124),
+            ),
         )
     return WorkbenchProjection(active, tuple(items))
 

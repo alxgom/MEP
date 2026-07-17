@@ -51,25 +51,48 @@ def draw_transient_message(screen, font, message, canvas_origin, text_color):
     screen.blit(label, (rect.left + 10, rect.top + 6))
 
 
-def draw_viewer_legend(screen, font, canvas_bounds, show_terminal_validity, plan_label_color, wet_room_color, wall_color, draw_validity_square):
+def draw_viewer_legend(
+    screen, font, canvas_bounds, show_terminal_validity, plan_label_color,
+    wet_room_color, wall_color, draw_validity_square, installation_entries=(),
+):
     import pygame
     canvas_left, canvas_top, _canvas_width, canvas_height = canvas_bounds
-    x, y = canvas_left + 18, canvas_top + canvas_height - 34
+    x, bottom = canvas_left + 18, canvas_top + canvas_height - 10
+    room_label = font.render("ROOMS", True, (96, 102, 110))
+    wet_label = font.render("wet rooms", True, plan_label_color)
+    room_rect = pygame.Rect(x, bottom - 42, max(116, wet_label.get_width() + 58), 32)
+    pygame.draw.rect(screen, (248, 247, 243), room_rect, border_radius=4)
+    pygame.draw.rect(screen, (140, 146, 150), room_rect, 1, border_radius=4)
+    screen.blit(room_label, (room_rect.x + 8, room_rect.y + 3))
+    pygame.draw.line(screen, wet_room_color, (room_rect.x + 10, room_rect.bottom - 9), (room_rect.x + 36, room_rect.bottom - 9), 3)
+    pygame.draw.line(screen, wall_color, (room_rect.x + 10, room_rect.bottom - 6), (room_rect.x + 36, room_rect.bottom - 6), 1)
+    screen.blit(wet_label, (room_rect.x + 44, room_rect.bottom - wet_label.get_height() - 3))
+
+    next_bottom = room_rect.y - 8
+    if installation_entries:
+        labels = [(label, font.render(label + (" (active)" if active else ""), True, plan_label_color), color)
+                  for label, color, active in installation_entries]
+        width = max(130, max(surface.get_width() for _label, surface, _color in labels) + 40)
+        install_rect = pygame.Rect(x, next_bottom - (18 + len(labels) * 18), width, 18 + len(labels) * 18)
+        pygame.draw.rect(screen, (248, 247, 243), install_rect, border_radius=4)
+        pygame.draw.rect(screen, (140, 146, 150), install_rect, 1, border_radius=4)
+        screen.blit(font.render("INSTALLATIONS", True, (96, 102, 110)), (install_rect.x + 8, install_rect.y + 3))
+        for index, (_label, surface, color) in enumerate(labels):
+            row_y = install_rect.y + 18 + index * 18
+            pygame.draw.line(screen, color, (install_rect.x + 10, row_y + 7), (install_rect.x + 30, row_y + 7), 4)
+            screen.blit(surface, (install_rect.x + 36, row_y))
+        next_bottom = install_rect.y - 8
+
     if show_terminal_validity:
         allowed = font.render("allowed", True, plan_label_color)
         blocked = font.render("blocked", True, plan_label_color)
-        rect = pygame.Rect(x, y - 30, 34 + allowed.get_width() + 28 + blocked.get_width() + 18, 24)
+        rect = pygame.Rect(x, next_bottom - 42, 34 + allowed.get_width() + 28 + blocked.get_width() + 18, 42)
         pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
         pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
-        draw_validity_square(screen, (rect.x + 15, rect.centery), 12, True)
-        screen.blit(allowed, (rect.x + 28, rect.centery - allowed.get_height() // 2))
+        screen.blit(font.render("TERMINAL VALIDITY VIEW", True, (96, 102, 110)), (rect.x + 8, rect.y + 3))
+        row_y = rect.bottom - 11
+        draw_validity_square(screen, (rect.x + 15, row_y), 12, True)
+        screen.blit(allowed, (rect.x + 28, row_y - allowed.get_height() // 2))
         blocked_x = rect.x + 34 + allowed.get_width() + 22
-        draw_validity_square(screen, (blocked_x, rect.centery), 12, False)
-        screen.blit(blocked, (blocked_x + 14, rect.centery - blocked.get_height() // 2))
-    label = font.render("wet rooms", True, plan_label_color)
-    rect = pygame.Rect(x, y, label.get_width() + 58, 24)
-    pygame.draw.rect(screen, (248, 247, 243), rect, border_radius=4)
-    pygame.draw.rect(screen, (140, 146, 150), rect, 1, border_radius=4)
-    pygame.draw.line(screen, wet_room_color, (rect.x + 10, rect.centery), (rect.x + 36, rect.centery), 3)
-    pygame.draw.line(screen, wall_color, (rect.x + 10, rect.centery + 3), (rect.x + 36, rect.centery + 3), 1)
-    screen.blit(label, (rect.x + 44, rect.centery - label.get_height() // 2))
+        draw_validity_square(screen, (blocked_x, row_y), 12, False)
+        screen.blit(blocked, (blocked_x + 14, row_y - blocked.get_height() // 2))

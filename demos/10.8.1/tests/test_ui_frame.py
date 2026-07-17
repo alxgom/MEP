@@ -89,6 +89,7 @@ def test_canvas_builder_accepts_cli_connector_schema():
         selected_room_polygon=None, global_pins=pins, selected_pins=set(),
         context_layers=(CanvasContextLayer(
             "sal", {"Kitchen": (8, 3)}, (("Kitchen", (((1, 1), (8, 3)),)),), _pins(),
+            (200, 50, 50),
         ),),
         auto_placement_mode=0, placement_fields={}, wet_room_names=(),
         route_colors={"Supply Air Tree": (52, 152, 219)}, palette=_palette(),
@@ -100,7 +101,7 @@ def test_canvas_builder_accepts_cli_connector_schema():
 
     assert len(scene.machines) == 2
     assert len(scene.machine.pins) == 4
-    assert scene.routes[0].color == (105, 113, 124)
+    assert scene.routes[0].color == (172, 79, 79)
     assert scene.routes[1].segments == [((2, 3), (6, 3))]
     assert scene.terminals[0].label == "Kitchen"
 

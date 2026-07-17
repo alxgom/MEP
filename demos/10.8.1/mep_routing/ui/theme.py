@@ -19,6 +19,15 @@ def _route_colors() -> Mapping[str, Color]:
     })
 
 
+def _installation_colors() -> Mapping[str, Color]:
+    return MappingProxyType({
+        "sal": (192, 57, 52),
+        "cli": (52, 152, 219),
+        "san": (46, 166, 113),
+        "coc": (230, 144, 52),
+    })
+
+
 @dataclass(frozen=True)
 class WorkbenchTheme:
     installation_header_top: int = 4
@@ -59,10 +68,12 @@ class WorkbenchTheme:
     terminal_blocked: Color = (142, 78, 86)
     terminal_blocked_hatch: Color = (96, 54, 62)
     route_colors: Mapping[str, Color] = field(default_factory=_route_colors)
+    installation_colors: Mapping[str, Color] = field(default_factory=_installation_colors)
 
-    def chrome_colors(self) -> dict[str, Color]:
+    def chrome_colors(self) -> dict[str, object]:
         return {
             "plot_background": self.plot_background, "text": self.text,
             "muted": self.muted, "plan_label": self.plan_label,
             "wet_room": self.wet_room_accent, "wall": self.wall,
+            "installations": self.installation_colors,
         }

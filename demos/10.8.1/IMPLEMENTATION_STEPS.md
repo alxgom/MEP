@@ -810,6 +810,10 @@ Before each commit:
 - Cli return ventilation now defaults off while retaining the existing per-session toggle and runtime behavior.
 - Validation: Python compilation, focused header/event/sidebar/state contracts, the full 370-contract Demo suite, and an eight-second headless startup smoke.
 
+- Added one theme-owned installation colour map. Non-active routes, terminals, and machines retain their installation colour blended toward a subdued context tone instead of collapsing to neutral grey.
+- Split the lower canvas legend into stable room semantics, enabled-installation colours with an active label, and a terminal-validity legend that appears only with its toggleable view. Plot and colorbar rendering remain unchanged.
+- Validation: Python compilation, focused projection/frame/theme/chrome contracts, the full 370-contract Demo suite, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

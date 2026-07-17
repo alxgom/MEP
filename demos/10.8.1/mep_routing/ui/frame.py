@@ -55,6 +55,7 @@ class CanvasContextLayer:
     terminals: Mapping[str, tuple[float, float]]
     routes: Sequence[tuple[str, Sequence]]
     global_pins: Mapping[str, tuple[float, float]]
+    color: Color = (105, 113, 124)
 
 
 @dataclass(frozen=True)
@@ -143,20 +144,22 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
     route_strokes = []
     context_machines = []
     for layer in state.context_layers:
+        context_color = tuple(int(channel * 0.62 + 128 * 0.38) for channel in layer.color)
+        context_dark = tuple(max(0, channel - 35) for channel in context_color)
         for route_name, point in layer.terminals.items():
             terminal_markers.append(TerminalMarker(
-                to_screen(*point), (116, 124, 134), (82, 88, 96), (92, 98, 106),
+                to_screen(*point), context_color, context_dark, context_dark,
                 route_name,
             ))
         for route_name, segments in layer.routes:
             route_strokes.append(RouteStroke(
                 [(to_screen(*p1), to_screen(*p2)) for p1, p2 in segments],
-                max(2, callbacks.route_draw_width(route_name) - 1), (105, 113, 124), False,
+                max(2, callbacks.route_draw_width(route_name) - 1), context_color, False,
             ))
         if all(name in layer.global_pins for name in ("c_tl", "c_tr", "c_br", "c_bl")):
             context_machines.append(MachineRender(
                 [to_screen(*layer.global_pins[name]) for name in ("c_tl", "c_tr", "c_br", "c_bl")],
-                (96, 102, 110), (),
+                context_color, (),
             ))
     for route_name, point in state.terminals.items():
         core = state.route_colors.get(route_name, (255, 255, 255))

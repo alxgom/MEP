@@ -78,12 +78,12 @@ class WorkbenchChromeRuntime:
                 self.colors["text"],
             )
 
-    def draw_viewer_legend(self, screen, font, show_terminal_validity):
+    def draw_viewer_legend(self, screen, font, show_terminal_validity, installation_entries=()):
         from .help import draw_viewer_legend
         return draw_viewer_legend(
             screen, font, self.viewport.canvas_rect, show_terminal_validity,
             self.colors["plan_label"], self.colors["wet_room"], self.colors["wall"],
-            self.terminal_ui.draw_validity_square,
+            self.terminal_ui.draw_validity_square, installation_entries,
         )
 
     def draw_plots(self, screen, font_small, font_title, font_value, font_minimum, history):

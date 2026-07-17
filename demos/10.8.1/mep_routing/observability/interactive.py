@@ -125,6 +125,16 @@ class InteractiveObservationController:
         return self.chrome.draw_transient(screen, font)
 
     def draw_viewer_legend(self, screen, font):
+        options = {item.key: item.label for item in self.app.INSTALLATION_OPTIONS}
+        entries = tuple(
+            (
+                options.get(key, key.title()),
+                self.app.theme.installation_colors.get(key, (105, 113, 124)),
+                key == self.app.installation_header_state.active,
+            )
+            for key in self.app.installation_header_state.order
+            if key in self.app.installation_header_state.enabled
+        )
         return self.chrome.draw_viewer_legend(
-            screen, font, self.app.terminal_validity_overlay_enabled,
+            screen, font, self.app.terminal_validity_overlay_enabled, entries,
         )
