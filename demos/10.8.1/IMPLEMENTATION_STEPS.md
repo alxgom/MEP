@@ -758,6 +758,10 @@ Before each commit:
 - Added a keyed `WorkbenchState` with independent Sal/Cli machine poses and results plus one dwelling-session owner. Removed the corresponding flat globals and migrated routing, activation, observation, commands, events, and canvas rendering to the state boundary while keeping machine selection in `InstallationUiSession`.
 - Validation: Python compilation and seven focused state, command, observation, and UI-facade contracts.
 
+- Added a narrow installation runtime lifecycle with concrete Sal and Cli adapters. The shared contract covers only solve context, machine pins, and declared interaction capabilities; each installation retains its own graph, placement, and solver implementation.
+- Added a registry/coordinator for ordered context-aware execution and keyed `WorkbenchState` result publication. `DemoRoutingController` no longer assembles per-run solver/pin lambdas or owns result replacement.
+- Validation: Python compilation and focused installation coordinator order, contextual obstacle, stale-result, and active-result contracts.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

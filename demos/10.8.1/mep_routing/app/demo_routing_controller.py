@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from shapely.ops import unary_union
 
-from mep_routing.app.installation_execution import InstallationRunSpec, execute_installations
+from mep_routing.app.installation_execution import InstallationCoordinator
+from mep_routing.app.installation_runtime import (
+    CliInstallationRuntime, InstallationRegistry, SalInstallationRuntime,
+)
 from mep_routing.domain import machine_pins, port_access_specs
-from mep_routing.installations.cli import cli_machine_pins
 from mep_routing.installations.sal import (
     SalInteractiveCallbacks,
     SalInteractiveSolver,
@@ -37,6 +39,12 @@ class DemoRoutingController:
 
     def __init__(self, app):
         self.app = app
+        self.installations = InstallationRegistry((
+            SalInstallationRuntime(self), CliInstallationRuntime(app),
+        ))
+        self.installation_coordinator = InstallationCoordinator(
+            self.installations, app.workbench_state,
+        )
 
     def _pose(self, key="sal"):
         return self.app.workbench_state.installation(key).pose
@@ -255,29 +263,8 @@ class DemoRoutingController:
 
     def solve_installations(self):
         a = self.app
-        machine_key = a.installation_ui_session.selected_keys["cli"]
-        cli_machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
-        sal_pose = self._pose("sal")
-        cli_pose = self._pose("cli")
-        specs = {
-            "sal": InstallationRunSpec(
-                lambda context: self.interactive_solver(context).solve(),
-                lambda: self.machine_pins(*sal_pose.as_tuple()),
-            ),
-            "cli": InstallationRunSpec(
-                lambda context: a.cli_runtime.solve(
-                    self._dwelling().active.prepared, cli_machine,
-                    cli_pose.center, cli_pose.angle_degrees,
-                    context_obstacles=context,
-                ),
-                lambda: cli_machine_pins(
-                    cli_machine, cli_pose.center, cli_pose.angle_degrees,
-                ),
-            ),
-        }
-        execution = execute_installations(
+        execution = self.installation_coordinator.execute(
             a.installation_header_state.order, a.installation_header_state.enabled,
-            a.installation_header_state.active, specs,
+            a.installation_header_state.active, self._dwelling().active,
         )
-        a.workbench_state.replace_runs(execution.runs)
         return execution.routing_tuple()
