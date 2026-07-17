@@ -10,24 +10,16 @@ from mep_routing.domain import (
 from mep_routing.config import SALUBRIDAD_DEFAULTS as _SALUBRIDAD_DEFAULTS
 from mep_routing.app import (
     CommonGraphConfig,
-    GraphBuildSession,
     InstallationGraphProfile,
     InstallationMachineUi,
     InstallationUiSession,
     TerminalRuntimeConfig,
-    create_active_dwelling,
-    load_real_dwelling as _load_real_dwelling_source,
 )
 from mep_routing.app.demo_routing_controller import DemoRoutingController
+from mep_routing.app.dwelling_runtime import DwellingRuntime
 from mep_routing.installations.cli import CLI_INSTALLATION, CliInteractiveRuntime, cli_machine_pins
 from mep_routing.data_sources import (
-    build_wall_polygons as _build_wall_polygons_for_dwelling,
-    build_synthetic_dwelling as _build_synthetic_dwelling_for_layout,
-    choose_initial_machine_position as _choose_initial_machine_position_for_dwelling,
-    derive_room_boundary_walls as _derive_room_boundary_walls_for_dwelling,
     discover_dwelling_cases as _discover_dwelling_cases,
-    prepare_real_dwelling as _prepare_real_dwelling,
-    prepare_synthetic_dwelling as _prepare_synthetic_dwelling,
     build_core_shaft_entry_specs as _source_core_shaft_entry_specs,
 )
 from mep_routing.installations.sal import (
@@ -37,7 +29,6 @@ from mep_routing.installations.sal.graph_inputs import build_sal_simple_graph_in
 from mep_routing.geometry import iter_polygons as _iter_polygons
 from mep_routing.placement import (
     PlacementSession,
-    insufficient_machine_clearance_regions as _insufficient_machine_clearance_regions,
 )
 from mep_routing.routing import (
     count_segment_crossings as _count_segment_crossings,
@@ -477,6 +468,7 @@ ap_scores = {}
 ap_fields = {}
 machine_vertical_clearance_blocks = ()
 routing_controller = DemoRoutingController(sys.modules[__name__])
+dwelling_runtime = DwellingRuntime(sys.modules[__name__])
 def get_representative_point(poly):
     centroid = poly.centroid
     if poly.contains(centroid):
@@ -613,108 +605,10 @@ _sal_interactive_solver = routing_controller.interactive_solver
 # ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
 solve_ventilation_routing = routing_controller.solve_installations
 
-def generate_synthetic_dwelling():
-    scenario = _build_synthetic_dwelling_for_layout(
-        generative_layout,
-        generative_layout.Room,
-        get_representative_point,
-        scale_to_mm=SCALE_TO_MM,
-        wall_thickness_mm=WALL_THICKNESS,
-    )
-    _apply_prepared_dwelling(_prepare_synthetic_dwelling(scenario), auto_place=False)
-
-
-def _apply_prepared_dwelling(prepared, *, auto_place):
-    global rooms, columns, shafts, covers, doors, walls, wall_polys, routing_region_base, shaft_extraction, terminals, wet_room_names
-    global machine_cx, machine_cy, machine_angle, cli_machine_cx, cli_machine_cy, cli_machine_angle, _bnd_segs
-    global current_scenario_label, current_scenario_summary, shaft_core_entry_specs, wet_room_outer_accents
-    global terminal_runtime, machine_vertical_clearance_blocks, active_dwelling, routing_workspace, graph_build_session
-    active_dwelling = create_active_dwelling(
-        prepared, COMMON_GRAPH_CONFIG, SAL_GRAPH_PROFILE, TERMINAL_RUNTIME_CONFIG,
-    )
-    routing_workspace = active_dwelling.workspace
-    terminal_runtime = active_dwelling.terminals
-    terminal_ui.bind(active_dwelling)
-    graph_build_session = GraphBuildSession(
-        routing_workspace, terminal_runtime,
-        invalidate_room_start_node_cache, invalidate_terminal_validity_cache,
-    )
-
-    # Compatibility aliases for UI code while consumers migrate to the session.
-    rooms = active_dwelling.rooms
-    columns = active_dwelling.columns
-    shafts = active_dwelling.shafts
-    covers = active_dwelling.covers
-    doors = active_dwelling.doors
-    walls = active_dwelling.walls
-    wall_polys = active_dwelling.wall_polygons
-    routing_region_base = active_dwelling.routing_region
-    shaft_extraction = active_dwelling.shaft_extraction
-    terminals = active_dwelling.terminal_points
-    wet_room_names = active_dwelling.wet_room_names
-    wet_room_outer_accents = prepared.wet_room_outer_accents
-    machine_cx, machine_cy = prepared.machine_position
-    machine_angle = 0
-    cli_machine = CLI_INSTALLATION.machine_catalog.value(
-        installation_ui_session.selected_keys["cli"]
-    )
-    cli_placement = cli_runtime.place_machine(prepared, cli_machine)
-    cli_machine_cx, cli_machine_cy = cli_placement.center
-    cli_machine_angle = cli_placement.angle_degrees
-    current_scenario_label = prepared.label
-    current_scenario_summary = prepared.summary
-    shaft_core_entry_specs = active_dwelling.shaft_core_entry_specs
-    _bnd_segs = None
-    machine_vertical_clearance_blocks = _insufficient_machine_clearance_regions(
-        rooms, MACHINE_SPEC.installation_height_mm, MACHINE_SPEC.installation_clearance_mm,
-    )
-    placement_session.bind(
-        routing_workspace, rooms, terminals, wet_room_names, routing_region_base,
-        shaft_extraction, machine_vertical_clearance_blocks,
-        (*walls, *wall_polys), columns, shafts,
-    )
-    graph_build_session.build_base_regular()
-    if auto_place:
-        run_auto_placement()
-    pins = get_machine_pins(machine_cx, machine_cy, machine_angle)
-    build_grid(machine_pins=pins)
-
-def _load_real_dwelling():
-    if not REAL_DWELLING_SCENARIOS:
-        raise RuntimeError("Dwelling export database contains no cases.")
-    case = REAL_DWELLING_SCENARIOS[real_scenario_idx % len(REAL_DWELLING_SCENARIOS)]
-    return _load_real_dwelling_source(
-        loader=load_dwelling_scenario, summarizer=scenario_summary,
-        db_path=REAL_DWELLING_DB, case=case,
-        frame_name=ROUTING_FRAME_OPTIONS[routing_frame_idx % len(ROUTING_FRAME_OPTIONS)],
-        preferred_shaft_installation=PREFERRED_SHAFT_INSTALLATION,
-    )
-
-def generate_new_dwelling():
-    invalidate_room_start_node_cache()
-    if DWELLING_SOURCE_MODES[dwelling_source_idx] == "Random Synthetic":
-        generate_synthetic_dwelling()
-        return
-
-    try:
-        scenario, label, summary = _load_real_dwelling()
-    except Exception as err:
-        print(f"Real dwelling load failed, falling back to synthetic: {err}")
-        generate_synthetic_dwelling()
-        return
-    prepared = _prepare_real_dwelling(
-        scenario,
-        wall_thickness_mm=WALL_THICKNESS,
-        label=label,
-        summary=summary,
-        derive_walls=_derive_room_boundary_walls_for_dwelling,
-        build_wall_polygons=_build_wall_polygons_for_dwelling,
-        choose_machine_position=lambda terminals, shaft: _choose_initial_machine_position_for_dwelling(
-            terminals, shaft, get_representative_point,
-        ),
-        build_core_entry_specs=_build_core_shaft_entry_specs,
-    )
-    _apply_prepared_dwelling(prepared, auto_place=True)
+generate_synthetic_dwelling = dwelling_runtime.generate_synthetic
+_apply_prepared_dwelling = dwelling_runtime.apply_prepared
+_load_real_dwelling = dwelling_runtime.load_real
+generate_new_dwelling = dwelling_runtime.generate
 
 def draw_colorbar(screen, node_scores):
     return canvas_ui.draw_distance_colorbar(

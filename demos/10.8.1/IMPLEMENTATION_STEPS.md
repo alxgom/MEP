@@ -666,6 +666,9 @@ Before each commit:
 
 ## Open Items
 
+- Added `DwellingRuntime` as the owner of synthetic/real source preparation and fallback, active-session publication, terminal/placement binding order, Cli initial placement, clearance derivation, and initial graph construction. `main.py` retains four event-adapter aliases.
+- Validation: Python compilation, `git diff --check`, and a generated synthetic dwelling Sal solve (8 rooms, 4 terminals, 5 routes). `main.py` is 686 physical lines after this boundary.
+
 - Added `InteractiveObservationController` as the compatibility boundary for KPI capture, history/log updates, reproducible UI-state snapshots, snapshot restoration, and observation chrome callbacks.
 - Plot drawing now belongs to `WorkbenchChromeRuntime`; `main.py` preserves the workbench callback surface through bound controller methods and reached 791 physical lines.
 - Validation: Python compilation and a focused observation snapshot round-trip contract.
