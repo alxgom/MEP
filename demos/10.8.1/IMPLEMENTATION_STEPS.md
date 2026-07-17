@@ -755,6 +755,9 @@ Before each commit:
 - Plot text uses one Arial-compatible family: 16 px bold titles, 14 px bold current values, 13 px minimum labels, and 11 px annotations, all with lining figures.
 - Real dwelling choices are discovered from every row in the configured dwellings-export SQLite catalog; selection retains project identity and no longer depends on a hardcoded case list in `main.py`.
 
+- Added a keyed `WorkbenchState` with independent Sal/Cli machine poses and results plus one dwelling-session owner. Removed the corresponding flat globals and migrated routing, activation, observation, commands, events, and canvas rendering to the state boundary while keeping machine selection in `InstallationUiSession`.
+- Validation: Python compilation and seven focused state, command, observation, and UI-facade contracts.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

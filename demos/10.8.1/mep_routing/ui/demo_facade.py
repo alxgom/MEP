@@ -42,12 +42,14 @@ class DemoUiFacade:
             if selected is not None:
                 transition = a.installation_ui_session.choose(active, selected)
                 a.installation_ui_session = transition.session
-                if active == "cli" and transition.changed and a.active_dwelling is not None:
+                dwelling = a.workbench_state.dwelling.active
+                if active == "cli" and transition.changed and dwelling is not None:
                     placement = a.cli_runtime.place_machine(
-                        a.active_dwelling.prepared, a.CLI_INSTALLATION.machine_catalog.value(selected),
+                        dwelling.prepared, a.CLI_INSTALLATION.machine_catalog.value(selected),
                     )
-                    a.cli_machine_cx, a.cli_machine_cy = placement.center
-                    a.cli_machine_angle = placement.angle_degrees
+                    a.workbench_state.installation("cli").pose.set(
+                        placement.center, placement.angle_degrees,
+                    )
                 return True, transition.runtime_invalidation_required
             a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
         return False, False
@@ -128,8 +130,9 @@ class DemoUiFacade:
         return a.canvas_ui.draw_ruler(screen, font, start_mm, end_mm, a.COLOR_TEXT)
 
     def invalidate_room_start_node_cache(self):
-        if self.app.terminal_runtime is not None:
-            self.app.terminal_runtime.invalidate_candidates()
+        terminal_runtime = self.app.workbench_state.dwelling.terminal_runtime
+        if terminal_runtime is not None:
+            terminal_runtime.invalidate_candidates()
 
     def invalidate_terminal_validity_cache(self):
         self.app.terminal_ui.invalidate()
@@ -146,7 +149,8 @@ class DemoUiFacade:
     def draw_distance_heatmap(self, screen, scores):
         a = self.app
         return a.canvas_ui.draw_distance_heatmap(
-            screen, self.get_placeable_heatmap_scores(scores), base_env=a.routing_workspace.base_env,
+            screen, self.get_placeable_heatmap_scores(scores),
+            base_env=a.workbench_state.dwelling.workspace.base_env,
             grid_spacing=a.GRID_SPACING, blocked_regions=a.get_machine_vertical_clearance_blocks(),
             scale_mode=a.heatmap_scale_mode, palette_index=a.heatmap_palette_idx,
             fill_color=a.COLOR_MACHINE_CLEARANCE_FILL, hatch_color=a.COLOR_MACHINE_CLEARANCE_HATCH,
@@ -156,7 +160,8 @@ class DemoUiFacade:
         a = self.app
         if a.edge_weight_heatmap_enabled:
             return a.canvas_ui.draw_edge_heatmap(
-                screen, a.routing_workspace.overlay.values, a.routing_workspace.env,
+                screen, a.workbench_state.dwelling.workspace.overlay.values,
+                a.workbench_state.dwelling.workspace.env,
                 a.OVERLAP_BLOCK_WEIGHT, a.COLOR_BLOCKED_EDGE,
             )
 
@@ -164,7 +169,7 @@ class DemoUiFacade:
         a = self.app
         if a.edge_weight_heatmap_enabled:
             return a.canvas_ui.draw_edge_colorbar(
-                screen, a.routing_workspace.overlay.values, a.OVERLAP_BLOCK_WEIGHT,
+                screen, a.workbench_state.dwelling.workspace.overlay.values, a.OVERLAP_BLOCK_WEIGHT,
                 a.COLOR_BLOCKED_EDGE, a.COLOR_TEXT,
             )
 

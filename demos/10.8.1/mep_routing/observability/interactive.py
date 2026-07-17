@@ -39,13 +39,14 @@ class InteractiveObservationController:
 
     def current_state(self):
         a = self.app
-        terminals = a.terminal_runtime
+        terminals = a.workbench_state.dwelling.terminal_runtime
+        sal_pose = a.workbench_state.installation("sal").pose
         return {
             "source_mode_idx": a.dwelling_source_idx,
             "real_scenario_idx": a.real_scenario_idx,
             "routing_frame_idx": a.routing_frame_idx,
             "scenario_label": a.current_scenario_label,
-            "machine": (float(a.machine_cx), float(a.machine_cy), int(a.machine_angle)),
+            "machine": (float(sal_pose.x_mm), float(sal_pose.y_mm), int(sal_pose.angle_degrees)),
             "graph_type_idx": a.graph_type_idx,
             "routing_strategy_idx": a.routing_strategy_idx,
             "router_backend_idx": a.router_backend_idx,
@@ -82,15 +83,17 @@ class InteractiveObservationController:
             "route_real_diameter_width_enabled", "min_piece_factor",
         ):
             setattr(a, name, state[name])
-        a.machine_cx, a.machine_cy, a.machine_angle = state["machine"]
+        sal_pose = a.workbench_state.installation("sal").pose
+        sal_pose.set(state["machine"][:2], state["machine"][2])
         a.C_BEND = state["bend_weight"]
         a.crossing_penalty_multiplier = state["crossing_penalty_multiplier"]
-        if a.terminal_runtime is not None:
-            a.terminal_runtime.restore_preferences(
+        terminal_runtime = a.workbench_state.dwelling.terminal_runtime
+        if terminal_runtime is not None:
+            terminal_runtime.restore_preferences(
                 state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"],
             )
         self.logs.selected_log_id = state["id"]
-        a.build_grid(machine_pins=a.get_machine_pins(a.machine_cx, a.machine_cy, a.machine_angle))
+        a.build_grid(machine_pins=a.get_machine_pins(*sal_pose.as_tuple()))
         return a.solve_ventilation_routing()
 
     def handle_solution_log_click(self, pos):

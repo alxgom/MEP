@@ -50,6 +50,7 @@ class WorkbenchCommandController:
 
     def apply_routing_key_command(self, event_key):
         a, p = self.app, self.pygame
+        sal_pose = a.workbench_state.installation("sal").pose
         command = {
             p.K_r: "rotate_machine", p.K_c: "cycle_strategy",
             p.K_t: "cycle_room_start", p.K_l: "cycle_router_backend",
@@ -60,7 +61,7 @@ class WorkbenchCommandController:
         if command is None:
             return None
         transition = routing_key_transition(command, {
-            "machine_angle": a.machine_angle,
+            "machine_angle": sal_pose.angle_degrees,
             "auto_placement_mode_idx": a.auto_placement_mode_idx,
             "routing_strategy_idx": a.routing_strategy_idx,
             "room_start_mode_idx": a.room_start_mode_idx,
@@ -80,16 +81,20 @@ class WorkbenchCommandController:
         if transition is None:
             return None
         for name, value in transition.state.items():
-            setattr(a, name, value)
+            if name == "machine_angle":
+                sal_pose.angle_degrees = value
+            else:
+                setattr(a, name, value)
         if transition.rebuild_graph:
-            a.build_grid(machine_pins=a.get_machine_pins(a.machine_cx, a.machine_cy, a.machine_angle))
+            a.build_grid(machine_pins=a.get_machine_pins(*sal_pose.as_tuple()))
         if transition.apply_rotation_mode:
             a.apply_rotation_mode_once()
-        if transition.refresh_placement_fields and a.routing_workspace.base_env is not None and a.shaft_extraction is not None:
+        workspace = a.workbench_state.dwelling.workspace
+        if transition.refresh_placement_fields and workspace.base_env is not None and a.shaft_extraction is not None:
             shaft_nodes, _ = a.get_shaft_entry_nodes(
-                a.routing_workspace.base_env, a.routing_workspace.base_spatial_index,
+                workspace.base_env, workspace.base_spatial_index,
             )
             a.ap_scores, a.ap_fields = a.get_auto_placement_scores(
-                a.routing_workspace.base_env, shaft_nodes,
+                workspace.base_env, shaft_nodes,
             )
         return transition

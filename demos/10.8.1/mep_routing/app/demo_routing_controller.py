@@ -38,6 +38,12 @@ class DemoRoutingController:
     def __init__(self, app):
         self.app = app
 
+    def _pose(self, key="sal"):
+        return self.app.workbench_state.installation(key).pose
+
+    def _dwelling(self):
+        return self.app.workbench_state.dwelling
+
     def machine_pins(self, cx, cy, angle_degrees):
         a = self.app
         return machine_pins(a.MACHINE_SPEC, cx, cy, angle_degrees)
@@ -48,38 +54,43 @@ class DemoRoutingController:
 
     def shaft_entry_geometry(self, node_idx, env=None):
         a = self.app
-        env = env or a.routing_workspace.env
-        return a.active_dwelling.shaft_entries.geometry(node_idx, env) if a.active_dwelling else None
+        state = self._dwelling()
+        env = env or state.workspace.env
+        return state.active.shaft_entries.geometry(node_idx, env) if state.active else None
 
     def shaft_entry_nodes(self, env, kd=None):
         a = self.app
-        if a.active_dwelling is None:
+        dwelling = self._dwelling().active
+        if dwelling is None:
             return [], None
-        return a.active_dwelling.shaft_entries.select(
+        return dwelling.shaft_entries.select(
             env, spatial_index=kd, search_radius_mm=a.SHAFT_ENTRY_SEARCH_MM,
             grid_spacing_mm=a.GRID_SPACING, max_candidates=a.SHAFT_ENTRY_MAX_CANDIDATES,
         )
 
     def add_shaft_entry_segments(self, segments, first_node_idx):
         a = self.app
-        if a.active_dwelling:
-            a.active_dwelling.shaft_entries.append_segments(
-                segments, first_node_idx, a.routing_workspace.env,
+        state = self._dwelling()
+        if state.active:
+            state.active.shaft_entries.append_segments(
+                segments, first_node_idx, state.workspace.env,
             )
 
     def update_dynamic_env(self, machine_polygon, context_obstacles=()):
         a = self.app
-        pins = self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
+        pose = self._pose()
+        pins = self.machine_pins(*pose.as_tuple())
         obstacle = unary_union((machine_polygon, *context_obstacles)) if context_obstacles else machine_polygon
-        a.graph_build_session.apply_machine_obstacle(
-            obstacle, pins, a.machine_angle, clearance_mm=a.MACHINE_CLEARANCE,
+        self._dwelling().graph_build_session.apply_machine_obstacle(
+            obstacle, pins, pose.angle_degrees, clearance_mm=a.MACHINE_CLEARANCE,
         )
 
     def build_grid(self, machine_pins=None):
         a = self.app
-        pins = machine_pins or self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
-        return a.graph_build_session.build(
-            a.graph_type_idx, pins, a.machine_angle, shift_hannan_walls=True,
+        pose = self._pose()
+        pins = machine_pins or self.machine_pins(*pose.as_tuple())
+        return self._dwelling().graph_build_session.build(
+            a.graph_type_idx, pins, pose.angle_degrees, shift_hannan_walls=True,
         )
 
     def solver_settings(self):
@@ -98,7 +109,8 @@ class DemoRoutingController:
 
     def live_session(self):
         a = self.app
-        dwelling = a.active_dwelling
+        dwelling = self._dwelling().active
+        pose = self._pose()
         return SalLiveRoutingSession(
             installation=a.SAL_INSTALLATION,
             machine_spec=a.MACHINE_SPEC,
@@ -108,8 +120,8 @@ class DemoRoutingController:
             walls=tuple(dwelling.walls),
             wall_polygons=tuple(dwelling.wall_polygons),
             shafts=tuple(dwelling.shafts),
-            machine_center=(a.machine_cx, a.machine_cy),
-            machine_angle=a.machine_angle,
+            machine_center=pose.center,
+            machine_angle=pose.angle_degrees,
             settings=self.solver_settings(),
             search_backend_index=a.router_backend_idx,
             estimate_turns=a.estimate_turns,
@@ -127,10 +139,11 @@ class DemoRoutingController:
 
     def refresh_edge_weight_overlay(self, routes):
         a = self.app
-        if a.routing_workspace.env is None:
+        workspace = self._dwelling().workspace
+        if workspace.env is None:
             return
         diameter = a.MACHINE_SMALL_DUCT_D if a.edge_weight_view_mode_idx == 0 else a.MACHINE_LARGE_DUCT_D
-        self.routing_runtime(a.routing_workspace.env).refresh_edge_weight_overlay(routes, diameter)
+        self.routing_runtime(workspace.env).refresh_edge_weight_overlay(routes, diameter)
 
     def count_short_pieces(self, routes):
         return self.route_analysis().count_short_pieces(routes)
@@ -148,7 +161,7 @@ class DemoRoutingController:
 
     def route_materializer(self, route_plan):
         a = self.app
-        workspace = a.active_dwelling.workspace
+        workspace = self._dwelling().active.workspace
         return SalRouteMaterializer(
             workspace.env.nodes, workspace.spatial_index, route_plan,
             self.add_shaft_entry_segments if a.shaft_extraction else None,
@@ -173,16 +186,19 @@ class DemoRoutingController:
 
     def align_rotation(self):
         a = self.app
-        a.machine_angle, selected, scores = a.placement_session.align_rotation(
-            (a.machine_cx, a.machine_cy), a.machine_angle,
+        pose = self._pose()
+        angle, selected, scores = a.placement_session.align_rotation(
+            pose.center, pose.angle_degrees,
         )
+        pose.angle_degrees = angle
         a.rotation_field_scores = a.placement_session.rotation_scores
         return selected, scores
 
     def apply_rotation_mode(self):
         a = self.app
-        a.machine_angle = a.placement_session.apply_rotation_mode(
-            a.rotation_mode_idx, (a.machine_cx, a.machine_cy), a.machine_angle,
+        pose = self._pose()
+        pose.angle_degrees = a.placement_session.apply_rotation_mode(
+            a.rotation_mode_idx, pose.center, pose.angle_degrees,
         )
         a.rotation_field_scores = a.placement_session.rotation_scores
 
@@ -196,17 +212,17 @@ class DemoRoutingController:
         if outcome.position is None:
             print("[Auto-Placement] No feasible machine placement satisfies the active restrictions")
             return
-        a.machine_cx, a.machine_cy = outcome.position
-        a.machine_angle = outcome.rotation
-        self.build_grid(machine_pins=self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle))
+        pose = self._pose()
+        pose.set(outcome.position, outcome.rotation)
+        self.build_grid(machine_pins=self.machine_pins(*pose.as_tuple()))
         if a.auto_placement_mode_idx == 2:
             print(f"[Core-like Machine Placement] tried {outcome.candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
         else:
-            print(f"[Auto-Placement] Solved position ({a.machine_cx}, {a.machine_cy}) at rotation {a.machine_angle} in {elapsed_ms:.2f}ms")
+            print(f"[Auto-Placement] Solved position {pose.center} at rotation {pose.angle_degrees} in {elapsed_ms:.2f}ms")
 
     def interactive_solver(self, context_obstacles=()):
         a = self.app
-        dwelling = a.active_dwelling
+        dwelling = self._dwelling().active
         workspace = dwelling.workspace
         callbacks = SalInteractiveCallbacks(
             update_dynamic_env=lambda polygon: self.update_dynamic_env(polygon, context_obstacles),
@@ -241,19 +257,21 @@ class DemoRoutingController:
         a = self.app
         machine_key = a.installation_ui_session.selected_keys["cli"]
         cli_machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
+        sal_pose = self._pose("sal")
+        cli_pose = self._pose("cli")
         specs = {
             "sal": InstallationRunSpec(
                 lambda context: self.interactive_solver(context).solve(),
-                lambda: self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle),
+                lambda: self.machine_pins(*sal_pose.as_tuple()),
             ),
             "cli": InstallationRunSpec(
                 lambda context: a.cli_runtime.solve(
-                    a.active_dwelling.prepared, cli_machine,
-                    (a.cli_machine_cx, a.cli_machine_cy), a.cli_machine_angle,
+                    self._dwelling().active.prepared, cli_machine,
+                    cli_pose.center, cli_pose.angle_degrees,
                     context_obstacles=context,
                 ),
                 lambda: cli_machine_pins(
-                    cli_machine, (a.cli_machine_cx, a.cli_machine_cy), a.cli_machine_angle,
+                    cli_machine, cli_pose.center, cli_pose.angle_degrees,
                 ),
             ),
         }
@@ -261,5 +279,5 @@ class DemoRoutingController:
             a.installation_header_state.order, a.installation_header_state.enabled,
             a.installation_header_state.active, specs,
         )
-        a.installation_runs = dict(execution.runs)
+        a.workbench_state.replace_runs(execution.runs)
         return execution.routing_tuple()

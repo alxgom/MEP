@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from mep_routing.app import WorkbenchState
 from mep_routing.ui.commands import WorkbenchCommandController
 
 
@@ -9,8 +10,10 @@ def _pygame_keys():
 
 def _app():
     rebuilds = []
+    workbench_state = WorkbenchState.create()
+    workbench_state.installation("sal").pose.set((10, 20))
     app = SimpleNamespace(
-        machine_angle=0, machine_cx=10, machine_cy=20,
+        workbench_state=workbench_state,
         auto_placement_mode_idx=0, routing_strategy_idx=0, room_start_mode_idx=0,
         router_backend_idx=0, heuristic_mode_idx=0, graph_type_idx=0,
         rotation_mode_idx=0, weight_mode_idx=0,
@@ -18,7 +21,7 @@ def _app():
         ROUTER_BACKENDS=("a", "b"), HEURISTIC_MODES=("a", "b"),
         GRAPH_TYPES=("a", "b"), ROTATION_MODES=("a", "b"),
         AUTO_PLACEMENT_MODES=("a", "b", "c"),
-        routing_workspace=SimpleNamespace(base_env=None), shaft_extraction=None,
+        shaft_extraction=None,
         get_machine_pins=lambda *args: args,
         build_grid=lambda **kwargs: rebuilds.append(kwargs),
         apply_rotation_mode_once=lambda: None,
@@ -33,7 +36,7 @@ def test_rotate_command_updates_angle_and_preserves_transition_effects():
     transition = controller.apply_routing_key_command(1)
 
     assert transition is not None
-    assert app.machine_angle == 90
+    assert app.workbench_state.installation("sal").pose.angle_degrees == 90
     assert rebuilds == []
 
 
@@ -41,5 +44,5 @@ def test_unknown_key_does_not_change_state():
     app, rebuilds = _app()
     controller = WorkbenchCommandController(app, _pygame_keys())
     assert controller.apply_routing_key_command(99) is None
-    assert app.machine_angle == 0
+    assert app.workbench_state.installation("sal").pose.angle_degrees == 0
     assert rebuilds == []

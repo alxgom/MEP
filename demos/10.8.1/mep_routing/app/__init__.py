@@ -9,6 +9,10 @@ from .dwelling_application import (
     load_real_dwelling,
 )
 from .graph_build_session import GraphBuildSession
+from .workbench_state import (
+    DisplayState, DwellingState, InstallationState, MachinePose,
+    SalWorkbenchState, WorkbenchState,
+)
 from .installation_ui import (
     InstallationMachineUi,
     InstallationUiSession,
@@ -38,6 +42,8 @@ __all__ = [
     "InstallationGraphProfile",
     "TerminalRuntimeConfig",
     "create_active_dwelling",
+    "DisplayState", "DwellingState", "InstallationState", "MachinePose",
+    "SalWorkbenchState", "WorkbenchState",
     "load_real_dwelling",
     "GraphBuildSession",
     "InstallationMachineUi",

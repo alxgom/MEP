@@ -14,6 +14,7 @@ from mep_routing.app import (
     InstallationMachineUi,
     InstallationUiSession,
     TerminalRuntimeConfig,
+    WorkbenchState,
 )
 from mep_routing.app.demo_routing_controller import DemoRoutingController
 from mep_routing.app.dwelling_runtime import DwellingRuntime
@@ -173,11 +174,7 @@ show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
-routing_workspace = None
-graph_build_session = None
-active_dwelling = None
 preferred_terminal_tool_mode = None
-terminal_runtime = None
 terminal_validity_overlay_enabled = False
 PREFERRED_TERMINAL_MARKER_SIZE_MM = 125.0
 PREFERRED_TERMINAL_REMAP_TOLERANCE_MM = 300.0
@@ -224,8 +221,8 @@ installation_ui_session = InstallationUiSession.create({
         runtime_available=CLI_INSTALLATION.interactive_runtime_available,
     ),
 })
+workbench_state = WorkbenchState.create(("sal", "cli"))
 cli_runtime = CliInteractiveRuntime(CLI_INSTALLATION, COMMON_GRAPH_CONFIG, TERMINAL_RUNTIME_CONFIG)
-installation_runs = {}
 
 # Pygame Window Config
 INSTALLATION_HEADER_TOP = 4
@@ -354,7 +351,6 @@ invalidate_terminal_validity_cache = ui_facade.invalidate_terminal_validity_cach
 # Auto-placement cache
 ap_scores = {}
 ap_fields = {}
-machine_vertical_clearance_blocks = ()
 routing_controller = DemoRoutingController(sys.modules[__name__])
 dwelling_runtime = DwellingRuntime(sys.modules[__name__])
 def get_representative_point(poly):
@@ -407,24 +403,13 @@ def apply_preferred_terminal_area(start_world, end_world, remove=False):
     return terminal_ui.apply_area_preference(start_world, end_world, remove=remove)
 
 def get_active_machine_pose():
-    if installation_header_state.active == "cli":
-        return cli_machine_cx, cli_machine_cy, cli_machine_angle
-    return machine_cx, machine_cy, machine_angle
+    return workbench_state.installation(installation_header_state.active).pose.as_tuple()
 
 def move_active_machine(position):
-    global machine_cx, machine_cy, cli_machine_cx, cli_machine_cy
-    if installation_header_state.active == "cli":
-        cli_machine_cx, cli_machine_cy = position
-    else:
-        machine_cx, machine_cy = position
+    workbench_state.installation(installation_header_state.active).pose.set(position)
 
 def rotate_active_machine(delta_degrees):
-    global machine_angle, cli_machine_angle
-    if installation_header_state.active == "cli":
-        cli_machine_angle = (cli_machine_angle + delta_degrees) % 360
-        return cli_machine_angle
-    machine_angle = (machine_angle + delta_degrees) % 360
-    return machine_angle
+    return workbench_state.installation(installation_header_state.active).pose.rotate(delta_degrees)
 
 def get_active_machine_pins(cx, cy, angle_deg):
     if installation_header_state.active == "cli":
@@ -480,7 +465,9 @@ placement_session = PlacementSession(
 
 def get_auto_placement_scores(env, shaft_boundary_nodes):
     placement_session.weight_mode = weight_mode_idx
-    return placement_session.placement_scores(env, routing_workspace.base_spatial_index, shaft_boundary_nodes)
+    return placement_session.placement_scores(
+        env, workbench_state.dwelling.workspace.base_spatial_index, shaft_boundary_nodes,
+    )
 
 ensure_placement_heatmap_scores = routing_controller.ensure_placement_scores
 apply_field_alignment_rotation = routing_controller.align_rotation

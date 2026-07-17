@@ -49,8 +49,12 @@ def _render(app, screen, clock, fonts, state):
     state.selected_route_name = selected
     selected_room = app.get_route_room_polygon(selected) if selected else None
     active = app.installation_header_state.active
+    workbench = app.workbench_state
+    dwelling_state = workbench.dwelling
+    sal_pose = workbench.installation("sal").pose
+    cli_pose = workbench.installation("cli").pose
     cli_result = app.cli_runtime.last_result
-    workspace = cli_result.workspace if active == "cli" and cli_result.workspace is not None else app.routing_workspace
+    workspace = cli_result.workspace if active == "cli" and cli_result.workspace is not None else dwelling_state.workspace
     terminals = cli_result.terminals if active == "cli" else app.terminals
     pose = app.get_active_machine_pose()
     pins = app.get_active_machine_pins(*pose)
@@ -61,13 +65,13 @@ def _render(app, screen, clock, fonts, state):
     machine_key = app.installation_ui_session.selected_keys["cli"]
     context = installation_context_layers(
         app.installation_header_state.order, app.installation_header_state.enabled,
-        active, app.installation_runs,
+        active, workbench.runs,
         {
-            "sal": InstallationVisual(app.terminals, app.get_machine_pins(app.machine_cx, app.machine_cy, app.machine_angle)),
+            "sal": InstallationVisual(app.terminals, app.get_machine_pins(*sal_pose.as_tuple())),
             "cli": InstallationVisual(
                 cli_result.terminals,
                 app.cli_machine_pins(app.CLI_INSTALLATION.machine_catalog.value(machine_key),
-                                     (app.cli_machine_cx, app.cli_machine_cy), app.cli_machine_angle),
+                                     cli_pose.center, cli_pose.angle_degrees),
             ),
         },
     )
@@ -126,7 +130,8 @@ def _render(app, screen, clock, fonts, state):
     if active == "sal":
         app.draw_terminal_tool_buttons(screen, fonts.bold, fonts.small)
 
-    preferred_count = sum(len(points) for points in (() if app.terminal_runtime is None else app.terminal_runtime.preferred_points_by_room.values()))
+    terminal_runtime = dwelling_state.terminal_runtime
+    preferred_count = sum(len(points) for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values()))
     warnings = app.get_route_validation_warnings(routes) if active == "sal" else []
     options = app.installation_ui_session.options(active)
     dropdown = app.installation_ui_session.dropdown_state(active)

@@ -78,13 +78,14 @@ class DwellingRuntime:
         dwelling = create_active_dwelling(
             prepared, a.COMMON_GRAPH_CONFIG, a.SAL_GRAPH_PROFILE, a.TERMINAL_RUNTIME_CONFIG,
         )
-        a.active_dwelling = dwelling
-        a.routing_workspace = dwelling.workspace
-        a.terminal_runtime = dwelling.terminals
+        state = a.workbench_state.dwelling
+        state.active = dwelling
+        state.workspace = dwelling.workspace
+        state.terminal_runtime = dwelling.terminals
         a.terminal_ui.bind(dwelling)
-        a.graph_build_session = GraphBuildSession(
-            a.routing_workspace,
-            a.terminal_runtime,
+        state.graph_build_session = GraphBuildSession(
+            state.workspace,
+            state.terminal_runtime,
             a.invalidate_room_start_node_cache,
             a.invalidate_terminal_validity_cache,
         )
@@ -110,27 +111,27 @@ class DwellingRuntime:
         for name, value in aliases.items():
             setattr(a, name, value)
 
-        a.machine_cx, a.machine_cy = prepared.machine_position
-        a.machine_angle = 0
+        sal_pose = a.workbench_state.installation("sal").pose
+        cli_pose = a.workbench_state.installation("cli").pose
+        sal_pose.set(prepared.machine_position, 0)
         cli_machine = a.CLI_INSTALLATION.machine_catalog.value(
             a.installation_ui_session.selected_keys["cli"],
         )
         cli_placement = a.cli_runtime.place_machine(prepared, cli_machine)
-        a.cli_machine_cx, a.cli_machine_cy = cli_placement.center
-        a.cli_machine_angle = cli_placement.angle_degrees
-        a.machine_vertical_clearance_blocks = insufficient_machine_clearance_regions(
+        cli_pose.set(cli_placement.center, cli_placement.angle_degrees)
+        state.machine_vertical_clearance_blocks = insufficient_machine_clearance_regions(
             dwelling.rooms,
             a.MACHINE_SPEC.installation_height_mm,
             a.MACHINE_SPEC.installation_clearance_mm,
         )
         a.placement_session.bind(
-            a.routing_workspace, dwelling.rooms, dwelling.terminal_points,
+            state.workspace, dwelling.rooms, dwelling.terminal_points,
             dwelling.wet_room_names, dwelling.routing_region, dwelling.shaft_extraction,
-            a.machine_vertical_clearance_blocks,
+            state.machine_vertical_clearance_blocks,
             (*dwelling.walls, *dwelling.wall_polygons), dwelling.columns, dwelling.shafts,
         )
-        a.graph_build_session.build_base_regular()
+        state.graph_build_session.build_base_regular()
         if auto_place:
             a.run_auto_placement()
-        pins = a.get_machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
+        pins = a.get_machine_pins(*sal_pose.as_tuple())
         a.build_grid(machine_pins=pins)

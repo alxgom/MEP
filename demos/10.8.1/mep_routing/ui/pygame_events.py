@@ -296,8 +296,9 @@ class WorkbenchEventAdapter:
                 self._record(f"Back:L{action}", (255, 255, 255))
         elif command.name == "terminal_tool":
             if command.value == "reset":
-                if a.terminal_runtime:
-                    a.terminal_runtime.clear_preferences()
+                terminal_runtime = a.workbench_state.dwelling.terminal_runtime
+                if terminal_runtime:
+                    terminal_runtime.clear_preferences()
                 self._solve(); self._record("Prefs reset", (26, 188, 156))
             if a.preferred_terminal_tool_mode:
                 s.ruler_mode = False
