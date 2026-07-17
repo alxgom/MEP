@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added installation-owned UI capability and projection snapshots derived from the runtime registry and keyed `WorkbenchState` results.
+- Canvas projection keeps every enabled solved installation visible in routing order while only the active projection exposes effective editing capabilities; matching event and terminal-tool guards no longer identify Sal/Cli directly.
+- Validation: Python compilation and focused installation-projection contracts.
+
 - Added `DemoUiFacade` as the compatibility owner of installation-header layout, machine selection, terminal/canvas tools, slider drawing, ruler behavior, UI cache invalidation, heatmap rendering, and route-width projection.
 - `main.py` retains the existing workbench callback names as bound facade methods and reached 542 physical lines.
 - Validation: Python compilation, focused UI-facade contracts, and a generated-dwelling solve.

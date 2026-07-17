@@ -5,7 +5,10 @@ from mep_routing.ui.demo_facade import DemoUiFacade
 
 def test_terminal_tool_is_disabled_outside_sal():
     app = SimpleNamespace(
-        installation_header_state=SimpleNamespace(active="cli"),
+        installation_header_state=SimpleNamespace(active="cli", enabled={"cli"}),
+        routing_controller=SimpleNamespace(installations=SimpleNamespace(
+            get=lambda key: SimpleNamespace(capabilities=SimpleNamespace(terminal_tools=False)),
+        )),
         preferred_terminal_tool_mode="point",
     )
     facade = DemoUiFacade(app, SimpleNamespace())

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .dropdown import dropdown_bounds
 from .installation_header import installation_header_layout
+from .installation_projection import active_capabilities
 
 
 class DemoUiFacade:
@@ -78,7 +79,7 @@ class DemoUiFacade:
 
     def handle_terminal_tool_button_click(self, pos):
         a = self.app
-        if a.installation_header_state.active != "sal":
+        if not active_capabilities(a).terminal_tools:
             a.preferred_terminal_tool_mode = None
             return None
         for mode, rect, _ in a.canvas_ui.terminal_buttons():

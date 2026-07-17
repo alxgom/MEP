@@ -20,6 +20,7 @@ from .events import (
     move_canvas_gesture,
     move_panel_interaction,
 )
+from .installation_projection import active_capabilities
 
 
 @dataclass
@@ -257,14 +258,14 @@ class WorkbenchEventAdapter:
         if command.name == "toggle_help":
             a.workbench_chrome.toggle_help(command.value)
         elif command.name == "set_slider":
-            if a.installation_header_state.active != "sal":
+            if not active_capabilities(a).solver_controls:
                 a.set_transient_message("This control belongs to Sal")
                 return
             name, x = command.value
             label, color = self._set_slider(name, x)
             self._solve(); self._record(label, color)
         elif command.name == "reset_slider":
-            if a.installation_header_state.active != "sal":
+            if not active_capabilities(a).solver_controls:
                 a.set_transient_message("This control belongs to Sal")
                 return
             if command.value == "bend":
@@ -409,10 +410,10 @@ class WorkbenchEventAdapter:
             if a.DWELLING_SOURCE_MODES[a.dwelling_source_idx] == "Real DB":
                 a.real_scenario_idx = (a.real_scenario_idx + 1) % len(a.REAL_DWELLING_SCENARIOS)
             self._change_dwelling(clear_history=True)
-        elif a.installation_header_state.active == "cli" and key == pygame.K_r:
+        elif (caps := active_capabilities(a)).machine_edit and not caps.solver_controls and key == pygame.K_r:
             angle = a.rotate_active_machine(90)
             self._solve(); self._record(f"Rot:{angle}", (46, 204, 113))
-        elif a.installation_header_state.active == "cli" and key in {
+        elif not caps.solver_controls and key in {
             pygame.K_c, pygame.K_t, pygame.K_l, pygame.K_y, pygame.K_TAB,
             pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,
         }:

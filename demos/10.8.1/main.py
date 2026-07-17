@@ -37,7 +37,7 @@ from mep_routing.routing import (
     total_route_length_m as _total_route_length_m,
 )
 from mep_routing.ui.runtime import CanvasUiRuntime
-from mep_routing.ui.installation_projection import InstallationVisual, installation_context_layers
+from mep_routing.ui.installation_projection import active_capabilities
 from mep_routing.ui.terminal_runtime import TerminalUiRuntime, TerminalUiStyle
 from mep_routing.ui.drawing import draw_outlined_text as _draw_outlined_text
 from mep_routing.ui.controls import dwelling_selector_bounds as _dwelling_selector_bounds
@@ -393,12 +393,12 @@ def get_route_start_nodes(route_name):
     return terminal_ui.route_start_nodes(route_name, use_nearest_terminal=(room_start_mode_idx == 1))
 
 def apply_preferred_terminal_point(world_pt, remove=False):
-    if installation_header_state.active != "sal":
+    if not active_capabilities(sys.modules[__name__]).terminal_tools:
         return False, None
     return terminal_ui.apply_point_preference(world_pt, remove=remove)
 
 def apply_preferred_terminal_area(start_world, end_world, remove=False):
-    if installation_header_state.active != "sal":
+    if not active_capabilities(sys.modules[__name__]).terminal_tools:
         return False, None
     return terminal_ui.apply_area_preference(start_world, end_world, remove=remove)
 

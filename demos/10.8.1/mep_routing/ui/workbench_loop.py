@@ -12,7 +12,7 @@ from .frame import (
     active_selected_route, build_canvas_scene, build_sidebar_view,
 )
 from .installation_header import draw_installation_header
-from .installation_projection import InstallationVisual, installation_context_layers
+from .installation_projection import project_workbench
 from .pygame_events import WorkbenchEventAdapter
 from .sidebar import SidebarColors, SidebarFonts, draw_sidebar
 
@@ -51,31 +51,16 @@ def _render(app, screen, clock, fonts, state):
     active = app.installation_header_state.active
     workbench = app.workbench_state
     dwelling_state = workbench.dwelling
-    sal_pose = workbench.installation("sal").pose
-    cli_pose = workbench.installation("cli").pose
-    cli_result = app.cli_runtime.last_result
-    workspace = cli_result.workspace if active == "cli" and cli_result.workspace is not None else dwelling_state.workspace
-    terminals = cli_result.terminals if active == "cli" else app.terminals
-    pose = app.get_active_machine_pose()
-    pins = app.get_active_machine_pins(*pose)
+    projection = project_workbench(app)
+    active_view = projection.active
+    workspace, terminals = active_view.workspace, active_view.terminals
+    pose, pins = active_view.pose, active_view.pins
     selected_pins = (
-        ({"air_out"} if selected == "Supply Air Tree" else set())
-        if active == "cli" else (app.get_selected_pin_names(selected, routes, pins) if selected else set())
+        app.get_selected_pin_names(selected, routes, pins) if selected and active_view.can("terminal_tools")
+        else ({"air_out"} if selected == "Supply Air Tree" else set())
     )
-    machine_key = app.installation_ui_session.selected_keys["cli"]
-    context = installation_context_layers(
-        app.installation_header_state.order, app.installation_header_state.enabled,
-        active, workbench.runs,
-        {
-            "sal": InstallationVisual(app.terminals, app.get_machine_pins(*sal_pose.as_tuple())),
-            "cli": InstallationVisual(
-                cli_result.terminals,
-                app.cli_machine_pins(app.CLI_INSTALLATION.machine_catalog.value(machine_key),
-                                     cli_pose.center, cli_pose.angle_degrees),
-            ),
-        },
-    )
-    if app.show_heatmap:
+    context = projection.context_layers
+    if app.show_heatmap and active_view.can("placement_overlay"):
         app.ensure_placement_heatmap_scores()
 
     def edge_overlay():
@@ -89,8 +74,8 @@ def _render(app, screen, clock, fonts, state):
         show_grid_graph=app.show_grid_graph, terminals=terminals, routes=routes or (),
         selected_route_name=selected, selected_room_polygon=selected_room,
         global_pins=pins, selected_pins=selected_pins, context_layers=context,
-        auto_placement_mode=(app.auto_placement_mode_idx if active == "sal" else 0),
-        placement_fields=(app.ap_fields if active == "sal" else {}),
+        auto_placement_mode=(app.auto_placement_mode_idx if active_view.can("placement_overlay") else 0),
+        placement_fields=(app.ap_fields if active_view.can("placement_overlay") else {}),
         wet_room_names=app.wet_room_names, route_colors=app.ROUTE_COLORS,
         palette=CanvasFramePalette(
             app.COLOR_BG, app.COLOR_WALL, app.COLOR_DOOR, app.COLOR_COLUMN, app.COLOR_SHAFT,
@@ -110,13 +95,13 @@ def _render(app, screen, clock, fonts, state):
         draw_distance_colorbar=lambda: app.draw_colorbar(screen, app.get_placeable_heatmap_scores(app.ap_scores)) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
         draw_edge_weight_heatmap=edge_overlay,
         draw_edge_weight_colorbar=lambda: app.draw_edge_weight_colorbar(screen),
-        draw_terminal_validity_overlay=lambda: app.terminal_ui.draw_validity_overlay(screen, app.terminal_validity_overlay_enabled and active == "sal"),
+        draw_terminal_validity_overlay=lambda: app.terminal_ui.draw_validity_overlay(screen, app.terminal_validity_overlay_enabled and active_view.can("terminal_tools")),
         draw_wet_room_accents=lambda: app.draw_wet_room_outer_accents(screen),
         draw_polygon_hatch=lambda shaft: app.canvas_ui.draw_hatch(screen, shaft, app.COLOR_SHAFT_INACTIVE_HATCH, spacing=9),
         draw_outlined_text=lambda target, font, label, position, color: app.draw_outlined_text(target, font, label, position, color),
-        draw_preferred_terminal_areas=lambda value: app.terminal_ui.draw_preferred_areas(screen, value) if active == "sal" else None,
-        draw_routed_terminal_endpoints=lambda value: app.terminal_ui.draw_routed_endpoints(screen, routes, value) if active == "sal" else None,
-        draw_preferred_terminal_markers=lambda value: app.terminal_ui.draw_preferred_markers(screen, value, routes) if active == "sal" else None,
+        draw_preferred_terminal_areas=lambda value: app.terminal_ui.draw_preferred_areas(screen, value) if active_view.can("terminal_tools") else None,
+        draw_routed_terminal_endpoints=lambda value: app.terminal_ui.draw_routed_endpoints(screen, routes, value) if active_view.can("terminal_tools") else None,
+        draw_preferred_terminal_markers=lambda value: app.terminal_ui.draw_preferred_markers(screen, value, routes) if active_view.can("terminal_tools") else None,
         draw_terminal_area_drag=lambda start, end: app.draw_terminal_area_drag(screen, start, end),
     )
     draw_canvas_scene(screen, scene=scene, fonts=CanvasFonts(small=fonts.small), hooks=hooks)
@@ -127,25 +112,25 @@ def _render(app, screen, clock, fonts, state):
     )
     app.draw_ruler_overlay(screen, fonts.small, state.ruler_start_mm, state.ruler_end_mm)
     app.draw_canvas_tool_controls(screen, fonts.small, state.ruler_mode, state.dwelling_selector_open)
-    if active == "sal":
+    if active_view.can("terminal_tools"):
         app.draw_terminal_tool_buttons(screen, fonts.bold, fonts.small)
 
     terminal_runtime = dwelling_state.terminal_runtime
     preferred_count = sum(len(points) for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values()))
-    warnings = app.get_route_validation_warnings(routes) if active == "sal" else []
+    warnings = app.get_route_validation_warnings(routes) if active_view.can("route_validation") else []
     options = app.installation_ui_session.options(active)
     dropdown = app.installation_ui_session.dropdown_state(active)
     available = app.installation_ui_session.installations[active].runtime_available
     sidebar = build_sidebar_view(SidebarFrameState(
-        auto_placement_mode=(app.AUTO_PLACEMENT_MODES[app.auto_placement_mode_idx] if active == "sal" else "Cli placement pending"),
+        auto_placement_mode=(app.AUTO_PLACEMENT_MODES[app.auto_placement_mode_idx] if active_view.can("solver_controls") else "Cli placement pending"),
         show_heatmap=app.show_heatmap, heatmap_scale_mode=app.heatmap_scale_mode,
         heatmap_palette_index=app.heatmap_palette_idx, weight_mode_index=app.weight_mode_idx,
         rotation_mode_index=app.rotation_mode_idx, rotation_field_scores=app.rotation_field_scores,
-        machine_angle=pose[2], strategy=(app.ROUTING_STRATEGIES[app.routing_strategy_idx] if active == "sal" else "Kou Steiner tree"),
-        router=(app.ROUTER_BACKENDS[app.router_backend_idx] if active == "sal" else "Cli supply runtime"),
-        heuristic=(app.HEURISTIC_MODES[app.heuristic_mode_idx] if active == "sal" else "Directional scales"),
-        graph_type=(app.GRAPH_TYPES[app.graph_type_idx] if active == "sal" else "Core Simple"),
-        room_start_mode=(app.ROOM_START_MODES[app.room_start_mode_idx] if active == "sal" else "Supply terminals"),
+        machine_angle=pose[2], strategy=(app.ROUTING_STRATEGIES[app.routing_strategy_idx] if active_view.can("solver_controls") else "Kou Steiner tree"),
+        router=(app.ROUTER_BACKENDS[app.router_backend_idx] if active_view.can("solver_controls") else "Cli supply runtime"),
+        heuristic=(app.HEURISTIC_MODES[app.heuristic_mode_idx] if active_view.can("solver_controls") else "Directional scales"),
+        graph_type=(app.GRAPH_TYPES[app.graph_type_idx] if active_view.can("solver_controls") else "Core Simple"),
+        room_start_mode=(app.ROOM_START_MODES[app.room_start_mode_idx] if active_view.can("solver_controls") else "Supply terminals"),
         selected_route_name=selected, preferred_terminal_count=preferred_count,
         bend_value=app.C_BEND, bend_min=app.C_BEND_MIN, bend_max=app.C_BEND_MAX,
         crossing_value=app.crossing_penalty_multiplier, crossing_min=app.CROSSING_MULTIPLIER_MIN,
@@ -174,7 +159,7 @@ def _render(app, screen, clock, fonts, state):
     app.draw_solution_logs_panel(screen, fonts.small, fonts.bold)
     app.draw_help_popup(screen, fonts.small)
     app.draw_transient_message(screen, fonts.small)
-    if active == "sal":
+    if active_view.can("terminal_tools"):
         app.terminal_ui.draw_validity_tooltip(screen, fonts.small, pygame.mouse.get_pos(), app.terminal_validity_overlay_enabled)
 
 

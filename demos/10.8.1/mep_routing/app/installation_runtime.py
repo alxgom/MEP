@@ -15,6 +15,10 @@ class InstallationCapabilities:
     machine_selection: bool = False
     automatic_placement: bool = False
     terminal_tools: bool = False
+    machine_edit: bool = True
+    solver_controls: bool = False
+    route_validation: bool = False
+    placement_overlay: bool = False
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,10 @@ class InstallationRegistry:
 
 class SalInstallationRuntime:
     key = "sal"
-    capabilities = InstallationCapabilities(automatic_placement=True, terminal_tools=True)
+    capabilities = InstallationCapabilities(
+        automatic_placement=True, terminal_tools=True,
+        solver_controls=True, route_validation=True, placement_overlay=True,
+    )
 
     def __init__(self, controller):
         self.controller = controller
