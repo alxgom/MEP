@@ -1,0 +1,265 @@
+"""Demo application routing facade kept separate from the Pygame entrypoint."""
+
+from __future__ import annotations
+
+from shapely.ops import unary_union
+
+from mep_routing.app.installation_execution import InstallationRunSpec, execute_installations
+from mep_routing.domain import machine_pins, port_access_specs
+from mep_routing.installations.cli import cli_machine_pins
+from mep_routing.installations.sal import (
+    SalInteractiveCallbacks,
+    SalInteractiveSolver,
+    SalLiveRoutingSession,
+    SalRouteMaterializer,
+    SalSolverSettings,
+)
+from mep_routing.routing import (
+    block_terminal_node_edges,
+    count_segment_crossings,
+    count_solution_turns,
+    find_route_at_point,
+    find_route_hit_at_point,
+    line_graph_dir_from_points,
+    selected_pin_names,
+    terminal_node_indices,
+    weighted_edge_cost,
+)
+
+
+class DemoRoutingController:
+    """Own solver composition while the entrypoint supplies live demo state.
+
+    ``app`` is the explicit compatibility boundary during the ongoing state-object
+    migration.  All mutations performed here are application outcomes (pose,
+    placement caches, and installation results), rather than hidden module state.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    def machine_pins(self, cx, cy, angle_degrees):
+        a = self.app
+        return machine_pins(a.MACHINE_SPEC, cx, cy, angle_degrees)
+
+    def port_access_specs(self, global_pins, machine_angle):
+        a = self.app
+        return port_access_specs(a.MACHINE_SPEC, global_pins, machine_angle)
+
+    def shaft_entry_geometry(self, node_idx, env=None):
+        a = self.app
+        env = env or a.routing_workspace.env
+        return a.active_dwelling.shaft_entries.geometry(node_idx, env) if a.active_dwelling else None
+
+    def shaft_entry_nodes(self, env, kd=None):
+        a = self.app
+        if a.active_dwelling is None:
+            return [], None
+        return a.active_dwelling.shaft_entries.select(
+            env, spatial_index=kd, search_radius_mm=a.SHAFT_ENTRY_SEARCH_MM,
+            grid_spacing_mm=a.GRID_SPACING, max_candidates=a.SHAFT_ENTRY_MAX_CANDIDATES,
+        )
+
+    def add_shaft_entry_segments(self, segments, first_node_idx):
+        a = self.app
+        if a.active_dwelling:
+            a.active_dwelling.shaft_entries.append_segments(
+                segments, first_node_idx, a.routing_workspace.env,
+            )
+
+    def update_dynamic_env(self, machine_polygon, context_obstacles=()):
+        a = self.app
+        pins = self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
+        obstacle = unary_union((machine_polygon, *context_obstacles)) if context_obstacles else machine_polygon
+        a.graph_build_session.apply_machine_obstacle(
+            obstacle, pins, a.machine_angle, clearance_mm=a.MACHINE_CLEARANCE,
+        )
+
+    def build_grid(self, machine_pins=None):
+        a = self.app
+        pins = machine_pins or self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle)
+        return a.graph_build_session.build(
+            a.graph_type_idx, pins, a.machine_angle, shift_hannan_walls=True,
+        )
+
+    def solver_settings(self):
+        a = self.app
+        return SalSolverSettings(
+            bend_cost=a.C_BEND,
+            crossing_penalty_multiplier=a.crossing_penalty_multiplier,
+            duct_buffer_ratio=a.DUCT_BUFFER_RATIO,
+            shaft_clearance_mm=a.PATINEJO_CLEARANCE_MM,
+            machine_clearance_soft_margin_mm=a.MACHINE_CLEARANCE_SOFT_MARGIN_MM,
+            overlap_block_weight=a.OVERLAP_BLOCK_WEIGHT,
+            min_piece_factor=a.min_piece_factor,
+            heuristic_mode=a.heuristic_mode_idx,
+            routing_strategy=a.routing_strategy_idx,
+        )
+
+    def live_session(self):
+        a = self.app
+        dwelling = a.active_dwelling
+        return SalLiveRoutingSession(
+            installation=a.SAL_INSTALLATION,
+            machine_spec=a.MACHINE_SPEC,
+            workspace=dwelling.workspace,
+            routing_region=dwelling.routing_region,
+            rooms=tuple(dwelling.rooms),
+            walls=tuple(dwelling.walls),
+            wall_polygons=tuple(dwelling.wall_polygons),
+            shafts=tuple(dwelling.shafts),
+            machine_center=(a.machine_cx, a.machine_cy),
+            machine_angle=a.machine_angle,
+            settings=self.solver_settings(),
+            search_backend_index=a.router_backend_idx,
+            estimate_turns=a.estimate_turns,
+        )
+
+    def route_analysis(self, policy=None):
+        a = self.app
+        return self.live_session().route_analysis(a.shaft_extraction, policy)
+
+    def routing_runtime(self, env, policy=None):
+        return self.live_session().routing_runtime(env, policy)
+
+    def route_diameter(self, route_name):
+        return self.route_analysis().route_diameter(route_name)
+
+    def refresh_edge_weight_overlay(self, routes):
+        a = self.app
+        if a.routing_workspace.env is None:
+            return
+        diameter = a.MACHINE_SMALL_DUCT_D if a.edge_weight_view_mode_idx == 0 else a.MACHINE_LARGE_DUCT_D
+        self.routing_runtime(a.routing_workspace.env).refresh_edge_weight_overlay(routes, diameter)
+
+    def count_short_pieces(self, routes):
+        return self.route_analysis().count_short_pieces(routes)
+
+    def route_at_point(self, routes, world_point):
+        a = self.app
+        return find_route_at_point(routes, world_point, max(40.0, 8.0 / a.canvas_ui.viewport.scale))
+
+    def route_hit_at_point(self, routes, world_point):
+        a = self.app
+        return find_route_hit_at_point(routes, world_point, max(40.0, 8.0 / a.canvas_ui.viewport.scale))
+
+    def selected_pin_names(self, route_name, routes, global_pins):
+        return selected_pin_names(route_name, routes, global_pins)
+
+    def route_materializer(self, route_plan):
+        a = self.app
+        workspace = a.active_dwelling.workspace
+        return SalRouteMaterializer(
+            workspace.env.nodes, workspace.spatial_index, route_plan,
+            self.add_shaft_entry_segments if a.shaft_extraction else None,
+        )
+
+    def solution_score(self, routes, crossings, *, policy=None):
+        return self.route_analysis(policy).score(routes, crossings)
+
+    def validation_warnings(self, routes):
+        a = self.app
+        warnings = self.route_analysis().quality_warnings(routes)
+        if (a.shaft_extraction is not None
+                and a.DWELLING_SOURCE_MODES[a.dwelling_source_idx] == "Real DB"
+                and not a.shaft_core_entry_specs):
+            warnings.append("missing core shaft entry metadata")
+        return warnings
+
+    def ensure_placement_scores(self):
+        a = self.app
+        a.placement_session.ensure_scores()
+        a.ap_scores, a.ap_fields = a.placement_session.scores, a.placement_session.fields
+
+    def align_rotation(self):
+        a = self.app
+        a.machine_angle, selected, scores = a.placement_session.align_rotation(
+            (a.machine_cx, a.machine_cy), a.machine_angle,
+        )
+        a.rotation_field_scores = a.placement_session.rotation_scores
+        return selected, scores
+
+    def apply_rotation_mode(self):
+        a = self.app
+        a.machine_angle = a.placement_session.apply_rotation_mode(
+            a.rotation_mode_idx, (a.machine_cx, a.machine_cy), a.machine_angle,
+        )
+        a.rotation_field_scores = a.placement_session.rotation_scores
+
+    def auto_place(self):
+        a = self.app
+        a.placement_session.weight_mode = a.weight_mode_idx
+        outcome, elapsed_ms = a.placement_session.auto_place(a.auto_placement_mode_idx)
+        if outcome is None:
+            return
+        a.ap_scores, a.ap_fields = a.placement_session.scores, a.placement_session.fields
+        if outcome.position is None:
+            print("[Auto-Placement] No feasible machine placement satisfies the active restrictions")
+            return
+        a.machine_cx, a.machine_cy = outcome.position
+        a.machine_angle = outcome.rotation
+        self.build_grid(machine_pins=self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle))
+        if a.auto_placement_mode_idx == 2:
+            print(f"[Core-like Machine Placement] tried {outcome.candidate_count} feasible candidates in {elapsed_ms:.1f}ms")
+        else:
+            print(f"[Auto-Placement] Solved position ({a.machine_cx}, {a.machine_cy}) at rotation {a.machine_angle} in {elapsed_ms:.2f}ms")
+
+    def interactive_solver(self, context_obstacles=()):
+        a = self.app
+        dwelling = a.active_dwelling
+        workspace = dwelling.workspace
+        callbacks = SalInteractiveCallbacks(
+            update_dynamic_env=lambda polygon: self.update_dynamic_env(polygon, context_obstacles),
+            build_grid=self.build_grid,
+            shaft_entry_nodes=lambda: self.shaft_entry_nodes(workspace.env, workspace.spatial_index),
+            terminal_nodes=lambda _pins, shaft_idx, shaft_route: terminal_node_indices(
+                dwelling.terminal_points, shaft_idx, workspace.spatial_index,
+                shaft_route_name=shaft_route,
+            ),
+            block_terminal_edges=lambda weights, terminal_map, block_weight: block_terminal_node_edges(
+                weights, workspace.env.adj, terminal_map, block_weight,
+            ),
+            weighted_edge_cost=weighted_edge_cost,
+            line_graph_direction=line_graph_dir_from_points,
+            route_start_nodes=lambda name: a.terminal_ui.route_start_nodes(
+                name, use_nearest_terminal=(a.room_start_mode_idx == 1),
+            ),
+            count_crossings=count_segment_crossings,
+        )
+        return SalInteractiveSolver(
+            live_session=self.live_session(),
+            terminals=dwelling.terminal_points,
+            graph_type=a.graph_type_idx,
+            columns=(*dwelling.columns, *context_obstacles),
+            blocked_vertical_regions=a.placement_session.clearance_blocks,
+            route_materializer_factory=self.route_materializer,
+            shaft_extraction=a.shaft_extraction,
+            callbacks=callbacks,
+        )
+
+    def solve_installations(self):
+        a = self.app
+        machine_key = a.installation_ui_session.selected_keys["cli"]
+        cli_machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
+        specs = {
+            "sal": InstallationRunSpec(
+                lambda context: self.interactive_solver(context).solve(),
+                lambda: self.machine_pins(a.machine_cx, a.machine_cy, a.machine_angle),
+            ),
+            "cli": InstallationRunSpec(
+                lambda context: a.cli_runtime.solve(
+                    a.active_dwelling.prepared, cli_machine,
+                    (a.cli_machine_cx, a.cli_machine_cy), a.cli_machine_angle,
+                    context_obstacles=context,
+                ),
+                lambda: cli_machine_pins(
+                    cli_machine, (a.cli_machine_cx, a.cli_machine_cy), a.cli_machine_angle,
+                ),
+            ),
+        }
+        execution = execute_installations(
+            a.installation_header_state.order, a.installation_header_state.enabled,
+            a.installation_header_state.active, specs,
+        )
+        a.installation_runs = dict(execution.runs)
+        return execution.routing_tuple()

@@ -666,6 +666,9 @@ Before each commit:
 
 ## Open Items
 
+- Added `DemoRoutingController` as the cohesive owner of Sal graph construction/dynamic obstacles, solver settings and live sessions, route analysis/materialization, placement transitions, interactive solving, and ordered Sal/Cli execution. `main.py` retains bound callback names for the existing event/UI adapters.
+- Validation: Python compilation, `git diff --check`, controller import, and a generated-dwelling initial Sal solve. `main.py` is 899 physical lines after this boundary.
+
 - Extracted Pygame initialization, font construction, event-loop ownership, canvas/context projection, sidebar rendering, placement explorer rendering, and frame timing into `ui.workbench_loop`; `main.py` now delegates application execution through one injected module facade.
 - Validation: Python compilation, `git diff --check`, and an eight-second headless startup/initial-routing smoke. `main.py` is 1,092 physical lines after this boundary.
 
