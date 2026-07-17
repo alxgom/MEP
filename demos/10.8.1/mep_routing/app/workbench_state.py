@@ -66,6 +66,13 @@ class SalWorkbenchState:
 
 
 @dataclass
+class CliWorkbenchState:
+    """Cli-specific interactive choices not yet available in routing core."""
+
+    return_ventilation_enabled: bool = True
+
+
+@dataclass
 class DisplayState:
     show_grid_graph: bool = False
     show_heatmap: bool = False
@@ -79,6 +86,7 @@ class WorkbenchState:
     installations: dict[str, InstallationState]
     dwelling: DwellingState = field(default_factory=DwellingState)
     sal: SalWorkbenchState = field(default_factory=SalWorkbenchState)
+    cli: CliWorkbenchState = field(default_factory=CliWorkbenchState)
     display: DisplayState = field(default_factory=DisplayState)
 
     @classmethod

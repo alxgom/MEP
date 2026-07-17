@@ -14,6 +14,7 @@ from .dropdown import DropdownOption, DropdownState, draw_dropdown
 
 Color = tuple[int, int, int]
 MACHINE_SELECTOR_Y = 108
+CLI_RETURN_TOGGLE_BOUNDS = (176, 247, 94, 20)
 HelpButtonDrawer = Callable[[str, Any, Any], None]
 MinPieceSliderDrawer = Callable[[Any, Any, int, int, int], None]
 WeightSliderDrawer = Callable[[Any, Any, int, int, int, str, float, float, float, Color, str, str, bool], None]
@@ -69,6 +70,7 @@ class MachineCard:
     machine_options: tuple[DropdownOption, ...] = ()
     selected_machine_key: str = ""
     machine_selector_open: bool = False
+    return_ventilation_enabled: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -176,7 +178,15 @@ def draw_sidebar(
         (text_x, 216),
     )
     screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 234))
-    screen.blit(fonts.small.render("[A] Auto | [P] Mode | [V] Heatmap | [?] More", True, colors.muted), (text_x, 252))
+    if view.machine.return_ventilation_enabled is None:
+        screen.blit(fonts.small.render("[A] Auto | [P] Mode | [V] Heatmap | [?] More", True, colors.muted), (text_x, 252))
+    else:
+        screen.blit(fonts.small.render("Return ventilation", True, colors.muted), (text_x, 251))
+        toggle = pygame.Rect(CLI_RETURN_TOGGLE_BOUNDS)
+        fill = (52, 152, 219) if view.machine.return_ventilation_enabled else (70, 74, 82)
+        pygame.draw.rect(screen, fill, toggle, border_radius=toggle.height // 2)
+        label = fonts.small.render("ON" if view.machine.return_ventilation_enabled else "OFF", True, colors.text)
+        screen.blit(label, (toggle.centerx - label.get_width() // 2, toggle.centery - label.get_height() // 2))
 
     solver_card = pygame.Rect(15, 280, card_width, 230)
     pygame.draw.rect(screen, colors.card, solver_card, border_radius=6)

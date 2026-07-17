@@ -30,6 +30,7 @@ def test_machine_selector_click_only_solves_for_runtime_invalidation():
     app = SimpleNamespace(
         auto_placement_mode_idx=0,
         ui_facade=SimpleNamespace(
+            handle_cli_return_toggle_click=lambda _pos: False,
             handle_machine_selector_click=lambda _pos: (True, False),
         ),
         routing_controller=SimpleNamespace(

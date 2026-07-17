@@ -280,6 +280,7 @@ class SidebarFrameState:
     selected_machine_key: str = ""
     machine_selector_open: bool = False
     machine_runtime_available: bool = True
+    cli_return_ventilation_enabled: bool | None = None
 
 
 def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
@@ -314,6 +315,7 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
         MachineCard(
             frame_name, state.machine_position, rotation, state.machine_options,
             state.selected_machine_key, state.machine_selector_open,
+            state.cli_return_ventilation_enabled,
         ),
         ExecutionStatusCard(state.status, state.validation_warnings, state.elapsed_ms, state.total_nodes, state.fps),
     )

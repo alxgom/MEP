@@ -88,6 +88,7 @@ class CliInstallationRuntime:
             pose.center,
             pose.angle_degrees,
             context_obstacles=context.context_obstacles,
+            return_enabled=self.app.workbench_state.cli.return_ventilation_enabled,
         )
 
     def machine_pins(self, state):

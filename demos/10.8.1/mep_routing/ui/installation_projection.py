@@ -102,7 +102,7 @@ def project_workbench(app):
             active_key, True, ProjectedCapabilities(),
             SimpleNamespace(routes=(), status=f"Routing disabled: {active_key.title()}", elapsed_ms=0.0, total_nodes=0),
             dwelling.workspace, app.terminals, state.pose.as_tuple(),
-            {} if runtime is None else runtime.machine_pins(state),
+            {},
         )
     return WorkbenchProjection(active, tuple(items))
 

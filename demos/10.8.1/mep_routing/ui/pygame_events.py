@@ -144,6 +144,8 @@ class WorkbenchEventAdapter:
                 factor = 1.12 if event.button == 4 else 1 / 1.12
                 self.app.canvas_ui.zoom_at(self.app.canvas_ui.viewport.zoom * factor, event.pos)
                 return
+            if not active_capabilities(self.app).machine_edit:
+                return
             now = pygame.time.get_ticks()
             if now - self.state.last_wheel_rotate_ms < self.app.demo_config.wheel_rotate_cooldown_ms:
                 return
@@ -157,6 +159,10 @@ class WorkbenchEventAdapter:
     def _left_down(self, pos):
         a, s = self.app, self.state
         mx, my = pos
+        if a.ui_facade.handle_cli_return_toggle_click(pos):
+            self._solve()
+            s.selected_route_name = None
+            return
         handled, runtime_invalidation = a.ui_facade.handle_machine_selector_click(pos)
         if handled:
             if runtime_invalidation:
@@ -233,7 +239,11 @@ class WorkbenchEventAdapter:
         mods = pygame.key.get_mods()
         shift, ctrl = bool(mods & pygame.KMOD_SHIFT), bool(mods & pygame.KMOD_CTRL)
         hit, machine_center = CanvasHit(), None
-        if not shift and not s.ruler_mode and a.preferred_terminal_tool_mode is None:
+        if (
+            active_capabilities(a).machine_edit
+            and not shift and not s.ruler_mode
+            and a.preferred_terminal_tool_mode is None
+        ):
             pose = a.get_active_machine_pose()
             pins = a.get_active_machine_pins(*pose)
             machine = Polygon([pins[name] for name in ("c_tl", "c_tr", "c_br", "c_bl")])

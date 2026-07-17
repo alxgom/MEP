@@ -782,6 +782,10 @@ Before each commit:
 - Combined machine selection, pose/frame information, and automatic-placement controls into one sidebar card. Single-machine catalogs such as Sal now retain a visible fixed selector while multi-machine catalogs remain expandable.
 - Validation: Python compilation, focused canvas/dropdown/facade/event contracts, the full 350-contract Demo suite, and an eight-second headless startup smoke.
 
+- Added Demo-owned Cli state and a Cli-only sidebar toggle for return ventilation. The option is passed into the Cli runtime, where disabling it omits return grilles, terminals, routing, and materialized return segments; routing core remains unchanged.
+- Disabled installations no longer project machine pins, and disabled active installations reject machine drag and wheel rotation while preserving their stored pose for later re-enabling.
+- Validation: Python compilation, 20 focused Cli/state/projection/facade/event/frame contracts, the full 353-contract Demo suite, and a real-dwelling dual-installation smoke confirming supply-only Cli routing plus empty disabled-Cli machine pins.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

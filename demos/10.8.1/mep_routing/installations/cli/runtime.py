@@ -58,13 +58,18 @@ class CliInteractiveRuntime:
         )
         return self.last_placement
 
-    def solve(self, prepared_dwelling, machine, center, angle_degrees=0, *, context_obstacles=()):
+    def solve(
+        self, prepared_dwelling, machine, center, angle_degrees=0, *,
+        context_obstacles=(), return_enabled=True,
+    ):
         started = perf_counter()
         pins = cli_machine_pins(machine, center, angle_degrees)
         grilles = prepare_cli_grilles(
             prepared_dwelling.rooms, prepared_dwelling.routing_region_base,
             machine=machine, machine_pins=pins, angle_degrees=angle_degrees,
         )
+        if not return_enabled:
+            grilles = CliGrillePlan(tuple(grilles.supply))
         if not grilles.supply:
             return self._finish(
                 (), "Blocked: no Cli supply grilles", started, 0, grilles, pins,
@@ -77,7 +82,10 @@ class CliInteractiveRuntime:
         )
         if supply is None:
             if context_obstacles:
-                relaxed = self.solve(prepared_dwelling, machine, center, angle_degrees)
+                relaxed = self.solve(
+                    prepared_dwelling, machine, center, angle_degrees,
+                    return_enabled=return_enabled,
+                )
                 if relaxed.routes:
                     self.last_result = replace(
                         relaxed,
@@ -89,10 +97,12 @@ class CliInteractiveRuntime:
                 (), "Blocked: no Cli supply tree", started, 0, grilles, pins,
                 context_obstacles=context_obstacles,
             )
-        returned = self._solve_tree(
-            "return", prepared_dwelling, machine, pins, angle_degrees,
-            grilles, context_obstacles,
-        )
+        returned = None
+        if return_enabled:
+            returned = self._solve_tree(
+                "return", prepared_dwelling, machine, pins, angle_degrees,
+                grilles, context_obstacles,
+            )
         routes = (("Supply Air Tree", [segment.line for segment in supply.segments]),)
         status = f"Cli supply solved: {len(grilles.supply)} grilles"
         return_segments = ()
@@ -105,7 +115,7 @@ class CliInteractiveRuntime:
                 f"Cli supply/return solved: {len(grilles.supply)} rooms, "
                 f"{len(supply.segments) + len(return_segments)} segments"
             )
-        else:
+        elif return_enabled:
             status += "; return tree blocked"
         return self._finish(
             routes, status, started, total_nodes, grilles, pins,

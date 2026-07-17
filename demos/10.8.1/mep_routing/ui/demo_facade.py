@@ -5,7 +5,7 @@ from __future__ import annotations
 from .dropdown import dropdown_bounds
 from .installation_header import installation_header_layout
 from .installation_projection import active_capabilities
-from .sidebar import MACHINE_SELECTOR_Y
+from .sidebar import CLI_RETURN_TOGGLE_BOUNDS, MACHINE_SELECTOR_Y
 
 
 class DemoUiFacade:
@@ -22,6 +22,16 @@ class DemoUiFacade:
             a.canvas_ui.viewport.canvas_left, a.theme.installation_header_top,
             a.installation_header_state.order, pill_width=pill, gap=gap,
         )
+
+    def handle_cli_return_toggle_click(self, pos):
+        a = self.app
+        if a.installation_header_state.active != "cli":
+            return False
+        if not self.pygame.Rect(CLI_RETURN_TOGGLE_BOUNDS).collidepoint(pos):
+            return False
+        state = a.workbench_state.cli
+        state.return_ventilation_enabled = not state.return_ventilation_enabled
+        return True
 
     def handle_machine_selector_click(self, pos):
         a = self.app

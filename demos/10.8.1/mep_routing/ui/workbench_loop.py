@@ -156,6 +156,9 @@ def _render(app, screen, clock, fonts, state):
         total_nodes=state.total_nodes, fps=clock.get_fps(), machine_options=options,
         selected_machine_key=dropdown.selected_key, machine_selector_open=dropdown.open,
         machine_runtime_available=available,
+        cli_return_ventilation_enabled=(
+            app.workbench_state.cli.return_ventilation_enabled if active == "cli" else None
+        ),
     ))
     viewport = app.canvas_ui.viewport
     draw_sidebar(

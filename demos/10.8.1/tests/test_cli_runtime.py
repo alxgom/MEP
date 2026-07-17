@@ -68,6 +68,24 @@ def test_cli_runtime_builds_core_simple_supply_tree():
     assert all(segment.width_mm > 0 and segment.height_mm > 0 for segment in result.supply_segments)
 
 
+def test_cli_runtime_can_disable_return_ventilation():
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION,
+        CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        return_enabled=False,
+    )
+
+    assert [name for name, _segments in result.routes] == ["Supply Air Tree"]
+    assert result.return_segments == ()
+    assert all(not name.endswith(" Return") for name in result.terminals)
+    assert result.status.startswith("Cli supply solved")
+
+
 def test_cli_runtime_tracks_ordered_context_obstacles():
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION,
