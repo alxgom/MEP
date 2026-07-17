@@ -48,6 +48,7 @@ class AutoPlacementCard:
     heatmap: str
     placement_weights: str
     rotation_mode: str
+    shortcuts: str = "[A] Auto | [P] Mode | [V] Heatmap | [?] More"
 
 
 @dataclass(frozen=True)
@@ -204,7 +205,7 @@ def draw_sidebar(
     )
     screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 234))
     if view.machine.return_ventilation_enabled is None:
-        screen.blit(fonts.small.render("[A] Auto | [P] Mode | [V] Heatmap | [?] More", True, colors.muted), (text_x, 252))
+        screen.blit(fonts.small.render(view.auto_placement.shortcuts, True, colors.muted), (text_x, 252))
     else:
         screen.blit(fonts.small.render("Return ventilation", True, colors.muted), (text_x, 251))
         toggle = pygame.Rect(CLI_RETURN_TOGGLE_BOUNDS)

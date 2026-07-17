@@ -19,6 +19,7 @@ class InstallationCapabilities:
     solver_controls: bool = False
     route_validation: bool = False
     placement_overlay: bool = False
+    routing_weights: bool = False
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,7 @@ class SalInstallationRuntime:
     capabilities = InstallationCapabilities(
         automatic_placement=True, terminal_tools=True,
         solver_controls=True, route_validation=True, placement_overlay=True,
+        routing_weights=True,
     )
 
     def __init__(self, controller):
@@ -70,7 +72,9 @@ class SalInstallationRuntime:
 
 class CliInstallationRuntime:
     key = "cli"
-    capabilities = InstallationCapabilities(machine_selection=True, automatic_placement=True)
+    capabilities = InstallationCapabilities(
+        machine_selection=True, automatic_placement=True, routing_weights=True,
+    )
 
     def __init__(self, app):
         self.app = app
@@ -92,6 +96,11 @@ class CliInstallationRuntime:
             graph_mode=self.app.CLI_INSTALLATION.graph_modes[
                 self.app.workbench_state.cli.graph_type_idx
             ],
+            solver_backend_index=self.app.workbench_state.cli.router_backend_idx,
+            bend_penalty_mm=self.app.workbench_state.cli.bend_penalty_mm,
+            crossing_penalty_multiplier=(
+                self.app.workbench_state.cli.crossing_penalty_multiplier
+            ),
         )
 
     def machine_pins(self, state):

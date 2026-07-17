@@ -282,6 +282,10 @@ class SidebarFrameState:
     machine_runtime_available: bool = True
     cli_return_ventilation_enabled: bool | None = None
     solver_dropdowns: tuple = ()
+    placement_heatmap_label: str | None = None
+    placement_weights_label: str | None = None
+    placement_rotation_label: str | None = None
+    placement_shortcuts_label: str | None = None
 
 
 def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
@@ -292,6 +296,9 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
         heatmap = f"{palette} / {scale}"
     weights = "Default" if state.weight_mode_index == 0 else "Equal (1.0)"
     rotation_mode = "Field" if state.rotation_mode_index == 1 else "Torque"
+    heatmap = state.placement_heatmap_label or heatmap
+    weights = state.placement_weights_label or weights
+    rotation_mode = state.placement_rotation_label or rotation_mode
     frame = state.scenario_summary.get("routing_frame") or {}
     frame_name = str(frame.get("name") or state.fallback_frame_name).replace("_", " ")
     if state.rotation_mode_index == 1:
@@ -306,7 +313,11 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
         frame_name = "Cli machine catalog"
         rotation = "Rotation: interactive runtime pending"
     return SidebarView(
-        AutoPlacementCard(state.auto_placement_mode, heatmap, weights, rotation_mode),
+        AutoPlacementCard(
+            state.auto_placement_mode, heatmap, weights, rotation_mode,
+            state.placement_shortcuts_label
+            or "[A] Auto | [P] Mode | [V] Heatmap | [?] More",
+        ),
         SolverCard(
             state.strategy, state.router, state.heuristic, state.graph_type, state.room_start_mode,
             state.selected_route_name, state.preferred_terminal_count,

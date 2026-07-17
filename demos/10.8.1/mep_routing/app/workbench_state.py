@@ -75,6 +75,9 @@ class CliWorkbenchState:
     router_backend_idx: int = 0
     heuristic_mode_idx: int = 0
     room_start_mode_idx: int = 0
+    auto_placement_mode_idx: int = 1
+    bend_penalty_mm: float = 4000.0
+    crossing_penalty_multiplier: float = 5.0
 
 
 @dataclass

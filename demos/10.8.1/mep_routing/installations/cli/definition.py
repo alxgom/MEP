@@ -20,9 +20,14 @@ CLI_GRAPH_LABELS = (
     "Routing-Core Port: Simple Grid",
 )
 CLI_STRATEGY_LABELS = ("Multi-terminal Steiner tree",)
-CLI_SEARCH_BACKEND_LABELS = ("Kou metric closure",)
+CLI_SEARCH_BACKEND_LABELS = (
+    "Routing-Core Port: Kou Steiner",
+    "Kou nonnegative heuristics",
+    "Line graph L(G) metric MST",
+)
 CLI_HEURISTIC_MODE_LABELS = ("Shortest-path distance",)
 CLI_START_MODE_LABELS = ("Supply/return grilles",)
+CLI_AUTO_PLACEMENT_LABELS = ("Manual", "Routing-Core Workflow")
 
 
 @dataclass(frozen=True)
@@ -38,6 +43,7 @@ class CliInstallationDefinition:
     search_backend_labels: tuple[str, ...] = CLI_SEARCH_BACKEND_LABELS
     heuristic_mode_labels: tuple[str, ...] = CLI_HEURISTIC_MODE_LABELS
     start_mode_labels: tuple[str, ...] = CLI_START_MODE_LABELS
+    auto_placement_labels: tuple[str, ...] = CLI_AUTO_PLACEMENT_LABELS
     interactive_runtime_available: bool = True
 
     @property

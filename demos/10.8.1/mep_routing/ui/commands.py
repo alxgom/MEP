@@ -33,6 +33,14 @@ class WorkbenchCommandController:
 
     def set_bend_weight_from_slider_x(self, x):
         a = self.app
+        if a.installation_header_state.active == "cli":
+            state = a.workbench_state.cli
+            raw = a.canvas_ui.slider_value(
+                "bend", x, a.demo_config.bend_min, a.demo_config.bend_max,
+                state.bend_penalty_mm,
+            )
+            state.bend_penalty_mm = float(round(raw / 100.0) * 100)
+            return
         raw = a.canvas_ui.slider_value(
             "bend", x, a.demo_config.bend_min, a.demo_config.bend_max, a.C_BEND,
         )
@@ -40,16 +48,29 @@ class WorkbenchCommandController:
 
     def set_crossing_weight_from_slider_x(self, x):
         a = self.app
+        if a.installation_header_state.active == "cli":
+            state = a.workbench_state.cli
+            state.crossing_penalty_multiplier = a.canvas_ui.slider_value(
+                "crossing", x, a.demo_config.crossing_min,
+                a.demo_config.crossing_max, state.crossing_penalty_multiplier,
+            )
+            return
         a.crossing_penalty_multiplier = a.canvas_ui.slider_value(
             "crossing", x, a.demo_config.crossing_min, a.demo_config.crossing_max,
             a.crossing_penalty_multiplier,
         )
 
     def reset_bend_weight(self):
-        self.app.C_BEND = self.app.demo_config.bend_default
+        if self.app.installation_header_state.active == "cli":
+            self.app.workbench_state.cli.bend_penalty_mm = 4000.0
+        else:
+            self.app.C_BEND = self.app.demo_config.bend_default
 
     def reset_crossing_weight(self):
-        self.app.crossing_penalty_multiplier = self.app.demo_config.crossing_default
+        if self.app.installation_header_state.active == "cli":
+            self.app.workbench_state.cli.crossing_penalty_multiplier = 5.0
+        else:
+            self.app.crossing_penalty_multiplier = self.app.demo_config.crossing_default
 
     def apply_routing_key_command(self, event_key):
         a, p = self.app, self.pygame
@@ -115,6 +136,19 @@ class WorkbenchCommandController:
         a, p = self.app, self.pygame
         state = a.workbench_state.cli
         definition = a.CLI_INSTALLATION
+        if event_key in (p.K_a, p.K_p):
+            if event_key == p.K_a:
+                state.auto_placement_mode_idx = (
+                    0 if state.auto_placement_mode_idx else 1
+                )
+            else:
+                state.auto_placement_mode_idx = (
+                    state.auto_placement_mode_idx + 1
+                ) % len(definition.auto_placement_labels)
+            return RoutingKeyTransition(
+                {}, record_history=False,
+                needs_auto_placement=state.auto_placement_mode_idx > 0,
+            )
         controls = {
             p.K_c: ("routing_strategy_idx", len(definition.strategy_labels), "Strategy"),
             p.K_l: ("router_backend_idx", len(definition.search_backend_labels), "Router"),

@@ -64,3 +64,33 @@ def test_cli_graph_hotkey_cycles_cli_state_without_changing_sal():
     assert transition is not None
     assert app.workbench_state.cli.graph_type_idx == 0
     assert app.graph_type_idx == 0
+
+
+def test_cli_auto_placement_hotkeys_update_only_cli_mode():
+    app, _rebuilds = _app()
+    app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
+    controller = WorkbenchCommandController(app, _pygame_keys())
+
+    manual = controller.apply_routing_key_command(_pygame_keys().K_p)
+    automatic = controller.apply_routing_key_command(_pygame_keys().K_a)
+
+    assert manual.needs_auto_placement is False
+    assert automatic.needs_auto_placement is True
+    assert app.workbench_state.cli.auto_placement_mode_idx == 1
+    assert app.auto_placement_mode_idx == 0
+
+
+def test_cli_weight_sliders_update_cli_values_without_changing_sal():
+    app, _rebuilds = _app()
+    app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
+    app.canvas_ui = SimpleNamespace(slider_value=lambda name, *_args: 2300 if name == "bend" else 7.5)
+    app.C_BEND = 4000
+    app.crossing_penalty_multiplier = 5
+    controller = WorkbenchCommandController(app, _pygame_keys())
+
+    controller.set_bend_weight_from_slider_x(100)
+    controller.set_crossing_weight_from_slider_x(100)
+
+    assert app.workbench_state.cli.bend_penalty_mm == 2300
+    assert app.workbench_state.cli.crossing_penalty_multiplier == 7.5
+    assert (app.C_BEND, app.crossing_penalty_multiplier) == (4000, 5)

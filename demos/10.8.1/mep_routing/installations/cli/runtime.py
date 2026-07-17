@@ -13,6 +13,7 @@ from .graph_inputs import build_cli_simple_graph_inputs
 from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
 from .placement import CliPlacementResult, CliPlacementRuntime
+from .solver_backends import solve_cli_tree
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,8 @@ class CliInteractiveRuntime:
     def solve(
         self, prepared_dwelling, machine, center, angle_degrees=0, *,
         context_obstacles=(), return_enabled=True, graph_mode=GraphMode.CORE_SIMPLE,
+        solver_backend_index=0, bend_penalty_mm=4000.0,
+        crossing_penalty_multiplier=5.0,
     ):
         started = perf_counter()
         pins = cli_machine_pins(machine, center, angle_degrees)
@@ -78,13 +81,17 @@ class CliInteractiveRuntime:
 
         supply = self._solve_tree(
             "supply", prepared_dwelling, machine, pins, angle_degrees,
-            grilles, context_obstacles, graph_mode,
+            grilles, context_obstacles, graph_mode, solver_backend_index,
+            bend_penalty_mm, crossing_penalty_multiplier,
         )
         if supply is None:
             if context_obstacles:
                 relaxed = self.solve(
                     prepared_dwelling, machine, center, angle_degrees,
                     return_enabled=return_enabled, graph_mode=graph_mode,
+                    solver_backend_index=solver_backend_index,
+                    bend_penalty_mm=bend_penalty_mm,
+                    crossing_penalty_multiplier=crossing_penalty_multiplier,
                 )
                 if relaxed.routes:
                     self.last_result = replace(
@@ -101,7 +108,9 @@ class CliInteractiveRuntime:
         if return_enabled:
             returned = self._solve_tree(
                 "return", prepared_dwelling, machine, pins, angle_degrees,
-                grilles, context_obstacles, graph_mode,
+                grilles, context_obstacles, graph_mode, solver_backend_index,
+                bend_penalty_mm, crossing_penalty_multiplier,
+                prior_segments=tuple(segment.line for segment in supply.segments),
             )
         routes = (("Supply Air Tree", [segment.line for segment in supply.segments]),)
         status = f"Cli supply solved: {len(grilles.supply)} grilles"
@@ -125,7 +134,8 @@ class CliInteractiveRuntime:
 
     def _solve_tree(
         self, role, prepared, machine, pins, angle, grilles, context_obstacles,
-        graph_mode,
+        graph_mode, solver_backend_index, bend_penalty_mm,
+        crossing_penalty_multiplier, prior_segments=(),
     ):
         connections = grilles.supply if role == "supply" else grilles.returns
         if not connections:
@@ -155,7 +165,12 @@ class CliInteractiveRuntime:
         runtime = build.runtime
         points = [access["access_point"], *terminals.values()]
         indices = tuple(dict.fromkeys(int(runtime.spatial_index.query(point)[1]) for point in points))
-        tree = self.definition.supply_tree_solver(runtime.nodes, runtime.adjacency, indices)
+        tree = solve_cli_tree(
+            solver_backend_index, runtime.nodes, runtime.adjacency, indices,
+            bend_penalty=bend_penalty_mm,
+            crossing_multiplier=crossing_penalty_multiplier,
+            prior_segments=prior_segments,
+        )
         if tree is None:
             return None
         segments = materialize_cli_tree(

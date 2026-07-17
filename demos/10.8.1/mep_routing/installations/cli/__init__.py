@@ -8,6 +8,7 @@ from .grilles import CliGrilleConnection, CliGrillePlacementConfig, CliGrillePla
 from .placement import CliPlacementResult, CliPlacementRuntime
 from .materializer import CliDuctSegment, materialize_cli_tree
 from .runtime import CliInteractiveRuntime, CliRoutingResult
+from .solver_backends import solve_cli_tree, solve_line_graph_mst
 from .terminals import is_cli_supply_room, prepare_cli_supply_terminals
 
 __all__ = [
@@ -18,5 +19,5 @@ __all__ = [
     "CliRoutingResult", "build_cli_simple_graph_inputs", "cli_machine_pins",
     "cli_air_access_spec", "cli_air_access_specs", "materialize_cli_tree",
     "cli_supply_access_specs", "is_cli_supply_room", "prepare_cli_supply_terminals",
-    "prepare_cli_grilles",
+    "prepare_cli_grilles", "solve_cli_tree", "solve_line_graph_mst",
 ]

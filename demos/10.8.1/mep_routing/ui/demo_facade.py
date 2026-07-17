@@ -147,6 +147,11 @@ class DemoUiFacade:
 
     def draw_min_piece_slider(self, screen, font, x, y, width):
         a = self.app
+        if a.installation_header_state.active == "cli":
+            a.canvas_ui.controls.min_piece = self.pygame.Rect(0, 0, 1, 1)
+            label = font.render("Piece validation: scope pending", True, a.theme.muted)
+            screen.blit(label, (x, y))
+            return
         a.canvas_ui.draw_min_piece_slider(
             screen, font, x, y, width, a.min_piece_factor,
             a.demo_config.min_piece_factor_min, a.demo_config.min_piece_factor_max,

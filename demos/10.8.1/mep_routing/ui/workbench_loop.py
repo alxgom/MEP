@@ -134,8 +134,19 @@ def _render(app, screen, clock, fonts, state):
     dropdown = app.installation_ui_session.dropdown_state(active)
     solver_dropdowns = app.ui_facade.solver_dropdowns()
     available = app.installation_ui_session.installations[active].runtime_available
+    cli_state = app.workbench_state.cli
+    if active == "cli":
+        auto_placement_mode = app.CLI_INSTALLATION.auto_placement_labels[
+            cli_state.auto_placement_mode_idx
+        ]
+        bend_value = cli_state.bend_penalty_mm
+        crossing_value = cli_state.crossing_penalty_multiplier
+    else:
+        auto_placement_mode = app.demo_config.auto_placement_modes[app.auto_placement_mode_idx]
+        bend_value = app.C_BEND
+        crossing_value = app.crossing_penalty_multiplier
     sidebar = build_sidebar_view(SidebarFrameState(
-        auto_placement_mode=(app.demo_config.auto_placement_modes[app.auto_placement_mode_idx] if active_view.can("solver_controls") else "Cli placement pending"),
+        auto_placement_mode=auto_placement_mode,
         show_heatmap=app.show_heatmap, heatmap_scale_mode=app.heatmap_scale_mode,
         heatmap_palette_index=app.heatmap_palette_idx, weight_mode_index=app.weight_mode_idx,
         rotation_mode_index=app.rotation_mode_idx, rotation_field_scores=app.rotation_field_scores,
@@ -145,9 +156,9 @@ def _render(app, screen, clock, fonts, state):
         graph_type=(app.demo_config.graph_types[app.graph_type_idx] if active_view.can("solver_controls") else "Core Simple"),
         room_start_mode=(app.demo_config.room_start_modes[app.room_start_mode_idx] if active_view.can("solver_controls") else "Supply terminals"),
         selected_route_name=selected, preferred_terminal_count=preferred_count,
-        bend_value=app.C_BEND, bend_min=app.demo_config.bend_min,
+        bend_value=bend_value, bend_min=app.demo_config.bend_min,
         bend_max=app.demo_config.bend_max,
-        crossing_value=app.crossing_penalty_multiplier,
+        crossing_value=crossing_value,
         crossing_min=app.demo_config.crossing_min,
         crossing_max=app.demo_config.crossing_max,
         scenario_summary=app.current_scenario_summary,
@@ -161,6 +172,10 @@ def _render(app, screen, clock, fonts, state):
             app.workbench_state.cli.return_ventilation_enabled if active == "cli" else None
         ),
         solver_dropdowns=solver_dropdowns,
+        placement_heatmap_label=("Not available" if active == "cli" else None),
+        placement_weights_label=("Grille-distance ranking" if active == "cli" else None),
+        placement_rotation_label=("Machine-aligned" if active == "cli" else None),
+        placement_shortcuts_label=("[A] Auto | [P] Mode" if active == "cli" else None),
     ))
     viewport = app.canvas_ui.viewport
     draw_sidebar(

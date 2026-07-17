@@ -284,15 +284,15 @@ class WorkbenchEventAdapter:
         if command.name == "toggle_help":
             a.workbench_chrome.toggle_help(command.value)
         elif command.name == "set_slider":
-            if not active_capabilities(a).solver_controls:
-                a.observation.set_transient_message("This control belongs to Sal")
+            if not active_capabilities(a).routing_weights:
+                a.observation.set_transient_message("Routing weights are not available here")
                 return
             name, x = command.value
             label, color = self._set_slider(name, x)
             self._solve(); self._record(label, color)
         elif command.name == "reset_slider":
-            if not active_capabilities(a).solver_controls:
-                a.observation.set_transient_message("This control belongs to Sal")
+            if not active_capabilities(a).routing_weights:
+                a.observation.set_transient_message("Routing weights are not available here")
                 return
             if command.value == "bend":
                 a.commands.reset_bend_weight(); marker = ("B:reset", (155, 89, 182))
@@ -464,8 +464,11 @@ class WorkbenchEventAdapter:
             ) % len(a.demo_config.routing_frame_options)
             self._change_dwelling(f"Frame:{a.routing_frame_idx}", (230, 126, 34))
         elif key == pygame.K_v:
-            a.show_heatmap = not a.show_heatmap
-            if a.show_heatmap: a.routing_controller.ensure_placement_scores()
+            if a.installation_header_state.active == "cli":
+                a.observation.set_transient_message("Cli placement heatmap is not implemented")
+            else:
+                a.show_heatmap = not a.show_heatmap
+                if a.show_heatmap: a.routing_controller.ensure_placement_scores()
         elif key == pygame.K_m: a.edge_weight_heatmap_enabled = not a.edge_weight_heatmap_enabled
         elif key == pygame.K_n: a.edge_weight_view_mode_idx = (a.edge_weight_view_mode_idx + 1) % 2
         elif key == pygame.K_x: a.route_real_diameter_width_enabled = not a.route_real_diameter_width_enabled

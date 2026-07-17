@@ -214,6 +214,20 @@ class DemoRoutingController:
 
     def auto_place(self):
         a = self.app
+        if a.installation_header_state.active == "cli":
+            state = a.workbench_state.cli
+            if state.auto_placement_mode_idx == 0:
+                return
+            dwelling = a.workbench_state.dwelling.active
+            if dwelling is None:
+                return
+            machine_key = a.installation_ui_session.selected_keys["cli"]
+            machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
+            placement = a.cli_runtime.place_machine(dwelling.prepared, machine)
+            a.workbench_state.installation("cli").pose.set(
+                placement.center, placement.angle_degrees,
+            )
+            return
         a.placement_session.weight_mode = a.weight_mode_idx
         outcome, elapsed_ms = a.placement_session.auto_place(a.auto_placement_mode_idx)
         if outcome is None:

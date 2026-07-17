@@ -24,6 +24,7 @@ class ProjectedCapabilities:
     solver_controls: bool = False
     route_validation: bool = False
     placement_overlay: bool = False
+    routing_weights: bool = False
 
 
 @dataclass(frozen=True)

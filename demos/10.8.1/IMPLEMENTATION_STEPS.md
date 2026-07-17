@@ -790,6 +790,12 @@ Before each commit:
 - Enabled all four graph builders already shared by the application for Cli. Cli's implemented multi-terminal Steiner strategy/backend/heuristic remain honest fixed one-entry controls until additional legacy backends are ported.
 - Validation: Python compilation, focused dropdown/hotkey/Cli-runtime contracts, the full 359-contract Demo suite, a real exported dwelling routed successfully with every Cli graph mode, and an eight-second headless UI startup smoke.
 
+- Added three Cli-owned multi-terminal backends: the shared Kou port, its nonnegative-heuristic variant, and a bend/crossing-aware line-state metric-closure MST. Sal continues to consume only its existing solvers.
+- Gave Cli independent bend and crossing weights. These are consumed by the line-state backend; the two Kou variants intentionally preserve their unweighted legacy behavior.
+- Added Cli machine auto-placement interaction through the existing installation placement runtime, with installation-specific mode text and hotkeys rather than exposing Sal-only heatmap and scoring controls.
+- Scoped route validation/KPIs, debug overlays, and grille controls in `CLI_FOLLOWUP_SCOPE.md`; no speculative controls or validation policy were implemented.
+- Validation: Python compilation, 42 focused Cli/backend/UI/placement contracts, and the full 366-contract Demo suite.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

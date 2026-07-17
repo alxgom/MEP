@@ -104,6 +104,22 @@ def test_cli_runtime_supports_its_declared_graph_modes(graph_mode):
     assert result.routes
 
 
+@pytest.mark.parametrize("backend_index", range(3))
+def test_cli_runtime_supports_its_declared_solver_backends(backend_index):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION,
+        CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        return_enabled=False, solver_backend_index=backend_index,
+    )
+
+    assert result.routes
+
+
 def test_cli_runtime_tracks_ordered_context_obstacles():
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION,
