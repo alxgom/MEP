@@ -13,6 +13,7 @@ from .dropdown import DropdownOption, DropdownState, draw_dropdown
 
 
 Color = tuple[int, int, int]
+MACHINE_SELECTOR_Y = 108
 HelpButtonDrawer = Callable[[str, Any, Any], None]
 MinPieceSliderDrawer = Callable[[Any, Any, int, int, int], None]
 WeightSliderDrawer = Callable[[Any, Any, int, int, int, str, float, float, float, Color, str, str, bool], None]
@@ -157,60 +158,53 @@ def draw_sidebar(
     screen.blit(fonts.title.render("Auto-Placement visualizer", True, colors.text), (20, 20))
     screen.blit(fonts.small.render("Vents & Extraction Router Dashboard", True, colors.muted), (20, 42))
 
-    auto_card = pygame.Rect(15, 75, card_width, 135)
+    auto_card = pygame.Rect(15, 75, card_width, 195)
     pygame.draw.rect(screen, colors.card, auto_card, border_radius=6)
-    screen.blit(fonts.bold.render("AUTO-PLACEMENT STATE", True, colors.text), (text_x, 85))
+    screen.blit(fonts.bold.render("MACHINE & AUTO-PLACEMENT", True, colors.text), (text_x, 85))
     draw_help_button("auto", auto_card, fonts.small)
-    screen.blit(fonts.bold.render(f"Mode: {view.auto_placement.mode}", True, colors.text), (text_x, 105))
-    screen.blit(fonts.small.render("[P] Mode | [V] Heatmap", True, colors.muted), (text_x, 125))
-    screen.blit(fonts.small.render(f"[V] Heatmap: {view.auto_placement.heatmap}", True, colors.muted), (text_x, 145))
-    screen.blit(fonts.small.render("[A] Auto | [?] More", True, colors.muted), (text_x, 160))
-    screen.blit(
-        fonts.small.render(f"[W] Placement Weights: {view.auto_placement.placement_weights}", True, colors.muted),
-        (text_x, 180),
-    )
-    screen.blit(fonts.small.render(f"[U] Rotation: {view.auto_placement.rotation_mode}", True, colors.muted), (text_x, 195))
-
-    solver_card = pygame.Rect(15, 220, card_width, 230)
-    pygame.draw.rect(screen, colors.card, solver_card, border_radius=6)
-    screen.blit(fonts.bold.render("ROUTING PATH SOLVER", True, colors.text), (text_x, 230))
-    draw_help_button("solver", solver_card, fonts.small)
-    solver_rows = (
-        (f"Strategy: {view.solver.strategy}", 250),
-        (f"Router: {view.solver.router}", 270),
-        (f"Heuristic: {view.solver.heuristic}", 290),
-        (f"Grid type: {view.solver.grid_type}", 310),
-        (f"Starts: {view.solver.starts}", 330),
-        (format_selected_route(view.solver.selected_route, view.solver.preferred_terminal_count), 350),
-    )
-    for label, y in solver_rows:
-        screen.blit(fonts.small.render(label, True, colors.text), (text_x, y))
-    draw_min_piece_slider(screen, fonts.small, text_x, 370, canvas_left - 70)
-    draw_weight_slider(
-        screen, fonts.small, text_x, 405, canvas_left - 70, "Bend weight",
-        view.solver.bend_value, view.solver.bend_min, view.solver.bend_max,
-        (155, 89, 182), "bend", "", True,
-    )
-    draw_weight_slider(
-        screen, fonts.small, text_x, 432, canvas_left - 70, "Cross x bend",
-        view.solver.crossing_value, view.solver.crossing_min, view.solver.crossing_max,
-        (230, 126, 34), "crossing", "x", False,
-    )
-
-    has_machine_selector = len(view.machine.machine_options) > 1
-    machine_card = pygame.Rect(15, 460, card_width, 120 if has_machine_selector else 85)
-    pygame.draw.rect(screen, colors.card, machine_card, border_radius=6)
-    screen.blit(fonts.bold.render("MACHINE PLACEMENT", True, colors.text), (text_x, 470))
-    draw_help_button("machine", machine_card, fonts.small)
-    screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 490))
     if view.machine.position_mm is None:
         position_text = "Placement: interactive runtime pending"
     else:
         machine_x, machine_y = view.machine.position_mm
         position_text = f"Position: ({int(machine_x)}, {int(machine_y)}) mm"
-    screen.blit(fonts.small.render(position_text, True, colors.text), (text_x, 510))
-    screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 530))
-    status_y = 590 if has_machine_selector else 555
+    screen.blit(fonts.small.render(position_text, True, colors.text), (text_x, 138))
+    screen.blit(fonts.small.render(f"Frame: {view.machine.frame[:24]}", True, colors.muted), (text_x, 156))
+    screen.blit(fonts.bold.render(f"Mode: {view.auto_placement.mode}", True, colors.text), (text_x, 178))
+    screen.blit(fonts.small.render(f"Heatmap: {view.auto_placement.heatmap}", True, colors.muted), (text_x, 198))
+    screen.blit(
+        fonts.small.render(f"Weights: {view.auto_placement.placement_weights}", True, colors.muted),
+        (text_x, 216),
+    )
+    screen.blit(fonts.small.render(view.machine.rotation[:38], True, colors.text), (text_x, 234))
+    screen.blit(fonts.small.render("[A] Auto | [P] Mode | [V] Heatmap | [?] More", True, colors.muted), (text_x, 252))
+
+    solver_card = pygame.Rect(15, 280, card_width, 230)
+    pygame.draw.rect(screen, colors.card, solver_card, border_radius=6)
+    screen.blit(fonts.bold.render("ROUTING PATH SOLVER", True, colors.text), (text_x, 290))
+    draw_help_button("solver", solver_card, fonts.small)
+    solver_rows = (
+        (f"Strategy: {view.solver.strategy}", 310),
+        (f"Router: {view.solver.router}", 330),
+        (f"Heuristic: {view.solver.heuristic}", 350),
+        (f"Grid type: {view.solver.grid_type}", 370),
+        (f"Starts: {view.solver.starts}", 390),
+        (format_selected_route(view.solver.selected_route, view.solver.preferred_terminal_count), 410),
+    )
+    for label, y in solver_rows:
+        screen.blit(fonts.small.render(label, True, colors.text), (text_x, y))
+    draw_min_piece_slider(screen, fonts.small, text_x, 430, canvas_left - 70)
+    draw_weight_slider(
+        screen, fonts.small, text_x, 465, canvas_left - 70, "Bend weight",
+        view.solver.bend_value, view.solver.bend_min, view.solver.bend_max,
+        (155, 89, 182), "bend", "", True,
+    )
+    draw_weight_slider(
+        screen, fonts.small, text_x, 492, canvas_left - 70, "Cross x bend",
+        view.solver.crossing_value, view.solver.crossing_min, view.solver.crossing_max,
+        (230, 126, 34), "crossing", "x", False,
+    )
+
+    status_y = 520
     status_card = pygame.Rect(15, status_y, card_width, 170)
     pygame.draw.rect(screen, colors.card, status_card, border_radius=6)
     screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, status_y + 10))
@@ -224,9 +218,9 @@ def draw_sidebar(
     screen.blit(fonts.small.render(f"Pathfinder time: {view.execution.elapsed_ms:.1f} ms", True, colors.text), (text_x, status_y + 125))
     screen.blit(fonts.small.render(f"Total routed nodes: {view.execution.total_nodes}", True, colors.muted), (text_x, status_y + 145))
     screen.blit(fonts.small.render(f"Render engine: Pygame ({view.execution.fps:.0f} FPS)", True, colors.muted), (text_x, status_y + 165))
-    if has_machine_selector:
+    if view.machine.machine_options:
         draw_dropdown(
-            screen, fonts.small, bounds=(text_x, 548, canvas_left - 70, 24),
+            screen, fonts.small, bounds=(text_x, MACHINE_SELECTOR_Y, canvas_left - 70, 24),
             options=view.machine.machine_options,
             state=DropdownState(view.machine.selected_machine_key, view.machine.machine_selector_open),
             text_color=colors.text, muted_color=colors.muted,

@@ -146,7 +146,7 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         for route_name, point in layer.terminals.items():
             terminal_markers.append(TerminalMarker(
                 to_screen(*point), (116, 124, 134), (82, 88, 96), (92, 98, 106),
-                f"{route_name} [{layer.installation.title()}]",
+                route_name,
             ))
         for route_name, segments in layer.routes:
             route_strokes.append(RouteStroke(

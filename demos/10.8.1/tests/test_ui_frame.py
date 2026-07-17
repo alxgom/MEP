@@ -100,6 +100,7 @@ def test_canvas_builder_accepts_cli_connector_schema():
     assert len(scene.machine.pins) == 4
     assert scene.routes[0].color == (105, 113, 124)
     assert scene.routes[1].segments == [((2, 3), (6, 3))]
+    assert scene.terminals[0].label == "Kitchen"
 
 
 def test_sidebar_builder_formats_display_modes_and_frame_name():

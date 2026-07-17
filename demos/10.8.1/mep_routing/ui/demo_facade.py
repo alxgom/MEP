@@ -5,6 +5,7 @@ from __future__ import annotations
 from .dropdown import dropdown_bounds
 from .installation_header import installation_header_layout
 from .installation_projection import active_capabilities
+from .sidebar import MACHINE_SELECTOR_Y
 
 
 class DemoUiFacade:
@@ -32,7 +33,8 @@ class DemoUiFacade:
             return False, False
         state = a.installation_ui_session.dropdown_state(active)
         control, option_bounds = dropdown_bounds(
-            25, 548, a.canvas_ui.viewport.canvas_left - 70, len(options), height=24,
+            25, MACHINE_SELECTOR_Y, a.canvas_ui.viewport.canvas_left - 70,
+            len(options), height=24,
         )
         if self.pygame.Rect(control).collidepoint(pos):
             a.installation_ui_session = a.installation_ui_session.toggle_dropdown(active)

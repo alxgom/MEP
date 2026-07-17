@@ -778,6 +778,10 @@ Before each commit:
 - Removed obsolete imports and corrupted separator comments, reducing `main.py` to 230 lines, and added `main.smoke_test()` backed by the typed `run_workbench_smoke()` application entrypoint.
 - Validation: Python compilation, focused application/smoke contracts, the full 350-contract Demo suite, and the non-interactive smoke entrypoint against a real exported dwelling.
 
+- Removed installation suffixes from context terminal labels so room identity remains installation-neutral on the canvas.
+- Combined machine selection, pose/frame information, and automatic-placement controls into one sidebar card. Single-machine catalogs such as Sal now retain a visible fixed selector while multi-machine catalogs remain expandable.
+- Validation: Python compilation, focused canvas/dropdown/facade/event contracts, the full 350-contract Demo suite, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

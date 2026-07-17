@@ -51,7 +51,7 @@ def draw_dropdown(screen, font, *, bounds: Bounds, options: Sequence[DropdownOpt
     """Draw a dropdown. Callers retain hit testing and application side effects."""
     import pygame
 
-    if len(options) <= 1:
+    if not options:
         return
     control_bounds, option_bounds = dropdown_bounds(*bounds[:3], len(options), height=bounds[3])
     control = pygame.Rect(control_bounds)
@@ -60,8 +60,9 @@ def draw_dropdown(screen, font, *, bounds: Bounds, options: Sequence[DropdownOpt
     pygame.draw.rect(screen, (150, 158, 166), control, 1, border_radius=4)
     label = font.render(selected.label[:28], True, text_color)
     screen.blit(label, (control.x + 8, control.centery - label.get_height() // 2))
-    arrow = font.render("^" if state.open else "v", True, muted_color)
-    screen.blit(arrow, (control.right - arrow.get_width() - 8, control.centery - arrow.get_height() // 2))
+    if len(options) > 1:
+        arrow = font.render("^" if state.open else "v", True, muted_color)
+        screen.blit(arrow, (control.right - arrow.get_width() - 8, control.centery - arrow.get_height() // 2))
     if state.open:
         for option, raw_bounds in zip(options, option_bounds):
             rect = pygame.Rect(raw_bounds)
