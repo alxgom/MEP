@@ -666,6 +666,9 @@ Before each commit:
 
 ## Open Items
 
+- Extracted Pygame initialization, font construction, event-loop ownership, canvas/context projection, sidebar rendering, placement explorer rendering, and frame timing into `ui.workbench_loop`; `main.py` now delegates application execution through one injected module facade.
+- Validation: Python compilation, `git diff --check`, and an eight-second headless startup/initial-routing smoke. `main.py` is 1,092 physical lines after this boundary.
+
 - Replaced the temporary Cli grille heuristic with the concrete Demo `10.8_cli` placement policy: 1000/1050 mm supply/return sizes, eligible wall extraction, wall margins and overlap checks, same-wall and different-wall alternatives, machine-aligned supply candidates, partial-false-ceiling detection, and horizontal returns.
 - Grille placement now receives the selected Cli machine pose explicitly. Cli placement scores supply and return distances from their respective machine connectors, and Cli's core-simple graph adds a 600 mm scaffold so valid legacy grille connection points remain connected on irregular routing regions.
 - Validation: Python compilation, seven focused direct Cli grille/placement/runtime contracts, partial-false-ceiling horizontal-return coverage, and a generated-dwelling supply/return solve using the auto-placed machine.
