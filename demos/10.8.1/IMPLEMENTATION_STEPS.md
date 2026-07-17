@@ -774,6 +774,10 @@ Before each commit:
 - Removed the compatibility aliases for graph building, machine pins, solving, dwelling activation, placement transitions, drawing delegates, and observation callbacks. Remaining composition data is temporarily proxied through one explicit migration seam.
 - Validation: Python compilation, the full 347-contract Demo suite, and an eight-second headless startup/initial-routing smoke.
 
+- Exported the application, routing, dwelling, command, facade, and chrome controllers through their package boundaries; `main.py` now imports composition services from those public surfaces.
+- Removed obsolete imports and corrupted separator comments, reducing `main.py` to 230 lines, and added `main.smoke_test()` backed by the typed `run_workbench_smoke()` application entrypoint.
+- Validation: Python compilation, focused application/smoke contracts, the full 350-contract Demo suite, and the non-interactive smoke entrypoint against a real exported dwelling.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

@@ -2,6 +2,38 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class WorkbenchSmokeResult:
+    """Small, stable result returned by the non-interactive startup check."""
+
+    dwelling_label: str
+    route_count: int
+    status: str
+    elapsed_ms: float
+    total_nodes: int
+
+
+def run_workbench_smoke(application):
+    """Generate one dwelling and route it without starting the Pygame loop."""
+
+    application.dwelling_runtime.generate()
+    routes, status, elapsed_ms, total_nodes = (
+        application.routing_controller.solve_installations()
+    )
+    active = application.workbench_state.dwelling.active
+    if active is None:
+        raise RuntimeError("Workbench smoke test did not create an active dwelling")
+    return WorkbenchSmokeResult(
+        dwelling_label=application.current_scenario_label,
+        route_count=len(routes),
+        status=status,
+        elapsed_ms=elapsed_ms,
+        total_nodes=total_nodes,
+    )
+
 
 class DemoWorkbenchApplication:
     """Own application controllers while legacy composition data is migrated.

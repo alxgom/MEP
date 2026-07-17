@@ -10,6 +10,9 @@ from .colors import (
     viridis_color,
 )
 from .theme import WorkbenchTheme
+from .commands import WorkbenchCommandController
+from .demo_facade import DemoUiFacade
+from .workbench_chrome import WorkbenchChromeRuntime
 
 __all__ = [
     "cool_colormap",
@@ -20,4 +23,7 @@ __all__ = [
     "turbo_color",
     "viridis_color",
     "WorkbenchTheme",
+    "WorkbenchChromeRuntime",
+    "WorkbenchCommandController",
+    "DemoUiFacade",
 ]

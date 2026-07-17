@@ -10,7 +10,13 @@ from .dwelling_application import (
 )
 from .graph_build_session import GraphBuildSession
 from .demo_config import DemoConfig, build_demo_config
-from .workbench_application import DemoWorkbenchApplication
+from .demo_routing_controller import DemoRoutingController
+from .dwelling_runtime import DwellingRuntime
+from .workbench_application import (
+    DemoWorkbenchApplication,
+    WorkbenchSmokeResult,
+    run_workbench_smoke,
+)
 from .workbench_state import (
     DisplayState, DwellingState, InstallationState, MachinePose,
     SalWorkbenchState, WorkbenchState,
@@ -53,7 +59,11 @@ __all__ = [
     "load_real_dwelling",
     "GraphBuildSession",
     "DemoConfig", "build_demo_config",
+    "DemoRoutingController",
     "DemoWorkbenchApplication",
+    "DwellingRuntime",
+    "WorkbenchSmokeResult",
+    "run_workbench_smoke",
     "InstallationMachineUi",
     "InstallationUiSession",
     "installation_context_obstacles",
