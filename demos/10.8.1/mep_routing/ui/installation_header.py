@@ -106,9 +106,7 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
     import pygame
 
     option_by_key = {option.key: option for option in options}
-    title = small_font.render(
-        f"ROUTING ORDER  |  active: {option_by_key[state.active].label}", True, (150, 158, 170),
-    )
+    title = small_font.render("ROUTING ORDER", True, (112, 120, 132))
     first_x = min(bounds[0] for bounds in layout.pill_bounds.values())
     first_y = min(bounds[1] for bounds in layout.pill_bounds.values())
     screen.blit(title, (first_x, first_y - title.get_height() - 2))
@@ -121,12 +119,12 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
         rect = pygame.Rect(layout.pill_bounds[key])
         active = key == state.active
         enabled = key in state.enabled
-        fill = (58, 76, 104) if active else (48, 52, 60)
-        if active and enabled:
+        fill = (244, 244, 242) if enabled else (48, 52, 60)
+        if active:
             fill = (56, 86, 130)
         if not (option.available or option.configurable):
             fill = (43, 45, 50)
-        border = (91, 149, 245) if active else (122, 128, 138)
+        border = (91, 149, 245) if active else ((126, 132, 140) if enabled else (72, 76, 84))
         if dragged_key == key:
             border = (241, 196, 15)
         pygame.draw.rect(screen, fill, rect, border_radius=rect.height // 2)
@@ -141,7 +139,16 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
         knob_x = switch.right - switch.height // 2 if enabled else switch.left + switch.height // 2
         pygame.draw.circle(screen, (238, 240, 244), (knob_x, switch.centery), knob_radius)
 
-        text_color = (225, 229, 236) if option.available or option.configurable else (112, 116, 124)
+        text_color = (
+            (244, 247, 250) if active
+            else (24, 27, 32) if enabled
+            else (132, 136, 144) if option.available or option.configurable
+            else (94, 98, 106)
+        )
         label = font.render(option.label, True, text_color)
-        label_x = switch.right + (rect.right - switch.right - label.get_width()) // 2
+        grip_x = rect.right - 11
+        label_x = switch.right + (grip_x - switch.right - label.get_width()) // 2
         screen.blit(label, (label_x, rect.centery - label.get_height() // 2))
+        grip_color = (210, 214, 220) if active else ((78, 82, 88) if enabled else (104, 108, 116))
+        for offset_y in (-6, 0, 6):
+            pygame.draw.circle(screen, grip_color, (grip_x, rect.centery + offset_y), 1)

@@ -200,8 +200,11 @@ def draw_canvas_scene(
 
     for index, machine in enumerate(scene.machines):
         pygame.draw.polygon(screen, machine.fill_color, machine.outline)
-        border = (255, 255, 255) if index == len(scene.machines) - 1 else (150, 156, 164)
-        pygame.draw.polygon(screen, border, machine.outline, 2 if index == len(scene.machines) - 1 else 1)
+        active = index == len(scene.machines) - 1
+        border = (91, 149, 245) if active else (150, 156, 164)
+        if active:
+            pygame.draw.polygon(screen, (232, 242, 255), machine.outline, 5)
+        pygame.draw.polygon(screen, border, machine.outline, 3 if active else 1)
         for pin in machine.pins:
             pygame.draw.circle(screen, pin.color, pin.point, pin.radius)
             pygame.draw.circle(screen, pin.ring_color, pin.point, pin.radius, 1)

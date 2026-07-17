@@ -11,7 +11,7 @@ Color = tuple[int, int, int] | tuple[int, int, int, int]
 
 def _route_colors() -> Mapping[str, Color]:
     return MappingProxyType({
-        "Shaft": (46, 204, 113), "Kitchen": (241, 196, 15),
+        "Shaft": (192, 57, 52), "Kitchen": (241, 196, 15),
         "Bathroom": (52, 152, 219), "Bathroom 1": (52, 152, 219),
         "Bathroom 2": (155, 89, 182), "Toilet": (230, 126, 34),
         "Washroom": (26, 188, 156), "Supply Air Tree": (52, 152, 219),
@@ -26,7 +26,7 @@ class WorkbenchTheme:
     colorbar_width: int = 56
     wall_draw_width: int = 2
     background: Color = (240, 238, 233)
-    panel: Color = (35, 35, 45)
+    panel: Color = (29, 30, 39)
     plot_background: Color = (22, 22, 30)
     room: Color = (45, 52, 54)
     covered_room: Color = (248, 247, 243)

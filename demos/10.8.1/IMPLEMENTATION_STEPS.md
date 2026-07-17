@@ -800,6 +800,11 @@ Before each commit:
 - Solver dropdown controls now render closed controls first and the open option sheet last. Opening a solver or machine selector also dismisses the other selector family, preserving one readable overlay.
 - Validation: Python compilation, 15 focused frame/facade/event/projection contracts, the full 368-contract Demo suite, and an eight-second headless startup smoke.
 
+- Refined the compact workbench chrome without changing plots, weight-view controls, dwelling presentation, grid overlays, or colorbar behavior. Enabled installation pills are light, disabled pills remain subdued, the active pill remains blue, and a three-dot grip hints at the existing drag-to-reorder interaction without changing the pill geometry.
+- Increased sidebar/card surface separation, made execution status a flatter non-interactive readout without a help affordance or decorative status rail, and limited semantic colour to success/failure text and warnings.
+- Moved terminal controls nearer the canvas edge while preserving most of the vertical colorbar reserve. Shaft routing now follows the shaft's red semantic colour, and the active machine has a stronger blue outline.
+- Validation: Python compilation, 18 focused UI/config contracts, the full 368-contract Demo suite, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

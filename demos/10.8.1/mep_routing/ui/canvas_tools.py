@@ -13,7 +13,9 @@ from .drawing import draw_dashed_polyline
 
 def terminal_tool_buttons(canvas_left, canvas_top, canvas_width):
     """Return terminal preference controls in their canvas-relative positions."""
-    x = canvas_left + canvas_width - 145
+    # Keep the tools close to the usable canvas edge without consuming the
+    # full vertical colorbar reserve.
+    x = canvas_left + canvas_width - 125
     y = canvas_top + 92
     return (
         ("point", pygame.Rect(x, y, 132, 70), "Terminal"),
