@@ -94,14 +94,14 @@ def solution_log_action(pos, log_button_rect, log_row_rects):
 
 def _entry_prefix(entry):
     if entry.get("kind") != "auto":
-        return f"L{entry['id']}"
+        return f"Log {entry['id']}"
     return {
         "score": "Best score",
-        "length_m": "Best len",
+        "length_m": "Best length",
         "turns": "Best turns",
-        "crossings": "Best cross",
-        "short_pieces": "Best short",
-        "elapsed_ms": "Best time",
+        "crossings": "Best crossings",
+        "short_pieces": "Fewest short pieces",
+        "elapsed_ms": "Fastest solve",
     }.get(entry.get("metric"), "Best")
 
 
@@ -154,25 +154,25 @@ def draw_solution_logs_panel(
     best_manual = manual_best_values(solution_logs)
     row_rects = []
     row_y = y + 40
-    row_height = 30
+    row_height = 34
     for entry in entries:
         rect = pygame.Rect(px, row_y, width, row_height - 3)
         active = entry["id"] == selected_log_id
         fill = (45, 54, 80) if active else ((38, 42, 48) if entry.get("kind") == "auto" else (30, 34, 42))
-        border = (255, 255, 255) if active else (55, 55, 70)
+        border = (91, 149, 245) if active else (55, 55, 70)
         pygame.draw.rect(screen, fill, rect, border_radius=4)
-        pygame.draw.rect(screen, border, rect, 1, border_radius=4)
+        pygame.draw.rect(screen, border, rect, 2 if active else 1, border_radius=4)
         row_rects.append((rect, entry["id"]))
 
         kpis = entry["kpis"]
-        title = font_small.render(f"{_entry_prefix(entry)}  {int(kpis['score'])}", True, text_color)
+        title = font_small.render(f"{_entry_prefix(entry)} · {int(kpis['score']):,}", True, text_color)
         detail = font_small.render(
-            f"{kpis['length_m']:.2f}m T{kpis['turns']} X{kpis['crossings']} S{kpis['short_pieces']}",
+            f"{kpis['length_m']:.2f} m · {int(kpis['turns'])} turns · {int(kpis['crossings'])} crossings",
             True,
             muted_color,
         )
         screen.blit(title, (rect.x + 6, rect.y + 3))
-        screen.blit(detail, (rect.x + 6, rect.y + 15))
+        screen.blit(detail, (rect.x + 6, rect.y + 17))
 
         if entry.get("kind") == "manual":
             badges = [

@@ -22,10 +22,11 @@ class Rect:
 def test_canvas_tool_button_bounds_preserve_toolbar_order_and_spacing():
     buttons = canvas_tool_button_bounds(100, 50)
 
-    assert [action for action, _bounds, _label in buttons] == ["in", "out", "reset", "ruler", "weights", "diameter"]
+    assert [action for action, _bounds, _label in buttons] == ["in", "out", "reset", "ruler", "diameter", "weights"]
     assert buttons[0][1] == (112, 62, 28, 28)
     assert buttons[4][1] == (296, 62, 72, 28)
-    assert buttons[5][1] == (472, 62, 54, 28)
+    assert buttons[4][2] == "Actual Ø"
+    assert buttons[5][1] == (382, 62, 72, 28)
 
 
 def test_weight_view_switch_bounds_follows_weights_button():

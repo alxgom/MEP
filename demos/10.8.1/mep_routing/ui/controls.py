@@ -12,16 +12,16 @@ def canvas_tool_button_bounds(canvas_left, canvas_top):
     reset_width = 46
     cursor = x0 + 2 * (size + gap) + reset_width + gap
     ruler = (cursor, y0, 58, size)
-    weights = (ruler[0] + ruler[2] + gap, y0, 72, size)
+    diameter = (ruler[0] + ruler[2] + gap, y0, 72, size)
+    weights = (diameter[0] + diameter[2] + 14, y0, 72, size)
     weight_switch = weight_view_switch_bounds(weights)
-    diameter = (weight_switch[0] + weight_switch[2] + gap, y0, 54, size)
     return (
         ("in", (x0, y0, size, size), "+"),
         ("out", (x0 + size + gap, y0, size, size), "-"),
         ("reset", (x0 + 2 * (size + gap), y0, reset_width, size), "1:1"),
         ("ruler", ruler, "Ruler"),
+        ("diameter", diameter, "Actual Ø"),
         ("weights", weights, "Weights"),
-        ("diameter", diameter, "Diam"),
     )
 
 
