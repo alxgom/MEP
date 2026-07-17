@@ -12,6 +12,8 @@ from mep_routing.ui.frame import (
     build_canvas_scene,
     build_sidebar_view,
 )
+from mep_routing.ui.sidebar import SolverDropdown, dropdown_overlay_order
+from mep_routing.ui.dropdown import DropdownOption
 
 
 def _palette():
@@ -101,6 +103,34 @@ def test_canvas_builder_accepts_cli_connector_schema():
     assert scene.routes[0].color == (105, 113, 124)
     assert scene.routes[1].segments == [((2, 3), (6, 3))]
     assert scene.terminals[0].label == "Kitchen"
+
+
+def test_canvas_builder_accepts_active_installation_without_machine_pins():
+    state = CanvasFrameState(
+        rooms=(), doors=(), columns=(), shafts=(), shaft_extraction=None,
+        graph_env=None, show_grid_graph=False, terminals={}, routes=(),
+        selected_route_name=None, selected_room_polygon=None, global_pins={},
+        selected_pins=set(), context_layers=(), auto_placement_mode=1,
+        placement_fields={"Shaft": {}}, wet_room_names=(), route_colors={},
+        palette=_palette(),
+        callbacks=CanvasFrameCallbacks(lambda x, y: (x, y), lambda shape: (0, 0), lambda name: 3, lambda point: (0, 0)),
+        room_wall_width=2, terminal_area_start=None, terminal_area_end=None,
+    )
+
+    scene = build_canvas_scene(state)
+
+    assert scene.machines == ()
+    assert scene.guide_lines == []
+
+
+def test_open_solver_dropdown_is_ordered_after_closed_controls():
+    option = (DropdownOption("0", "Only"),)
+    closed = SolverDropdown("strategy", "Strategy", option, "0")
+    opened = SolverDropdown("router", "Router", option, "0", True)
+
+    ordered = dropdown_overlay_order(((0, opened), (1, closed)))
+
+    assert [dropdown.key for _index, dropdown in ordered] == ["strategy", "router"]
 
 
 def test_sidebar_builder_formats_display_modes_and_frame_name():

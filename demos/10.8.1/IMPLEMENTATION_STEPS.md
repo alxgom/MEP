@@ -796,6 +796,10 @@ Before each commit:
 - Scoped route validation/KPIs, debug overlays, and grille controls in `CLI_FOLLOWUP_SCOPE.md`; no speculative controls or validation policy were implemented.
 - Validation: Python compilation, 42 focused Cli/backend/UI/placement contracts, and the full 366-contract Demo suite.
 
+- Hardened canvas projection for disabled or stale active installations whose machine-pin map is intentionally empty; machine outlines and placement guides now render only when their required installation-specific pins exist.
+- Solver dropdown controls now render closed controls first and the open option sheet last. Opening a solver or machine selector also dismisses the other selector family, preserving one readable overlay.
+- Validation: Python compilation, 15 focused frame/facade/event/projection contracts, the full 368-contract Demo suite, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

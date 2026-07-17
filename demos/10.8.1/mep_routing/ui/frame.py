@@ -183,7 +183,12 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
             state.selected_route_name == route_name,
         ))
 
-    outline = [to_screen(*state.global_pins[name]) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
+    corner_names = ("c_tl", "c_tr", "c_br", "c_bl")
+    outline = (
+        [to_screen(*state.global_pins[name]) for name in corner_names]
+        if all(name in state.global_pins for name in corner_names)
+        else None
+    )
     pin_markers = []
     connector_names = tuple(
         name for name in ("tl", "tr", "bl", "br", "left_mid", "right_mid", "air_out", "air_in", "freon1", "freon2")
@@ -199,21 +204,30 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         pin_markers.append(MachinePinMarker(to_screen(*state.global_pins[pin_name]), color, ring, 5 if large else 4))
 
     guides = _build_guide_lines(state)
+    machines = list(context_machines)
+    if outline is not None:
+        machines.append(MachineRender(
+            outline, (230, 126, 34) if state.auto_placement_mode > 0 else (127, 140, 141), pin_markers,
+        ))
     return CanvasScene(
         palette.background, canvas_rooms, palette.wall, state.room_wall_width,
         canvas_doors, palette.door, canvas_columns, canvas_shafts,
         grid_edges, grid_nodes, palette.graph_edge, palette.graph_node,
         terminal_markers, shaft_marker, route_strokes, palette.selection_halo,
         state.selected_route_name, state.terminal_area_start, state.terminal_area_end,
-        (*context_machines, MachineRender(
-            outline, (230, 126, 34) if state.auto_placement_mode > 0 else (127, 140, 141), pin_markers,
-        )),
+        tuple(machines),
         guides,
     )
 
 
 def _build_guide_lines(state: CanvasFrameState):
-    if state.auto_placement_mode != 1 or not state.placement_fields:
+    required_pins = ("left_mid", "right_mid", "tl", "tr", "bl", "br")
+    if (
+        state.auto_placement_mode != 1
+        or not state.placement_fields
+        or state.shaft_extraction is None
+        or not all(name in state.global_pins for name in required_pins)
+    ):
         return []
     to_screen, query = state.callbacks.to_screen, state.callbacks.spatial_query
     shaft_point = state.callbacks.representative_point(state.shaft_extraction)

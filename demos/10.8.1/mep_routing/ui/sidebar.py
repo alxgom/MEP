@@ -88,6 +88,13 @@ def solver_dropdown_bounds(index: int, option_count: int):
     )
 
 
+def dropdown_overlay_order(indexed_dropdowns):
+    """Draw the open control last so its option sheet remains a true overlay."""
+    return tuple(item for item in indexed_dropdowns if not item[1].open) + tuple(
+        item for item in indexed_dropdowns if item[1].open
+    )
+
+
 @dataclass(frozen=True)
 class MachineCard:
     frame: str
@@ -263,7 +270,8 @@ def draw_sidebar(
             state=DropdownState(view.machine.selected_machine_key, view.machine.machine_selector_open),
             text_color=colors.text, muted_color=colors.muted,
         )
-    for index, dropdown in enumerate(view.solver.dropdowns):
+    indexed_dropdowns = tuple(enumerate(view.solver.dropdowns))
+    for index, dropdown in dropdown_overlay_order(indexed_dropdowns):
         control, _option_bounds = solver_dropdown_bounds(index, len(dropdown.options))
         draw_dropdown(
             screen, fonts.small, bounds=control,

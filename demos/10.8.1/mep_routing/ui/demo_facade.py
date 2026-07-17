@@ -102,6 +102,8 @@ class DemoUiFacade:
             if self.pygame.Rect(control).collidepoint(pos):
                 if len(dropdown.options) <= 1:
                     return True, False, dropdown.key
+                if hasattr(a, "installation_ui_session"):
+                    a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
                 key = (active, dropdown.key)
                 a.workbench_state.solver_dropdown_open_for = (
                     None if a.workbench_state.solver_dropdown_open_for == key else key
@@ -125,6 +127,7 @@ class DemoUiFacade:
             len(options), height=24,
         )
         if self.pygame.Rect(control).collidepoint(pos):
+            a.workbench_state.solver_dropdown_open_for = None
             a.installation_ui_session = a.installation_ui_session.toggle_dropdown(active)
             return True, False
         if state.open:
