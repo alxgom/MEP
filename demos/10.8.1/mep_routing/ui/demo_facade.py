@@ -1,0 +1,175 @@
+"""Thin UI facade for Demo 10.8.1's remaining callback surface."""
+
+from __future__ import annotations
+
+from .dropdown import dropdown_bounds
+from .installation_header import installation_header_layout
+
+
+class DemoUiFacade:
+    def __init__(self, app, pygame):
+        self.app, self.pygame = app, pygame
+
+    def installation_header_layout(self):
+        a = self.app
+        count = len(a.installation_header_state.order)
+        width = max(420, a.canvas_ui.viewport.canvas_width - 28)
+        pill = min(126, max(92, (width - (count - 1) * 30) // count))
+        gap = min(42, max(24, (width - count * pill) // max(1, count - 1)))
+        return installation_header_layout(
+            a.canvas_ui.viewport.canvas_left, a.INSTALLATION_HEADER_TOP,
+            a.installation_header_state.order, pill_width=pill, gap=gap,
+        )
+
+    def handle_machine_selector_click(self, pos):
+        a = self.app
+        active = a.installation_header_state.active
+        if active not in a.installation_ui_session.installations:
+            return False, False
+        options = a.installation_ui_session.options(active)
+        if len(options) <= 1:
+            return False, False
+        state = a.installation_ui_session.dropdown_state(active)
+        control, option_bounds = dropdown_bounds(
+            25, 548, a.canvas_ui.viewport.canvas_left - 70, len(options), height=24,
+        )
+        if self.pygame.Rect(control).collidepoint(pos):
+            a.installation_ui_session = a.installation_ui_session.toggle_dropdown(active)
+            return True, False
+        if state.open:
+            selected = next((option.key for option, bounds in zip(options, option_bounds)
+                             if self.pygame.Rect(bounds).collidepoint(pos)), None)
+            if selected is not None:
+                transition = a.installation_ui_session.choose(active, selected)
+                a.installation_ui_session = transition.session
+                if active == "cli" and transition.changed and a.active_dwelling is not None:
+                    placement = a.cli_runtime.place_machine(
+                        a.active_dwelling.prepared, a.CLI_INSTALLATION.machine_catalog.value(selected),
+                    )
+                    a.cli_machine_cx, a.cli_machine_cy = placement.center
+                    a.cli_machine_angle = placement.angle_degrees
+                return True, transition.runtime_invalidation_required
+            a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
+        return False, False
+
+    def draw_min_piece_slider(self, screen, font, x, y, width):
+        a = self.app
+        a.canvas_ui.draw_min_piece_slider(
+            screen, font, x, y, width, a.min_piece_factor,
+            a.MIN_PIECE_FACTOR_MIN, a.MIN_PIECE_FACTOR_MAX, a.COLOR_TEXT, a.COLOR_MUTED,
+        )
+
+    def draw_weight_slider(self, screen, font, x, y, width, label, value, minimum, maximum,
+                           color, rect_name, suffix="", integer=False):
+        a = self.app
+        a.canvas_ui.draw_weight_slider(
+            screen, font, x, y, width, label, value, minimum, maximum,
+            a.COLOR_TEXT, a.COLOR_MUTED, name=rect_name, suffix=suffix, integer=integer,
+        )
+
+    def record_current_solution(self, routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
+        a = self.app
+        if routes:
+            a.record_history(routes, a.count_segment_crossings(routes), elapsed_ms)
+            if marker_label:
+                a.routing_history.add_marker(marker_label, marker_color)
+
+    def handle_terminal_tool_button_click(self, pos):
+        a = self.app
+        if a.installation_header_state.active != "sal":
+            a.preferred_terminal_tool_mode = None
+            return None
+        for mode, rect, _ in a.canvas_ui.terminal_buttons():
+            if not rect.collidepoint(pos):
+                continue
+            if mode == "reset":
+                a.preferred_terminal_tool_mode = None
+                return "reset"
+            if mode == "map":
+                a.terminal_validity_overlay_enabled = not a.terminal_validity_overlay_enabled
+                return "map"
+            a.preferred_terminal_tool_mode = None if a.preferred_terminal_tool_mode == mode else mode
+            return "mode"
+        return None
+
+    def draw_terminal_tool_buttons(self, screen, font_bold, font_small):
+        a = self.app
+        a.canvas_ui.draw_terminal_tools(
+            screen, font_bold, font_small, active_mode=a.preferred_terminal_tool_mode,
+            overlay_enabled=a.terminal_validity_overlay_enabled,
+            colors=(a.COLOR_TEXT, a.COLOR_MUTED, a.COLOR_TERMINAL_ALLOWED),
+        )
+
+    def dwelling_selector_options(self):
+        return ("New random dwelling",) + tuple(case.label for case in self.app.REAL_DWELLING_SCENARIOS)
+
+    def draw_canvas_tool_controls(self, screen, font, ruler_mode, dwelling_selector_open=False):
+        a = self.app
+        return a.canvas_ui.draw_toolbar(screen, font, state={
+            "ruler_enabled": ruler_mode, "edge_weights_enabled": a.edge_weight_heatmap_enabled,
+            "diameter_width_enabled": a.route_real_diameter_width_enabled,
+            "small_weight_view": a.edge_weight_view_mode_idx == 0,
+            "dwelling_label": a.current_scenario_label,
+            "dwelling_options": self.dwelling_selector_options(),
+            "dwelling_selector_open": dwelling_selector_open,
+            "active_terminal_mode": a.preferred_terminal_tool_mode, "text_color": a.COLOR_TEXT,
+        })
+
+    def set_ruler_cursor(self, enabled):
+        try:
+            self.pygame.mouse.set_cursor(
+                self.pygame.SYSTEM_CURSOR_CROSSHAIR if enabled else self.pygame.SYSTEM_CURSOR_ARROW,
+            )
+        except self.pygame.error:
+            pass
+
+    def draw_ruler_overlay(self, screen, font, start_mm, end_mm):
+        a = self.app
+        return a.canvas_ui.draw_ruler(screen, font, start_mm, end_mm, a.COLOR_TEXT)
+
+    def invalidate_room_start_node_cache(self):
+        if self.app.terminal_runtime is not None:
+            self.app.terminal_runtime.invalidate_candidates()
+
+    def invalidate_terminal_validity_cache(self):
+        self.app.terminal_ui.invalidate()
+
+    def draw_colorbar(self, screen, node_scores):
+        a = self.app
+        return a.canvas_ui.draw_distance_colorbar(
+            screen, bool(node_scores), a.heatmap_scale_mode, a.heatmap_palette_idx, a.COLOR_TEXT,
+        )
+
+    def get_placeable_heatmap_scores(self, scores):
+        return self.app.placement_session.placeable_scores(scores)
+
+    def draw_distance_heatmap(self, screen, scores):
+        a = self.app
+        return a.canvas_ui.draw_distance_heatmap(
+            screen, self.get_placeable_heatmap_scores(scores), base_env=a.routing_workspace.base_env,
+            grid_spacing=a.GRID_SPACING, blocked_regions=a.get_machine_vertical_clearance_blocks(),
+            scale_mode=a.heatmap_scale_mode, palette_index=a.heatmap_palette_idx,
+            fill_color=a.COLOR_MACHINE_CLEARANCE_FILL, hatch_color=a.COLOR_MACHINE_CLEARANCE_HATCH,
+        )
+
+    def draw_edge_weight_heatmap(self, screen):
+        a = self.app
+        if a.edge_weight_heatmap_enabled:
+            return a.canvas_ui.draw_edge_heatmap(
+                screen, a.routing_workspace.overlay.values, a.routing_workspace.env,
+                a.OVERLAP_BLOCK_WEIGHT, a.COLOR_BLOCKED_EDGE,
+            )
+
+    def draw_edge_weight_colorbar(self, screen):
+        a = self.app
+        if a.edge_weight_heatmap_enabled:
+            return a.canvas_ui.draw_edge_colorbar(
+                screen, a.routing_workspace.overlay.values, a.OVERLAP_BLOCK_WEIGHT,
+                a.COLOR_BLOCKED_EDGE, a.COLOR_TEXT,
+            )
+
+    def get_route_draw_width(self, route_name):
+        a = self.app
+        if a.route_real_diameter_width_enabled:
+            return max(1, int(round(a.get_route_diameter(route_name) * a.canvas_ui.viewport.scale)))
+        return 5 if a.SAL_INSTALLATION.is_large_route(route_name) else 3

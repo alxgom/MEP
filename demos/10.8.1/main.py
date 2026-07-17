@@ -40,7 +40,6 @@ from mep_routing.ui.installation_projection import InstallationVisual, installat
 from mep_routing.ui.terminal_runtime import TerminalUiRuntime, TerminalUiStyle
 from mep_routing.ui.drawing import draw_outlined_text as _draw_outlined_text
 from mep_routing.ui.controls import dwelling_selector_bounds as _dwelling_selector_bounds
-from mep_routing.ui.dropdown import dropdown_bounds as _dropdown_bounds
 from mep_routing.ui.overlays import (
     draw_terminal_area_drag as _draw_terminal_area_drag,
     draw_wet_room_outer_accents as _draw_wet_room_outer_accents,
@@ -67,13 +66,13 @@ from mep_routing.ui.sidebar import (
     draw_sidebar as _draw_sidebar,
 )
 from mep_routing.ui.commands import WorkbenchCommandController
+from mep_routing.ui.demo_facade import DemoUiFacade
 from mep_routing.ui.installation_header import (
     InstallationHeaderState,
     InstallationOption,
     activate_installation as _activate_installation,
     draw_installation_header as _draw_installation_header,
     installation_header_hit as _installation_header_hit,
-    installation_header_layout as _installation_header_layout,
     reorder_installation_at_x as _reorder_installation_at_x,
     toggle_installation as _toggle_installation,
 )
@@ -329,19 +328,6 @@ to_screen = canvas_ui.viewport.to_screen
 to_mm = canvas_ui.viewport.to_world
 
 
-def get_installation_header_layout():
-    count = len(installation_header_state.order)
-    available_width = max(420, canvas_ui.viewport.canvas_width - 28)
-    pill_width = min(126, max(92, (available_width - (count - 1) * 30) // count))
-    gap = min(42, max(24, (available_width - count * pill_width) // max(1, count - 1)))
-    return _installation_header_layout(
-        canvas_ui.viewport.canvas_left,
-        INSTALLATION_HEADER_TOP,
-        installation_header_state.order,
-        pill_width=pill_width,
-        gap=gap,
-    )
-
 workbench_commands = WorkbenchCommandController(sys.modules[__name__], pygame)
 handle_canvas_tool_button_click = workbench_commands.handle_canvas_tool_button_click
 set_min_piece_factor_from_slider_x = workbench_commands.set_min_piece_factor_from_slider_x
@@ -350,118 +336,20 @@ set_crossing_weight_from_slider_x = workbench_commands.set_crossing_weight_from_
 reset_bend_weight = workbench_commands.reset_bend_weight
 reset_crossing_weight = workbench_commands.reset_crossing_weight
 apply_routing_key_command = workbench_commands.apply_routing_key_command
-
-def handle_machine_selector_click(pos):
-    """Handle the active installation's selector without owning runtime policy."""
-    global installation_ui_session, cli_machine_cx, cli_machine_cy, cli_machine_angle
-    active = installation_header_state.active
-    if active not in installation_ui_session.installations:
-        return False, False
-    options = installation_ui_session.options(active)
-    if len(options) <= 1:
-        return False, False
-    state = installation_ui_session.dropdown_state(active)
-    control, option_bounds = _dropdown_bounds(
-        25, 548, canvas_ui.viewport.canvas_left - 70, len(options), height=24,
-    )
-    if pygame.Rect(control).collidepoint(pos):
-        installation_ui_session = installation_ui_session.toggle_dropdown(active)
-        return True, False
-    if state.open:
-        selected = next((
-            option.key for option, bounds in zip(options, option_bounds)
-            if pygame.Rect(bounds).collidepoint(pos)
-        ), None)
-        if selected is not None:
-            transition = installation_ui_session.choose(active, selected)
-            installation_ui_session = transition.session
-            if active == "cli" and transition.changed and active_dwelling is not None:
-                placement = cli_runtime.place_machine(
-                    active_dwelling.prepared,
-                    CLI_INSTALLATION.machine_catalog.value(selected),
-                )
-                cli_machine_cx, cli_machine_cy = placement.center
-                cli_machine_angle = placement.angle_degrees
-            return True, transition.runtime_invalidation_required
-        installation_ui_session = installation_ui_session.dismiss_dropdown()
-    return False, False
-
-def draw_min_piece_slider(screen, font_small, x, y, width):
-    canvas_ui.draw_min_piece_slider(
-        screen, font_small, x, y, width, min_piece_factor,
-        MIN_PIECE_FACTOR_MIN, MIN_PIECE_FACTOR_MAX, COLOR_TEXT, COLOR_MUTED,
-    )
-
-def draw_weight_slider(screen, font_small, x, y, width, label, value, min_value, max_value, color, rect_name, suffix="", integer=False):
-    canvas_ui.draw_weight_slider(
-        screen, font_small, x, y, width, label, value, min_value, max_value,
-        COLOR_TEXT, COLOR_MUTED, name=rect_name, suffix=suffix, integer=integer,
-    )
-
-def record_current_solution(routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
-    if routes:
-        crossings_c = count_segment_crossings(routes)
-        record_history(routes, crossings_c, elapsed_ms)
-        if marker_label:
-            routing_history.add_marker(marker_label, marker_color)
-
-def handle_terminal_tool_button_click(pos):
-    global preferred_terminal_tool_mode, terminal_validity_overlay_enabled
-    if installation_header_state.active != "sal":
-        preferred_terminal_tool_mode = None
-        return None
-    for mode, rect, _ in canvas_ui.terminal_buttons():
-        if not rect.collidepoint(pos):
-            continue
-        if mode == "reset":
-            preferred_terminal_tool_mode = None
-            return "reset"
-        if mode == "map":
-            terminal_validity_overlay_enabled = not terminal_validity_overlay_enabled
-            return "map"
-        preferred_terminal_tool_mode = None if preferred_terminal_tool_mode == mode else mode
-        return "mode"
-    return None
-
-def draw_terminal_tool_buttons(screen, font_bold, font_small):
-    canvas_ui.draw_terminal_tools(
-        screen, font_bold, font_small, active_mode=preferred_terminal_tool_mode,
-        overlay_enabled=terminal_validity_overlay_enabled,
-        colors=(COLOR_TEXT, COLOR_MUTED, COLOR_TERMINAL_ALLOWED),
-    )
-
-def dwelling_selector_options():
-    return ("New random dwelling",) + tuple(case.label for case in REAL_DWELLING_SCENARIOS)
-
-
-def draw_canvas_tool_controls(screen, font_small, ruler_mode, dwelling_selector_open=False):
-    return canvas_ui.draw_toolbar(screen, font_small, state={
-        "ruler_enabled": ruler_mode,
-        "edge_weights_enabled": edge_weight_heatmap_enabled,
-        "diameter_width_enabled": route_real_diameter_width_enabled,
-        "small_weight_view": edge_weight_view_mode_idx == 0,
-        "dwelling_label": current_scenario_label,
-        "dwelling_options": dwelling_selector_options(),
-        "dwelling_selector_open": dwelling_selector_open,
-        "active_terminal_mode": preferred_terminal_tool_mode,
-        "text_color": COLOR_TEXT,
-    })
-
-def set_ruler_cursor(enabled):
-    try:
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_CROSSHAIR if enabled else pygame.SYSTEM_CURSOR_ARROW)
-    except pygame.error:
-        pass
-
-def draw_ruler_overlay(screen, font_small, start_mm, end_mm):
-    return canvas_ui.draw_ruler(screen, font_small, start_mm, end_mm, COLOR_TEXT)
-
-def invalidate_room_start_node_cache():
-    if terminal_runtime is not None:
-        terminal_runtime.invalidate_candidates()
-
-def invalidate_terminal_validity_cache():
-    terminal_ui.invalidate()
+ui_facade = DemoUiFacade(sys.modules[__name__], pygame)
+get_installation_header_layout = ui_facade.installation_header_layout
+handle_machine_selector_click = ui_facade.handle_machine_selector_click
+draw_min_piece_slider = ui_facade.draw_min_piece_slider
+draw_weight_slider = ui_facade.draw_weight_slider
+record_current_solution = ui_facade.record_current_solution
+handle_terminal_tool_button_click = ui_facade.handle_terminal_tool_button_click
+draw_terminal_tool_buttons = ui_facade.draw_terminal_tool_buttons
+dwelling_selector_options = ui_facade.dwelling_selector_options
+draw_canvas_tool_controls = ui_facade.draw_canvas_tool_controls
+set_ruler_cursor = ui_facade.set_ruler_cursor
+draw_ruler_overlay = ui_facade.draw_ruler_overlay
+invalidate_room_start_node_cache = ui_facade.invalidate_room_start_node_cache
+invalidate_terminal_validity_cache = ui_facade.invalidate_terminal_validity_cache
 
 # Auto-placement cache
 ap_scores = {}
@@ -610,43 +498,12 @@ _apply_prepared_dwelling = dwelling_runtime.apply_prepared
 _load_real_dwelling = dwelling_runtime.load_real
 generate_new_dwelling = dwelling_runtime.generate
 
-def draw_colorbar(screen, node_scores):
-    return canvas_ui.draw_distance_colorbar(
-        screen, bool(node_scores), heatmap_scale_mode, heatmap_palette_idx, COLOR_TEXT,
-    )
-
-def get_placeable_heatmap_scores(node_scores):
-    return placement_session.placeable_scores(node_scores)
-
-def draw_distance_heatmap(screen, node_scores):
-    placeable_scores = get_placeable_heatmap_scores(node_scores)
-    return canvas_ui.draw_distance_heatmap(
-        screen, placeable_scores, base_env=routing_workspace.base_env,
-        grid_spacing=GRID_SPACING,
-        blocked_regions=get_machine_vertical_clearance_blocks(),
-        scale_mode=heatmap_scale_mode, palette_index=heatmap_palette_idx,
-        fill_color=COLOR_MACHINE_CLEARANCE_FILL,
-        hatch_color=COLOR_MACHINE_CLEARANCE_HATCH,
-    )
-
-def draw_edge_weight_heatmap(screen):
-    if edge_weight_heatmap_enabled:
-        return canvas_ui.draw_edge_heatmap(
-            screen, routing_workspace.overlay.values, routing_workspace.env,
-            OVERLAP_BLOCK_WEIGHT, COLOR_BLOCKED_EDGE,
-        )
-
-def draw_edge_weight_colorbar(screen):
-    if edge_weight_heatmap_enabled:
-        return canvas_ui.draw_edge_colorbar(
-            screen, routing_workspace.overlay.values, OVERLAP_BLOCK_WEIGHT,
-            COLOR_BLOCKED_EDGE, COLOR_TEXT,
-        )
-
-def get_route_draw_width(route_name):
-    if route_real_diameter_width_enabled:
-        return max(1, int(round(get_route_diameter(route_name) * canvas_ui.viewport.scale)))
-    return 5 if SAL_INSTALLATION.is_large_route(route_name) else 3
+draw_colorbar = ui_facade.draw_colorbar
+get_placeable_heatmap_scores = ui_facade.get_placeable_heatmap_scores
+draw_distance_heatmap = ui_facade.draw_distance_heatmap
+draw_edge_weight_heatmap = ui_facade.draw_edge_weight_heatmap
+draw_edge_weight_colorbar = ui_facade.draw_edge_weight_colorbar
+get_route_draw_width = ui_facade.get_route_draw_width
 
 observation_controller = InteractiveObservationController(sys.modules[__name__], workbench_chrome)
 observation_runtime = observation_controller.runtime

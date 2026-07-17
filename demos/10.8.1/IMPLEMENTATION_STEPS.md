@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added `DemoUiFacade` as the compatibility owner of installation-header layout, machine selection, terminal/canvas tools, slider drawing, ruler behavior, UI cache invalidation, heatmap rendering, and route-width projection.
+- `main.py` retains the existing workbench callback names as bound facade methods and reached 542 physical lines.
+- Validation: Python compilation, focused UI-facade contracts, and a generated-dwelling solve.
+
 - Added `DwellingRuntime` as the owner of synthetic/real source preparation and fallback, active-session publication, terminal/placement binding order, Cli initial placement, clearance derivation, and initial graph construction. `main.py` retains four event-adapter aliases.
 - Validation: Python compilation, `git diff --check`, and a generated synthetic dwelling Sal solve (8 rooms, 4 terminals, 5 routes). `main.py` is 686 physical lines after this boundary.
 
