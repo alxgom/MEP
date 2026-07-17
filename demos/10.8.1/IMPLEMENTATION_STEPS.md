@@ -818,6 +818,10 @@ Before each commit:
 - Reworked solution-log rows into readable metric names and two-line summaries with units and full words; selected solutions now use the same blue interaction emphasis as the active workbench controls.
 - Validation: Python compilation, 16 focused control/log/chrome/event contracts, the full 370-contract Demo suite, and an eight-second headless startup smoke.
 
+- Replaced the permanent 56 px vertical colorbar gutter with one compact horizontal bottom-right canvas overlay contract. Distance palettes retain low/high and palette labels; edge weights retain ratio endpoints and the blocked-edge key.
+- The reclaimed width is now part of the canvas viewport, so terminal tools align near the actual right canvas edge. Heatmap calculation, toggles, palettes, dwelling/grid rendering, and KPI plots are unchanged.
+- Validation: Python compilation, 12 focused viewport/colorbar/config/facade contracts, the full 373-contract Demo suite, direct off-screen rendering of both colorbar types, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

@@ -32,3 +32,10 @@ def test_layout_enforces_minimum_window_and_canvas_sizes():
     assert viewport.window_size == (1200, 720)
     assert viewport.canvas_width >= 320
     assert viewport.canvas_height >= 320
+
+
+def test_layout_has_no_permanent_vertical_colorbar_gutter():
+    viewport = CanvasViewport()
+
+    assert viewport.colorbar_width == 0
+    assert viewport.canvas_width == viewport.window_width - viewport.canvas_left - viewport.panel_width - 10

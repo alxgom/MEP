@@ -32,7 +32,7 @@ def _installation_colors() -> Mapping[str, Color]:
 class WorkbenchTheme:
     installation_header_top: int = 4
     panel_width: int = 280
-    colorbar_width: int = 56
+    colorbar_width: int = 0
     wall_draw_width: int = 2
     background: Color = (240, 238, 233)
     panel: Color = (29, 30, 39)

@@ -42,7 +42,7 @@ class CanvasViewport:
     canvas_left: int = 320
     canvas_top: int = 78
     panel_width: int = 280
-    colorbar_width: int = 56
+    colorbar_width: int = 0
     world_width_mm: float = 15000.0
     world_height_mm: float = 11000.0
     zoom: float = 1.0
@@ -286,8 +286,7 @@ class CanvasUiRuntime:
 
     def draw_distance_colorbar(self, screen, has_scores, scale_mode, palette_index, text_color):
         return draw_distance_colorbar(
-            screen, has_scores, (self.viewport.colorbar_left, self.viewport.colorbar_width),
-            self.viewport.canvas_top, self.viewport.canvas_height, scale_mode, palette_index,
+            screen, has_scores, self.viewport.canvas_rect, scale_mode, palette_index,
             lambda value: heatmap_color(value, palette_index), text_color,
         )
 
@@ -303,7 +302,6 @@ class CanvasUiRuntime:
         if not overlay:
             return
         return draw_edge_weight_colorbar(
-            screen, overlay, (self.viewport.colorbar_left, self.viewport.colorbar_width),
-            self.viewport.canvas_top, self.viewport.canvas_height, block_weight, blocked_color,
+            screen, overlay, self.viewport.canvas_rect, block_weight, blocked_color,
             cool_colormap, edge_weight_log_scale, text_color,
         )

@@ -5,26 +5,35 @@ from __future__ import annotations
 import math
 
 
-def draw_distance_colorbar(screen, has_scores, colorbar_bounds, canvas_top, canvas_height, heatmap_scale_mode, palette_index, heatmap_color, text_color):
+def horizontal_colorbar_bounds(canvas_bounds, width=240):
+    """Return a compact bottom-right overlay inside the usable canvas."""
+    canvas_left, canvas_top, canvas_width, canvas_height = canvas_bounds
+    width = min(int(width), max(140, canvas_width - 36))
+    return canvas_left + canvas_width - width - 18, canvas_top + canvas_height - 54, width, 40
+
+
+def draw_distance_colorbar(screen, has_scores, canvas_bounds, heatmap_scale_mode, palette_index, heatmap_color, text_color):
     """Draw the active node-score palette legend."""
     import pygame
 
     if not has_scores:
         return
-    colorbar_left, colorbar_width = colorbar_bounds
-    bar_x, bar_y, bar_width, bar_height = colorbar_left + (colorbar_width - 20) // 2, canvas_top + 40, 20, canvas_height - 150
-    pygame.draw.rect(screen, (255, 255, 255), (bar_x - 1, bar_y - 1, bar_width + 2, bar_height + 2), 1)
-    for y in range(bar_height):
-        t = 1.0 - y / bar_height
+    panel_x, panel_y, panel_width, panel_height = horizontal_colorbar_bounds(canvas_bounds)
+    pygame.draw.rect(screen, (31, 35, 43), (panel_x, panel_y, panel_width, panel_height), border_radius=4)
+    pygame.draw.rect(screen, (150, 158, 166), (panel_x, panel_y, panel_width, panel_height), 1, border_radius=4)
+    bar_x, bar_y, bar_width, bar_height = panel_x + 48, panel_y + 19, panel_width - 96, 10
+    for x in range(bar_width):
+        t = x / max(1, bar_width - 1)
         color = heatmap_color(min(1.0, t / 0.75) if heatmap_scale_mode == 0 else t)
-        pygame.draw.line(screen, color, (bar_x, bar_y + y), (bar_x + bar_width - 1, bar_y + y))
+        pygame.draw.line(screen, color, (bar_x + x, bar_y), (bar_x + x, bar_y + bar_height - 1))
+    pygame.draw.rect(screen, (255, 255, 255), (bar_x - 1, bar_y - 1, bar_width + 2, bar_height + 2), 1)
     font = pygame.font.SysFont("Outfit", 14, bold=True)
     high_label = font.render("HIGH", True, heatmap_color(1.0))
     low_label = font.render("LOW", True, heatmap_color(0.0))
-    screen.blit(high_label, (bar_x + bar_width // 2 - high_label.get_width() // 2, bar_y - 18))
-    screen.blit(low_label, (bar_x + bar_width // 2 - low_label.get_width() // 2, bar_y + bar_height + 6))
+    screen.blit(low_label, (panel_x + 8, bar_y - 2))
+    screen.blit(high_label, (panel_x + panel_width - high_label.get_width() - 8, bar_y - 2))
     title = font.render("VIRIDIS" if palette_index == 1 else "TURBO", True, text_color)
-    screen.blit(title, (bar_x + bar_width // 2 - title.get_width() // 2, bar_y + bar_height + 24))
+    screen.blit(title, (panel_x + panel_width // 2 - title.get_width() // 2, panel_y + 2))
 
 
 def build_distance_heatmap_surface(node_scores, regular_nodes, grid_spacing_mm, canvas_bounds, screen_to_world, interpolate_score, score_to_t, heatmap_color):
@@ -73,28 +82,30 @@ def draw_edge_weight_heatmap(screen, edge_weights, nodes, adjacency, world_to_sc
         pygame.draw.line(screen, color, point_a, point_b, width)
 
 
-def draw_edge_weight_colorbar(screen, edge_weights, colorbar_bounds, canvas_top, canvas_height, block_weight, blocked_color, cool_colormap, log_scale, text_color):
+def draw_edge_weight_colorbar(screen, edge_weights, canvas_bounds, block_weight, blocked_color, cool_colormap, log_scale, text_color):
     """Draw the edge-weight ratio legend and blocked-edge key."""
     import pygame
 
     if not edge_weights:
         return
-    colorbar_left, colorbar_width = colorbar_bounds
-    bar_x, bar_y, bar_width, bar_height = colorbar_left + (colorbar_width - 20) // 2, canvas_top + 40, 20, canvas_height - 150
+    panel_x, panel_y, panel_width, panel_height = horizontal_colorbar_bounds(canvas_bounds, 270)
+    bar_x, bar_y, bar_width, bar_height = panel_x + 54, panel_y + 19, panel_width - 108, 10
     max_ratio, _log_max = log_scale(edge_weights, block_weight)
+    pygame.draw.rect(screen, (31, 35, 43), (panel_x, panel_y, panel_width, panel_height), border_radius=4)
+    pygame.draw.rect(screen, (150, 158, 166), (panel_x, panel_y, panel_width, panel_height), 1, border_radius=4)
+    for x in range(bar_width):
+        color = cool_colormap(x / max(1, bar_width - 1))
+        pygame.draw.line(screen, color, (bar_x + x, bar_y), (bar_x + x, bar_y + bar_height - 1))
     pygame.draw.rect(screen, (255, 255, 255), (bar_x - 1, bar_y - 1, bar_width + 2, bar_height + 2), 1)
-    for y in range(bar_height):
-        color = cool_colormap(1.0 - y / bar_height)
-        pygame.draw.line(screen, color, (bar_x, bar_y + y), (bar_x + bar_width - 1, bar_y + y))
     font = pygame.font.SysFont("Outfit", 13, bold=True)
-    title = font.render("WGT", True, text_color)
+    title = font.render("EDGE WEIGHT", True, text_color)
     high_label = font.render(f"+{max_ratio:.1f}x", True, cool_colormap(1.0))
     low_label = font.render("+0x", True, cool_colormap(0.0))
-    screen.blit(title, (bar_x + bar_width // 2 - title.get_width() // 2, bar_y - 32))
-    screen.blit(high_label, (bar_x + bar_width // 2 - high_label.get_width() // 2, bar_y - 16))
-    screen.blit(low_label, (bar_x + bar_width // 2 - low_label.get_width() // 2, bar_y + bar_height + 6))
+    screen.blit(title, (panel_x + panel_width // 2 - title.get_width() // 2, panel_y + 2))
+    screen.blit(low_label, (panel_x + 8, bar_y - 2))
+    screen.blit(high_label, (panel_x + panel_width - high_label.get_width() - 8, bar_y - 2))
     if any(value >= block_weight for value in edge_weights.values()):
-        block_rect = pygame.Rect(bar_x, bar_y + bar_height + 28, bar_width, 8)
+        block_rect = pygame.Rect(panel_x + panel_width - 42, panel_y + 4, 12, 8)
         pygame.draw.rect(screen, blocked_color, block_rect)
         blocked_label = font.render("BLOCK", True, text_color)
-        screen.blit(blocked_label, (bar_x + bar_width // 2 - blocked_label.get_width() // 2, bar_y + bar_height + 40))
+        screen.blit(blocked_label, (block_rect.x - blocked_label.get_width() - 4, panel_y + 2))
