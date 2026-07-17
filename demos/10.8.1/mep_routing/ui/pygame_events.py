@@ -140,7 +140,7 @@ class WorkbenchEventAdapter:
                 self.app.canvas_ui.zoom_at(self.app.canvas_ui.viewport.zoom * factor, event.pos)
                 return
             now = pygame.time.get_ticks()
-            if now - self.state.last_wheel_rotate_ms < self.app.WHEEL_ROTATE_COOLDOWN_MS:
+            if now - self.state.last_wheel_rotate_ms < self.app.demo_config.wheel_rotate_cooldown_ms:
                 return
             self.state.last_wheel_rotate_ms = now
             self.app.auto_placement_mode_idx = 0
@@ -188,7 +188,7 @@ class WorkbenchEventAdapter:
             )
             s.dwelling_selector_open = False
         if selected is not None:
-            a.dwelling_source_idx = a.DWELLING_SOURCE_MODES.index(
+            a.dwelling_source_idx = a.demo_config.dwelling_source_modes.index(
                 "Random Synthetic" if selected == 0 else "Real DB"
             )
             if selected:
@@ -407,7 +407,7 @@ class WorkbenchEventAdapter:
                 a.preferred_terminal_tool_mode = None; s.canvas_gesture = replace(self._gesture(), terminal_area_dragging=False); self._cursor(False)
             else: s.selected_route_name = None
         elif key == pygame.K_SPACE:
-            if a.DWELLING_SOURCE_MODES[a.dwelling_source_idx] == "Real DB":
+            if a.demo_config.dwelling_source_modes[a.dwelling_source_idx] == "Real DB":
                 a.real_scenario_idx = (a.real_scenario_idx + 1) % len(a.REAL_DWELLING_SCENARIOS)
             self._change_dwelling(clear_history=True)
         elif (caps := active_capabilities(a)).machine_edit and not caps.solver_controls and key == pygame.K_r:
@@ -426,10 +426,14 @@ class WorkbenchEventAdapter:
                 for marker in transition.markers: a.routing_history.add_marker(*marker)
         elif key == pygame.K_g: a.show_grid_graph = not a.show_grid_graph
         elif key == pygame.K_d:
-            a.dwelling_source_idx = (a.dwelling_source_idx + 1) % len(a.DWELLING_SOURCE_MODES)
+            a.dwelling_source_idx = (
+                a.dwelling_source_idx + 1
+            ) % len(a.demo_config.dwelling_source_modes)
             self._change_dwelling(f"Src:{a.dwelling_source_idx}", (52, 152, 219), clear_history=True)
         elif key == pygame.K_o:
-            a.routing_frame_idx = (a.routing_frame_idx + 1) % len(a.ROUTING_FRAME_OPTIONS)
+            a.routing_frame_idx = (
+                a.routing_frame_idx + 1
+            ) % len(a.demo_config.routing_frame_options)
             self._change_dwelling(f"Frame:{a.routing_frame_idx}", (230, 126, 34))
         elif key == pygame.K_v:
             a.show_heatmap = not a.show_heatmap

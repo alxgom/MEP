@@ -9,6 +9,7 @@ from .dwelling_application import (
     load_real_dwelling,
 )
 from .graph_build_session import GraphBuildSession
+from .demo_config import DemoConfig, build_demo_config
 from .workbench_state import (
     DisplayState, DwellingState, InstallationState, MachinePose,
     SalWorkbenchState, WorkbenchState,
@@ -50,6 +51,7 @@ __all__ = [
     "SalWorkbenchState", "WorkbenchState",
     "load_real_dwelling",
     "GraphBuildSession",
+    "DemoConfig", "build_demo_config",
     "InstallationMachineUi",
     "InstallationUiSession",
     "installation_context_obstacles",

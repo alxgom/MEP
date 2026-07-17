@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
-from mep_routing.app import WorkbenchState
+from mep_routing.app import WorkbenchState, build_demo_config
+from mep_routing.installations.sal import SAL_INSTALLATION
 from mep_routing.observability import InteractiveObservationController
 
 
@@ -12,6 +13,7 @@ def _app():
     workbench_state.dwelling.terminal_runtime = terminal
     app = SimpleNamespace(
         workbench_state=workbench_state,
+        demo_config=build_demo_config(SAL_INSTALLATION),
         _total_route_length_m=lambda routes: 1.0, count_solution_turns=lambda routes: 2,
         count_segment_crossings=lambda routes: 0, count_solution_short_pieces=lambda routes: 0,
         get_solution_score=lambda routes, crossings: 3,

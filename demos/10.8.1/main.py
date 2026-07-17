@@ -7,13 +7,11 @@ import pygame
 from mep_routing.domain import (
     local_axis_to_world as _local_axis_to_world,
 )
-from mep_routing.config import SALUBRIDAD_DEFAULTS as _SALUBRIDAD_DEFAULTS
 from mep_routing.app import (
-    CommonGraphConfig,
+    build_demo_config,
     InstallationGraphProfile,
     InstallationMachineUi,
     InstallationUiSession,
-    TerminalRuntimeConfig,
     WorkbenchState,
 )
 from mep_routing.app.demo_routing_controller import DemoRoutingController
@@ -37,6 +35,7 @@ from mep_routing.routing import (
     total_route_length_m as _total_route_length_m,
 )
 from mep_routing.ui.runtime import CanvasUiRuntime
+from mep_routing.ui import WorkbenchTheme
 from mep_routing.ui.installation_projection import active_capabilities
 from mep_routing.ui.terminal_runtime import TerminalUiRuntime, TerminalUiStyle
 from mep_routing.ui.drawing import draw_outlined_text as _draw_outlined_text
@@ -85,9 +84,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..', '08-bend-aware-non-orthogonal')))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..', '..')))
 
-DWELLING_EXPORT_ROOT = _SALUBRIDAD_DEFAULTS.get_default("DWELLING_EXPORT_ROOT")
-if DWELLING_EXPORT_ROOT.exists():
-    sys.path.append(str(DWELLING_EXPORT_ROOT))
+demo_config = build_demo_config(SAL_INSTALLATION)
+theme = WorkbenchTheme()
+if demo_config.dwelling_export_root.exists():
+    sys.path.append(str(demo_config.dwelling_export_root))
 
 import generative_layout
 from solver import estimate_turns
@@ -98,76 +98,25 @@ except ImportError:
     load_dwelling_scenario = None
     scenario_summary = None
 
-# Constants
-SCALE_TO_MM    = 1000
-WALL_THICKNESS = _SALUBRIDAD_DEFAULTS.get_default("WALL_THICKNESS")
-GRID_SPACING   = 200    # mm ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â regular routing grid resolution
-HANNAN_SCAFFOLD_SPACING = 600  # mm, static connectivity scaffold for dynamic Hannan axes
-CORE_EPSILON_GRID_MM = _SALUBRIDAD_DEFAULTS.get_default("CORE_EPSILON_GRID_MM")
-GRID_SPACING = _SALUBRIDAD_DEFAULTS.get_default("GRID_SPACING")
-HANNAN_SCAFFOLD_SPACING = _SALUBRIDAD_DEFAULTS.get_default("HANNAN_SCAFFOLD_SPACING")
-MACHINE_SPEC = SAL_INSTALLATION.default_machine
-SMALL_PIN_STUB_LENGTH = MACHINE_SPEC.small_pin_stub_length_mm
-LARGE_PIN_STUB_LENGTH = MACHINE_SPEC.large_pin_stub_length_mm
-MACHINE_CLEARANCE = 0
-MACHINE_BODY_W = MACHINE_SPEC.body_width_mm
-MACHINE_BODY_H = MACHINE_SPEC.body_height_mm
-MACHINE_OVERALL_W = MACHINE_SPEC.overall_width_mm
-MACHINE_SMALL_DUCT_D = MACHINE_SPEC.small_duct_diameter_mm
-MACHINE_LARGE_DUCT_D = MACHINE_SPEC.large_duct_diameter_mm
-DUCT_BUFFER_RATIO = _SALUBRIDAD_DEFAULTS.get_default("DUCT_BUFFER_RATIO")
-ROUTING_WALL_CLEARANCE_MM = _SALUBRIDAD_DEFAULTS.get_default("ROUTING_WALL_CLEARANCE_MM")
-TERMINAL_REGULATION_CLEARANCE_MM = _SALUBRIDAD_DEFAULTS.get_default("TERMINAL_REGULATION_CLEARANCE_MM")
-BUFFER_ROOM_TERMINALES_AIRE_MM = _SALUBRIDAD_DEFAULTS.get_default("BUFFER_ROOM_TERMINALES_AIRE_MM")
-PATINEJO_CLEARANCE_MM = _SALUBRIDAD_DEFAULTS.get_default("PATINEJO_CLEARANCE_MM")
-SHAFT_ENTRY_SEARCH_MM = _SALUBRIDAD_DEFAULTS.get_default("SHAFT_ENTRY_SEARCH_MM")
-SHAFT_ENTRY_MAX_CANDIDATES = _SALUBRIDAD_DEFAULTS.get_default("SHAFT_ENTRY_MAX_CANDIDATES")
-MACHINE_CLEARANCE_SOFT_MARGIN_MM = _SALUBRIDAD_DEFAULTS.get_default("MACHINE_CLEARANCE_SOFT_MARGIN_MM")
-FPS = _SALUBRIDAD_DEFAULTS.get_default("FPS")
-WHEEL_ROTATE_COOLDOWN_MS = 180
-C_BEND_DEFAULT = _SALUBRIDAD_DEFAULTS.get_default("C_BEND_DEFAULT")
-C_BEND_MIN = _SALUBRIDAD_DEFAULTS.get_default("C_BEND_MIN")
-C_BEND_MAX = _SALUBRIDAD_DEFAULTS.get_default("C_BEND_MAX")
-CROSSING_MULTIPLIER_DEFAULT = _SALUBRIDAD_DEFAULTS.get_default("CROSSING_MULTIPLIER_DEFAULT")
-CROSSING_MULTIPLIER_MIN = _SALUBRIDAD_DEFAULTS.get_default("CROSSING_MULTIPLIER_MIN")
-CROSSING_MULTIPLIER_MAX = _SALUBRIDAD_DEFAULTS.get_default("CROSSING_MULTIPLIER_MAX")
-C_BEND         = C_BEND_DEFAULT  # Turn penalty in mm
-crossing_penalty_multiplier = CROSSING_MULTIPLIER_DEFAULT
-OVERLAP_BLOCK_WEIGHT = _SALUBRIDAD_DEFAULTS.get_default("OVERLAP_BLOCK_WEIGHT")
-MIN_PIECE_FACTOR_DEFAULT = _SALUBRIDAD_DEFAULTS.get_default("MIN_PIECE_FACTOR_DEFAULT")
-MIN_PIECE_FACTOR_MIN = _SALUBRIDAD_DEFAULTS.get_default("MIN_PIECE_FACTOR_MIN")
-MIN_PIECE_FACTOR_MAX = _SALUBRIDAD_DEFAULTS.get_default("MIN_PIECE_FACTOR_MAX")
-min_piece_factor = MIN_PIECE_FACTOR_DEFAULT
+# Live solver choices; immutable defaults and labels live in ``demo_config``.
+C_BEND = demo_config.bend_default
+crossing_penalty_multiplier = demo_config.crossing_default
+min_piece_factor = demo_config.min_piece_factor_default
 
-# Graph types
-GRAPH_TYPES = SAL_INSTALLATION.graph_modes
-graph_type_idx = GRAPH_TYPES.index(SAL_INSTALLATION.default_graph_mode)
+graph_type_idx = demo_config.graph_types.index(SAL_INSTALLATION.default_graph_mode)
 
-ROUTING_STRATEGIES = SAL_INSTALLATION.strategy_labels
 routing_strategy_idx = SAL_INSTALLATION.routing_strategies.index(
     SAL_INSTALLATION.default_routing_strategy
 )
 
-ROUTER_BACKENDS = SAL_INSTALLATION.search_backend_labels
 router_backend_idx = SAL_INSTALLATION.search_backends.index(
     SAL_INSTALLATION.default_search_backend
 )
 
-HEURISTIC_MODES = SAL_INSTALLATION.heuristic_mode_labels
-heuristic_mode_idx = HEURISTIC_MODES.index(SAL_INSTALLATION.default_heuristic_mode)
+heuristic_mode_idx = demo_config.heuristic_modes.index(SAL_INSTALLATION.default_heuristic_mode)
 
-AUTO_PLACEMENT_MODES = [
-    "Manual",
-    "Topological Fields",
-    "Routing-Core Workflow"
-]
 auto_placement_mode_idx = 2
-ROTATION_MODES = [
-    "Torque",
-    "Field",
-]
 rotation_mode_idx = 0
-ROTATION_FIELD_EPS = 1e-6
 rotation_field_scores = {"H": 0.0, "V": 0.0, "selected": None}
 show_grid_graph = False
 show_heatmap = False
@@ -176,29 +125,7 @@ edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
 preferred_terminal_tool_mode = None
 terminal_validity_overlay_enabled = False
-PREFERRED_TERMINAL_MARKER_SIZE_MM = 125.0
-PREFERRED_TERMINAL_REMAP_TOLERANCE_MM = 300.0
-
-COMMON_GRAPH_CONFIG = CommonGraphConfig(
-    GRID_SPACING, HANNAN_SCAFFOLD_SPACING, WALL_THICKNESS,
-    ROUTING_WALL_CLEARANCE_MM, CORE_EPSILON_GRID_MM,
-)
-TERMINAL_RUNTIME_CONFIG = TerminalRuntimeConfig(
-    TERMINAL_REGULATION_CLEARANCE_MM,
-    BUFFER_ROOM_TERMINALES_AIRE_MM,
-    PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
-)
-
-ROOM_START_MODES = [
-    "Room node set",
-    "Centroid terminal",
-]
 room_start_mode_idx = 0
-
-DWELLING_SOURCE_MODES = [
-    "Real DB",
-    "Random Synthetic",
-]
 dwelling_source_idx = 0
 
 INSTALLATION_OPTIONS = (
@@ -222,102 +149,39 @@ installation_ui_session = InstallationUiSession.create({
     ),
 })
 workbench_state = WorkbenchState.create(("sal", "cli"))
-cli_runtime = CliInteractiveRuntime(CLI_INSTALLATION, COMMON_GRAPH_CONFIG, TERMINAL_RUNTIME_CONFIG)
+cli_runtime = CliInteractiveRuntime(
+    CLI_INSTALLATION, demo_config.common_graph, demo_config.terminal_runtime,
+)
 
-# Pygame Window Config
-INSTALLATION_HEADER_TOP = 4
-PANEL_W = 280          # right-side plot panel
-COLORBAR_W = 56        # reserved lane between drawing canvas and right-side plots
 canvas_ui = CanvasUiRuntime()
 is_fullscreen = False
 preference_reset_rect = pygame.Rect(0, 0, 1, 1)
-
-# Color Scheme
-COLOR_BG = (240, 238, 233)
-COLOR_PANEL = (35, 35, 45)
-COLOR_PLOT_BG = (22, 22, 30)
-COLOR_ROOM = (45, 52, 54)
-COLOR_ROOM_COVERED = (248, 247, 243)
-COLOR_COVER_OVERLAY = (96, 104, 112, 34)
-COLOR_HALLWAY = (57, 72, 85)
-COLOR_WALL = (0, 0, 0)
-COLOR_WET_ROOM_ACCENT = (95, 178, 218)
-WALL_DRAW_WIDTH = 2
-COLOR_COLUMN = (0, 0, 0)
-COLOR_SHAFT = (231, 76, 60)
-COLOR_SHAFT_BG = (231, 76, 60, 40)
-COLOR_SHAFT_INACTIVE = (154, 84, 82)
-COLOR_SHAFT_INACTIVE_HATCH = (92, 58, 58)
-COLOR_MACHINE_CLEARANCE_HATCH = (105, 105, 105)
-COLOR_MACHINE_CLEARANCE_FILL = (145, 145, 145, 235)
-COLOR_DOOR = (220, 220, 220)
-COLOR_MACHINE = (127, 140, 141)
-COLOR_MACHINE_HOVER = (149, 165, 166)
-COLOR_TEXT = (236, 240, 241)
-COLOR_MUTED = (149, 165, 166)
-COLOR_DESELECTED_ROUTE = (7, 8, 10)
-COLOR_DESELECTED_ROOM = (39, 42, 43)
-COLOR_DESELECTED_PIN = (112, 116, 120)
-COLOR_SELECTION_HALO = (210, 235, 255)
-COLOR_BLOCKED_EDGE = (82, 76, 88)
-COLOR_GRAPH_EDGE = (122, 130, 140)
-COLOR_GRAPH_NODE = (96, 106, 116)
-COLOR_PLAN_LABEL = (18, 22, 28)
-COLOR_PLAN_LABEL_HALO = (255, 255, 255)
-COLOR_TERMINAL_ALLOWED = (78, 158, 178)
-COLOR_TERMINAL_BLOCKED = (142, 78, 86)
-COLOR_TERMINAL_BLOCKED_HATCH = (96, 54, 62)
-
-# Route Colors
-ROUTE_COLORS = {
-    "Shaft": (46, 204, 113),      # Green
-    "Kitchen": (241, 196, 15),    # Yellow
-    "Bathroom": (52, 152, 219),   # Blue
-    "Bathroom 1": (52, 152, 219), # Blue
-    "Bathroom 2": (155, 89, 182), # Purple
-    "Toilet": (230, 126, 34),     # Orange
-    "Washroom": (26, 188, 156),   # Turquoise
-    "Supply Air Tree": (52, 152, 219),
-    "Return Air Tree": (155, 89, 182),
-}
 terminal_ui = TerminalUiRuntime(canvas_ui, TerminalUiStyle(
-    route_colors=ROUTE_COLORS, text_color=COLOR_TEXT,
-    allowed_color=COLOR_TERMINAL_ALLOWED, blocked_color=COLOR_TERMINAL_BLOCKED,
-    blocked_hatch_color=COLOR_TERMINAL_BLOCKED_HATCH,
-    marker_size_mm=PREFERRED_TERMINAL_MARKER_SIZE_MM,
-    remap_tolerance_mm=PREFERRED_TERMINAL_REMAP_TOLERANCE_MM,
-    regulation_clearance_mm=TERMINAL_REGULATION_CLEARANCE_MM,
-    room_buffer_mm=BUFFER_ROOM_TERMINALES_AIRE_MM,
+    route_colors=theme.route_colors, text_color=theme.text,
+    allowed_color=theme.terminal_allowed, blocked_color=theme.terminal_blocked,
+    blocked_hatch_color=theme.terminal_blocked_hatch,
+    marker_size_mm=demo_config.preferred_terminal_marker_size_mm,
+    remap_tolerance_mm=demo_config.preferred_terminal_remap_tolerance_mm,
+    regulation_clearance_mm=demo_config.terminal_clearance_mm,
+    room_buffer_mm=demo_config.terminal_room_buffer_mm,
 ))
 workbench_chrome = WorkbenchChromeRuntime(
-    canvas_ui.viewport, terminal_ui, PANEL_W,
-    {
-        "plot_background": COLOR_PLOT_BG, "text": COLOR_TEXT, "muted": COLOR_MUTED,
-        "plan_label": COLOR_PLAN_LABEL, "wet_room": COLOR_WET_ROOM_ACCENT, "wall": COLOR_WALL,
-    },
+    canvas_ui.viewport, terminal_ui, theme.panel_width, theme.chrome_colors(),
 )
 
-REAL_DWELLING_DB = _SALUBRIDAD_DEFAULTS.get_default("REAL_DWELLING_DB")
-PREFERRED_SHAFT_INSTALLATION = _SALUBRIDAD_DEFAULTS.get_default("PREFERRED_SHAFT_INSTALLATION")
 try:
-    REAL_DWELLING_SCENARIOS = _discover_dwelling_cases(REAL_DWELLING_DB)
+    REAL_DWELLING_SCENARIOS = _discover_dwelling_cases(demo_config.real_dwelling_db)
 except (ImportError, OSError) as error:
     print(f"Real dwelling catalog unavailable: {error}")
     REAL_DWELLING_SCENARIOS = ()
 if not REAL_DWELLING_SCENARIOS:
-    dwelling_source_idx = DWELLING_SOURCE_MODES.index("Random Synthetic")
-ROUTING_FRAME_OPTIONS = [
-    "dominant_walls",
-    "area_inertia_allowed",
-    "area_inertia_rooms",
-]
+    dwelling_source_idx = demo_config.dwelling_source_modes.index("Random Synthetic")
 real_scenario_idx = 0
 routing_frame_idx = 0
 current_scenario_label = "synthetic"
 current_scenario_summary = {}
 
 # Observation state for the right-side plots and solution-log panel.
-HIST_MAXLEN = 400
 weight_mode_idx = 0                             # 0 for Default, 1 for Equal Weights
 heatmap_scale_mode = 0                          # 0 for Linear (75% Saturation), 1 for Log Scale
 heatmap_palette_idx = 0                         # 0 for Turbo, 1 for Viridis
@@ -362,8 +226,8 @@ def get_representative_point(poly):
 
 def _build_core_shaft_entry_specs(scenario):
     return _source_core_shaft_entry_specs(
-        scenario, summarize=scenario_summary, scale_to_mm=SCALE_TO_MM,
-        match_tolerance_mm=CORE_EPSILON_GRID_MM * 0.75,
+        scenario, summarize=scenario_summary, scale_to_mm=demo_config.scale_to_mm,
+        match_tolerance_mm=demo_config.core_epsilon_grid_mm * 0.75,
     )
 
 _shaft_entry_geometry_for_node = routing_controller.shaft_entry_geometry
@@ -379,7 +243,8 @@ get_machine_pins = routing_controller.machine_pins
 get_port_access_specs = routing_controller.port_access_specs
 
 SAL_GRAPH_PROFILE = InstallationGraphProfile(
-    get_port_access_specs, build_sal_simple_graph_inputs, MACHINE_SMALL_DUCT_D,
+    get_port_access_specs, build_sal_simple_graph_inputs,
+    SAL_INSTALLATION.default_machine.small_duct_diameter_mm,
 )
 
 _sal_solver_settings = routing_controller.solver_settings
@@ -418,10 +283,16 @@ def get_active_machine_pins(cx, cy, angle_deg):
     return get_machine_pins(cx, cy, angle_deg)
 
 def draw_wet_room_outer_accents(screen):
-    return _draw_wet_room_outer_accents(screen, wet_room_outer_accents, to_screen, _iter_polygons, COLOR_WET_ROOM_ACCENT)
+    return _draw_wet_room_outer_accents(
+        screen, wet_room_outer_accents, to_screen, _iter_polygons,
+        theme.wet_room_accent,
+    )
 
-def draw_outlined_text(screen, font, text, pos, color, outline_color=COLOR_PLAN_LABEL_HALO):
-    return _draw_outlined_text(screen, font, text, pos, color, outline_color)
+def draw_outlined_text(screen, font, text, pos, color, outline_color=None):
+    return _draw_outlined_text(
+        screen, font, text, pos, color,
+        theme.plan_label_halo if outline_color is None else outline_color,
+    )
 
 def draw_terminal_area_drag(screen, start_world, end_world):
     return _draw_terminal_area_drag(screen, start_world, end_world, to_screen)
@@ -452,7 +323,10 @@ def get_machine_vertical_clearance_blocks():
     return placement_session.clearance_blocks
 
 placement_session = PlacementSession(
-    machine_area=MACHINE_OVERALL_W * MACHINE_BODY_H,
+    machine_area=(
+        SAL_INSTALLATION.default_machine.overall_width_mm
+        * SAL_INSTALLATION.default_machine.body_height_mm
+    ),
     machine_pins=get_machine_pins,
     representative_point=get_representative_point,
     route_room_polygon=get_route_room_polygon,
@@ -460,7 +334,7 @@ placement_session = PlacementSession(
     graph_builder=build_grid,
     shaft_nodes=get_shaft_entry_nodes,
     weight_mode=weight_mode_idx,
-    rotation_eps=ROTATION_FIELD_EPS,
+    rotation_eps=demo_config.rotation_field_epsilon,
 )
 
 def get_auto_placement_scores(env, shaft_boundary_nodes):
@@ -516,7 +390,7 @@ def main():
     run_pygame_workbench(
         sys.modules[__name__],
         caption="Integrated MEP Routing Workbench (Demo 10.8.1)",
-        fps=FPS,
+        fps=demo_config.fps,
     )
 
 if __name__ == "__main__":

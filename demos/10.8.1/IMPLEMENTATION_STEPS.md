@@ -766,6 +766,10 @@ Before each commit:
 - Added a registry/coordinator for ordered context-aware execution and keyed `WorkbenchState` result publication. `DemoRoutingController` no longer assembles per-run solver/pin lambdas or owns result replacement.
 - Validation: Python compilation and focused installation coordinator order, contextual obstacle, stale-result, and active-result contracts.
 
+- Added immutable `DemoConfig` and `WorkbenchTheme` composition objects. Stable Sal defaults, graph/terminal construction settings, mode vocabularies, filesystem inputs, panel dimensions, and the complete canvas/sidebar palette no longer live as constant blocks in `main.py`.
+- Routing, dwelling activation, commands, observation, event handling, and rendering now consume the typed objects directly; mutable solver choices remain live workbench state rather than being mislabeled as configuration.
+- Validation: Python compilation, nine focused config/theme and affected-controller contracts, and an eight-second headless startup/initial-routing smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

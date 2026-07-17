@@ -9,6 +9,7 @@ from .colors import (
     turbo_color,
     viridis_color,
 )
+from .theme import WorkbenchTheme
 
 __all__ = [
     "cool_colormap",
@@ -18,4 +19,5 @@ __all__ = [
     "score_to_heatmap_t",
     "turbo_color",
     "viridis_color",
+    "WorkbenchTheme",
 ]

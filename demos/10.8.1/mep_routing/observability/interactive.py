@@ -76,7 +76,9 @@ class InteractiveObservationController:
 
     def restore_solution_log(self, entry):
         a = self.app
-        state = restored_snapshot_state(entry, a.C_BEND_DEFAULT, a.CROSSING_MULTIPLIER_DEFAULT)
+        state = restored_snapshot_state(
+            entry, a.demo_config.bend_default, a.demo_config.crossing_default,
+        )
         for name in (
             "graph_type_idx", "routing_strategy_idx", "router_backend_idx", "heuristic_mode_idx",
             "rotation_mode_idx", "room_start_mode_idx", "weight_mode_idx", "edge_weight_view_mode_idx",

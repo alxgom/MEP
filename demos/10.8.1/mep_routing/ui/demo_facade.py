@@ -18,7 +18,7 @@ class DemoUiFacade:
         pill = min(126, max(92, (width - (count - 1) * 30) // count))
         gap = min(42, max(24, (width - count * pill) // max(1, count - 1)))
         return installation_header_layout(
-            a.canvas_ui.viewport.canvas_left, a.INSTALLATION_HEADER_TOP,
+            a.canvas_ui.viewport.canvas_left, a.theme.installation_header_top,
             a.installation_header_state.order, pill_width=pill, gap=gap,
         )
 
@@ -59,7 +59,8 @@ class DemoUiFacade:
         a = self.app
         a.canvas_ui.draw_min_piece_slider(
             screen, font, x, y, width, a.min_piece_factor,
-            a.MIN_PIECE_FACTOR_MIN, a.MIN_PIECE_FACTOR_MAX, a.COLOR_TEXT, a.COLOR_MUTED,
+            a.demo_config.min_piece_factor_min, a.demo_config.min_piece_factor_max,
+            a.theme.text, a.theme.muted,
         )
 
     def draw_weight_slider(self, screen, font, x, y, width, label, value, minimum, maximum,
@@ -67,7 +68,7 @@ class DemoUiFacade:
         a = self.app
         a.canvas_ui.draw_weight_slider(
             screen, font, x, y, width, label, value, minimum, maximum,
-            a.COLOR_TEXT, a.COLOR_MUTED, name=rect_name, suffix=suffix, integer=integer,
+            a.theme.text, a.theme.muted, name=rect_name, suffix=suffix, integer=integer,
         )
 
     def record_current_solution(self, routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
@@ -100,7 +101,7 @@ class DemoUiFacade:
         a.canvas_ui.draw_terminal_tools(
             screen, font_bold, font_small, active_mode=a.preferred_terminal_tool_mode,
             overlay_enabled=a.terminal_validity_overlay_enabled,
-            colors=(a.COLOR_TEXT, a.COLOR_MUTED, a.COLOR_TERMINAL_ALLOWED),
+            colors=(a.theme.text, a.theme.muted, a.theme.terminal_allowed),
         )
 
     def dwelling_selector_options(self):
@@ -115,7 +116,7 @@ class DemoUiFacade:
             "dwelling_label": a.current_scenario_label,
             "dwelling_options": self.dwelling_selector_options(),
             "dwelling_selector_open": dwelling_selector_open,
-            "active_terminal_mode": a.preferred_terminal_tool_mode, "text_color": a.COLOR_TEXT,
+            "active_terminal_mode": a.preferred_terminal_tool_mode, "text_color": a.theme.text,
         })
 
     def set_ruler_cursor(self, enabled):
@@ -128,7 +129,7 @@ class DemoUiFacade:
 
     def draw_ruler_overlay(self, screen, font, start_mm, end_mm):
         a = self.app
-        return a.canvas_ui.draw_ruler(screen, font, start_mm, end_mm, a.COLOR_TEXT)
+        return a.canvas_ui.draw_ruler(screen, font, start_mm, end_mm, a.theme.text)
 
     def invalidate_room_start_node_cache(self):
         terminal_runtime = self.app.workbench_state.dwelling.terminal_runtime
@@ -141,7 +142,7 @@ class DemoUiFacade:
     def draw_colorbar(self, screen, node_scores):
         a = self.app
         return a.canvas_ui.draw_distance_colorbar(
-            screen, bool(node_scores), a.heatmap_scale_mode, a.heatmap_palette_idx, a.COLOR_TEXT,
+            screen, bool(node_scores), a.heatmap_scale_mode, a.heatmap_palette_idx, a.theme.text,
         )
 
     def get_placeable_heatmap_scores(self, scores):
@@ -152,9 +153,11 @@ class DemoUiFacade:
         return a.canvas_ui.draw_distance_heatmap(
             screen, self.get_placeable_heatmap_scores(scores),
             base_env=a.workbench_state.dwelling.workspace.base_env,
-            grid_spacing=a.GRID_SPACING, blocked_regions=a.get_machine_vertical_clearance_blocks(),
+            grid_spacing=a.demo_config.grid_spacing_mm,
+            blocked_regions=a.get_machine_vertical_clearance_blocks(),
             scale_mode=a.heatmap_scale_mode, palette_index=a.heatmap_palette_idx,
-            fill_color=a.COLOR_MACHINE_CLEARANCE_FILL, hatch_color=a.COLOR_MACHINE_CLEARANCE_HATCH,
+            fill_color=a.theme.machine_clearance_fill,
+            hatch_color=a.theme.machine_clearance_hatch,
         )
 
     def draw_edge_weight_heatmap(self, screen):
@@ -163,15 +166,16 @@ class DemoUiFacade:
             return a.canvas_ui.draw_edge_heatmap(
                 screen, a.workbench_state.dwelling.workspace.overlay.values,
                 a.workbench_state.dwelling.workspace.env,
-                a.OVERLAP_BLOCK_WEIGHT, a.COLOR_BLOCKED_EDGE,
+                a.demo_config.overlap_block_weight, a.theme.blocked_edge,
             )
 
     def draw_edge_weight_colorbar(self, screen):
         a = self.app
         if a.edge_weight_heatmap_enabled:
             return a.canvas_ui.draw_edge_colorbar(
-                screen, a.workbench_state.dwelling.workspace.overlay.values, a.OVERLAP_BLOCK_WEIGHT,
-                a.COLOR_BLOCKED_EDGE, a.COLOR_TEXT,
+                screen, a.workbench_state.dwelling.workspace.overlay.values,
+                a.demo_config.overlap_block_weight,
+                a.theme.blocked_edge, a.theme.text,
             )
 
     def get_route_draw_width(self, route_name):

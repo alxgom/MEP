@@ -54,11 +54,11 @@ class DemoRoutingController:
 
     def machine_pins(self, cx, cy, angle_degrees):
         a = self.app
-        return machine_pins(a.MACHINE_SPEC, cx, cy, angle_degrees)
+        return machine_pins(a.SAL_INSTALLATION.default_machine, cx, cy, angle_degrees)
 
     def port_access_specs(self, global_pins, machine_angle):
         a = self.app
-        return port_access_specs(a.MACHINE_SPEC, global_pins, machine_angle)
+        return port_access_specs(a.SAL_INSTALLATION.default_machine, global_pins, machine_angle)
 
     def shaft_entry_geometry(self, node_idx, env=None):
         a = self.app
@@ -72,8 +72,9 @@ class DemoRoutingController:
         if dwelling is None:
             return [], None
         return dwelling.shaft_entries.select(
-            env, spatial_index=kd, search_radius_mm=a.SHAFT_ENTRY_SEARCH_MM,
-            grid_spacing_mm=a.GRID_SPACING, max_candidates=a.SHAFT_ENTRY_MAX_CANDIDATES,
+            env, spatial_index=kd, search_radius_mm=a.demo_config.shaft_entry_search_mm,
+            grid_spacing_mm=a.demo_config.grid_spacing_mm,
+            max_candidates=a.demo_config.shaft_entry_max_candidates,
         )
 
     def add_shaft_entry_segments(self, segments, first_node_idx):
@@ -90,7 +91,7 @@ class DemoRoutingController:
         pins = self.machine_pins(*pose.as_tuple())
         obstacle = unary_union((machine_polygon, *context_obstacles)) if context_obstacles else machine_polygon
         self._dwelling().graph_build_session.apply_machine_obstacle(
-            obstacle, pins, pose.angle_degrees, clearance_mm=a.MACHINE_CLEARANCE,
+            obstacle, pins, pose.angle_degrees, clearance_mm=a.demo_config.machine_clearance_mm,
         )
 
     def build_grid(self, machine_pins=None):
@@ -106,10 +107,10 @@ class DemoRoutingController:
         return SalSolverSettings(
             bend_cost=a.C_BEND,
             crossing_penalty_multiplier=a.crossing_penalty_multiplier,
-            duct_buffer_ratio=a.DUCT_BUFFER_RATIO,
-            shaft_clearance_mm=a.PATINEJO_CLEARANCE_MM,
-            machine_clearance_soft_margin_mm=a.MACHINE_CLEARANCE_SOFT_MARGIN_MM,
-            overlap_block_weight=a.OVERLAP_BLOCK_WEIGHT,
+            duct_buffer_ratio=a.demo_config.duct_buffer_ratio,
+            shaft_clearance_mm=a.demo_config.shaft_clearance_mm,
+            machine_clearance_soft_margin_mm=a.demo_config.machine_clearance_soft_margin_mm,
+            overlap_block_weight=a.demo_config.overlap_block_weight,
             min_piece_factor=a.min_piece_factor,
             heuristic_mode=a.heuristic_mode_idx,
             routing_strategy=a.routing_strategy_idx,
@@ -121,7 +122,7 @@ class DemoRoutingController:
         pose = self._pose()
         return SalLiveRoutingSession(
             installation=a.SAL_INSTALLATION,
-            machine_spec=a.MACHINE_SPEC,
+            machine_spec=a.SAL_INSTALLATION.default_machine,
             workspace=dwelling.workspace,
             routing_region=dwelling.routing_region,
             rooms=tuple(dwelling.rooms),
@@ -150,7 +151,8 @@ class DemoRoutingController:
         workspace = self._dwelling().workspace
         if workspace.env is None:
             return
-        diameter = a.MACHINE_SMALL_DUCT_D if a.edge_weight_view_mode_idx == 0 else a.MACHINE_LARGE_DUCT_D
+        machine = a.SAL_INSTALLATION.default_machine
+        diameter = machine.small_duct_diameter_mm if a.edge_weight_view_mode_idx == 0 else machine.large_duct_diameter_mm
         self.routing_runtime(workspace.env).refresh_edge_weight_overlay(routes, diameter)
 
     def count_short_pieces(self, routes):
@@ -182,7 +184,7 @@ class DemoRoutingController:
         a = self.app
         warnings = self.route_analysis().quality_warnings(routes)
         if (a.shaft_extraction is not None
-                and a.DWELLING_SOURCE_MODES[a.dwelling_source_idx] == "Real DB"
+                and a.demo_config.dwelling_source_modes[a.dwelling_source_idx] == "Real DB"
                 and not a.shaft_core_entry_specs):
             warnings.append("missing core shaft entry metadata")
         return warnings

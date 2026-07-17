@@ -76,28 +76,32 @@ def _render(app, screen, clock, fonts, state):
         global_pins=pins, selected_pins=selected_pins, context_layers=context,
         auto_placement_mode=(app.auto_placement_mode_idx if active_view.can("placement_overlay") else 0),
         placement_fields=(app.ap_fields if active_view.can("placement_overlay") else {}),
-        wet_room_names=app.wet_room_names, route_colors=app.ROUTE_COLORS,
+        wet_room_names=app.wet_room_names, route_colors=app.theme.route_colors,
         palette=CanvasFramePalette(
-            app.COLOR_BG, app.COLOR_WALL, app.COLOR_DOOR, app.COLOR_COLUMN, app.COLOR_SHAFT,
-            app.COLOR_SHAFT_INACTIVE, app.COLOR_GRAPH_EDGE, app.COLOR_GRAPH_NODE, app.COLOR_ROOM,
-            app.COLOR_ROOM_COVERED, app.COLOR_DESELECTED_ROOM, app.COLOR_DESELECTED_PIN,
-            app.COLOR_DESELECTED_ROUTE, app.COLOR_PLAN_LABEL, app.COLOR_TEXT, app.COLOR_SELECTION_HALO,
+            app.theme.background, app.theme.wall, app.theme.door, app.theme.column,
+            app.theme.shaft, app.theme.inactive_shaft, app.theme.graph_edge,
+            app.theme.graph_node, app.theme.room, app.theme.covered_room,
+            app.theme.deselected_room, app.theme.deselected_pin,
+            app.theme.deselected_route, app.theme.plan_label, app.theme.text,
+            app.theme.selection_halo,
         ),
         callbacks=CanvasFrameCallbacks(app.to_screen, app.get_representative_point,
                                        app.get_route_draw_width, workspace.spatial_index.query),
-        room_wall_width=app.WALL_DRAW_WIDTH,
+        room_wall_width=app.theme.wall_draw_width,
         terminal_area_start=state.terminal_area_start_mm,
         terminal_area_end=state.terminal_area_end_mm if state.terminal_area_dragging else None,
     ))
     hooks = CanvasRenderHooks(
-        draw_covers=lambda: app.canvas_ui.draw_geometry(screen, app.covers, app.COLOR_COVER_OVERLAY),
+        draw_covers=lambda: app.canvas_ui.draw_geometry(screen, app.covers, app.theme.cover_overlay),
         draw_distance_heatmap=lambda: app.draw_distance_heatmap(screen, app.ap_scores) if app.show_heatmap and app.ap_scores else None,
         draw_distance_colorbar=lambda: app.draw_colorbar(screen, app.get_placeable_heatmap_scores(app.ap_scores)) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
         draw_edge_weight_heatmap=edge_overlay,
         draw_edge_weight_colorbar=lambda: app.draw_edge_weight_colorbar(screen),
         draw_terminal_validity_overlay=lambda: app.terminal_ui.draw_validity_overlay(screen, app.terminal_validity_overlay_enabled and active_view.can("terminal_tools")),
         draw_wet_room_accents=lambda: app.draw_wet_room_outer_accents(screen),
-        draw_polygon_hatch=lambda shaft: app.canvas_ui.draw_hatch(screen, shaft, app.COLOR_SHAFT_INACTIVE_HATCH, spacing=9),
+        draw_polygon_hatch=lambda shaft: app.canvas_ui.draw_hatch(
+            screen, shaft, app.theme.inactive_shaft_hatch, spacing=9,
+        ),
         draw_outlined_text=lambda target, font, label, position, color: app.draw_outlined_text(target, font, label, position, color),
         draw_preferred_terminal_areas=lambda value: app.terminal_ui.draw_preferred_areas(screen, value) if active_view.can("terminal_tools") else None,
         draw_routed_terminal_endpoints=lambda value: app.terminal_ui.draw_routed_endpoints(screen, routes, value) if active_view.can("terminal_tools") else None,
@@ -122,20 +126,24 @@ def _render(app, screen, clock, fonts, state):
     dropdown = app.installation_ui_session.dropdown_state(active)
     available = app.installation_ui_session.installations[active].runtime_available
     sidebar = build_sidebar_view(SidebarFrameState(
-        auto_placement_mode=(app.AUTO_PLACEMENT_MODES[app.auto_placement_mode_idx] if active_view.can("solver_controls") else "Cli placement pending"),
+        auto_placement_mode=(app.demo_config.auto_placement_modes[app.auto_placement_mode_idx] if active_view.can("solver_controls") else "Cli placement pending"),
         show_heatmap=app.show_heatmap, heatmap_scale_mode=app.heatmap_scale_mode,
         heatmap_palette_index=app.heatmap_palette_idx, weight_mode_index=app.weight_mode_idx,
         rotation_mode_index=app.rotation_mode_idx, rotation_field_scores=app.rotation_field_scores,
-        machine_angle=pose[2], strategy=(app.ROUTING_STRATEGIES[app.routing_strategy_idx] if active_view.can("solver_controls") else "Kou Steiner tree"),
-        router=(app.ROUTER_BACKENDS[app.router_backend_idx] if active_view.can("solver_controls") else "Cli supply runtime"),
-        heuristic=(app.HEURISTIC_MODES[app.heuristic_mode_idx] if active_view.can("solver_controls") else "Directional scales"),
-        graph_type=(app.GRAPH_TYPES[app.graph_type_idx] if active_view.can("solver_controls") else "Core Simple"),
-        room_start_mode=(app.ROOM_START_MODES[app.room_start_mode_idx] if active_view.can("solver_controls") else "Supply terminals"),
+        machine_angle=pose[2], strategy=(app.demo_config.routing_strategies[app.routing_strategy_idx] if active_view.can("solver_controls") else "Kou Steiner tree"),
+        router=(app.demo_config.router_backends[app.router_backend_idx] if active_view.can("solver_controls") else "Cli supply runtime"),
+        heuristic=(app.demo_config.heuristic_modes[app.heuristic_mode_idx] if active_view.can("solver_controls") else "Directional scales"),
+        graph_type=(app.demo_config.graph_types[app.graph_type_idx] if active_view.can("solver_controls") else "Core Simple"),
+        room_start_mode=(app.demo_config.room_start_modes[app.room_start_mode_idx] if active_view.can("solver_controls") else "Supply terminals"),
         selected_route_name=selected, preferred_terminal_count=preferred_count,
-        bend_value=app.C_BEND, bend_min=app.C_BEND_MIN, bend_max=app.C_BEND_MAX,
-        crossing_value=app.crossing_penalty_multiplier, crossing_min=app.CROSSING_MULTIPLIER_MIN,
-        crossing_max=app.CROSSING_MULTIPLIER_MAX, scenario_summary=app.current_scenario_summary,
-        fallback_frame_name=app.ROUTING_FRAME_OPTIONS[app.routing_frame_idx], machine_position=pose[:2],
+        bend_value=app.C_BEND, bend_min=app.demo_config.bend_min,
+        bend_max=app.demo_config.bend_max,
+        crossing_value=app.crossing_penalty_multiplier,
+        crossing_min=app.demo_config.crossing_min,
+        crossing_max=app.demo_config.crossing_max,
+        scenario_summary=app.current_scenario_summary,
+        fallback_frame_name=app.demo_config.routing_frame_options[app.routing_frame_idx],
+        machine_position=pose[:2],
         status=status, validation_warnings=warnings, elapsed_ms=state.elapsed_ms,
         total_nodes=state.total_nodes, fps=clock.get_fps(), machine_options=options,
         selected_machine_key=dropdown.selected_key, machine_selector_open=dropdown.open,
@@ -145,16 +153,22 @@ def _render(app, screen, clock, fonts, state):
     draw_sidebar(
         screen, canvas_left=viewport.canvas_left, window_height=viewport.window_height,
         fonts=SidebarFonts(title=fonts.title, bold=fonts.bold, small=fonts.small),
-        colors=SidebarColors(panel=app.COLOR_PANEL, wall=app.COLOR_WALL, text=app.COLOR_TEXT, muted=app.COLOR_MUTED),
+        colors=SidebarColors(
+            panel=app.theme.panel, wall=app.theme.wall,
+            text=app.theme.text, muted=app.theme.muted,
+        ),
         view=sidebar, draw_help_button=lambda card, rect, font: app.draw_card_help_button(screen, card, rect, font),
         draw_min_piece_slider=app.draw_min_piece_slider, draw_weight_slider=app.draw_weight_slider,
     )
     app.draw_viewer_legend(screen, fonts.small)
-    panel_x = viewport.window_width - app.PANEL_W
-    pygame.draw.rect(screen, app.COLOR_PANEL, (panel_x, 0, app.PANEL_W, viewport.window_height))
+    panel_x = viewport.window_width - app.theme.panel_width
+    pygame.draw.rect(
+        screen, app.theme.panel,
+        (panel_x, 0, app.theme.panel_width, viewport.window_height),
+    )
     pygame.draw.line(screen, (55, 55, 70), (panel_x, 0), (panel_x, viewport.window_height))
-    label = fonts.bold.render("PLACEMENT EXPLORER", True, app.COLOR_MUTED)
-    screen.blit(label, (panel_x + app.PANEL_W // 2 - label.get_width() // 2, 8))
+    label = fonts.bold.render("PLACEMENT EXPLORER", True, app.theme.muted)
+    screen.blit(label, (panel_x + app.theme.panel_width // 2 - label.get_width() // 2, 8))
     app.draw_plots(screen, fonts.plot_small, fonts.plot_title, fonts.plot_value, fonts.plot_minimum)
     app.draw_solution_logs_panel(screen, fonts.small, fonts.bold)
     app.draw_help_popup(screen, fonts.small)

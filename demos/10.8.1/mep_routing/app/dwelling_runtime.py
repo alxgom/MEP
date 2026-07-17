@@ -27,8 +27,8 @@ class DwellingRuntime:
             a.generative_layout,
             a.generative_layout.Room,
             a.get_representative_point,
-            scale_to_mm=a.SCALE_TO_MM,
-            wall_thickness_mm=a.WALL_THICKNESS,
+            scale_to_mm=a.demo_config.scale_to_mm,
+            wall_thickness_mm=a.demo_config.wall_thickness_mm,
         )
         self.apply_prepared(prepare_synthetic_dwelling(scenario), auto_place=False)
 
@@ -40,16 +40,18 @@ class DwellingRuntime:
         return load_real_dwelling(
             loader=a.load_dwelling_scenario,
             summarizer=a.scenario_summary,
-            db_path=a.REAL_DWELLING_DB,
+            db_path=a.demo_config.real_dwelling_db,
             case=case,
-            frame_name=a.ROUTING_FRAME_OPTIONS[a.routing_frame_idx % len(a.ROUTING_FRAME_OPTIONS)],
-            preferred_shaft_installation=a.PREFERRED_SHAFT_INSTALLATION,
+            frame_name=a.demo_config.routing_frame_options[
+                a.routing_frame_idx % len(a.demo_config.routing_frame_options)
+            ],
+            preferred_shaft_installation=a.demo_config.preferred_shaft_installation,
         )
 
     def generate(self):
         a = self.app
         a.invalidate_room_start_node_cache()
-        if a.DWELLING_SOURCE_MODES[a.dwelling_source_idx] == "Random Synthetic":
+        if a.demo_config.dwelling_source_modes[a.dwelling_source_idx] == "Random Synthetic":
             self.generate_synthetic()
             return
         try:
@@ -60,7 +62,7 @@ class DwellingRuntime:
             return
         prepared = prepare_real_dwelling(
             scenario,
-            wall_thickness_mm=a.WALL_THICKNESS,
+            wall_thickness_mm=a.demo_config.wall_thickness_mm,
             label=label,
             summary=summary,
             derive_walls=derive_room_boundary_walls,
@@ -76,7 +78,8 @@ class DwellingRuntime:
         """Activate sessions in dependency order and publish UI compatibility state."""
         a = self.app
         dwelling = create_active_dwelling(
-            prepared, a.COMMON_GRAPH_CONFIG, a.SAL_GRAPH_PROFILE, a.TERMINAL_RUNTIME_CONFIG,
+            prepared, a.demo_config.common_graph, a.SAL_GRAPH_PROFILE,
+            a.demo_config.terminal_runtime,
         )
         state = a.workbench_state.dwelling
         state.active = dwelling
@@ -121,8 +124,8 @@ class DwellingRuntime:
         cli_pose.set(cli_placement.center, cli_placement.angle_degrees)
         state.machine_vertical_clearance_blocks = insufficient_machine_clearance_regions(
             dwelling.rooms,
-            a.MACHINE_SPEC.installation_height_mm,
-            a.MACHINE_SPEC.installation_clearance_mm,
+            a.SAL_INSTALLATION.default_machine.installation_height_mm,
+            a.SAL_INSTALLATION.default_machine.installation_clearance_mm,
         )
         a.placement_session.bind(
             state.workspace, dwelling.rooms, dwelling.terminal_points,
