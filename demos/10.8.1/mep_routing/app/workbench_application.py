@@ -1,0 +1,122 @@
+"""Concrete application surface consumed by the Pygame workbench."""
+
+from __future__ import annotations
+
+
+class DemoWorkbenchApplication:
+    """Own application controllers while legacy composition data is migrated.
+
+    The fallback namespace contains values only.  Controller callbacks are
+    deliberately not flattened onto it, so UI adapters depend on this concrete
+    object and its named controller boundaries.
+    """
+
+    _OWN_FIELDS = {
+        "_composition", "routing_controller", "dwelling_runtime", "ui_facade",
+        "commands", "observation", "chrome",
+    }
+
+    def __init__(self, composition):
+        object.__setattr__(self, "_composition", composition)
+        for name in self._OWN_FIELDS - {"_composition"}:
+            object.__setattr__(self, name, None)
+
+    def bind(self, *, routing, dwelling, ui, commands, observation, chrome):
+        object.__setattr__(self, "routing_controller", routing)
+        object.__setattr__(self, "dwelling_runtime", dwelling)
+        object.__setattr__(self, "ui_facade", ui)
+        object.__setattr__(self, "commands", commands)
+        object.__setattr__(self, "observation", observation)
+        object.__setattr__(self, "chrome", chrome)
+        return self
+
+    def __getattr__(self, name):
+        return getattr(self._composition, name)
+
+    def __setattr__(self, name, value):
+        if name in self._OWN_FIELDS:
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._composition, name, value)
+
+    @property
+    def observation_runtime(self):
+        return self.observation.runtime
+
+    @property
+    def routing_history(self):
+        return self.observation.history
+
+    @property
+    def solution_log_session(self):
+        return self.observation.logs
+
+    def get_active_machine_pose(self):
+        active = self.installation_header_state.active
+        return self.workbench_state.installation(active).pose.as_tuple()
+
+    def move_active_machine(self, position):
+        active = self.installation_header_state.active
+        self.workbench_state.installation(active).pose.set(position)
+
+    def rotate_active_machine(self, delta_degrees):
+        active = self.installation_header_state.active
+        return self.workbench_state.installation(active).pose.rotate(delta_degrees)
+
+    def get_active_machine_pins(self, cx, cy, angle_degrees):
+        if self.installation_header_state.active == "cli":
+            machine_key = self.installation_ui_session.selected_keys["cli"]
+            machine = self.CLI_INSTALLATION.machine_catalog.value(machine_key)
+            return self.cli_machine_pins(machine, (cx, cy), angle_degrees)
+        return self.routing_controller.machine_pins(cx, cy, angle_degrees)
+
+    @staticmethod
+    def get_representative_point(polygon):
+        centroid = polygon.centroid
+        point = centroid if polygon.contains(centroid) else polygon.representative_point()
+        return round(point.x), round(point.y)
+
+    def _build_core_shaft_entry_specs(self, scenario):
+        return self._source_core_shaft_entry_specs(
+            scenario, summarize=self.scenario_summary,
+            scale_to_mm=self.demo_config.scale_to_mm,
+            match_tolerance_mm=self.demo_config.core_epsilon_grid_mm * 0.75,
+        )
+
+    def count_segment_crossings(self, routes):
+        return self._count_segment_crossings(routes)
+
+    def count_solution_turns(self, routes):
+        return self._count_solution_turns(routes)
+
+    def find_room_route_at_point(self, world_point, route_names):
+        return self.terminal_ui.find_room_route(
+            world_point, route_names, self.shaft_extraction,
+        )
+
+    def draw_wet_room_outer_accents(self, screen):
+        return self._draw_wet_room_outer_accents(
+            screen, self.wet_room_outer_accents, self.to_screen,
+            self._iter_polygons, self.theme.wet_room_accent,
+        )
+
+    def draw_outlined_text(self, screen, font, text, position, color, outline_color=None):
+        return self._draw_outlined_text(
+            screen, font, text, position, color,
+            self.theme.plan_label_halo if outline_color is None else outline_color,
+        )
+
+    def draw_terminal_area_drag(self, screen, start_world, end_world):
+        return self._draw_terminal_area_drag(
+            screen, start_world, end_world, self.to_screen,
+        )
+
+    def apply_preferred_terminal_point(self, world_point, remove=False):
+        if not self.active_capabilities(self).terminal_tools:
+            return False, None
+        return self.terminal_ui.apply_point_preference(world_point, remove=remove)
+
+    def apply_preferred_terminal_area(self, start_world, end_world, remove=False):
+        if not self.active_capabilities(self).terminal_tools:
+            return False, None
+        return self.terminal_ui.apply_area_preference(start_world, end_world, remove=remove)

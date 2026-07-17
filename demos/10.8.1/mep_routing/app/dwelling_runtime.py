@@ -50,7 +50,7 @@ class DwellingRuntime:
 
     def generate(self):
         a = self.app
-        a.invalidate_room_start_node_cache()
+        a.ui_facade.invalidate_room_start_node_cache()
         if a.demo_config.dwelling_source_modes[a.dwelling_source_idx] == "Random Synthetic":
             self.generate_synthetic()
             return
@@ -89,8 +89,8 @@ class DwellingRuntime:
         state.graph_build_session = GraphBuildSession(
             state.workspace,
             state.terminal_runtime,
-            a.invalidate_room_start_node_cache,
-            a.invalidate_terminal_validity_cache,
+            a.ui_facade.invalidate_room_start_node_cache,
+            a.ui_facade.invalidate_terminal_validity_cache,
         )
 
         aliases = {
@@ -135,6 +135,6 @@ class DwellingRuntime:
         )
         state.graph_build_session.build_base_regular()
         if auto_place:
-            a.run_auto_placement()
-        pins = a.get_machine_pins(*sal_pose.as_tuple())
-        a.build_grid(machine_pins=pins)
+            a.routing_controller.auto_place()
+        pins = a.routing_controller.machine_pins(*sal_pose.as_tuple())
+        a.routing_controller.build_grid(machine_pins=pins)

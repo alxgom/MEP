@@ -47,7 +47,7 @@ def _render(app, screen, clock, fonts, state):
     routes, status = state.routes, state.status
     selected = active_selected_route(state.selected_route_name, routes)
     state.selected_route_name = selected
-    selected_room = app.get_route_room_polygon(selected) if selected else None
+    selected_room = app.terminal_ui.route_room_polygon(selected) if selected else None
     active = app.installation_header_state.active
     workbench = app.workbench_state
     dwelling_state = workbench.dwelling
@@ -56,17 +56,18 @@ def _render(app, screen, clock, fonts, state):
     workspace, terminals = active_view.workspace, active_view.terminals
     pose, pins = active_view.pose, active_view.pins
     selected_pins = (
-        app.get_selected_pin_names(selected, routes, pins) if selected and active_view.can("terminal_tools")
+        app.routing_controller.selected_pin_names(selected, routes, pins)
+        if selected and active_view.can("terminal_tools")
         else ({"air_out"} if selected == "Supply Air Tree" else set())
     )
     context = projection.context_layers
     if app.show_heatmap and active_view.can("placement_overlay"):
-        app.ensure_placement_heatmap_scores()
+        app.routing_controller.ensure_placement_scores()
 
     def edge_overlay():
         if app.edge_weight_heatmap_enabled:
-            app.refresh_edge_weight_view_overlay(routes)
-        app.draw_edge_weight_heatmap(screen)
+            app.routing_controller.refresh_edge_weight_overlay(routes)
+        app.ui_facade.draw_edge_weight_heatmap(screen)
 
     scene = build_canvas_scene(CanvasFrameState(
         rooms=app.rooms, doors=app.doors, columns=app.columns, shafts=app.shafts,
@@ -86,17 +87,20 @@ def _render(app, screen, clock, fonts, state):
             app.theme.selection_halo,
         ),
         callbacks=CanvasFrameCallbacks(app.to_screen, app.get_representative_point,
-                                       app.get_route_draw_width, workspace.spatial_index.query),
+                                       app.ui_facade.get_route_draw_width,
+                                       workspace.spatial_index.query),
         room_wall_width=app.theme.wall_draw_width,
         terminal_area_start=state.terminal_area_start_mm,
         terminal_area_end=state.terminal_area_end_mm if state.terminal_area_dragging else None,
     ))
     hooks = CanvasRenderHooks(
         draw_covers=lambda: app.canvas_ui.draw_geometry(screen, app.covers, app.theme.cover_overlay),
-        draw_distance_heatmap=lambda: app.draw_distance_heatmap(screen, app.ap_scores) if app.show_heatmap and app.ap_scores else None,
-        draw_distance_colorbar=lambda: app.draw_colorbar(screen, app.get_placeable_heatmap_scores(app.ap_scores)) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
+        draw_distance_heatmap=lambda: app.ui_facade.draw_distance_heatmap(screen, app.ap_scores) if app.show_heatmap and app.ap_scores else None,
+        draw_distance_colorbar=lambda: app.ui_facade.draw_colorbar(
+            screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores),
+        ) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
         draw_edge_weight_heatmap=edge_overlay,
-        draw_edge_weight_colorbar=lambda: app.draw_edge_weight_colorbar(screen),
+        draw_edge_weight_colorbar=lambda: app.ui_facade.draw_edge_weight_colorbar(screen),
         draw_terminal_validity_overlay=lambda: app.terminal_ui.draw_validity_overlay(screen, app.terminal_validity_overlay_enabled and active_view.can("terminal_tools")),
         draw_wet_room_accents=lambda: app.draw_wet_room_outer_accents(screen),
         draw_polygon_hatch=lambda shaft: app.canvas_ui.draw_hatch(
@@ -111,17 +115,21 @@ def _render(app, screen, clock, fonts, state):
     draw_canvas_scene(screen, scene=scene, fonts=CanvasFonts(small=fonts.small), hooks=hooks)
     draw_installation_header(
         screen, fonts.small, fonts.micro, app.installation_header_state,
-        app.INSTALLATION_OPTIONS, app.get_installation_header_layout(),
+        app.INSTALLATION_OPTIONS, app.ui_facade.installation_header_layout(),
         dragged_key=state.installation_drag_key,
     )
-    app.draw_ruler_overlay(screen, fonts.small, state.ruler_start_mm, state.ruler_end_mm)
-    app.draw_canvas_tool_controls(screen, fonts.small, state.ruler_mode, state.dwelling_selector_open)
+    app.ui_facade.draw_ruler_overlay(
+        screen, fonts.small, state.ruler_start_mm, state.ruler_end_mm,
+    )
+    app.ui_facade.draw_canvas_tool_controls(
+        screen, fonts.small, state.ruler_mode, state.dwelling_selector_open,
+    )
     if active_view.can("terminal_tools"):
-        app.draw_terminal_tool_buttons(screen, fonts.bold, fonts.small)
+        app.ui_facade.draw_terminal_tool_buttons(screen, fonts.bold, fonts.small)
 
     terminal_runtime = dwelling_state.terminal_runtime
     preferred_count = sum(len(points) for points in (() if terminal_runtime is None else terminal_runtime.preferred_points_by_room.values()))
-    warnings = app.get_route_validation_warnings(routes) if active_view.can("route_validation") else []
+    warnings = app.routing_controller.validation_warnings(routes) if active_view.can("route_validation") else []
     options = app.installation_ui_session.options(active)
     dropdown = app.installation_ui_session.dropdown_state(active)
     available = app.installation_ui_session.installations[active].runtime_available
@@ -157,10 +165,14 @@ def _render(app, screen, clock, fonts, state):
             panel=app.theme.panel, wall=app.theme.wall,
             text=app.theme.text, muted=app.theme.muted,
         ),
-        view=sidebar, draw_help_button=lambda card, rect, font: app.draw_card_help_button(screen, card, rect, font),
-        draw_min_piece_slider=app.draw_min_piece_slider, draw_weight_slider=app.draw_weight_slider,
+        view=sidebar,
+        draw_help_button=lambda card, rect, font: app.observation.draw_card_help_button(
+            screen, card, rect, font,
+        ),
+        draw_min_piece_slider=app.ui_facade.draw_min_piece_slider,
+        draw_weight_slider=app.ui_facade.draw_weight_slider,
     )
-    app.draw_viewer_legend(screen, fonts.small)
+    app.observation.draw_viewer_legend(screen, fonts.small)
     panel_x = viewport.window_width - app.theme.panel_width
     pygame.draw.rect(
         screen, app.theme.panel,
@@ -169,10 +181,12 @@ def _render(app, screen, clock, fonts, state):
     pygame.draw.line(screen, (55, 55, 70), (panel_x, 0), (panel_x, viewport.window_height))
     label = fonts.bold.render("PLACEMENT EXPLORER", True, app.theme.muted)
     screen.blit(label, (panel_x + app.theme.panel_width // 2 - label.get_width() // 2, 8))
-    app.draw_plots(screen, fonts.plot_small, fonts.plot_title, fonts.plot_value, fonts.plot_minimum)
-    app.draw_solution_logs_panel(screen, fonts.small, fonts.bold)
-    app.draw_help_popup(screen, fonts.small)
-    app.draw_transient_message(screen, fonts.small)
+    app.observation.draw_plots(
+        screen, fonts.plot_small, fonts.plot_title, fonts.plot_value, fonts.plot_minimum,
+    )
+    app.observation.draw_solution_logs_panel(screen, fonts.small, fonts.bold)
+    app.observation.draw_help_popup(screen, fonts.small)
+    app.observation.draw_transient_message(screen, fonts.small)
     if active_view.can("terminal_tools"):
         app.terminal_ui.draw_validity_tooltip(screen, fonts.small, pygame.mouse.get_pos(), app.terminal_validity_overlay_enabled)
 
@@ -187,8 +201,10 @@ def run_pygame_workbench(app, *, caption, fps):
     pygame.display.set_caption(caption)
     clock = pygame.time.Clock()
     fonts = _fonts()
-    app.generate_new_dwelling()
-    events = WorkbenchEventAdapter(app, screen, app.solve_ventilation_routing())
+    app.dwelling_runtime.generate()
+    events = WorkbenchEventAdapter(
+        app, screen, app.routing_controller.solve_installations(),
+    )
     try:
         while events.state.running:
             events.run_pending_auto_placement()

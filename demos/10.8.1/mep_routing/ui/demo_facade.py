@@ -74,9 +74,11 @@ class DemoUiFacade:
     def record_current_solution(self, routes, elapsed_ms, marker_label=None, marker_color=(241, 196, 15)):
         a = self.app
         if routes:
-            a.record_history(routes, a.count_segment_crossings(routes), elapsed_ms)
+            a.observation.record_history(
+                routes, a.count_segment_crossings(routes), elapsed_ms,
+            )
             if marker_label:
-                a.routing_history.add_marker(marker_label, marker_color)
+                a.observation.history.add_marker(marker_label, marker_color)
 
     def handle_terminal_tool_button_click(self, pos):
         a = self.app
@@ -154,7 +156,7 @@ class DemoUiFacade:
             screen, self.get_placeable_heatmap_scores(scores),
             base_env=a.workbench_state.dwelling.workspace.base_env,
             grid_spacing=a.demo_config.grid_spacing_mm,
-            blocked_regions=a.get_machine_vertical_clearance_blocks(),
+            blocked_regions=a.workbench_state.dwelling.machine_vertical_clearance_blocks,
             scale_mode=a.heatmap_scale_mode, palette_index=a.heatmap_palette_idx,
             fill_color=a.theme.machine_clearance_fill,
             hatch_color=a.theme.machine_clearance_hatch,
@@ -181,5 +183,8 @@ class DemoUiFacade:
     def get_route_draw_width(self, route_name):
         a = self.app
         if a.route_real_diameter_width_enabled:
-            return max(1, int(round(a.get_route_diameter(route_name) * a.canvas_ui.viewport.scale)))
+            return max(1, int(round(
+                a.routing_controller.route_diameter(route_name)
+                * a.canvas_ui.viewport.scale
+            )))
         return 5 if a.SAL_INSTALLATION.is_large_route(route_name) else 3

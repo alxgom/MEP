@@ -21,6 +21,11 @@ from .events import (
     move_panel_interaction,
 )
 from .installation_projection import active_capabilities
+from .controls import dwelling_selector_bounds
+from .installation_header import (
+    activate_installation, installation_header_hit, reorder_installation_at_x,
+    toggle_installation,
+)
 
 
 @dataclass
@@ -72,7 +77,7 @@ class WorkbenchEventAdapter:
         )
 
     def _solve(self):
-        result = self.app.solve_ventilation_routing()
+        result = self.app.routing_controller.solve_installations()
         self.state.routes, self.state.status, self.state.elapsed_ms, self.state.total_nodes = result
 
     def _successful(self):
@@ -80,7 +85,7 @@ class WorkbenchEventAdapter:
 
     def _record(self, label=None, color=(241, 196, 15)):
         if self._successful():
-            self.app.record_current_solution(
+            self.app.ui_facade.record_current_solution(
                 self.state.routes, self.state.elapsed_ms, label, color,
             )
 
@@ -92,13 +97,13 @@ class WorkbenchEventAdapter:
         )
 
     def _cursor(self, active):
-        self.app.set_ruler_cursor(active)
+        self.app.ui_facade.set_ruler_cursor(active)
 
     def run_pending_auto_placement(self):
         if not self.state.needs_auto_placement:
             return
         self.state.needs_auto_placement = False
-        self.app.run_auto_placement()
+        self.app.routing_controller.auto_place()
         self._solve()
         self._record("Auto", (230, 126, 34))
 
@@ -152,31 +157,31 @@ class WorkbenchEventAdapter:
     def _left_down(self, pos):
         a, s = self.app, self.state
         mx, my = pos
-        handled, runtime_invalidation = a.handle_machine_selector_click(pos)
+        handled, runtime_invalidation = a.ui_facade.handle_machine_selector_click(pos)
         if handled:
             if runtime_invalidation:
                 self._solve()
                 s.selected_route_name = None
             return
-        installation_hit = a._installation_header_hit(a.get_installation_header_layout(), pos)
+        installation_hit = installation_header_hit(a.ui_facade.installation_header_layout(), pos)
         if installation_hit is not None:
             kind, key = installation_hit
             if kind == "switch":
-                a.installation_header_state, changed = a._toggle_installation(
+                a.installation_header_state, changed = toggle_installation(
                     a.installation_header_state, key, a.INSTALLATION_OPTIONS,
                 )
                 if changed:
                     self._solve()
                     s.selected_route_name = None
                 else:
-                    a.set_transient_message(f"{key.title()} is not available yet")
+                    a.observation.set_transient_message(f"{key.title()} is not available yet")
             else:
                 s.installation_drag_key, s.installation_drag_moved = key, False
             return
 
-        selector, options = a._dwelling_selector_bounds(
+        selector, options = dwelling_selector_bounds(
             a.canvas_ui.viewport.canvas_left, a.canvas_ui.viewport.canvas_top,
-            len(a.dwelling_selector_options()),
+            len(a.ui_facade.dwelling_selector_options()),
         )
         if pygame.Rect(selector).collidepoint(pos):
             s.dwelling_selector_open = not s.dwelling_selector_open
@@ -211,13 +216,13 @@ class WorkbenchEventAdapter:
         occupied = any((panel_hit.help_card, panel_hit.min_piece_slider, panel_hit.bend_slider,
                         panel_hit.bend_reset, panel_hit.crossing_slider, panel_hit.crossing_reset))
         if not occupied:
-            panel_hit = replace(panel_hit, canvas_tool=a.handle_canvas_tool_button_click(pos))
+            panel_hit = replace(panel_hit, canvas_tool=a.commands.handle_canvas_tool_button_click(pos))
             occupied = panel_hit.canvas_tool is not None
         if not occupied:
-            panel_hit = replace(panel_hit, solution_log_action=a.handle_solution_log_click(pos))
+            panel_hit = replace(panel_hit, solution_log_action=a.observation.handle_solution_log_click(pos))
             occupied = panel_hit.solution_log_action is not None
         if not occupied:
-            panel_hit = replace(panel_hit, terminal_tool_action=a.handle_terminal_tool_button_click(pos))
+            panel_hit = replace(panel_hit, terminal_tool_action=a.ui_facade.handle_terminal_tool_button_click(pos))
         panel = begin_panel_interaction(s.panel_interaction, hit=panel_hit, screen_x=mx)
         s.panel_interaction = panel.state
         if panel.commands:
@@ -240,7 +245,7 @@ class WorkbenchEventAdapter:
                 else ({name for name, _segments in s.routes} if s.routes else set())
             )
             room_hit = a.find_room_route_at_point(world, route_names)
-            route_hit = a.find_route_hit_at_point(s.routes, world)
+            route_hit = a.routing_controller.route_hit_at_point(s.routes, world)
             threshold = max(20.0, 4.0 / a.canvas_ui.viewport.scale)
             direct = route_hit[0] if route_hit and (not room_hit or route_hit[1] <= threshold) else None
             hit = CanvasHit(machine_hit, direct, room_hit)
@@ -259,19 +264,19 @@ class WorkbenchEventAdapter:
             a.workbench_chrome.toggle_help(command.value)
         elif command.name == "set_slider":
             if not active_capabilities(a).solver_controls:
-                a.set_transient_message("This control belongs to Sal")
+                a.observation.set_transient_message("This control belongs to Sal")
                 return
             name, x = command.value
             label, color = self._set_slider(name, x)
             self._solve(); self._record(label, color)
         elif command.name == "reset_slider":
             if not active_capabilities(a).solver_controls:
-                a.set_transient_message("This control belongs to Sal")
+                a.observation.set_transient_message("This control belongs to Sal")
                 return
             if command.value == "bend":
-                a.reset_bend_weight(); marker = ("B:reset", (155, 89, 182))
+                a.commands.reset_bend_weight(); marker = ("B:reset", (155, 89, 182))
             else:
-                a.reset_crossing_weight(); marker = ("X:reset", (230, 126, 34))
+                a.commands.reset_crossing_weight(); marker = ("X:reset", (230, 126, 34))
             self._solve(); self._record(*marker)
         elif command.name == "canvas_tool":
             if command.value == "ruler":
@@ -287,13 +292,13 @@ class WorkbenchEventAdapter:
         elif command.name == "solution_log":
             action = command.value
             if action == "log":
-                a.log_current_solution(s.routes, s.status, s.elapsed_ms, s.total_nodes)
+                a.observation.log_current_solution(s.routes, s.status, s.elapsed_ms, s.total_nodes)
                 return
             entry = (a.solution_log_session.auto_best_logs.get(action.split(":", 1)[1])
                      if isinstance(action, str) and action.startswith("best:") else
                      next((item for item in a.solution_log_session.manual_logs if item["id"] == action), None))
             if entry is not None:
-                s.routes, s.status, s.elapsed_ms, s.total_nodes = a.restore_solution_log(entry)
+                s.routes, s.status, s.elapsed_ms, s.total_nodes = a.observation.restore_solution_log(entry)
                 self._record(f"Back:L{action}", (255, 255, 255))
         elif command.name == "terminal_tool":
             if command.value == "reset":
@@ -309,10 +314,10 @@ class WorkbenchEventAdapter:
     def _set_slider(self, name, x):
         a = self.app
         if name == "min_piece":
-            a.set_min_piece_factor_from_slider_x(x); return f"Min:{a.min_piece_factor:.2f}", (241, 196, 15)
+            a.commands.set_min_piece_factor_from_slider_x(x); return f"Min:{a.min_piece_factor:.2f}", (241, 196, 15)
         if name == "bend":
-            a.set_bend_weight_from_slider_x(x); return f"B:{a.C_BEND:.0f}", (155, 89, 182)
-        a.set_crossing_weight_from_slider_x(x); return f"X:{a.crossing_penalty_multiplier:.1f}", (230, 126, 34)
+            a.commands.set_bend_weight_from_slider_x(x); return f"B:{a.C_BEND:.0f}", (155, 89, 182)
+        a.commands.set_crossing_weight_from_slider_x(x); return f"X:{a.crossing_penalty_multiplier:.1f}", (230, 126, 34)
 
     def _canvas_command(self, command):
         a, s = self.app, self.state
@@ -323,7 +328,7 @@ class WorkbenchEventAdapter:
             point, remove = command.value
             changed, room = a.apply_preferred_terminal_point(point, remove=remove)
             if room: s.selected_route_name = room
-            elif not remove: a.set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
+            elif not remove: a.observation.set_transient_message("Invalid terminal: too close to wall or outside allowed room buffer")
             if changed: self._solve(); self._record("Term-" if remove else "Term+", (26, 188, 156))
         elif command.name == "apply_terminal_area":
             start, end, remove = command.value
@@ -343,11 +348,11 @@ class WorkbenchEventAdapter:
         if event.button not in (1, 2): return
         if event.button == 1 and s.installation_drag_key is not None:
             if not s.installation_drag_moved:
-                a.installation_header_state, changed = a._activate_installation(
+                a.installation_header_state, changed = activate_installation(
                     a.installation_header_state, s.installation_drag_key, a.INSTALLATION_OPTIONS,
                 )
                 if not changed and s.installation_drag_key != a.installation_header_state.active:
-                    a.set_transient_message(f"{s.installation_drag_key.title()} is not available yet")
+                    a.observation.set_transient_message(f"{s.installation_drag_key.title()} is not available yet")
                 elif changed:
                     a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
                     self._solve()
@@ -366,9 +371,9 @@ class WorkbenchEventAdapter:
     def _mouse_motion(self, event):
         a, s = self.app, self.state
         if s.installation_drag_key is not None:
-            reordered = a._reorder_installation_at_x(
+            reordered = reorder_installation_at_x(
                 a.installation_header_state, s.installation_drag_key, event.pos[0],
-                a.get_installation_header_layout(),
+                a.ui_facade.installation_header_layout(),
             )
             if reordered.order != a.installation_header_state.order:
                 a.installation_header_state, s.installation_drag_moved = reordered, True
@@ -386,8 +391,8 @@ class WorkbenchEventAdapter:
 
     def _change_dwelling(self, marker=None, color=(52, 152, 219), clear_history=False):
         a, s = self.app, self.state
-        a.generate_new_dwelling(); a.solution_log_session.clear()
-        if clear_history: a.clear_history_buffers()
+        a.dwelling_runtime.generate(); a.solution_log_session.clear()
+        if clear_history: a.observation.clear_history_buffers()
         s.needs_auto_placement = a.auto_placement_mode_idx > 0
         self._solve(); self._record(marker, color)
 
@@ -417,12 +422,14 @@ class WorkbenchEventAdapter:
             pygame.K_c, pygame.K_t, pygame.K_l, pygame.K_y, pygame.K_TAB,
             pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,
         }:
-            a.set_transient_message("This command belongs to Sal")
-        elif transition := a.apply_routing_key_command(key):
+            a.observation.set_transient_message("This command belongs to Sal")
+        elif transition := a.commands.apply_routing_key_command(key):
             s.needs_auto_placement |= transition.needs_auto_placement
             self._solve()
             if transition.record_history and self._successful():
-                a.record_history(s.routes, a.count_segment_crossings(s.routes), s.elapsed_ms)
+                a.observation.record_history(
+                    s.routes, a.count_segment_crossings(s.routes), s.elapsed_ms,
+                )
                 for marker in transition.markers: a.routing_history.add_marker(*marker)
         elif key == pygame.K_g: a.show_grid_graph = not a.show_grid_graph
         elif key == pygame.K_d:
@@ -437,7 +444,7 @@ class WorkbenchEventAdapter:
             self._change_dwelling(f"Frame:{a.routing_frame_idx}", (230, 126, 34))
         elif key == pygame.K_v:
             a.show_heatmap = not a.show_heatmap
-            if a.show_heatmap: a.ensure_placement_heatmap_scores()
+            if a.show_heatmap: a.routing_controller.ensure_placement_scores()
         elif key == pygame.K_m: a.edge_weight_heatmap_enabled = not a.edge_weight_heatmap_enabled
         elif key == pygame.K_n: a.edge_weight_view_mode_idx = (a.edge_weight_view_mode_idx + 1) % 2
         elif key == pygame.K_x: a.route_real_diameter_width_enabled = not a.route_real_diameter_width_enabled

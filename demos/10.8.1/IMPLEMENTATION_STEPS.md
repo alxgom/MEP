@@ -770,6 +770,10 @@ Before each commit:
 - Routing, dwelling activation, commands, observation, event handling, and rendering now consume the typed objects directly; mutable solver choices remain live workbench state rather than being mislabeled as configuration.
 - Validation: Python compilation, nine focused config/theme and affected-controller contracts, and an eight-second headless startup/initial-routing smoke.
 
+- Added `DemoWorkbenchApplication` as the concrete surface consumed by the event adapter and render loop. Routing, dwelling, command, UI, observation, and chrome controllers are named boundaries instead of dozens of callbacks flattened onto `main.py`.
+- Removed the compatibility aliases for graph building, machine pins, solving, dwelling activation, placement transitions, drawing delegates, and observation callbacks. Remaining composition data is temporarily proxied through one explicit migration seam.
+- Validation: Python compilation, the full 347-contract Demo suite, and an eight-second headless startup/initial-routing smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

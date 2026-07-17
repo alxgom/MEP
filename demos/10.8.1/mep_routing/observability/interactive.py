@@ -16,7 +16,7 @@ class InteractiveObservationController:
         self.runtime = RoutingObservationRuntime(
             route_length_m=app._total_route_length_m,
             route_turns=app.count_solution_turns,
-            route_score=app.get_solution_score,
+            route_score=app.routing_controller.solution_score,
             solution_kpis=self.current_kpis,
             metric_value=metric_value_for_log,
             best_metrics=DEFAULT_BEST_METRICS,
@@ -34,7 +34,8 @@ class InteractiveObservationController:
         a = self.app
         return solution_kpis(
             routes, elapsed_ms, a.count_segment_crossings, a._total_route_length_m,
-            a.count_solution_turns, a.count_solution_short_pieces, a.get_solution_score,
+            a.count_solution_turns, a.routing_controller.count_short_pieces,
+            a.routing_controller.solution_score,
         )
 
     def current_state(self):
@@ -95,8 +96,10 @@ class InteractiveObservationController:
                 state["preferred_terminal_points_by_room"], state["preferred_terminal_areas"],
             )
         self.logs.selected_log_id = state["id"]
-        a.build_grid(machine_pins=a.get_machine_pins(*sal_pose.as_tuple()))
-        return a.solve_ventilation_routing()
+        a.routing_controller.build_grid(
+            machine_pins=a.routing_controller.machine_pins(*sal_pose.as_tuple()),
+        )
+        return a.routing_controller.solve_installations()
 
     def handle_solution_log_click(self, pos):
         return self.chrome.solution_log_action(pos)

@@ -24,10 +24,15 @@ def _app():
         route_real_diameter_width_enabled=True, min_piece_factor=1.5,
         C_BEND=200.0, crossing_penalty_multiplier=5.0,
         C_BEND_DEFAULT=100.0, CROSSING_MULTIPLIER_DEFAULT=2.0,
-        get_machine_pins=lambda *pose: pose, rebuilt=None,
-        solve_ventilation_routing=lambda: ([], "Solved", 1.0, 4),
+        rebuilt=None,
     )
-    app.build_grid = lambda **kwargs: setattr(app, "rebuilt", kwargs)
+    app.routing_controller = SimpleNamespace(
+        solution_score=app.get_solution_score,
+        count_short_pieces=app.count_solution_short_pieces,
+        machine_pins=lambda *pose: pose,
+        build_grid=lambda **kwargs: setattr(app, "rebuilt", kwargs),
+        solve_installations=lambda: ([], "Solved", 1.0, 4),
+    )
     return app
 
 

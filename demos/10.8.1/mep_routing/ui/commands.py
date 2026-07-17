@@ -90,15 +90,18 @@ class WorkbenchCommandController:
             else:
                 setattr(a, name, value)
         if transition.rebuild_graph:
-            a.build_grid(machine_pins=a.get_machine_pins(*sal_pose.as_tuple()))
+            a.routing_controller.build_grid(
+                machine_pins=a.routing_controller.machine_pins(*sal_pose.as_tuple()),
+            )
         if transition.apply_rotation_mode:
-            a.apply_rotation_mode_once()
+            a.routing_controller.apply_rotation_mode()
         workspace = a.workbench_state.dwelling.workspace
         if transition.refresh_placement_fields and workspace.base_env is not None and a.shaft_extraction is not None:
-            shaft_nodes, _ = a.get_shaft_entry_nodes(
+            shaft_nodes, _ = a.routing_controller.shaft_entry_nodes(
                 workspace.base_env, workspace.base_spatial_index,
             )
-            a.ap_scores, a.ap_fields = a.get_auto_placement_scores(
-                workspace.base_env, shaft_nodes,
+            a.placement_session.weight_mode = a.weight_mode_idx
+            a.ap_scores, a.ap_fields = a.placement_session.placement_scores(
+                workspace.base_env, workspace.base_spatial_index, shaft_nodes,
             )
         return transition

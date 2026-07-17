@@ -19,7 +19,7 @@ def test_terminal_tool_is_disabled_outside_sal():
 def test_route_width_uses_real_diameter_or_installation_default():
     app = SimpleNamespace(
         route_real_diameter_width_enabled=True,
-        get_route_diameter=lambda name: 125,
+        routing_controller=SimpleNamespace(route_diameter=lambda name: 125),
         canvas_ui=SimpleNamespace(viewport=SimpleNamespace(scale=0.1)),
         SAL_INSTALLATION=SimpleNamespace(is_large_route=lambda name: name == "Shaft"),
     )
