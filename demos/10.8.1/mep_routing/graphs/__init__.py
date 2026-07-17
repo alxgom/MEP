@@ -15,6 +15,7 @@ from .regular import build_regular_grid, filter_edges_against_walls
 from .hannan import build_static_axes as build_hannan_static_axes
 from .epsilon import build_axes as build_epsilon_axes
 from .dynamic import filter_dynamic_machine_obstacle
+from .occupancy import adjacency_without_obstacle_bounds
 from .simple import SimpleGraphInputs, SimpleGraphResult, build_simple_grid
 from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant
 from .lifecycle import DynamicGraphResult, GraphBuildResult, GraphLifecycle, GraphMode
@@ -32,6 +33,7 @@ __all__ = [
     "build_hannan_static_axes",
     "build_epsilon_axes",
     "filter_dynamic_machine_obstacle",
+    "adjacency_without_obstacle_bounds",
     "GraphVariantResult",
     "build_epsilon_variant",
     "build_hannan_variant",

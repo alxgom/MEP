@@ -81,6 +81,17 @@ class CliWorkbenchState:
 
 
 @dataclass
+class CocWorkbenchState:
+    """Coc owns a fixed two-terminal routing choice, without placement state."""
+
+    graph_type_idx: int = 0
+    routing_strategy_idx: int = 0
+    router_backend_idx: int = 0
+    heuristic_mode_idx: int = 0
+    room_start_mode_idx: int = 0
+
+
+@dataclass
 class DisplayState:
     show_grid_graph: bool = False
     show_heatmap: bool = False
@@ -95,6 +106,7 @@ class WorkbenchState:
     dwelling: DwellingState = field(default_factory=DwellingState)
     sal: SalWorkbenchState = field(default_factory=SalWorkbenchState)
     cli: CliWorkbenchState = field(default_factory=CliWorkbenchState)
+    coc: CocWorkbenchState = field(default_factory=CocWorkbenchState)
     display: DisplayState = field(default_factory=DisplayState)
     solver_dropdown_open_for: tuple[str, str] | None = None
 

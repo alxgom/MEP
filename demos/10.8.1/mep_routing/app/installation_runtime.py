@@ -105,3 +105,24 @@ class CliInstallationRuntime:
 
     def machine_pins(self, state):
         return cli_machine_pins(self._machine(), state.pose.center, state.pose.angle_degrees)
+
+
+class CocInstallationRuntime:
+    key = "coc"
+    capabilities = InstallationCapabilities(
+        machine_edit=False, solver_controls=True,
+    )
+
+    def __init__(self, app):
+        self.app = app
+
+    def solve(self, context):
+        state = self.app.workbench_state.coc
+        return self.app.coc_runtime.solve(
+            context.dwelling.prepared,
+            context_obstacles=context.context_obstacles,
+            graph_mode=self.app.COC_INSTALLATION.graph_modes[state.graph_type_idx],
+        )
+
+    def machine_pins(self, state):
+        return self.app.coc_runtime.last_result.machine_pins

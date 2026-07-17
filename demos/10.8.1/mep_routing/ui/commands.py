@@ -79,6 +79,8 @@ class WorkbenchCommandController:
             return None
         if active == "cli":
             return self._apply_cli_routing_key_command(event_key)
+        if active == "coc":
+            return self._apply_coc_routing_key_command(event_key)
         sal_pose = a.workbench_state.installation("sal").pose
         command = {
             p.K_r: "rotate_machine", p.K_c: "cycle_strategy",
@@ -164,4 +166,24 @@ class WorkbenchCommandController:
         setattr(state, attribute, value)
         return RoutingKeyTransition(
             {}, markers=((f"{label}:{value}", (52, 152, 219)),),
+        )
+
+    def _apply_coc_routing_key_command(self, event_key):
+        a, p = self.app, self.pygame
+        state, definition = a.workbench_state.coc, a.COC_INSTALLATION
+        controls = {
+            p.K_c: ("routing_strategy_idx", len(definition.strategy_labels), "Strategy"),
+            p.K_l: ("router_backend_idx", len(definition.search_backend_labels), "Router"),
+            p.K_y: ("heuristic_mode_idx", len(definition.heuristic_mode_labels), "Heuristic"),
+            p.K_TAB: ("graph_type_idx", len(definition.graph_labels), "Grid"),
+            p.K_t: ("room_start_mode_idx", len(definition.start_mode_labels), "Starts"),
+        }
+        selected = controls.get(event_key)
+        if selected is None:
+            return None
+        attribute, count, label = selected
+        value = (getattr(state, attribute) + 1) % count
+        setattr(state, attribute, value)
+        return RoutingKeyTransition(
+            {}, markers=((f"{label}:{value}", (230, 144, 52)),),
         )

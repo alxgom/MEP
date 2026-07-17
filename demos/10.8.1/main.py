@@ -18,6 +18,7 @@ from mep_routing.app import (
     WorkbenchState,
 )
 from mep_routing.installations.cli import CLI_INSTALLATION, CliInteractiveRuntime, cli_machine_pins
+from mep_routing.installations.coc import COC_INSTALLATION, CocInteractiveRuntime
 from mep_routing.data_sources import (
     discover_dwelling_cases as _discover_dwelling_cases,
     build_core_shaft_entry_specs as _source_core_shaft_entry_specs,
@@ -109,7 +110,7 @@ INSTALLATION_OPTIONS = (
     InstallationOption("sal", "Sal", available=True),
     InstallationOption("cli", "Cli", available=True),
     InstallationOption("san", "San"),
-    InstallationOption("coc", "Coc"),
+    InstallationOption("coc", "Coc", available=True),
 )
 installation_header_state = InstallationHeaderState(
     order=tuple(option.key for option in INSTALLATION_OPTIONS),
@@ -124,10 +125,14 @@ installation_ui_session = InstallationUiSession.create({
         CLI_INSTALLATION.machine_catalog,
         runtime_available=CLI_INSTALLATION.interactive_runtime_available,
     ),
+    "coc": InstallationMachineUi(COC_INSTALLATION.source_catalog, runtime_available=True),
 })
-workbench_state = WorkbenchState.create(("sal", "cli"))
+workbench_state = WorkbenchState.create(("sal", "cli", "coc"))
 cli_runtime = CliInteractiveRuntime(
     CLI_INSTALLATION, demo_config.common_graph, demo_config.terminal_runtime,
+)
+coc_runtime = CocInteractiveRuntime(
+    COC_INSTALLATION, demo_config.common_graph, demo_config.terminal_runtime,
 )
 
 canvas_ui = CanvasUiRuntime()

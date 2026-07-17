@@ -829,6 +829,11 @@ Before each commit:
 - Aggregate samples combine enabled route sets and sequential solver elapsed time. Installation samples retain their own result and elapsed time. Solution logs remain aggregate, and interaction markers are mirrored into every visible scope.
 - Validation: Python compilation and focused observation/plot contracts. The direct Pygame application smoke is unavailable in this shell because its interpreter does not include Pygame.
 
+- Added Coc as a real installation runtime using dwelling-export's selected kitchen exhaust connector, dedicated Coc shaft entry, appliance footprint, and 125 mm duct metadata. Coc is a fixed two-terminal plan route: it has no machine placement, machine editing, height solving, or downstream 3D behavior.
+- Coc owns its graph/strategy control catalog. The routing-core-style simple graph remains the default, with an explicit regular-grid option and a reported regular-grid fallback for sparse-axis disconnections.
+- Ordered-installation context is applied during Coc search by a NumPy graph-occupancy filter that eliminates covered vertices and edges from numeric obstacle bounds. Shapely remains in normalized dwelling/graph construction adapters, not Coc obstacle avoidance or path search.
+- Validation: Python compilation, 14 focused Coc/graph/state/execution/frame contracts, the full 379-contract Demo suite, and direct routing of all seven exported dwelling cases (7/7 successful, four using the reported regular-grid fallback). The Pygame launch smoke remains unavailable in this shell because its interpreter does not include Pygame.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

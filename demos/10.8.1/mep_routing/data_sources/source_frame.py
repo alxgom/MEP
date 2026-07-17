@@ -37,13 +37,22 @@ def build_core_shaft_entry_specs(
     summarize: Callable[[Any], Mapping[str, Any]] | None,
     scale_to_mm: float,
     match_tolerance_mm: float,
+    installation: str | None = None,
 ) -> list[dict[str, Any]]:
     """Extract routing-core shaft entries in the normalized demo frame."""
     summary = summarize(scenario) if summarize else {"metadata": getattr(scenario, "metadata", {})}
     raw_meta = summary.get("metadata") or {}
     candidates = raw_meta.get("shaft_candidates") or []
     candidate_idx = raw_meta.get("shaft_candidate_index")
-    if candidate_idx is None or candidate_idx < 0 or candidate_idx >= len(candidates):
+    if installation:
+        candidates = [
+            candidate for candidate in candidates
+            if candidate.get("candidate_for_living") and any(
+                str(route.get("installation") or "").casefold() == installation.casefold()
+                for route in candidate.get("routing") or ()
+            )
+        ]
+    elif candidate_idx is None or candidate_idx < 0 or candidate_idx >= len(candidates):
         candidates = [candidate for candidate in candidates if candidate.get("candidate_for_living")]
     else:
         candidates = [candidates[candidate_idx]]
@@ -51,6 +60,8 @@ def build_core_shaft_entry_specs(
     specs = []
     for candidate in candidates:
         for routing in candidate.get("routing") or []:
+            if installation and str(routing.get("installation") or "").casefold() != installation.casefold():
+                continue
             centroid = transform_source_point(routing.get("centroid"), summary, scale_to_mm=scale_to_mm)
             if centroid is None:
                 continue

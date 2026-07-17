@@ -50,8 +50,8 @@ class DemoUiFacade:
     def solver_dropdowns(self):
         a = self.app
         active = a.installation_header_state.active
-        if active == "cli":
-            definition = a.CLI_INSTALLATION
+        if active in ("cli", "coc"):
+            definition = a.CLI_INSTALLATION if active == "cli" else a.COC_INSTALLATION
             labels = (
                 definition.strategy_labels,
                 definition.search_backend_labels,
@@ -59,7 +59,7 @@ class DemoUiFacade:
                 definition.graph_labels,
                 definition.start_mode_labels,
             )
-            state = a.workbench_state.cli
+            state = getattr(a.workbench_state, active)
         else:
             labels = (
                 a.demo_config.routing_strategies,
@@ -92,7 +92,7 @@ class DemoUiFacade:
                              if self.pygame.Rect(bounds).collidepoint(pos)), None)
             if selected is not None:
                 attribute = next(item[2] for item in SOLVER_CONTROL_FIELDS if item[0] == opened.key)
-                target = a.workbench_state.cli if active == "cli" else a
+                target = getattr(a.workbench_state, active) if active in ("cli", "coc") else a
                 changed = getattr(target, attribute) != selected
                 setattr(target, attribute, selected)
                 a.workbench_state.solver_dropdown_open_for = None
@@ -150,7 +150,7 @@ class DemoUiFacade:
 
     def draw_min_piece_slider(self, screen, font, x, y, width):
         a = self.app
-        if a.installation_header_state.active == "cli":
+        if a.installation_header_state.active != "sal":
             a.canvas_ui.controls.min_piece = self.pygame.Rect(0, 0, 1, 1)
             label = font.render("Piece validation: scope pending", True, a.theme.muted)
             screen.blit(label, (x, y))
@@ -281,6 +281,10 @@ class DemoUiFacade:
     def get_route_draw_width(self, route_name):
         a = self.app
         if a.route_real_diameter_width_enabled:
+            if route_name == "Kitchen Exhaust":
+                result = a.workbench_state.installation("coc").result
+                diameter = getattr(result, "diameter_mm", 125)
+                return max(1, int(round(diameter * a.canvas_ui.viewport.scale)))
             return max(1, int(round(
                 a.routing_controller.route_diameter(route_name)
                 * a.canvas_ui.viewport.scale

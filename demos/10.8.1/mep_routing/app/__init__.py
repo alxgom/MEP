@@ -18,7 +18,7 @@ from .workbench_application import (
     run_workbench_smoke,
 )
 from .workbench_state import (
-    CliWorkbenchState, DisplayState, DwellingState, InstallationState, MachinePose,
+    CliWorkbenchState, CocWorkbenchState, DisplayState, DwellingState, InstallationState, MachinePose,
     SalWorkbenchState, WorkbenchState,
 )
 from .installation_ui import (
@@ -29,7 +29,7 @@ from .installation_ui import (
 from .installation_context import installation_context_obstacles
 from .installation_execution import InstallationCoordinator, InstallationExecution
 from .installation_runtime import (
-    CliInstallationRuntime, InstallationCapabilities, InstallationRegistry,
+    CliInstallationRuntime, CocInstallationRuntime, InstallationCapabilities, InstallationRegistry,
     InstallationRuntime, InstallationSolveContext, SalInstallationRuntime,
 )
 
@@ -54,7 +54,7 @@ __all__ = [
     "InstallationGraphProfile",
     "TerminalRuntimeConfig",
     "create_active_dwelling",
-    "CliWorkbenchState", "DisplayState", "DwellingState", "InstallationState", "MachinePose",
+    "CliWorkbenchState", "CocWorkbenchState", "DisplayState", "DwellingState", "InstallationState", "MachinePose",
     "SalWorkbenchState", "WorkbenchState",
     "load_real_dwelling",
     "GraphBuildSession",
@@ -69,7 +69,7 @@ __all__ = [
     "installation_context_obstacles",
     "InstallationCoordinator", "InstallationExecution",
     "InstallationCapabilities", "InstallationRegistry", "InstallationRuntime",
-    "InstallationSolveContext", "SalInstallationRuntime", "CliInstallationRuntime",
+    "InstallationSolveContext", "SalInstallationRuntime", "CliInstallationRuntime", "CocInstallationRuntime",
     "MachineSelectionTransition",
     "InteractionCallbacks",
     "InteractionState",

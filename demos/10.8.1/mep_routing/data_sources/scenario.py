@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping
 
 
@@ -26,6 +26,7 @@ class PreparedDwelling:
     shaft_core_entry_specs: list[dict[str, Any]]
     label: str
     summary: Mapping[str, Any]
+    installation_inputs: Mapping[str, Any] = field(default_factory=dict)
 
 
 def wet_room_outer_accents(rooms: Iterable, wet_room_names: Iterable[str], *, buffer_mm: float = 10.0) -> list:
@@ -64,6 +65,7 @@ def prepare_synthetic_dwelling(scenario, *, label: str = "synthetic", summary: M
         shaft_core_entry_specs=[],
         label=label,
         summary=dict(summary or {}),
+        installation_inputs={},
     )
 
 
@@ -77,6 +79,7 @@ def prepare_real_dwelling(
     build_wall_polygons: Callable[[list, list, list, float], list],
     choose_machine_position: Callable[[dict, Any], tuple[float, float]],
     build_core_entry_specs: Callable[[Any], list[dict[str, Any]]],
+    build_installation_inputs: Callable[[Any], Mapping[str, Any]] | None = None,
 ) -> PreparedDwelling:
     """Prepare a real exported dwelling with its app-specific adapters injected."""
     rooms = list(scenario.rooms)
@@ -107,4 +110,5 @@ def prepare_real_dwelling(
         shaft_core_entry_specs=list(build_core_entry_specs(scenario)),
         label=label,
         summary=dict(summary),
+        installation_inputs=dict(build_installation_inputs(scenario) if build_installation_inputs else {}),
     )

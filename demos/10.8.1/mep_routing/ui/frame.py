@@ -194,13 +194,13 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
     )
     pin_markers = []
     connector_names = tuple(
-        name for name in ("tl", "tr", "bl", "br", "left_mid", "right_mid", "air_out", "air_in", "freon1", "freon2")
+        name for name in ("tl", "tr", "bl", "br", "left_mid", "right_mid", "air_out", "air_in", "freon1", "freon2", "exhaust")
         if name in state.global_pins
     )
     for pin_name in connector_names:
         large = pin_name in ("left_mid", "right_mid")
         supply = pin_name == "air_out"
-        color = (52, 152, 219) if supply else ((241, 196, 15) if large else (230, 126, 34))
+        color = (230, 144, 52) if pin_name == "exhaust" else ((52, 152, 219) if supply else ((241, 196, 15) if large else (230, 126, 34)))
         ring = (255, 255, 255)
         if state.selected_route_name and pin_name not in state.selected_pins:
             color, ring = palette.deselected_pin, (80, 84, 88)

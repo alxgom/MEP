@@ -71,7 +71,8 @@ def _render(app, screen, clock, fonts, state):
 
     scene = build_canvas_scene(CanvasFrameState(
         rooms=app.rooms, doors=app.doors, columns=app.columns, shafts=app.shafts,
-        shaft_extraction=app.shaft_extraction, graph_env=workspace.env,
+        shaft_extraction=getattr(active_view.result, "shaft_extraction", app.shaft_extraction),
+        graph_env=workspace.env,
         show_grid_graph=app.show_grid_graph, terminals=terminals, routes=routes or (),
         selected_route_name=selected, selected_room_polygon=selected_room,
         global_pins=pins, selected_pins=selected_pins, context_layers=context,
@@ -142,6 +143,10 @@ def _render(app, screen, clock, fonts, state):
         ]
         bend_value = cli_state.bend_penalty_mm
         crossing_value = cli_state.crossing_penalty_multiplier
+    elif active == "coc":
+        auto_placement_mode = "Fixed exported source"
+        bend_value = 0.0
+        crossing_value = 0.0
     else:
         auto_placement_mode = app.demo_config.auto_placement_modes[app.auto_placement_mode_idx]
         bend_value = app.C_BEND
@@ -151,11 +156,12 @@ def _render(app, screen, clock, fonts, state):
         show_heatmap=app.show_heatmap, heatmap_scale_mode=app.heatmap_scale_mode,
         heatmap_palette_index=app.heatmap_palette_idx, weight_mode_index=app.weight_mode_idx,
         rotation_mode_index=app.rotation_mode_idx, rotation_field_scores=app.rotation_field_scores,
-        machine_angle=pose[2], strategy=(app.demo_config.routing_strategies[app.routing_strategy_idx] if active_view.can("solver_controls") else "Kou Steiner tree"),
-        router=(app.demo_config.router_backends[app.router_backend_idx] if active_view.can("solver_controls") else "Cli supply runtime"),
-        heuristic=(app.demo_config.heuristic_modes[app.heuristic_mode_idx] if active_view.can("solver_controls") else "Directional scales"),
-        graph_type=(app.demo_config.graph_types[app.graph_type_idx] if active_view.can("solver_controls") else "Core Simple"),
-        room_start_mode=(app.demo_config.room_start_modes[app.room_start_mode_idx] if active_view.can("solver_controls") else "Supply terminals"),
+        machine_angle=pose[2],
+        strategy=solver_dropdowns[0].options[int(solver_dropdowns[0].selected_key)].label,
+        router=solver_dropdowns[1].options[int(solver_dropdowns[1].selected_key)].label,
+        heuristic=solver_dropdowns[2].options[int(solver_dropdowns[2].selected_key)].label,
+        graph_type=solver_dropdowns[3].options[int(solver_dropdowns[3].selected_key)].label,
+        room_start_mode=solver_dropdowns[4].options[int(solver_dropdowns[4].selected_key)].label,
         selected_route_name=selected, preferred_terminal_count=preferred_count,
         bend_value=bend_value, bend_min=app.demo_config.bend_min,
         bend_max=app.demo_config.bend_max,
@@ -173,10 +179,10 @@ def _render(app, screen, clock, fonts, state):
             app.workbench_state.cli.return_ventilation_enabled if active == "cli" else None
         ),
         solver_dropdowns=solver_dropdowns,
-        placement_heatmap_label=("Not available" if active == "cli" else None),
-        placement_weights_label=("Grille-distance ranking" if active == "cli" else None),
-        placement_rotation_label=("Machine-aligned" if active == "cli" else None),
-        placement_shortcuts_label=("[A] Auto | [P] Mode" if active == "cli" else None),
+        placement_heatmap_label=("Not available" if active in ("cli", "coc") else None),
+        placement_weights_label=("Grille-distance ranking" if active == "cli" else "Not applicable" if active == "coc" else None),
+        placement_rotation_label=("Machine-aligned" if active == "cli" else "Exported geometry" if active == "coc" else None),
+        placement_shortcuts_label=("[A] Auto | [P] Mode" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
     ))
     viewport = app.canvas_ui.viewport
     draw_sidebar(

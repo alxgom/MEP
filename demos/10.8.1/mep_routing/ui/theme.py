@@ -16,6 +16,7 @@ def _route_colors() -> Mapping[str, Color]:
         "Bathroom 2": (155, 89, 182), "Toilet": (230, 126, 34),
         "Washroom": (26, 188, 156), "Supply Air Tree": (52, 152, 219),
         "Return Air Tree": (155, 89, 182),
+        "Kitchen Exhaust": (230, 144, 52),
     })
 
 

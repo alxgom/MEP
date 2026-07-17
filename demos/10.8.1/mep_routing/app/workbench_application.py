@@ -96,6 +96,10 @@ class DemoWorkbenchApplication:
         return self.workbench_state.installation(active).pose.rotate(delta_degrees)
 
     def get_active_machine_pins(self, cx, cy, angle_degrees):
+        if self.installation_header_state.active == "coc":
+            state = self.workbench_state.installation("coc")
+            runtime = self.routing_controller.installations.get("coc")
+            return dict(runtime.machine_pins(state))
         if self.installation_header_state.active == "cli":
             machine_key = self.installation_ui_session.selected_keys["cli"]
             machine = self.CLI_INSTALLATION.machine_catalog.value(machine_key)
@@ -113,7 +117,41 @@ class DemoWorkbenchApplication:
             scenario, summarize=self.scenario_summary,
             scale_to_mm=self.demo_config.scale_to_mm,
             match_tolerance_mm=self.demo_config.core_epsilon_grid_mm * 0.75,
+            installation="Sal",
         )
+
+    def _build_installation_inputs(self, scenario):
+        appliances = tuple(getattr(scenario, "coc_appliances", ()) or ())
+        appliance = next(
+            (item for item in appliances if item.get("selected")),
+            appliances[0] if appliances else None,
+        )
+        shaft_entries = self._source_core_shaft_entry_specs(
+            scenario, summarize=self.scenario_summary,
+            scale_to_mm=self.demo_config.scale_to_mm,
+            match_tolerance_mm=self.demo_config.core_epsilon_grid_mm * 0.75,
+            installation="Coc",
+        )
+        shaft = None
+        if shaft_entries:
+            x, y = shaft_entries[0]["centroid"]
+            def distance_to_bounds(item):
+                min_x, min_y, max_x, max_y = item.bounds
+                dx = max(min_x - x, 0.0, x - max_x)
+                dy = max(min_y - y, 0.0, y - max_y)
+                return dx * dx + dy * dy
+            shaft = next(
+                (item for item in scenario.shafts
+                 if item.bounds[0] <= x <= item.bounds[2]
+                 and item.bounds[1] <= y <= item.bounds[3]),
+                min(scenario.shafts, key=distance_to_bounds, default=None),
+            )
+        return {"coc": {
+            "appliance": appliance,
+            "duct": dict(getattr(scenario, "coc_duct", {}) or {}),
+            "shaft_entries": tuple(shaft_entries),
+            "shaft": shaft,
+        }}
 
     def count_segment_crossings(self, routes):
         return self._count_segment_crossings(routes)

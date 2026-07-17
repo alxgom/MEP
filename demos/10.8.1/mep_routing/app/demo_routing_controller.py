@@ -6,7 +6,8 @@ from shapely.ops import unary_union
 
 from mep_routing.app.installation_execution import InstallationCoordinator
 from mep_routing.app.installation_runtime import (
-    CliInstallationRuntime, InstallationRegistry, SalInstallationRuntime,
+    CliInstallationRuntime, CocInstallationRuntime, InstallationRegistry,
+    SalInstallationRuntime,
 )
 from mep_routing.domain import machine_pins, port_access_specs
 from mep_routing.installations.sal import (
@@ -41,6 +42,7 @@ class DemoRoutingController:
         self.app = app
         self.installations = InstallationRegistry((
             SalInstallationRuntime(self), CliInstallationRuntime(app),
+            CocInstallationRuntime(app),
         ))
         self.installation_coordinator = InstallationCoordinator(
             self.installations, app.workbench_state,

@@ -71,6 +71,7 @@ class DwellingRuntime:
                 terminals, shaft, a.get_representative_point,
             ),
             build_core_entry_specs=a._build_core_shaft_entry_specs,
+            build_installation_inputs=a._build_installation_inputs,
         )
         self.apply_prepared(prepared, auto_place=True)
 
@@ -116,12 +117,16 @@ class DwellingRuntime:
 
         sal_pose = a.workbench_state.installation("sal").pose
         cli_pose = a.workbench_state.installation("cli").pose
+        coc_pose = a.workbench_state.installation("coc").pose
         sal_pose.set(prepared.machine_position, 0)
         cli_machine = a.CLI_INSTALLATION.machine_catalog.value(
             a.installation_ui_session.selected_keys["cli"],
         )
         cli_placement = a.cli_runtime.place_machine(prepared, cli_machine)
         cli_pose.set(cli_placement.center, cli_placement.angle_degrees)
+        coc_payload = (prepared.installation_inputs or {}).get("coc") or {}
+        coc_source = (coc_payload.get("appliance") or {}).get("exhaust_xy")
+        coc_pose.set(tuple(coc_source) if coc_source else (0.0, 0.0), 0)
         state.machine_vertical_clearance_blocks = insufficient_machine_clearance_regions(
             dwelling.rooms,
             a.SAL_INSTALLATION.default_machine.installation_height_mm,
