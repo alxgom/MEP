@@ -132,6 +132,7 @@ def _render(app, screen, clock, fonts, state):
     warnings = app.routing_controller.validation_warnings(routes) if active_view.can("route_validation") else []
     options = app.installation_ui_session.options(active)
     dropdown = app.installation_ui_session.dropdown_state(active)
+    solver_dropdowns = app.ui_facade.solver_dropdowns()
     available = app.installation_ui_session.installations[active].runtime_available
     sidebar = build_sidebar_view(SidebarFrameState(
         auto_placement_mode=(app.demo_config.auto_placement_modes[app.auto_placement_mode_idx] if active_view.can("solver_controls") else "Cli placement pending"),
@@ -159,6 +160,7 @@ def _render(app, screen, clock, fonts, state):
         cli_return_ventilation_enabled=(
             app.workbench_state.cli.return_ventilation_enabled if active == "cli" else None
         ),
+        solver_dropdowns=solver_dropdowns,
     ))
     viewport = app.canvas_ui.viewport
     draw_sidebar(

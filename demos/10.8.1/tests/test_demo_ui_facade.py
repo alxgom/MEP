@@ -2,6 +2,10 @@ from types import SimpleNamespace
 
 from mep_routing.ui.demo_facade import DemoUiFacade
 from mep_routing.ui.sidebar import CLI_RETURN_TOGGLE_BOUNDS
+from mep_routing.ui.sidebar import solver_dropdown_bounds
+from mep_routing.app import WorkbenchState, build_demo_config
+from mep_routing.installations.cli import CLI_INSTALLATION
+from mep_routing.installations.sal import SAL_INSTALLATION
 
 
 class _Rect:
@@ -55,3 +59,26 @@ def test_cli_return_toggle_is_scoped_to_active_cli():
 
     app.installation_header_state.active = "sal"
     assert not facade.handle_cli_return_toggle_click((x + 1, y + 1))
+
+
+def test_solver_dropdown_updates_only_active_installation_state():
+    workbench_state = WorkbenchState.create()
+    app = SimpleNamespace(
+        installation_header_state=SimpleNamespace(active="cli"),
+        workbench_state=workbench_state,
+        CLI_INSTALLATION=CLI_INSTALLATION,
+        demo_config=build_demo_config(SAL_INSTALLATION),
+    )
+    facade = DemoUiFacade(app, SimpleNamespace(Rect=_Rect))
+    graph_row = 3
+    control, option_bounds = solver_dropdown_bounds(
+        graph_row, len(CLI_INSTALLATION.graph_labels),
+    )
+
+    assert facade.handle_solver_dropdown_click((control[0] + 1, control[1] + 1))[0]
+    handled, changed, field = facade.handle_solver_dropdown_click(
+        (option_bounds[1][0] + 1, option_bounds[1][1] + 1),
+    )
+
+    assert (handled, changed, field) == (True, True, "graph")
+    assert workbench_state.cli.graph_type_idx == 1

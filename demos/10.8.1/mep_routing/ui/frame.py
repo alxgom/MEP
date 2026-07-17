@@ -281,6 +281,7 @@ class SidebarFrameState:
     machine_selector_open: bool = False
     machine_runtime_available: bool = True
     cli_return_ventilation_enabled: bool | None = None
+    solver_dropdowns: tuple = ()
 
 
 def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
@@ -311,6 +312,7 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
             state.selected_route_name, state.preferred_terminal_count,
             state.bend_value, state.bend_min, state.bend_max,
             state.crossing_value, state.crossing_min, state.crossing_max,
+            state.solver_dropdowns,
         ),
         MachineCard(
             frame_name, state.machine_position, rotation, state.machine_options,

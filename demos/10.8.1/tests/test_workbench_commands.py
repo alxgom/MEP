@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from mep_routing.app import WorkbenchState, build_demo_config
 from mep_routing.installations.sal import SAL_INSTALLATION
+from mep_routing.installations.cli import CLI_INSTALLATION
 from mep_routing.ui.commands import WorkbenchCommandController
 
 
@@ -15,6 +16,8 @@ def _app():
     workbench_state.installation("sal").pose.set((10, 20))
     app = SimpleNamespace(
         workbench_state=workbench_state,
+        installation_header_state=SimpleNamespace(active="sal", enabled={"sal"}),
+        CLI_INSTALLATION=CLI_INSTALLATION,
         demo_config=build_demo_config(SAL_INSTALLATION),
         auto_placement_mode_idx=0, routing_strategy_idx=0, room_start_mode_idx=0,
         router_backend_idx=0, heuristic_mode_idx=0, graph_type_idx=0,
@@ -48,3 +51,16 @@ def test_unknown_key_does_not_change_state():
     assert controller.apply_routing_key_command(99) is None
     assert app.workbench_state.installation("sal").pose.angle_degrees == 0
     assert rebuilds == []
+
+
+def test_cli_graph_hotkey_cycles_cli_state_without_changing_sal():
+    app, _rebuilds = _app()
+    app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
+    app.workbench_state.cli.graph_type_idx = 3
+    controller = WorkbenchCommandController(app, _pygame_keys())
+
+    transition = controller.apply_routing_key_command(_pygame_keys().K_TAB)
+
+    assert transition is not None
+    assert app.workbench_state.cli.graph_type_idx == 0
+    assert app.graph_type_idx == 0

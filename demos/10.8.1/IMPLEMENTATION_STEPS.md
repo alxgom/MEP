@@ -786,6 +786,10 @@ Before each commit:
 - Disabled installations no longer project machine pins, and disabled active installations reject machine drag and wheel rotation while preserving their stored pose for later re-enabling.
 - Validation: Python compilation, 20 focused Cli/state/projection/facade/event/frame contracts, the full 353-contract Demo suite, and a real-dwelling dual-installation smoke confirming supply-only Cli routing plus empty disabled-Cli machine pins.
 
+- Replaced read-only solver rows with installation-scoped dropdown controls for strategy, router, heuristic, graph, and terminal starts. Sal retains its existing catalogs and hotkeys; Cli owns independent indices and the same `C/T/L/Y/Tab` interaction surface.
+- Enabled all four graph builders already shared by the application for Cli. Cli's implemented multi-terminal Steiner strategy/backend/heuristic remain honest fixed one-entry controls until additional legacy backends are ported.
+- Validation: Python compilation, focused dropdown/hotkey/Cli-runtime contracts, the full 359-contract Demo suite, a real exported dwelling routed successfully with every Cli graph mode, and an eight-second headless UI startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

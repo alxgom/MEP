@@ -60,7 +60,7 @@ class CliInteractiveRuntime:
 
     def solve(
         self, prepared_dwelling, machine, center, angle_degrees=0, *,
-        context_obstacles=(), return_enabled=True,
+        context_obstacles=(), return_enabled=True, graph_mode=GraphMode.CORE_SIMPLE,
     ):
         started = perf_counter()
         pins = cli_machine_pins(machine, center, angle_degrees)
@@ -78,13 +78,13 @@ class CliInteractiveRuntime:
 
         supply = self._solve_tree(
             "supply", prepared_dwelling, machine, pins, angle_degrees,
-            grilles, context_obstacles,
+            grilles, context_obstacles, graph_mode,
         )
         if supply is None:
             if context_obstacles:
                 relaxed = self.solve(
                     prepared_dwelling, machine, center, angle_degrees,
-                    return_enabled=return_enabled,
+                    return_enabled=return_enabled, graph_mode=graph_mode,
                 )
                 if relaxed.routes:
                     self.last_result = replace(
@@ -101,7 +101,7 @@ class CliInteractiveRuntime:
         if return_enabled:
             returned = self._solve_tree(
                 "return", prepared_dwelling, machine, pins, angle_degrees,
-                grilles, context_obstacles,
+                grilles, context_obstacles, graph_mode,
             )
         routes = (("Supply Air Tree", [segment.line for segment in supply.segments]),)
         status = f"Cli supply solved: {len(grilles.supply)} grilles"
@@ -123,7 +123,10 @@ class CliInteractiveRuntime:
             return_segments=return_segments, context_obstacles=context_obstacles,
         )
 
-    def _solve_tree(self, role, prepared, machine, pins, angle, grilles, context_obstacles):
+    def _solve_tree(
+        self, role, prepared, machine, pins, angle, grilles, context_obstacles,
+        graph_mode,
+    ):
         connections = grilles.supply if role == "supply" else grilles.returns
         if not connections:
             return None
@@ -146,7 +149,7 @@ class CliInteractiveRuntime:
         dwelling = create_active_dwelling(
             role_prepared, self.graph_config, profile, self.terminal_config,
         )
-        build = dwelling.workspace.build_selected(GraphMode.CORE_SIMPLE, pins, angle)
+        build = dwelling.workspace.build_selected(GraphMode(graph_mode), pins, angle)
         if build is None or not len(build.runtime.nodes):
             return None
         runtime = build.runtime

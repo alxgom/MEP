@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
-from .dropdown import dropdown_bounds
+from .dropdown import DropdownOption, dropdown_bounds
 from .installation_header import installation_header_layout
 from .installation_projection import active_capabilities
-from .sidebar import CLI_RETURN_TOGGLE_BOUNDS, MACHINE_SELECTOR_Y
+from .sidebar import (
+    CLI_RETURN_TOGGLE_BOUNDS,
+    MACHINE_SELECTOR_Y,
+    SolverDropdown,
+    solver_dropdown_bounds,
+)
+
+
+SOLVER_CONTROL_FIELDS = (
+    ("strategy", "Strategy", "routing_strategy_idx"),
+    ("router", "Router", "router_backend_idx"),
+    ("heuristic", "Heuristic", "heuristic_mode_idx"),
+    ("graph", "Grid", "graph_type_idx"),
+    ("starts", "Starts", "room_start_mode_idx"),
+)
 
 
 class DemoUiFacade:
@@ -32,6 +46,70 @@ class DemoUiFacade:
         state = a.workbench_state.cli
         state.return_ventilation_enabled = not state.return_ventilation_enabled
         return True
+
+    def solver_dropdowns(self):
+        a = self.app
+        active = a.installation_header_state.active
+        if active == "cli":
+            definition = a.CLI_INSTALLATION
+            labels = (
+                definition.strategy_labels,
+                definition.search_backend_labels,
+                definition.heuristic_mode_labels,
+                definition.graph_labels,
+                definition.start_mode_labels,
+            )
+            state = a.workbench_state.cli
+        else:
+            labels = (
+                a.demo_config.routing_strategies,
+                a.demo_config.router_backends,
+                a.demo_config.heuristic_modes,
+                a.demo_config.graph_types,
+                a.demo_config.room_start_modes,
+            )
+            state = a
+        opened = a.workbench_state.solver_dropdown_open_for
+        return tuple(
+            SolverDropdown(
+                key, label,
+                tuple(DropdownOption(str(i), value) for i, value in enumerate(values)),
+                str(getattr(state, attribute)),
+                opened == (active, key),
+            )
+            for (key, label, attribute), values in zip(SOLVER_CONTROL_FIELDS, labels)
+        )
+
+    def handle_solver_dropdown_click(self, pos):
+        a = self.app
+        active = a.installation_header_state.active
+        dropdowns = self.solver_dropdowns()
+        opened = next((item for item in dropdowns if item.open), None)
+        if opened is not None:
+            index = next(i for i, item in enumerate(dropdowns) if item.key == opened.key)
+            _control, option_bounds = solver_dropdown_bounds(index, len(opened.options))
+            selected = next((int(option.key) for option, bounds in zip(opened.options, option_bounds)
+                             if self.pygame.Rect(bounds).collidepoint(pos)), None)
+            if selected is not None:
+                attribute = next(item[2] for item in SOLVER_CONTROL_FIELDS if item[0] == opened.key)
+                target = a.workbench_state.cli if active == "cli" else a
+                changed = getattr(target, attribute) != selected
+                setattr(target, attribute, selected)
+                a.workbench_state.solver_dropdown_open_for = None
+                return True, changed, opened.key
+        for index, dropdown in enumerate(dropdowns):
+            control, _options = solver_dropdown_bounds(index, len(dropdown.options))
+            if self.pygame.Rect(control).collidepoint(pos):
+                if len(dropdown.options) <= 1:
+                    return True, False, dropdown.key
+                key = (active, dropdown.key)
+                a.workbench_state.solver_dropdown_open_for = (
+                    None if a.workbench_state.solver_dropdown_open_for == key else key
+                )
+                return True, False, dropdown.key
+        if opened is not None:
+            a.workbench_state.solver_dropdown_open_for = None
+        return False, False, None
 
     def handle_machine_selector_click(self, pos):
         a = self.app

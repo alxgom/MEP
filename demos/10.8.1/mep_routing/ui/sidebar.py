@@ -9,12 +9,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
-from .dropdown import DropdownOption, DropdownState, draw_dropdown
+from .dropdown import DropdownOption, DropdownState, draw_dropdown, dropdown_bounds
 
 
 Color = tuple[int, int, int]
 MACHINE_SELECTOR_Y = 108
 CLI_RETURN_TOGGLE_BOUNDS = (176, 247, 94, 20)
+SOLVER_DROPDOWN_X = 105
+SOLVER_DROPDOWN_Y = 306
+SOLVER_DROPDOWN_WIDTH = 175
+SOLVER_DROPDOWN_HEIGHT = 22
+SOLVER_DROPDOWN_STEP = 26
 HelpButtonDrawer = Callable[[str, Any, Any], None]
 MinPieceSliderDrawer = Callable[[Any, Any, int, int, int], None]
 WeightSliderDrawer = Callable[[Any, Any, int, int, int, str, float, float, float, Color, str, str, bool], None]
@@ -60,6 +65,26 @@ class SolverCard:
     crossing_value: float
     crossing_min: float
     crossing_max: float
+    dropdowns: tuple["SolverDropdown", ...] = ()
+
+
+@dataclass(frozen=True)
+class SolverDropdown:
+    key: str
+    label: str
+    options: tuple[DropdownOption, ...]
+    selected_key: str
+    open: bool = False
+
+
+def solver_dropdown_bounds(index: int, option_count: int):
+    return dropdown_bounds(
+        SOLVER_DROPDOWN_X,
+        SOLVER_DROPDOWN_Y + index * SOLVER_DROPDOWN_STEP,
+        SOLVER_DROPDOWN_WIDTH,
+        option_count,
+        height=SOLVER_DROPDOWN_HEIGHT,
+    )
 
 
 @dataclass(frozen=True)
@@ -188,33 +213,35 @@ def draw_sidebar(
         label = fonts.small.render("ON" if view.machine.return_ventilation_enabled else "OFF", True, colors.text)
         screen.blit(label, (toggle.centerx - label.get_width() // 2, toggle.centery - label.get_height() // 2))
 
-    solver_card = pygame.Rect(15, 280, card_width, 230)
+    solver_card = pygame.Rect(15, 280, card_width, 270)
     pygame.draw.rect(screen, colors.card, solver_card, border_radius=6)
     screen.blit(fonts.bold.render("ROUTING PATH SOLVER", True, colors.text), (text_x, 290))
     draw_help_button("solver", solver_card, fonts.small)
-    solver_rows = (
-        (f"Strategy: {view.solver.strategy}", 310),
-        (f"Router: {view.solver.router}", 330),
-        (f"Heuristic: {view.solver.heuristic}", 350),
-        (f"Grid type: {view.solver.grid_type}", 370),
-        (f"Starts: {view.solver.starts}", 390),
-        (format_selected_route(view.solver.selected_route, view.solver.preferred_terminal_count), 410),
+    for index, dropdown in enumerate(view.solver.dropdowns):
+        y = SOLVER_DROPDOWN_Y + index * SOLVER_DROPDOWN_STEP + 3
+        screen.blit(fonts.small.render(dropdown.label, True, colors.muted), (text_x, y))
+    screen.blit(
+        fonts.small.render(
+            format_selected_route(
+                view.solver.selected_route, view.solver.preferred_terminal_count,
+            ),
+            True, colors.text,
+        ),
+        (text_x, 440),
     )
-    for label, y in solver_rows:
-        screen.blit(fonts.small.render(label, True, colors.text), (text_x, y))
-    draw_min_piece_slider(screen, fonts.small, text_x, 430, canvas_left - 70)
+    draw_min_piece_slider(screen, fonts.small, text_x, 460, canvas_left - 70)
     draw_weight_slider(
-        screen, fonts.small, text_x, 465, canvas_left - 70, "Bend weight",
+        screen, fonts.small, text_x, 495, canvas_left - 70, "Bend weight",
         view.solver.bend_value, view.solver.bend_min, view.solver.bend_max,
         (155, 89, 182), "bend", "", True,
     )
     draw_weight_slider(
-        screen, fonts.small, text_x, 492, canvas_left - 70, "Cross x bend",
+        screen, fonts.small, text_x, 522, canvas_left - 70, "Cross x bend",
         view.solver.crossing_value, view.solver.crossing_min, view.solver.crossing_max,
         (230, 126, 34), "crossing", "x", False,
     )
 
-    status_y = 520
+    status_y = 560
     status_card = pygame.Rect(15, status_y, card_width, 170)
     pygame.draw.rect(screen, colors.card, status_card, border_radius=6)
     screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.text), (text_x, status_y + 10))
@@ -233,5 +260,13 @@ def draw_sidebar(
             screen, fonts.small, bounds=(text_x, MACHINE_SELECTOR_Y, canvas_left - 70, 24),
             options=view.machine.machine_options,
             state=DropdownState(view.machine.selected_machine_key, view.machine.machine_selector_open),
+            text_color=colors.text, muted_color=colors.muted,
+        )
+    for index, dropdown in enumerate(view.solver.dropdowns):
+        control, _option_bounds = solver_dropdown_bounds(index, len(dropdown.options))
+        draw_dropdown(
+            screen, fonts.small, bounds=control,
+            options=dropdown.options,
+            state=DropdownState(dropdown.selected_key, dropdown.open),
             text_color=colors.text, muted_color=colors.muted,
         )

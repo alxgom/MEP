@@ -70,6 +70,11 @@ class CliWorkbenchState:
     """Cli-specific interactive choices not yet available in routing core."""
 
     return_ventilation_enabled: bool = True
+    graph_type_idx: int = 3
+    routing_strategy_idx: int = 0
+    router_backend_idx: int = 0
+    heuristic_mode_idx: int = 0
+    room_start_mode_idx: int = 0
 
 
 @dataclass
@@ -88,6 +93,7 @@ class WorkbenchState:
     sal: SalWorkbenchState = field(default_factory=SalWorkbenchState)
     cli: CliWorkbenchState = field(default_factory=CliWorkbenchState)
     display: DisplayState = field(default_factory=DisplayState)
+    solver_dropdown_open_for: tuple[str, str] | None = None
 
     @classmethod
     def create(cls, installation_keys=("sal", "cli"), **kwargs):

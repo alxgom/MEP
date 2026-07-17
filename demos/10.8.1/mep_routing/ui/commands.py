@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .events import routing_key_transition
+from .events import RoutingKeyTransition, routing_key_transition
 
 
 class WorkbenchCommandController:
@@ -53,6 +53,11 @@ class WorkbenchCommandController:
 
     def apply_routing_key_command(self, event_key):
         a, p = self.app, self.pygame
+        active = a.installation_header_state.active
+        if active not in a.installation_header_state.enabled:
+            return None
+        if active == "cli":
+            return self._apply_cli_routing_key_command(event_key)
         sal_pose = a.workbench_state.installation("sal").pose
         command = {
             p.K_r: "rotate_machine", p.K_c: "cycle_strategy",
@@ -105,3 +110,24 @@ class WorkbenchCommandController:
                 workspace.base_env, workspace.base_spatial_index, shaft_nodes,
             )
         return transition
+
+    def _apply_cli_routing_key_command(self, event_key):
+        a, p = self.app, self.pygame
+        state = a.workbench_state.cli
+        definition = a.CLI_INSTALLATION
+        controls = {
+            p.K_c: ("routing_strategy_idx", len(definition.strategy_labels), "Strategy"),
+            p.K_l: ("router_backend_idx", len(definition.search_backend_labels), "Router"),
+            p.K_y: ("heuristic_mode_idx", len(definition.heuristic_mode_labels), "Heuristic"),
+            p.K_TAB: ("graph_type_idx", len(definition.graph_labels), "Grid"),
+            p.K_t: ("room_start_mode_idx", len(definition.start_mode_labels), "Starts"),
+        }
+        selected = controls.get(event_key)
+        if selected is None:
+            return None
+        attribute, count, label = selected
+        value = (getattr(state, attribute) + 1) % count
+        setattr(state, attribute, value)
+        return RoutingKeyTransition(
+            {}, markers=((f"{label}:{value}", (52, 152, 219)),),
+        )

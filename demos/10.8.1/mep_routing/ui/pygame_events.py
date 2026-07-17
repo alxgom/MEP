@@ -163,6 +163,17 @@ class WorkbenchEventAdapter:
             self._solve()
             s.selected_route_name = None
             return
+        handled, changed, field = a.ui_facade.handle_solver_dropdown_click(pos)
+        if handled:
+            if changed:
+                if field == "graph" and a.installation_header_state.active == "sal":
+                    pose = a.workbench_state.installation("sal").pose
+                    a.routing_controller.build_grid(
+                        machine_pins=a.routing_controller.machine_pins(*pose.as_tuple()),
+                    )
+                self._solve()
+                s.selected_route_name = None
+            return
         handled, runtime_invalidation = a.ui_facade.handle_machine_selector_click(pos)
         if handled:
             if runtime_invalidation:
@@ -428,11 +439,6 @@ class WorkbenchEventAdapter:
         elif (caps := active_capabilities(a)).machine_edit and not caps.solver_controls and key == pygame.K_r:
             angle = a.rotate_active_machine(90)
             self._solve(); self._record(f"Rot:{angle}", (46, 204, 113))
-        elif not caps.solver_controls and key in {
-            pygame.K_c, pygame.K_t, pygame.K_l, pygame.K_y, pygame.K_TAB,
-            pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,
-        }:
-            a.observation.set_transient_message("This command belongs to Sal")
         elif transition := a.commands.apply_routing_key_command(key):
             s.needs_auto_placement |= transition.needs_auto_placement
             self._solve()
@@ -441,6 +447,11 @@ class WorkbenchEventAdapter:
                     s.routes, a.count_segment_crossings(s.routes), s.elapsed_ms,
                 )
                 for marker in transition.markers: a.routing_history.add_marker(*marker)
+        elif not caps.solver_controls and key in {
+            pygame.K_c, pygame.K_t, pygame.K_l, pygame.K_y, pygame.K_TAB,
+            pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,
+        }:
+            a.observation.set_transient_message("This control is not available for the active installation")
         elif key == pygame.K_g: a.show_grid_graph = not a.show_grid_graph
         elif key == pygame.K_d:
             a.dwelling_source_idx = (

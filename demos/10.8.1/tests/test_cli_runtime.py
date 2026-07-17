@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from shapely.geometry import Point, box
+import pytest
 
 from mep_routing.app import CommonGraphConfig, TerminalRuntimeConfig
 from mep_routing.data_sources.scenario import PreparedDwelling
@@ -12,6 +13,7 @@ from mep_routing.installations.cli import (
     prepare_cli_grilles,
     prepare_cli_supply_terminals,
 )
+from mep_routing.graphs import GraphMode
 
 
 def _room(name, bounds, *, covered=True):
@@ -84,6 +86,22 @@ def test_cli_runtime_can_disable_return_ventilation():
     assert result.return_segments == ()
     assert all(not name.endswith(" Return") for name in result.terminals)
     assert result.status.startswith("Cli supply solved")
+
+
+@pytest.mark.parametrize("graph_mode", tuple(GraphMode))
+def test_cli_runtime_supports_its_declared_graph_modes(graph_mode):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION,
+        CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        return_enabled=False, graph_mode=graph_mode,
+    )
+
+    assert result.routes
 
 
 def test_cli_runtime_tracks_ordered_context_obstacles():
