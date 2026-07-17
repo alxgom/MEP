@@ -822,6 +822,9 @@ Before each commit:
 - The reclaimed width is now part of the canvas viewport, so terminal tools align near the actual right canvas edge. Heatmap calculation, toggles, palettes, dwelling/grid rendering, and KPI plots are unchanged.
 - Validation: Python compilation, 12 focused viewport/colorbar/config/facade contracts, the full 373-contract Demo suite, direct off-screen rendering of both colorbar types, and an eight-second headless startup smoke.
 
+- Cleaned the five retained KPI plots without changing their data or layout: best/log event diamonds remain, but persistent marker captions no longer collide with traces and each other. Minimum footers now use metric-aware units and integer formatting for score/turns.
+- Validation: Python compilation, six focused plot/history contracts, the full 374-contract Demo suite, a marker-dense off-screen plot render, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

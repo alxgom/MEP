@@ -16,6 +16,17 @@ def format_current_value(metric_index, value):
     return f"{value:.1f} ms"
 
 
+def format_minimum_value(metric_index, value):
+    """Use the same metric vocabulary for the compact minimum footer."""
+    if metric_index == 0:
+        return f"Best {value:.2f} m"
+    if metric_index in (1, 2):
+        return f"Best {int(round(value))}"
+    if metric_index == 3:
+        return f"Best {value:.2f} turns/m"
+    return f"Best {value:.1f} ms"
+
+
 def draw_routing_plots(screen, font_small, font_bold, font_value, font_minimum, window_width, panel_width, buffers, sample_count, event_markers, background, text_color, muted_color):
     import pygame
     x, width, height, gap = window_width - panel_width + 8, panel_width - 24, 104, 8
@@ -55,10 +66,8 @@ def draw_routing_plots(screen, font_small, font_bold, font_value, font_minimum, 
         pygame.draw.lines(screen, color, False, points, 2)
         pygame.draw.circle(screen, (231, 76, 60), (sx(minimum_i), sy(minimum)), 4)
         pygame.draw.circle(screen, (255, 255, 255), points[-1], 4); pygame.draw.circle(screen, color, points[-1], 3)
-        for marker_x, marker_y, label, marker_color in log_markers:
-            diamond = [(marker_x, marker_y - 6), (marker_x + 6, marker_y), (marker_x, marker_y + 6), (marker_x - 6, marker_y)]
+        for marker_x, marker_y, _label, marker_color in log_markers:
+            diamond = [(marker_x, marker_y - 5), (marker_x + 5, marker_y), (marker_x, marker_y + 5), (marker_x - 5, marker_y)]
             pygame.draw.polygon(screen, marker_color, diamond); pygame.draw.polygon(screen, (255, 255, 255), diamond, 1)
-            marker_label = font_small.render(label, True, marker_color)
-            screen.blit(marker_label, (marker_x + 8, max(chart_y, marker_y - 8)))
-        minimum_label = font_minimum.render(f"Min: {minimum:.1f}", True, (231, 76, 60))
+        minimum_label = font_minimum.render(format_minimum_value(index, minimum), True, (231, 76, 60))
         screen.blit(minimum_label, (x + width - minimum_label.get_width(), chart_y + chart_h + 2))
