@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Replaced the temporary Cli grille heuristic with the concrete Demo `10.8_cli` placement policy: 1000/1050 mm supply/return sizes, eligible wall extraction, wall margins and overlap checks, same-wall and different-wall alternatives, machine-aligned supply candidates, partial-false-ceiling detection, and horizontal returns.
+- Grille placement now receives the selected Cli machine pose explicitly. Cli placement scores supply and return distances from their respective machine connectors, and Cli's core-simple graph adds a 600 mm scaffold so valid legacy grille connection points remain connected on irregular routing regions.
+- Validation: Python compilation, seven focused direct Cli grille/placement/runtime contracts, partial-false-ceiling horizontal-return coverage, and a generated-dwelling supply/return solve using the auto-placed machine.
+
 - Extracted ordered multi-installation execution from `main.py`: capability-specific callbacks remain concrete, while a small coordinator owns enabled/order traversal, prior-result obstacle projection, active-result selection, and result storage.
 - Extracted non-active canvas layer projection into a pure UI module. `main.py` now supplies installation visuals instead of assembling `CanvasContextLayer` instances inline and is 1,179 physical lines.
 - Validation: Python compilation and two direct focused execution-order/context and active/context projection contracts.

@@ -89,6 +89,21 @@ def test_cli_grilles_prepare_supply_and_return_per_occupied_room():
     assert len(plan.supply) == 2
     assert len(plan.returns) == 2
     assert all(item.route_name.endswith(("Supply", "Return")) for item in plan.connections)
+    assert {item.width_mm for item in plan.supply} == {1000}
+    assert {item.width_mm for item in plan.returns} == {1050}
+    assert all(item.placement_type.startswith("common_wall") for item in plan.connections)
+
+
+def test_cli_grilles_use_horizontal_return_with_partial_false_ceiling():
+    room = _room("Living", (0, 0, 4000, 3000))
+    false_ceiling = box(2000, 0, 4000, 3000)
+    room.space_coverings = [(false_ceiling, False)]
+    plan = prepare_cli_grilles((room,), room.polygon)
+    assert len(plan.connections) == 2
+    assert {item.placement_type for item in plan.connections} == {"return_horizontal"}
+    returned = plan.returns[0]
+    assert returned.grille_point == returned.routing_point
+    assert false_ceiling.covers(Point(returned.grille_point))
 
 
 def test_cli_placement_uses_selected_machine_footprint():

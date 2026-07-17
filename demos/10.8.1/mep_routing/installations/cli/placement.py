@@ -34,7 +34,7 @@ class CliPlacementRuntime:
         candidates.append(tuple(map(round, prepared.machine_position)))
         representative = region.representative_point()
         candidates.append((round(float(representative.x)), round(float(representative.y))))
-        targets = [item.routing_point for item in grille_plan.connections]
+        targets = tuple(grille_plan.connections)
         best = None
         feasible = 0
         for angle in (0, 90):
@@ -44,7 +44,13 @@ class CliPlacementRuntime:
                 if not region.covers(footprint) or any(footprint.intersects(obstacle) for obstacle in obstacles):
                     continue
                 feasible += 1
-                route_distance = sum(math.dist(center, target) for target in targets)
+                route_distance = sum(
+                    math.dist(
+                        pins["air_out" if item.role == "supply" else "air_in"],
+                        item.routing_point,
+                    )
+                    for item in targets
+                )
                 clearance = min((footprint.distance(obstacle) for obstacle in obstacles), default=2000.0)
                 score = route_distance - min(clearance, 2000.0) * 0.1
                 key = (score, angle, center)

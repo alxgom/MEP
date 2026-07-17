@@ -51,7 +51,7 @@ class CliInteractiveRuntime:
 
     def place_machine(self, prepared_dwelling, machine, *, context_obstacles=()):
         grilles = prepare_cli_grilles(
-            prepared_dwelling.rooms, prepared_dwelling.routing_region_base,
+            prepared_dwelling.rooms, prepared_dwelling.routing_region_base, machine=machine,
         )
         self.last_placement = self.placement.place(
             prepared_dwelling, machine, grilles, context_obstacles=context_obstacles,
@@ -60,10 +60,11 @@ class CliInteractiveRuntime:
 
     def solve(self, prepared_dwelling, machine, center, angle_degrees=0, *, context_obstacles=()):
         started = perf_counter()
+        pins = cli_machine_pins(machine, center, angle_degrees)
         grilles = prepare_cli_grilles(
             prepared_dwelling.rooms, prepared_dwelling.routing_region_base,
+            machine=machine, machine_pins=pins, angle_degrees=angle_degrees,
         )
-        pins = cli_machine_pins(machine, center, angle_degrees)
         if not grilles.supply:
             return self._finish(
                 (), "Blocked: no Cli supply grilles", started, 0, grilles, pins,

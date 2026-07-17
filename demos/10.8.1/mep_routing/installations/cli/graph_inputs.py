@@ -22,4 +22,5 @@ def build_cli_simple_graph_inputs(
         obstacles=tuple(obstacles),
         epsilon_mm=epsilon_mm,
         axis_clearance_mm=axis_clearance_mm,
+        scaffold_spacing_mm=max(600.0, epsilon_mm * 3.0),
     )

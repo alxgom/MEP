@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from time import perf_counter
 from typing import Iterable
 
@@ -27,6 +28,7 @@ class SimpleGraphInputs:
     boundary_inset_mm: float | None = None
     boundary_cluster_mm: float = 300.0
     boundary_inner_clearance_mm: float = 110.0
+    scaffold_spacing_mm: float | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +107,11 @@ def build_simple_grid(inputs: SimpleGraphInputs) -> SimpleGraphResult:
     boundary_x, boundary_y = _boundary_axes(inputs)
     axes_x.update(boundary_x)
     axes_y.update(boundary_y)
+    if inputs.scaffold_spacing_mm and inputs.scaffold_spacing_mm > 0:
+        min_x, min_y, max_x, max_y = allowed.bounds
+        spacing = float(inputs.scaffold_spacing_mm)
+        axes_x.update(range(math.ceil(min_x / spacing) * round(spacing), math.floor(max_x / spacing) * round(spacing) + 1, round(spacing)))
+        axes_y.update(range(math.ceil(min_y / spacing) * round(spacing), math.floor(max_y / spacing) * round(spacing) + 1, round(spacing)))
     obstacles = tuple(o for o in inputs.obstacles if o is not None and not o.is_empty)
     for obstacle in obstacles:
         min_x, min_y, max_x, max_y = obstacle.buffer(inputs.axis_clearance_mm, join_style=2).bounds
