@@ -34,10 +34,11 @@ class RoutingObservationRuntime:
             state, self.solution_kpis(routes, elapsed_ms), status, total_nodes,
         )
 
-    def log_manual(self, state, routes, status: str, elapsed_ms: float, total_nodes: int) -> bool:
+    def log_manual(self, state, routes, status: str, elapsed_ms: float, total_nodes: int, *, record=True) -> bool:
         if not routes:
             return False
-        self.record(routes, self.solution_kpis(routes, elapsed_ms)["crossings"], elapsed_ms)
+        if record:
+            self.record(routes, self.solution_kpis(routes, elapsed_ms)["crossings"], elapsed_ms)
         self.update_auto_bests(state, routes, "Auto best", elapsed_ms, 0)
         entry = self.logs.add_manual(
             self.snapshot(state, routes, status, elapsed_ms, total_nodes),

@@ -3,6 +3,43 @@
 from __future__ import annotations
 
 
+def kpi_scope_layout(window_width, panel_width, scope_options):
+    """Return compact scope-pill bounds without coupling input handling to Pygame."""
+    x = window_width - panel_width + 8
+    label_width = 58
+    bounds = []
+    for key, label, _color in scope_options:
+        width = max(30, len(label) * 6 + 14)
+        bounds.append((key, (x + label_width, 28, width, 20)))
+        label_width += width + 4
+    return tuple(bounds)
+
+
+def kpi_scope_hit(pos, window_width, panel_width, scope_options):
+    """Return the selected KPI scope key, if a compact scope pill was clicked."""
+    px, py = pos
+    for key, (x, y, width, height) in kpi_scope_layout(window_width, panel_width, scope_options):
+        if x <= px < x + width and y <= py < y + height:
+            return key
+    return None
+
+
+def draw_kpi_scope_selector(screen, font, window_width, panel_width, scope_key, scope_options, text_color, muted_color):
+    import pygame
+    x = window_width - panel_width + 8
+    screen.blit(font.render("KPI SCOPE", True, muted_color), (x, 32))
+    for key, bounds in kpi_scope_layout(window_width, panel_width, scope_options):
+        _key, label, color = next(option for option in scope_options if option[0] == key)
+        selected = key == scope_key
+        fill = color if selected else (42, 43, 54)
+        outline = color if selected else (78, 79, 92)
+        foreground = (20, 21, 29) if selected else text_color
+        pygame.draw.rect(screen, fill, bounds, border_radius=9)
+        pygame.draw.rect(screen, outline, bounds, 1, border_radius=9)
+        text = font.render(label, True, foreground)
+        screen.blit(text, (bounds[0] + (bounds[2] - text.get_width()) // 2, bounds[1] + 4))
+
+
 def format_current_value(metric_index, value):
     """Format a plot value with its metric-specific precision and unit."""
     if metric_index == 0:
@@ -27,13 +64,17 @@ def format_minimum_value(metric_index, value):
     return f"Best {value:.1f} ms"
 
 
-def draw_routing_plots(screen, font_small, font_bold, font_value, font_minimum, window_width, panel_width, buffers, sample_count, event_markers, background, text_color, muted_color):
+def draw_routing_plots(screen, font_small, font_bold, font_value, font_minimum, window_width, panel_width, buffers, sample_count, event_markers, background, text_color, muted_color, scope_key="all", scope_options=()):
     import pygame
     x, width, height, gap = window_width - panel_width + 8, panel_width - 24, 104, 8
-    titles = ("DUCT LENGTH", "COST SCORE", "TURNS", "TURNS / M", "SOLVER TIME")
+    draw_kpi_scope_selector(
+        screen, font_small, window_width, panel_width, scope_key, scope_options, text_color, muted_color,
+    )
+    score_title = "WORKBENCH SCORE" if scope_key == "all" else "COST SCORE"
+    titles = ("DUCT LENGTH", score_title, "TURNS", "TURNS / M", "SOLVER TIME")
     colors = ((46, 204, 113), (241, 196, 15), (155, 89, 182), (26, 188, 156), (52, 152, 219))
     for index, (title, buffer, color) in enumerate(zip(titles, buffers, colors)):
-        y = 50 + index * (height + gap)
+        y = 54 + index * (height + gap)
         pygame.draw.rect(screen, background, (x - 4, y, width + 8, height), border_radius=6)
         pygame.draw.rect(screen, (55, 55, 70), (x - 4, y, width + 8, height), 1, border_radius=6)
         screen.blit(font_bold.render(title, True, color), (x, y + 6))

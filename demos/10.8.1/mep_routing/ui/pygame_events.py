@@ -199,6 +199,8 @@ class WorkbenchEventAdapter:
                 s.installation_drag_enabled = kind == "grip"
                 s.installation_drag_position = pos if s.installation_drag_enabled else None
             return
+        if a.observation.handle_kpi_scope_click(pos):
+            return
 
         selector, options = dwelling_selector_bounds(
             a.canvas_ui.viewport.canvas_left, a.canvas_ui.viewport.canvas_top,
@@ -470,7 +472,7 @@ class WorkbenchEventAdapter:
                 a.observation.record_history(
                     s.routes, a.count_segment_crossings(s.routes), s.elapsed_ms,
                 )
-                for marker in transition.markers: a.routing_history.add_marker(*marker)
+                for marker in transition.markers: a.observation.add_history_marker(*marker)
         elif not caps.solver_controls and key in {
             pygame.K_c, pygame.K_t, pygame.K_l, pygame.K_y, pygame.K_TAB,
             pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,

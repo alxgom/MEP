@@ -176,7 +176,7 @@ class DemoUiFacade:
                 routes, a.count_segment_crossings(routes), elapsed_ms,
             )
             if marker_label:
-                a.observation.history.add_marker(marker_label, marker_color)
+                a.observation.add_history_marker(marker_label, marker_color)
 
     def handle_terminal_tool_button_click(self, pos):
         a = self.app

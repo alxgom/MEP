@@ -825,6 +825,10 @@ Before each commit:
 - Cleaned the five retained KPI plots without changing their data or layout: best/log event diamonds remain, but persistent marker captions no longer collide with traces and each other. Minimum footers now use metric-aware units and integer formatting for score/turns.
 - Validation: Python compilation, six focused plot/history contracts, the full 374-contract Demo suite, a marker-dense off-screen plot render, and an eight-second headless startup smoke.
 
+- Added a compact KPI scope selector in the right rail. `All installations` is the default aggregate history; enabled installations receive their own histories from the same executions, so Sal can be compared before and after Cli joins the routing context without changing solver behavior or routing order.
+- Aggregate samples combine enabled route sets and sequential solver elapsed time. Installation samples retain their own result and elapsed time. Solution logs remain aggregate, and interaction markers are mirrored into every visible scope.
+- Validation: Python compilation and focused observation/plot contracts. The direct Pygame application smoke is unavailable in this shell because its interpreter does not include Pygame.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

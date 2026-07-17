@@ -51,3 +51,25 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     assert app.rebuilt == {"machine_pins": (10.0, 20.0, 90)}
     assert controller.logs.selected_log_id == 7
     assert result[1] == "Solved"
+
+
+def test_kpi_histories_keep_aggregate_and_installation_samples_from_one_execution():
+    app = _app()
+    app._total_route_length_m = lambda routes: float(len(routes))
+    app.workbench_state.replace_runs({
+        "sal": SimpleNamespace(routes=(("Sal", ()),), elapsed_ms=4.0),
+        "cli": SimpleNamespace(routes=(("Cli", ()),), elapsed_ms=7.0),
+    })
+    controller = InteractiveObservationController(app, SimpleNamespace())
+
+    controller.record_history((("Sal", ()),), 0, 4.0)
+
+    assert controller.kpi_scope == "all"
+    assert controller.history.length_m[-1] == 2.0
+    assert controller.history.elapsed_ms[-1] == 11.0
+    assert controller._histories["sal"].length_m[-1] == 1.0
+    assert controller._histories["cli"].length_m[-1] == 1.0
+    assert controller._histories["sal"].elapsed_ms[-1] == 4.0
+    assert controller._histories["cli"].elapsed_ms[-1] == 7.0
+    assert controller.select_kpi_scope("sal")
+    assert controller.displayed_history is controller._histories["sal"]

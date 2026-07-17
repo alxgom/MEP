@@ -86,11 +86,13 @@ class WorkbenchChromeRuntime:
             self.terminal_ui.draw_validity_square, installation_entries,
         )
 
-    def draw_plots(self, screen, font_small, font_title, font_value, font_minimum, history):
+    def draw_plots(self, screen, font_small, font_title, font_value, font_minimum, history,
+                   scope_key="all", scope_options=()):
         from .plots import draw_routing_plots
         return draw_routing_plots(
             screen, font_small, font_title, font_value, font_minimum,
             self.viewport.window_width, self.panel_width,
             history.buffers, history.sample_count, history.event_markers,
             self.colors["plot_background"], self.colors["text"], self.colors["muted"],
+            scope_key, scope_options,
         )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .runtime import RoutingObservationRuntime
+from .session import RoutingHistory
 from .snapshots import restored_snapshot_state
 from ..ui.solution_logs import DEFAULT_BEST_METRICS, metric_value_for_log, solution_kpis
 
@@ -21,10 +22,17 @@ class InteractiveObservationController:
             metric_value=metric_value_for_log,
             best_metrics=DEFAULT_BEST_METRICS,
         )
+        self._histories = {"all": self.runtime.history}
+        self.kpi_scope = "all"
 
     @property
     def history(self):
         return self.runtime.history
+
+    @property
+    def displayed_history(self):
+        """History selected by the KPI rail; solution logs always remain aggregate."""
+        return self._histories.get(self.kpi_scope, self.history)
 
     @property
     def logs(self):
@@ -37,6 +45,49 @@ class InteractiveObservationController:
             a.count_solution_turns, a.routing_controller.count_short_pieces,
             a.routing_controller.solution_score,
         )
+
+    def kpi_scope_options(self):
+        """Expose aggregate plus installations that have yielded a plot sample."""
+        labels = {
+            item.key: item.label
+            for item in getattr(self.app, "INSTALLATION_OPTIONS", ())
+        }
+        colors = getattr(getattr(self.app, "theme", None), "installation_colors", {})
+        return tuple(
+            (key, "All installations" if key == "all" else labels.get(key, key.title()),
+             (82, 133, 203) if key == "all" else colors.get(key, (105, 113, 124)))
+            for key in self._histories
+        )
+
+    def select_kpi_scope(self, key):
+        if key not in self._histories:
+            return False
+        self.kpi_scope = key
+        return True
+
+    def handle_kpi_scope_click(self, pos):
+        from ..ui.plots import kpi_scope_hit
+        viewport = self.chrome.viewport
+        key = kpi_scope_hit(
+            pos, viewport.window_width, self.chrome.panel_width, self.kpi_scope_options(),
+        )
+        return key is not None and self.select_kpi_scope(key)
+
+    def _history_for(self, key):
+        return self._histories.setdefault(key, RoutingHistory(maxlen=self.history.maxlen))
+
+    @staticmethod
+    def _combined_routes(runs):
+        return tuple(
+            route
+            for result in runs.values()
+            for route in (getattr(result, "routes", ()) or ())
+        )
+
+    def _record_sample(self, key, routes, elapsed_ms):
+        history = self._history_for(key)
+        history.append(self.current_kpis(routes, elapsed_ms))
+        return history
 
     def current_state(self):
         a = self.app
@@ -65,15 +116,37 @@ class InteractiveObservationController:
         }
 
     def record_history(self, routes, crossings_count, elapsed_ms):
-        self.runtime.record(routes, crossings_count, elapsed_ms)
-        if routes:
-            self.runtime.update_auto_bests(self.current_state(), routes, "Auto best", elapsed_ms, 0)
+        runs = self.app.workbench_state.runs
+        if runs:
+            all_routes = self._combined_routes(runs)
+            all_elapsed_ms = sum(float(getattr(result, "elapsed_ms", 0.0)) for result in runs.values())
+            for key, result in runs.items():
+                self._record_sample(key, getattr(result, "routes", ()) or (), getattr(result, "elapsed_ms", 0.0))
+        else:
+            all_routes, all_elapsed_ms = routes, elapsed_ms
+        self._record_sample("all", all_routes, all_elapsed_ms)
+        if all_routes:
+            self.runtime.update_auto_bests(self.current_state(), all_routes, "Auto best", all_elapsed_ms, 0)
+
+    def add_history_marker(self, label, color):
+        for history in self._histories.values():
+            history.add_marker(label, color)
 
     def clear_history_buffers(self):
         self.runtime.clear()
+        for key, history in self._histories.items():
+            if key != "all":
+                history.clear()
+        self._histories = {"all": self.history}
+        self.kpi_scope = "all"
 
     def log_current_solution(self, routes, status, elapsed_ms, total_nodes):
-        return self.runtime.log_manual(self.current_state(), routes, status, elapsed_ms, total_nodes)
+        if not routes:
+            return False
+        self.record_history(routes, self.app.count_segment_crossings(routes), elapsed_ms)
+        return self.runtime.log_manual(
+            self.current_state(), routes, status, elapsed_ms, total_nodes, record=False,
+        )
 
     def restore_solution_log(self, entry):
         a = self.app
@@ -109,7 +182,8 @@ class InteractiveObservationController:
 
     def draw_plots(self, screen, font_small, font_title, font_value, font_minimum):
         return self.chrome.draw_plots(
-            screen, font_small, font_title, font_value, font_minimum, self.history,
+            screen, font_small, font_title, font_value, font_minimum, self.displayed_history,
+            self.kpi_scope, self.kpi_scope_options(),
         )
 
     def draw_card_help_button(self, screen, card_id, rect, font):
