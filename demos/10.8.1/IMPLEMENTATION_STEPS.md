@@ -666,6 +666,10 @@ Before each commit:
 
 ## Open Items
 
+- Added `InteractiveObservationController` as the compatibility boundary for KPI capture, history/log updates, reproducible UI-state snapshots, snapshot restoration, and observation chrome callbacks.
+- Plot drawing now belongs to `WorkbenchChromeRuntime`; `main.py` preserves the workbench callback surface through bound controller methods and reached 791 physical lines.
+- Validation: Python compilation and a focused observation snapshot round-trip contract.
+
 - Added `DemoRoutingController` as the cohesive owner of Sal graph construction/dynamic obstacles, solver settings and live sessions, route analysis/materialization, placement transitions, interactive solving, and ordered Sal/Cli execution. `main.py` retains bound callback names for the existing event/UI adapters.
 - Validation: Python compilation, `git diff --check`, controller import, and a generated-dwelling initial Sal solve. `main.py` is 899 physical lines after this boundary.
 

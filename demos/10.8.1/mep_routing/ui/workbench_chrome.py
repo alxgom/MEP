@@ -85,3 +85,12 @@ class WorkbenchChromeRuntime:
             self.colors["plan_label"], self.colors["wet_room"], self.colors["wall"],
             self.terminal_ui.draw_validity_square,
         )
+
+    def draw_plots(self, screen, font_small, font_title, font_value, font_minimum, history):
+        from .plots import draw_routing_plots
+        return draw_routing_plots(
+            screen, font_small, font_title, font_value, font_minimum,
+            self.viewport.window_width, self.panel_width,
+            history.buffers, history.sample_count, history.event_markers,
+            self.colors["plot_background"], self.colors["text"], self.colors["muted"],
+        )
