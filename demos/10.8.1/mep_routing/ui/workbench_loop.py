@@ -116,7 +116,8 @@ def _render(app, screen, clock, fonts, state):
     draw_installation_header(
         screen, fonts.small, fonts.micro, app.installation_header_state,
         app.INSTALLATION_OPTIONS, app.ui_facade.installation_header_layout(),
-        dragged_key=state.installation_drag_key,
+        dragged_key=state.installation_drag_key if state.installation_drag_enabled else None,
+        dragged_position=state.installation_drag_position,
     )
     app.ui_facade.draw_ruler_overlay(
         screen, fonts.small, state.ruler_start_mm, state.ruler_end_mm,

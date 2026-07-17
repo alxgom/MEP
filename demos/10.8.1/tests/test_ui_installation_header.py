@@ -43,3 +43,12 @@ def test_header_hit_prioritizes_switch_over_pill_body():
     pill = layout.pill_bounds["sal"]
     assert installation_header_hit(layout, (switch[0] + 2, switch[1] + 2)) == ("switch", "sal")
     assert installation_header_hit(layout, (pill[0] + pill[2] - 4, pill[1] + 4)) == ("pill", "sal")
+
+
+def test_header_exposes_a_dedicated_drag_grip_hit_area():
+    layout = installation_header_layout(320, 4, STATE.order)
+    grip = layout.grip_bounds["sal"]
+
+    assert installation_header_hit(
+        layout, (grip[0] + grip[2] // 2, grip[1] + grip[3] // 2),
+    ) == ("grip", "sal")

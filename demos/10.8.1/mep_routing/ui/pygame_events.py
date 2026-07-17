@@ -42,6 +42,8 @@ class WorkbenchEventState:
     last_wheel_rotate_ms: int = 0
     installation_drag_key: str | None = None
     installation_drag_moved: bool = False
+    installation_drag_enabled: bool = False
+    installation_drag_position: tuple[int, int] | None = None
     canvas_gesture: CanvasGestureState = CanvasGestureState()
     panel_interaction: PanelInteractionState = PanelInteractionState()
 
@@ -194,6 +196,8 @@ class WorkbenchEventAdapter:
                     a.observation.set_transient_message(f"{key.title()} is not available yet")
             else:
                 s.installation_drag_key, s.installation_drag_moved = key, False
+                s.installation_drag_enabled = kind == "grip"
+                s.installation_drag_position = pos if s.installation_drag_enabled else None
             return
 
         selector, options = dwelling_selector_bounds(
@@ -382,6 +386,8 @@ class WorkbenchEventAdapter:
                 self._solve()
                 s.selected_route_name = None
             s.installation_drag_key, s.installation_drag_moved = None, False
+            s.installation_drag_enabled, s.installation_drag_position = False, None
+            self._update_header_cursor(event.pos)
             return
         s.panel_interaction = end_panel_interaction(s.panel_interaction).state
         transition = end_canvas_gesture(self._gesture(), button="left" if event.button == 1 else "middle")
@@ -392,6 +398,13 @@ class WorkbenchEventAdapter:
     def _mouse_motion(self, event):
         a, s = self.app, self.state
         if s.installation_drag_key is not None:
+            if not s.installation_drag_enabled:
+                return
+            s.installation_drag_position = event.pos
+            try:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
+            except pygame.error:
+                pass
             reordered = reorder_installation_at_x(
                 a.installation_header_state, s.installation_drag_key, event.pos[0],
                 a.ui_facade.installation_header_layout(),
@@ -409,6 +422,17 @@ class WorkbenchEventAdapter:
         )
         s.canvas_gesture = transition.state
         for command in transition.commands: self._canvas_command(command)
+        self._update_header_cursor(event.pos)
+
+    def _update_header_cursor(self, pos):
+        if self.state.ruler_mode or self.app.preferred_terminal_tool_mode:
+            return
+        hit = installation_header_hit(self.app.ui_facade.installation_header_layout(), pos)
+        cursor = pygame.SYSTEM_CURSOR_HAND if hit and hit[0] == "grip" else pygame.SYSTEM_CURSOR_ARROW
+        try:
+            pygame.mouse.set_cursor(cursor)
+        except pygame.error:
+            pass
 
     def _change_dwelling(self, marker=None, color=(52, 152, 219), clear_history=False):
         a, s = self.app, self.state

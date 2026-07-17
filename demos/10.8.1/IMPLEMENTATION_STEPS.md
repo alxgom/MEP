@@ -805,6 +805,11 @@ Before each commit:
 - Moved terminal controls nearer the canvas edge while preserving most of the vertical colorbar reserve. Shaft routing now follows the shaft's red semantic colour, and the active machine has a stronger blue outline.
 - Validation: Python compilation, 18 focused UI/config contracts, the full 368-contract Demo suite, and an eight-second headless startup smoke.
 
+- Split routing-order pill activation from its dedicated three-dot drag grip. The grip uses a hand cursor on hover; dragging lifts the pill under the pointer with a shadow and amber outline while the ordered row reflows, then snaps the pill into place on release.
+- Reserved a separate semantic status line so bold success/failure emphasis no longer overlaps wrapped solver diagnostics such as permutation/iteration counts.
+- Cli return ventilation now defaults off while retaining the existing per-session toggle and runtime behavior.
+- Validation: Python compilation, focused header/event/sidebar/state contracts, the full 370-contract Demo suite, and an eight-second headless startup smoke.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

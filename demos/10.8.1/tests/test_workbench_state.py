@@ -20,3 +20,7 @@ def test_installation_poses_and_results_are_independent():
 def test_machine_pose_rotation_is_normalized():
     pose = MachinePose(angle_degrees=350)
     assert pose.rotate(20) == 10
+
+
+def test_cli_return_ventilation_defaults_off():
+    assert WorkbenchState.create().cli.return_ventilation_enabled is False

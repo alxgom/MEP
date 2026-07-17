@@ -24,18 +24,21 @@ class InstallationHeaderState:
 class InstallationHeaderLayout:
     pill_bounds: dict[str, tuple[int, int, int, int]]
     switch_bounds: dict[str, tuple[int, int, int, int]]
+    grip_bounds: dict[str, tuple[int, int, int, int]]
     arrow_segments: tuple[tuple[tuple[int, int], tuple[int, int]], ...]
 
 
 def installation_header_layout(canvas_left, header_top, order, *, pill_width=126, pill_height=40, gap=42):
     pill_bounds = {}
     switch_bounds = {}
+    grip_bounds = {}
     arrow_segments = []
     x = int(canvas_left) + 14
     y = int(header_top) + 16
     for index, key in enumerate(order):
         pill_bounds[key] = (x, y, pill_width, pill_height)
         switch_bounds[key] = (x + 8, y + 8, 38, pill_height - 16)
+        grip_bounds[key] = (x + pill_width - 19, y + 7, 14, pill_height - 14)
         if index < len(order) - 1:
             start_x = x + pill_width + 8
             end_x = x + pill_width + gap - 8
@@ -46,7 +49,7 @@ def installation_header_layout(canvas_left, header_top, order, *, pill_width=126
                 ((end_x - 7, mid_y + 6), (end_x, mid_y)),
             ))
         x += pill_width + gap
-    return InstallationHeaderLayout(pill_bounds, switch_bounds, tuple(arrow_segments))
+    return InstallationHeaderLayout(pill_bounds, switch_bounds, grip_bounds, tuple(arrow_segments))
 
 
 def installation_header_hit(layout, point):
@@ -55,6 +58,10 @@ def installation_header_hit(layout, point):
         x, y, width, height = bounds
         if x <= px < x + width and y <= py < y + height:
             return "switch", key
+    for key, bounds in layout.grip_bounds.items():
+        x, y, width, height = bounds
+        if x <= px < x + width and y <= py < y + height:
+            return "grip", key
     for key, bounds in layout.pill_bounds.items():
         x, y, width, height = bounds
         if x <= px < x + width and y <= py < y + height:
@@ -102,7 +109,9 @@ def reorder_installation_at_x(state, key, screen_x, layout):
     return move_installation(state, key, target)
 
 
-def draw_installation_header(screen, font, small_font, state, options, layout, *, dragged_key=None):
+def draw_installation_header(
+    screen, font, small_font, state, options, layout, *, dragged_key=None, dragged_position=None,
+):
     import pygame
 
     option_by_key = {option.key: option for option in options}
@@ -114,9 +123,8 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
     for start, end in layout.arrow_segments:
         pygame.draw.line(screen, (130, 138, 148), start, end, 2)
 
-    for key in state.order:
+    def draw_pill(key, rect, *, floating=False):
         option = option_by_key[key]
-        rect = pygame.Rect(layout.pill_bounds[key])
         active = key == state.active
         enabled = key in state.enabled
         fill = (244, 244, 242) if enabled else (48, 52, 60)
@@ -125,12 +133,19 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
         if not (option.available or option.configurable):
             fill = (43, 45, 50)
         border = (91, 149, 245) if active else ((126, 132, 140) if enabled else (72, 76, 84))
-        if dragged_key == key:
+        if floating:
             border = (241, 196, 15)
+            shadow = rect.move(0, 5)
+            pygame.draw.rect(screen, (18, 20, 26), shadow, border_radius=shadow.height // 2)
         pygame.draw.rect(screen, fill, rect, border_radius=rect.height // 2)
-        pygame.draw.rect(screen, border, rect, 2 if active or dragged_key == key else 1, border_radius=rect.height // 2)
+        pygame.draw.rect(screen, border, rect, 2 if active or floating else 1, border_radius=rect.height // 2)
 
-        switch = pygame.Rect(layout.switch_bounds[key])
+        base_pill = layout.pill_bounds[key]
+        base_switch = layout.switch_bounds[key]
+        switch = pygame.Rect(
+            rect.x + base_switch[0] - base_pill[0], rect.y + base_switch[1] - base_pill[1],
+            base_switch[2], base_switch[3],
+        )
         switch_fill = (92, 150, 245) if enabled else (70, 74, 82)
         if not option.available:
             switch_fill = (58, 60, 66)
@@ -152,3 +167,13 @@ def draw_installation_header(screen, font, small_font, state, options, layout, *
         grip_color = (210, 214, 220) if active else ((78, 82, 88) if enabled else (104, 108, 116))
         for offset_y in (-6, 0, 6):
             pygame.draw.circle(screen, grip_color, (grip_x, rect.centery + offset_y), 1)
+
+    for key in state.order:
+        if key != dragged_key or dragged_position is None:
+            draw_pill(key, pygame.Rect(layout.pill_bounds[key]))
+
+    if dragged_key is not None and dragged_position is not None:
+        width, height = layout.pill_bounds[dragged_key][2:]
+        floating_rect = pygame.Rect(0, 0, width, height)
+        floating_rect.center = (int(dragged_position[0]), int(dragged_position[1]) - 4)
+        draw_pill(dragged_key, floating_rect, floating=True)

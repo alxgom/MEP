@@ -257,16 +257,19 @@ def draw_sidebar(
     pygame.draw.rect(screen, colors.status_surface, status_card, border_radius=4)
     pygame.draw.rect(screen, (55, 61, 72), status_card, 1, border_radius=4)
     screen.blit(fonts.bold.render("SOLVER EXECUTION STATUS", True, colors.muted), (text_x, status_y + 10))
-    status_lines = wrap_status_lines(view.execution.message)
-    for index, line in enumerate(status_lines):
-        normalized = line.strip().lower()
-        status_color = (
-            colors.success if normalized.startswith("success")
-            else colors.failure if normalized.startswith(("fail", "error"))
-            else colors.text
-        )
-        status_font = fonts.bold if index == 0 and status_color != colors.text else fonts.small
-        screen.blit(status_font.render(line, True, status_color), (text_x, status_y + 30 + index * 18))
+    message = view.execution.message.strip()
+    normalized = message.lower()
+    semantic = None
+    if normalized.startswith("success"):
+        semantic, message = ("SUCCESS", colors.success), message.partition(":")[2].strip()
+    elif normalized.startswith(("fail", "error", "routing blocked")):
+        semantic = ("FAILED", colors.failure)
+    detail_y = status_y + 30
+    if semantic is not None:
+        screen.blit(fonts.bold.render(semantic[0], True, semantic[1]), (text_x, detail_y))
+        detail_y += max(18, fonts.bold.get_height() + 2)
+    for index, line in enumerate(wrap_status_lines(message, max_line_length=34)):
+        screen.blit(fonts.small.render(line, True, colors.text), (text_x, detail_y + index * 17))
 
     warning_text = format_validation_warning(view.execution.validation_warnings)
     warning_color = colors.muted if not view.execution.validation_warnings else colors.warning

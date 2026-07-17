@@ -69,7 +69,7 @@ class SalWorkbenchState:
 class CliWorkbenchState:
     """Cli-specific interactive choices not yet available in routing core."""
 
-    return_ventilation_enabled: bool = True
+    return_ventilation_enabled: bool = False
     graph_type_idx: int = 3
     routing_strategy_idx: int = 0
     router_backend_idx: int = 0
