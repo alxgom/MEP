@@ -839,6 +839,10 @@ Before each commit:
 - Added verified routing-core project-input airflow/loss data for PEAD M71JA and M100JA. Other PEAD models remain explicitly unsourced and retain connector dimensions rather than receiving inferred engineering values.
 - Validation: Python compilation and focused Cli sizing/runtime contracts.
 
+- Added a separate Cli `Core ducts` canvas control without changing the lightweight `Actual Ø` stroke view. The overlay lazily projects completed supply segments into routing-core-compatible conducto rectangles and max-connected-width union squares.
+- Polygon projection is installation-owned, measured independently, and cached by `CliRoutingResult`; repeated render frames do not rebuild Shapely geometry, and a new solve invalidates the cache. Conducto and union polygons remain separate artifacts for comparison with future geometry procedures.
+- Validation: Python compilation, focused conducto/union/cache and toolbar contracts, and the full Demo suite (386 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

@@ -9,6 +9,7 @@ from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
 from .geometry import cli_air_access_spec, cli_machine_pins
+from .duct_geometry import build_core_duct_polygon_projection
 from .graph_inputs import build_cli_simple_graph_inputs
 from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
@@ -52,6 +53,8 @@ class CliInteractiveRuntime:
         self.terminal_config = terminal_config
         self.placement = placement or CliPlacementRuntime()
         self.sizing_policy_factory = sizing_policy_factory
+        self._core_polygon_result = None
+        self._core_polygon_projection = None
         self.last_placement = None
         self.last_result = CliRoutingResult((), "Cli has not run", 0.0, 0, {}, {})
 
@@ -207,4 +210,16 @@ class CliInteractiveRuntime:
             tuple(supply_segments), tuple(return_segments), placement or self.last_placement,
             len(tuple(context_obstacles)),
         )
+        self._core_polygon_result = None
+        self._core_polygon_projection = None
         return self.last_result
+
+    def core_polygon_projection(self, result=None):
+        """Build once per routing result, then reuse across render frames."""
+        result = self.last_result if result is None else result
+        if result is not self._core_polygon_result:
+            self._core_polygon_projection = build_core_duct_polygon_projection(
+                result.supply_segments,
+            )
+            self._core_polygon_result = result
+        return self._core_polygon_projection

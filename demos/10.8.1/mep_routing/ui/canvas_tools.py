@@ -83,6 +83,7 @@ def draw_canvas_tool_controls(
     ruler_enabled,
     edge_weights_enabled,
     diameter_width_enabled,
+    core_ducts_enabled,
     small_weight_view,
     zoom_level,
     dwelling_label,
@@ -99,6 +100,7 @@ def draw_canvas_tool_controls(
             (action == "ruler" and ruler_enabled)
             or (action == "weights" and edge_weights_enabled)
             or (action == "diameter" and diameter_width_enabled)
+            or (action == "core_ducts" and core_ducts_enabled)
         )
         fill = (58, 80, 94) if active else (38, 44, 54)
         border = (52, 152, 219) if active else (170, 180, 190)

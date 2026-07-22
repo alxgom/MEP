@@ -102,6 +102,11 @@ def _render(app, screen, clock, fonts, state):
         ) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
         draw_edge_weight_heatmap=edge_overlay,
         draw_edge_weight_colorbar=lambda: app.ui_facade.draw_edge_weight_colorbar(screen),
+        draw_route_polygons=lambda: app.canvas_ui.draw_geometry(
+            screen,
+            app.cli_runtime.core_polygon_projection(active_view.result).polygons,
+            (*app.theme.installation_colors["cli"], 86),
+        ) if active == "cli" and app.show_cli_core_polygons and active_view.result is not None else None,
         draw_terminal_validity_overlay=lambda: app.terminal_ui.draw_validity_overlay(screen, app.terminal_validity_overlay_enabled and active_view.can("terminal_tools")),
         draw_wet_room_accents=lambda: app.draw_wet_room_outer_accents(screen),
         draw_polygon_hatch=lambda shaft: app.canvas_ui.draw_hatch(

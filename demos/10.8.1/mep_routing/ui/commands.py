@@ -19,6 +19,11 @@ class WorkbenchCommandController:
                 a.canvas_ui.apply_view_action(action)
                 if action == "diameter":
                     a.route_real_diameter_width_enabled = not a.route_real_diameter_width_enabled
+                elif action == "core_ducts":
+                    if a.installation_header_state.active == "cli":
+                        a.show_cli_core_polygons = not a.show_cli_core_polygons
+                    else:
+                        a.observation.set_transient_message("Core duct polygons are available for Cli")
                 return action
         if a.canvas_ui.weight_switch_rect().collidepoint(pos):
             return "weight_view"

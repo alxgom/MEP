@@ -115,6 +115,7 @@ class CanvasRenderHooks:
     draw_distance_colorbar: Callable[[], None]
     draw_edge_weight_heatmap: Callable[[], None]
     draw_edge_weight_colorbar: Callable[[], None]
+    draw_route_polygons: Callable[[], None]
     draw_terminal_validity_overlay: Callable[[], None]
     draw_wet_room_accents: Callable[[], None]
     draw_polygon_hatch: Callable[[Any], None]
@@ -145,6 +146,7 @@ def draw_canvas_scene(
     hooks.draw_distance_colorbar()
     hooks.draw_edge_weight_heatmap()
     hooks.draw_edge_weight_colorbar()
+    hooks.draw_route_polygons()
     hooks.draw_terminal_validity_overlay()
     hooks.draw_wet_room_accents()
 
