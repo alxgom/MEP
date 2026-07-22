@@ -11,7 +11,8 @@ from .materializer import CliDuctSegment, materialize_cli_tree
 from .runtime import CliInteractiveRuntime, CliRoutingResult
 from .solver_backends import solve_cli_tree, solve_line_graph_mst
 from .sizing import (
-    CliDuctSize, CliDuctSizingPolicy, CliSizingContext, CoreConstantFrictionSizing,
+    CliDuctSize, CliDuctSizingPolicy, CliGrilleSize, CliGrilleSizingPolicy,
+    CliSizingContext, CoreConstantFrictionSizing, CoreSupplyGrilleSizing,
     size_tree_edges,
 )
 from .terminals import is_cli_supply_room, prepare_cli_supply_terminals
@@ -21,7 +22,8 @@ __all__ = [
     "CliConnector", "CliInstallationDefinition", "CliInteractiveRuntime", "CliMachine",
     "CliGrilleConnection", "CliGrillePlacementConfig", "CliGrillePlan", "CliPlacementResult", "CliPlacementRuntime",
     "CliDuctPolygonProjection", "CliDuctSegment", "CliDuctSize", "CliDuctSizingPolicy", "CliSizingContext",
-    "CoreConstantFrictionSizing",
+    "CoreConstantFrictionSizing", "CoreSupplyGrilleSizing",
+    "CliGrilleSize", "CliGrilleSizingPolicy",
     "CliRoutingResult", "build_cli_simple_graph_inputs", "build_core_duct_polygon_projection", "cli_machine_pins",
     "cli_air_access_spec", "cli_air_access_specs", "materialize_cli_tree",
     "cli_supply_access_specs", "is_cli_supply_room", "prepare_cli_supply_terminals",

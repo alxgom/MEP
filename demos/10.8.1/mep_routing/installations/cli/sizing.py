@@ -39,6 +39,59 @@ class CliDuctSizingPolicy(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class CliGrilleSize:
+    room_area_m2: float
+    airflow_m3h: float
+    width_mm: int
+    height_mm: int
+    face_velocity_m_s: float
+
+
+class CliGrilleSizingPolicy(Protocol):
+    def size(self, room_area_m2: float, total_area_m2: float) -> CliGrilleSize:
+        ...
+
+
+class CoreSupplyGrilleSizing:
+    """Port of ``InfoClima.get_width_reja_impulsion`` and ``_reja``."""
+
+    def __init__(
+        self, total_airflow_m3h: float, *, height_mm=150,
+        velocities_m_s=(3.0, 3.5, 4.0), width_increment_mm=100,
+        maximum_width_mm=1000,
+    ):
+        self.total_airflow_m3h = float(total_airflow_m3h)
+        self.height_mm = int(height_mm)
+        self.velocities_m_s = tuple(map(float, velocities_m_s))
+        self.width_increment_mm = int(width_increment_mm)
+        self.maximum_width_mm = int(maximum_width_mm)
+
+    def size(self, room_area_m2: float, total_area_m2: float) -> CliGrilleSize:
+        if self.total_airflow_m3h <= 0 or room_area_m2 < 0 or total_area_m2 <= 0:
+            raise ValueError("grille airflow and sizing areas must be positive")
+        airflow = self.total_airflow_m3h * room_area_m2 / total_area_m2
+        height_m = self.height_mm / 1000.0
+        width_mm = self.maximum_width_mm
+        for velocity in self.velocities_m_s:
+            # Core doubles the free area requirement to model a 50% effective area.
+            required_area = airflow / (3600.0 * velocity) / 0.5
+            raw_width_mm = required_area / height_m * 1000.0
+            candidate = int(
+                math.ceil(raw_width_mm / self.width_increment_mm)
+                * self.width_increment_mm
+            )
+            if candidate <= self.maximum_width_mm:
+                width_mm = candidate
+                break
+        face_velocity = (airflow * 2.0) / (
+            (width_mm / 1000.0) * height_m * 3600.0
+        )
+        return CliGrilleSize(
+            room_area_m2, airflow, width_mm, self.height_mm, face_velocity,
+        )
+
+
 class CoreConstantFrictionSizing:
     """Port of ``InfoClima.get_dimensiones_conducto`` and ``_conducto``."""
 

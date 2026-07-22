@@ -1,7 +1,8 @@
 import pytest
 
 from mep_routing.installations.cli import (
-    CliSizingContext, CoreConstantFrictionSizing, size_tree_edges,
+    CliSizingContext, CoreConstantFrictionSizing, CoreSupplyGrilleSizing,
+    size_tree_edges,
 )
 
 
@@ -41,3 +42,14 @@ def test_tree_sizing_policy_is_replaceable():
     sizes = size_tree_edges(((0, 1),), 0, {1: 8.0}, FixedPolicy())
 
     assert sizes[(0, 1)] == (8.0, 8.0)
+
+
+def test_core_supply_grille_sizing_uses_room_airflow_and_face_velocity():
+    policy = CoreSupplyGrilleSizing(1260.0)
+
+    grille = policy.size(15.0, 30.0)
+
+    assert grille.airflow_m3h == 630.0
+    assert grille.width_mm == 800
+    assert grille.height_mm == 150
+    assert grille.face_velocity_m_s == pytest.approx(2.9166666667)

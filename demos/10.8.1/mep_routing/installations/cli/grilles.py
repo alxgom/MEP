@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dataclass_replace
 import math
 
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
@@ -37,6 +37,7 @@ class CliGrilleConnection:
     inward_normal: tuple[float, float]
     placement_type: str = "wall"
     room_area_m2: float = 0.0
+    sizing: object | None = None
 
 
 @dataclass(frozen=True)
@@ -308,17 +309,24 @@ def _options(room, routing_region, config, machine, pins, angle):
 
 def prepare_cli_grilles(
     rooms, routing_region, *, machine=None, machine_pins=None, angle_degrees=0,
-    config=CliGrillePlacementConfig(),
+    config=CliGrillePlacementConfig(), supply_width_by_room_id=None,
 ):
     """Select the first valid legacy-compatible supply/return option per Cli room."""
     targets = [room for room in rooms if is_cli_supply_room(room)]
     connections, counts = [], {}
     for room in targets:
+        room_config = config
+        supply_sizing = None
+        if supply_width_by_room_id and id(room) in supply_width_by_room_id:
+            supply_sizing = supply_width_by_room_id[id(room)]
+            room_config = dataclass_replace(
+                config, supply_width_mm=supply_sizing.width_mm,
+            )
         base_name = str(getattr(room, "name", "") or "Cli").strip() or "Cli"
         counts[base_name] = counts.get(base_name, 0) + 1
         room_name = base_name if counts[base_name] == 1 else f"{base_name} {counts[base_name]}"
         options = _options(
-            room, routing_region, config, machine, machine_pins, angle_degrees,
+            room, routing_region, room_config, machine, machine_pins, angle_degrees,
         )
         if not options:
             continue
@@ -329,5 +337,6 @@ def prepare_cli_grilles(
                 room_name, candidate.role, candidate.point, candidate.routing_point,
                 candidate.width_mm, candidate.inward_normal, placement_type,
                 float(room.polygon.area) / 1_000_000.0,
+                supply_sizing if candidate.role == "supply" else None,
             ))
     return CliGrillePlan(tuple(connections))

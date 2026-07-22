@@ -848,6 +848,11 @@ Before each commit:
 - Return endpoint behavior remains intentionally unchanged because the current port scope is supply-only.
 - Validation: Python compilation, focused endpoint sizing/length contracts, and the full Demo suite (387 passed).
 
+- Replaced the hardcoded 1000 mm Cli supply-grille width with a replaceable routing-core grille-sizing policy. It allocates machine airflow by conditioned room area, evaluates 3/3.5/4 m/s face velocities with 50% effective area, rounds upward in 100 mm increments, and caps width at 1000 mm.
+- Per-grille airflow, selected width, 150 mm height, and actual face velocity are retained on each supply connection. Calculated width now participates in placement feasibility and physical endpoint materialization; unsourced machines retain the previous fallback width.
+- The `Core ducts` baseline intentionally retains routing-core's max-width square union at the grille transition. Its oversized footprint is now documented as a core geometry artifact for the planned alternative geometry procedure, rather than being mistaken for a sizing error.
+- Validation: Python compilation, focused grille policy/runtime contracts, and the full Demo suite (388 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

@@ -15,7 +15,11 @@ from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
 from .placement import CliPlacementResult, CliPlacementRuntime
 from .solver_backends import solve_cli_tree
-from .sizing import CliSizingContext, CoreConstantFrictionSizing, size_tree_edges
+from .sizing import (
+    CliSizingContext, CoreConstantFrictionSizing, CoreSupplyGrilleSizing,
+    size_tree_edges,
+)
+from .terminals import is_cli_supply_room
 
 
 @dataclass(frozen=True)
@@ -47,20 +51,24 @@ class CliInteractiveRuntime:
     def __init__(
         self, definition, graph_config, terminal_config, placement=None,
         sizing_policy_factory=CoreConstantFrictionSizing,
+        grille_sizing_policy_factory=CoreSupplyGrilleSizing,
     ):
         self.definition = definition
         self.graph_config = graph_config
         self.terminal_config = terminal_config
         self.placement = placement or CliPlacementRuntime()
         self.sizing_policy_factory = sizing_policy_factory
+        self.grille_sizing_policy_factory = grille_sizing_policy_factory
         self._core_polygon_result = None
         self._core_polygon_projection = None
         self.last_placement = None
         self.last_result = CliRoutingResult((), "Cli has not run", 0.0, 0, {}, {})
 
     def place_machine(self, prepared_dwelling, machine, *, context_obstacles=()):
+        grille_sizes = self._size_supply_grilles(prepared_dwelling.rooms, machine)
         grilles = prepare_cli_grilles(
             prepared_dwelling.rooms, prepared_dwelling.routing_region_base, machine=machine,
+            supply_width_by_room_id=grille_sizes,
         )
         self.last_placement = self.placement.place(
             prepared_dwelling, machine, grilles, context_obstacles=context_obstacles,
@@ -75,9 +83,11 @@ class CliInteractiveRuntime:
     ):
         started = perf_counter()
         pins = cli_machine_pins(machine, center, angle_degrees)
+        grille_sizes = self._size_supply_grilles(prepared_dwelling.rooms, machine)
         grilles = prepare_cli_grilles(
             prepared_dwelling.rooms, prepared_dwelling.routing_region_base,
             machine=machine, machine_pins=pins, angle_degrees=angle_degrees,
+            supply_width_by_room_id=grille_sizes,
         )
         if not return_enabled:
             grilles = CliGrillePlan(tuple(grilles.supply))
@@ -139,6 +149,20 @@ class CliInteractiveRuntime:
             workspace=supply.workspace, supply_segments=supply.segments,
             return_segments=return_segments, context_obstacles=context_obstacles,
         )
+
+    def _size_supply_grilles(self, rooms, machine):
+        if not machine.airflow_m3h:
+            return {}
+        targets = tuple(room for room in rooms if is_cli_supply_room(room))
+        areas = {id(room): float(room.polygon.area) / 1_000_000.0 for room in targets}
+        total_area = sum(areas.values())
+        if total_area <= 0:
+            return {}
+        policy = self.grille_sizing_policy_factory(machine.airflow_m3h)
+        return {
+            id(room): policy.size(areas[id(room)], total_area)
+            for room in targets
+        }
 
     def _solve_tree(
         self, role, prepared, machine, pins, angle, grilles, context_obstacles,

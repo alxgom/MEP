@@ -116,6 +116,9 @@ def test_cli_supply_materializes_core_sized_endpoint_branches_and_short_stubs():
     assert all(math.dist(item.start, item.end) == pytest.approx(100) for item in grille_stubs)
     assert all(item.sizing is not None for item in grille_branches)
     assert all(item.width_mm < stub.width_mm for item, stub in zip(grille_branches, grille_stubs))
+    assert {item.width_mm for item in grille_stubs} == {800}
+    assert {item.width_mm for item in result.grille_plan.supply} == {800}
+    assert {item.sizing.airflow_m3h for item in result.grille_plan.supply} == {630.0}
 
 
 def test_cli_runtime_can_disable_return_ventilation():
