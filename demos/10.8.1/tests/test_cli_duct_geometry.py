@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 
 import pytest
+from shapely.geometry import box
 
 from mep_routing.installations.cli import (
+    CliDuctAlignmentConstraints,
     build_aligned_duct_polygon_projection,
     build_core_duct_polygon_projection,
 )
@@ -128,6 +130,23 @@ def test_aligned_projection_keeps_machine_side_reduction_centered():
     assert projection.conducto_polygons[1].bounds == pytest.approx((200, -200, 500, 200))
 
 
+def test_aligned_projection_moves_first_reduction_only_when_center_hits_obstacle():
+    segments = (
+        CliDuctSegment((0, 0), (200, 0), 250, 150, "machine_stub", "Supply"),
+        CliDuctSegment((200, 0), (500, 0), 400, 150, "machine_branch", "Supply"),
+        CliDuctSegment((500, 0), (1000, 0), 400, 150, "tree", "Supply"),
+    )
+    constraints = CliDuctAlignmentConstraints(
+        obstacles=(box(200, -260, 1000, -130),),
+    )
+
+    projection = build_aligned_duct_polygon_projection(segments, constraints)
+
+    assert projection.alignment_states == (0, -1, -1)
+    assert projection.alignment_offsets_mm == (0.0, 75.0, 75.0)
+    assert projection.conducto_polygons[1].bounds == pytest.approx((200, -125, 500, 275))
+
+
 def test_aligned_projection_handles_disconnected_endpoint_adapters():
     segments = (
         CliDuctSegment((0, 0), (200, 0), 250, 150, "machine_stub", "Supply"),
@@ -155,3 +174,29 @@ def test_cli_runtime_reuses_aligned_projection_for_same_result():
     second = runtime.aligned_polygon_projection(result)
 
     assert second is first
+
+
+def test_cli_runtime_supplies_static_obstacles_to_alignment_projection():
+    from mep_routing.installations.cli.runtime import CliInteractiveRuntime
+
+    runtime = object.__new__(CliInteractiveRuntime)
+    runtime._aligned_polygon_result = None
+    runtime._aligned_polygon_projection = None
+    result = SimpleNamespace(
+        supply_segments=(
+            CliDuctSegment((0, 0), (200, 0), 250, 150, "machine_stub", "Supply"),
+            CliDuctSegment((200, 0), (1000, 0), 400, 150, "machine_branch", "Supply"),
+        ),
+        workspace=SimpleNamespace(lifecycle=SimpleNamespace(
+            routing_region=box(-500, -500, 1500, 500),
+            wall_polygons=(box(200, -260, 1000, -130),),
+            columns=(), shafts=(),
+        )),
+        context_obstacles=(),
+        machine_pins={},
+    )
+
+    projection = runtime.aligned_polygon_projection(result)
+
+    assert projection.alignment_states == (0, -1)
+    assert projection.alignment_offsets_mm == (0.0, 75.0)

@@ -889,6 +889,10 @@ Before each commit:
 - Hardened the projection for Regular Grid endpoint snapping. Machine, tree, and grille adapters may materialize as separate geometric components, so alignment now orients every component deterministically instead of assuming one connected tree. It deliberately does not invent bridging ducts across snapped gaps.
 - Validation: Python compilation, focused face-offset/centered-first-reduction/disconnected-adapter contracts, the full Demo suite (402 passed), and a live Regular Grid Cli solve with the Aligned overlay selected (11 supply segments, 14 polygons, no crash).
 
+- Changed the centered machine-side reduction from a forced state to a preference. The aligned projection evaluates center first, then both face-aligned offsets when the centered candidate's following straight run overlaps the routing boundary, walls, columns, shafts, machine footprint, or retained earlier-installation obstacles.
+- Constraint evaluation remains lazy with the polygon overlay and does not change the routing skeleton. Intentional connector contact is excluded by evaluating the reduction's downstream run; if every candidate is obstructed, the centered invalid outcome is retained instead of silently inventing geometry.
+- Validation: Python compilation, focused centered/obstacle-forced/runtime-constraint contracts, the full Demo suite (404 passed), and a live Regular Grid Cli solve with Aligned geometry enabled.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

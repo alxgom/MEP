@@ -5,13 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from time import perf_counter
 
+from shapely.geometry import Polygon
+
 from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
 from .geometry import cli_air_access_spec, cli_machine_pins
 from .clearance import apply_cli_edge_weights, cli_minimum_clearance_weights
 from .duct_geometry import build_core_duct_polygon_projection
-from .aligned_duct_geometry import build_aligned_duct_polygon_projection
+from .aligned_duct_geometry import (
+    CliDuctAlignmentConstraints, build_aligned_duct_polygon_projection,
+)
 from .graph_inputs import build_cli_simple_graph_inputs
 from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
@@ -38,6 +42,7 @@ class CliRoutingResult:
     return_segments: tuple[CliDuctSegment, ...] = ()
     placement: CliPlacementResult | None = None
     context_obstacle_count: int = 0
+    context_obstacles: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -120,6 +125,7 @@ class CliInteractiveRuntime:
                         relaxed,
                         status=f"Cli context relaxed after collision; {relaxed.status}",
                         context_obstacle_count=len(tuple(context_obstacles)),
+                        context_obstacles=tuple(context_obstacles),
                     )
                     return self.last_result
             return self._finish(
@@ -258,11 +264,12 @@ class CliInteractiveRuntime:
         self, routes, status, started, total_nodes, grilles, pins, *, workspace=None,
         supply_segments=(), return_segments=(), context_obstacles=(), placement=None,
     ):
+        context_obstacles = tuple(context_obstacles)
         self.last_result = CliRoutingResult(
             tuple(routes), status, (perf_counter() - started) * 1000.0, total_nodes,
             grilles.grille_terminals(), dict(pins), workspace, grilles,
             tuple(supply_segments), tuple(return_segments), placement or self.last_placement,
-            len(tuple(context_obstacles)),
+            len(context_obstacles), context_obstacles,
         )
         self._core_polygon_result = None
         self._core_polygon_projection = None
@@ -285,7 +292,25 @@ class CliInteractiveRuntime:
         result = self.last_result if result is None else result
         if result is not self._aligned_polygon_result:
             self._aligned_polygon_projection = build_aligned_duct_polygon_projection(
-                result.supply_segments,
+                result.supply_segments, self._alignment_constraints(result),
             )
             self._aligned_polygon_result = result
         return self._aligned_polygon_projection
+
+    @staticmethod
+    def _alignment_constraints(result):
+        workspace = getattr(result, "workspace", None)
+        lifecycle = getattr(workspace, "lifecycle", None)
+        if lifecycle is None:
+            return None
+        obstacles = []
+        for name in ("wall_polygons", "columns", "shafts"):
+            obstacles.extend(tuple(getattr(lifecycle, name, ()) or ()))
+        obstacles.extend(tuple(getattr(result, "context_obstacles", ()) or ()))
+        pins = getattr(result, "machine_pins", {}) or {}
+        corners = [pins.get(name) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
+        if all(point is not None for point in corners):
+            obstacles.append(Polygon(corners))
+        return CliDuctAlignmentConstraints(
+            getattr(lifecycle, "routing_region", None), tuple(obstacles),
+        )

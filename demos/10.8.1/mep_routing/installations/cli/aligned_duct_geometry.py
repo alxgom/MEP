@@ -10,6 +10,14 @@ from shapely.geometry import MultiPoint, Polygon
 
 
 @dataclass(frozen=True)
+class CliDuctAlignmentConstraints:
+    """Physical geometry used to reject alignment candidates."""
+
+    allowed_region: object | None = None
+    obstacles: tuple = ()
+
+
+@dataclass(frozen=True)
 class CliAlignedDuctProjection:
     conducto_polygons: tuple[Polygon, ...]
     junction_polygons: tuple[Polygon, ...]
@@ -121,9 +129,10 @@ def _orient_forest(segments):
     return tuple(roots), oriented, children_at, incidence
 
 
-def _alignment_states(segments, roots, oriented, children_at):
+def _alignment_states(segments, roots, oriented, children_at, constraints):
     states = [0] * len(segments)
     offsets = [0.0] * len(segments)
+    machine_reduction_pending = {roots[0]: True}
     events = 0
     pending = list(roots)
     while pending:
@@ -143,17 +152,31 @@ def _alignment_states(segments, roots, oriented, children_at):
             _score, direction, child_index = child_data[0]
             same_section = segments[parent_index].width_mm == segments[child_index].width_mm
             if _is_collinear(incoming, direction):
-                states[child_index] = states[parent_index]
+                state = states[parent_index]
+                if (
+                    not same_section
+                    and machine_reduction_pending.get(parent_index, False)
+                ):
+                    state = _preferred_reduction_state(
+                        segments, parent_index, child_index, offsets[parent_index],
+                        oriented, children_at, constraints,
+                    )
+                states[child_index] = state
                 offsets[child_index] = offsets[parent_index]
                 if not same_section:
-                    offsets[child_index] += states[parent_index] * (
+                    offsets[child_index] += state * (
                         segments[parent_index].width_mm
                         - segments[child_index].width_mm
                     ) / 2.0
                     events += 1
+                machine_reduction_pending[child_index] = (
+                    machine_reduction_pending.get(parent_index, False)
+                    and same_section
+                )
             else:
                 states[child_index] = 0
                 offsets[child_index] = 0.0
+                machine_reduction_pending[child_index] = False
                 events += 1
         else:
             events += 1
@@ -163,6 +186,7 @@ def _alignment_states(segments, roots, oriented, children_at):
                 if child_index != dominant[2]:
                     states[child_index] = 0
                     offsets[child_index] = 0.0
+                    machine_reduction_pending[child_index] = False
                     continue
                 state = _dominant_state(incoming, dominant[1], other_data)
                 states[child_index] = state
@@ -174,6 +198,7 @@ def _alignment_states(segments, roots, oriented, children_at):
                     segments[parent_index].width_mm
                     - segments[child_index].width_mm
                 ) / 2.0
+                machine_reduction_pending[child_index] = False
         pending.extend(children)
     return tuple(states), tuple(offsets), events
 
@@ -199,6 +224,64 @@ def _conducto(segment, offset_mm, oriented_line):
     return polygon if polygon.is_valid and polygon.area > 0 else None
 
 
+def _candidate_run_polygons(
+    segments, parent_index, child_index, parent_offset, state,
+    oriented, children_at,
+):
+    polygons = []
+    current_parent = parent_index
+    current = child_index
+    offset = parent_offset
+    while True:
+        offset += state * (
+            segments[current_parent].width_mm - segments[current].width_mm
+        ) / 2.0
+        polygon = _conducto(segments[current], offset, oriented[current])
+        if polygon is not None:
+            polygons.append(polygon)
+        children = children_at.get(current, ())
+        if len(children) != 1:
+            break
+        next_index = children[0]
+        if not _is_collinear(
+            _unit(*oriented[current]), _unit(*oriented[next_index]),
+        ):
+            break
+        current_parent, current = current, next_index
+    return tuple(polygons)
+
+
+def _candidate_is_viable(polygons, constraints, tolerance=1e-6):
+    if constraints is None:
+        return True
+    allowed = constraints.allowed_region
+    if allowed is not None:
+        allowed = allowed.buffer(tolerance, join_style=2)
+        if any(not allowed.covers(polygon) for polygon in polygons):
+            return False
+    for obstacle in constraints.obstacles:
+        if obstacle is None or obstacle.is_empty:
+            continue
+        if any(polygon.intersection(obstacle).area > tolerance for polygon in polygons):
+            return False
+    return True
+
+
+def _preferred_reduction_state(
+    segments, parent_index, child_index, parent_offset,
+    oriented, children_at, constraints,
+):
+    """Prefer center, using a face alignment only when obstacles require it."""
+    for state in (0, -1, 1):
+        polygons = _candidate_run_polygons(
+            segments, parent_index, child_index, parent_offset, state,
+            oriented, children_at,
+        )
+        if _candidate_is_viable(polygons, constraints):
+            return state
+    return 0
+
+
 def _junctions(segments, offsets, incidence, oriented):
     result = []
     for point, edge_indices in sorted(incidence.items()):
@@ -215,7 +298,7 @@ def _junctions(segments, offsets, incidence, oriented):
     return tuple(result)
 
 
-def build_aligned_duct_polygon_projection(segments):
+def build_aligned_duct_polygon_projection(segments, constraints=None):
     """Build one deterministic flow-aware face-aligned projection."""
     started = perf_counter()
     segments = tuple(segments)
@@ -223,7 +306,7 @@ def build_aligned_duct_polygon_projection(segments):
         return CliAlignedDuctProjection((), (), (), (), 0, 0.0)
     roots, oriented, children_at, incidence = _orient_forest(segments)
     states, offsets, event_count = _alignment_states(
-        segments, roots, oriented, children_at,
+        segments, roots, oriented, children_at, constraints,
     )
     conductos = tuple(
         polygon for index, (segment, offset) in enumerate(zip(segments, offsets))
