@@ -57,7 +57,7 @@ def test_canvas_builder_derives_selection_graph_machine_and_guides():
         columns=(Polygon([(6, 1), (7, 1), (7, 2), (6, 2)]),),
         shafts=(shaft,), shaft_extraction=shaft, graph_env=env, show_grid_graph=True,
         terminals={"Kitchen": (3, 3), "Bathroom": (6, 3)},
-        terminal_segments={},
+        terminal_segments={}, terminal_arrows={},
         routes=(("Kitchen", (((0, 0), (3, 3)),)),), selected_route_name="Kitchen",
         selected_room_polygon=room.polygon, global_pins=_pins(), selected_pins={"right_mid"}, context_layers=(),
         auto_placement_mode=1, placement_fields=fields, wet_room_names=("Kitchen", "Bathroom"),
@@ -87,6 +87,7 @@ def test_canvas_builder_accepts_cli_connector_schema():
         rooms=(), doors=(), columns=(), shafts=(), shaft_extraction=None,
         graph_env=None, show_grid_graph=False, terminals={"Living Supply": (6, 3)},
         terminal_segments={"Living Supply": ((4, 3), (8, 3))},
+        terminal_arrows={"Living Supply": ((6, 3), (6, 5))},
         routes=(("Supply Air Tree", (((2, 3), (6, 3)),)),), selected_route_name=None,
         selected_room_polygon=None, global_pins=pins, selected_pins=set(),
         context_layers=(CanvasContextLayer(
@@ -107,13 +108,15 @@ def test_canvas_builder_accepts_cli_connector_schema():
     assert scene.routes[1].segments == [((2, 3), (6, 3))]
     assert scene.terminals[0].label == "Kitchen"
     assert scene.terminals[1].segment == ((4, 3), (8, 3))
+    assert scene.terminals[1].arrow == ((6, 3), (6, 5))
+    assert scene.terminals[1].core_color == (52, 152, 219)
 
 
 def test_canvas_builder_accepts_active_installation_without_machine_pins():
     state = CanvasFrameState(
         rooms=(), doors=(), columns=(), shafts=(), shaft_extraction=None,
         graph_env=None, show_grid_graph=False, terminals={}, routes=(),
-        terminal_segments={},
+        terminal_segments={}, terminal_arrows={},
         selected_route_name=None, selected_room_polygon=None, global_pins={},
         selected_pins=set(), context_layers=(), auto_placement_mode=1,
         placement_fields={"Shaft": {}}, wet_room_names=(), route_colors={},

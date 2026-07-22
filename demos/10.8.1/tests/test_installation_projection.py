@@ -29,7 +29,7 @@ def test_projection_keeps_all_enabled_results_visible_but_only_active_interactiv
 def test_cli_projection_builds_physical_width_grille_segment_from_wall_normal():
     connection = SimpleNamespace(
         route_name="Living Supply", grille_point=(1000, 2000),
-        inward_normal=(0.0, 1.0), width_mm=800,
+        inward_normal=(0.0, 1.0), width_mm=800, role="supply",
     )
     item = InstallationProjection(
         "cli", True, ProjectedCapabilities(),
@@ -39,6 +39,9 @@ def test_cli_projection_builds_physical_width_grille_segment_from_wall_normal():
 
     assert item.terminal_segments["Living Supply"] == (
         (600.0, 2000.0), (1400.0, 2000.0),
+    )
+    assert item.terminal_arrows["Living Supply"] == (
+        (1000.0, 2000.0), (1000.0, 2500.0),
     )
 
 

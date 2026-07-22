@@ -63,6 +63,27 @@ class InstallationProjection:
             )))
         return result
 
+    @property
+    def terminal_arrows(self):
+        plan = getattr(self.result, "grille_plan", None)
+        connections = getattr(plan, "connections", ()) if plan is not None else ()
+        result = {}
+        for item in connections:
+            normal_x, normal_y = map(float, item.inward_normal)
+            magnitude = (normal_x * normal_x + normal_y * normal_y) ** 0.5
+            if magnitude <= 1e-9:
+                continue
+            direction = 1.0 if item.role == "supply" else -1.0
+            center_x, center_y = item.grille_point
+            result[item.route_name] = (
+                (float(center_x), float(center_y)),
+                (
+                    center_x + direction * normal_x / magnitude * 500.0,
+                    center_y + direction * normal_y / magnitude * 500.0,
+                ),
+            )
+        return result
+
     def can(self, name):
         return self.active and bool(getattr(self.capabilities, name))
 
@@ -77,7 +98,7 @@ class WorkbenchProjection:
         return tuple(
             CanvasContextLayer(
                 item.key, item.terminals, item.routes, item.pins, item.color,
-                item.terminal_segments,
+                item.terminal_segments, item.terminal_arrows,
             )
             for item in self.visible if not item.active
         )

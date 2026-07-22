@@ -868,6 +868,10 @@ Before each commit:
 - The installation projection carries the same grille geometry for active and subdued context layers while routing continues to consume the existing point terminals.
 - Validation: Python compilation, focused grille projection/frame contracts, and the full Demo suite (394 passed).
 
+- Unified Cli grille symbols with the installation's blue supply-output colour instead of falling back to white room-terminal colours. Wall grilles now include routing-core-style 500 mm airflow arrows: supply points into the room and return points toward the ceiling routing side.
+- Horizontal ceiling returns intentionally omit a plan arrow because their airflow direction is vertical.
+- Validation: Python compilation, focused grille colour/airflow projection/frame contracts, and the full Demo suite.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

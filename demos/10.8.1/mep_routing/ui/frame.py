@@ -57,6 +57,7 @@ class CanvasContextLayer:
     global_pins: Mapping[str, tuple[float, float]]
     color: Color = (105, 113, 124)
     terminal_segments: Mapping[str, tuple[tuple[float, float], tuple[float, float]]] | None = None
+    terminal_arrows: Mapping[str, tuple[tuple[float, float], tuple[float, float]]] | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ class CanvasFrameState:
     show_grid_graph: bool
     terminals: Mapping[str, tuple[float, float]]
     terminal_segments: Mapping[str, tuple[tuple[float, float], tuple[float, float]]]
+    terminal_arrows: Mapping[str, tuple[tuple[float, float], tuple[float, float]]]
     routes: Sequence[tuple[str, Sequence]]
     selected_route_name: str | None
     selected_room_polygon: Any
@@ -150,10 +152,12 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         context_dark = tuple(max(0, channel - 35) for channel in context_color)
         for route_name, point in layer.terminals.items():
             segment = (layer.terminal_segments or {}).get(route_name)
+            arrow = (layer.terminal_arrows or {}).get(route_name)
             terminal_markers.append(TerminalMarker(
                 to_screen(*point), context_color, context_dark, context_dark,
                 route_name,
                 None if segment is None else (to_screen(*segment[0]), to_screen(*segment[1])),
+                None if arrow is None else (to_screen(*arrow[0]), to_screen(*arrow[1])),
             ))
         for route_name, segments in layer.routes:
             route_strokes.append(RouteStroke(
@@ -166,7 +170,11 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
                 context_color, (),
             ))
     for route_name, point in state.terminals.items():
-        core = state.route_colors.get(route_name, (255, 255, 255))
+        is_cli_grille = route_name in state.terminal_segments
+        core = state.route_colors.get(
+            "Supply Air Tree" if is_cli_grille else route_name,
+            (255, 255, 255),
+        )
         if state.selected_route_name and route_name != state.selected_route_name:
             core, ring, text = palette.deselected_pin, (70, 74, 78), (84, 88, 94)
         else:
@@ -178,6 +186,10 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
                 to_screen(*state.terminal_segments[route_name][0]),
                 to_screen(*state.terminal_segments[route_name][1]),
             ) if route_name in state.terminal_segments else None,
+            (
+                to_screen(*state.terminal_arrows[route_name][0]),
+                to_screen(*state.terminal_arrows[route_name][1]),
+            ) if route_name in state.terminal_arrows else None,
         ))
 
     shaft_marker = None

@@ -44,6 +44,7 @@ class TerminalMarker:
     text_color: Color
     label: str
     segment: ScreenSegment | None = None
+    arrow: ScreenSegment | None = None
 
 
 @dataclass(frozen=True)
@@ -178,6 +179,18 @@ def draw_canvas_scene(
         else:
             pygame.draw.line(screen, terminal.ring_color, *terminal.segment, 8)
             pygame.draw.line(screen, terminal.core_color, *terminal.segment, 5)
+        if terminal.arrow is not None:
+            start, end = terminal.arrow
+            pygame.draw.line(screen, terminal.core_color, start, end, 3)
+            dx, dy = end[0] - start[0], end[1] - start[1]
+            length = max((dx * dx + dy * dy) ** 0.5, 1.0)
+            ux, uy = dx / length, dy / length
+            side_x, side_y = -uy, ux
+            pygame.draw.polygon(screen, terminal.core_color, (
+                end,
+                (round(end[0] - ux * 8 + side_x * 5), round(end[1] - uy * 8 + side_y * 5)),
+                (round(end[0] - ux * 8 - side_x * 5), round(end[1] - uy * 8 - side_y * 5)),
+            ))
         label_surface = fonts.small.render(terminal.label, True, terminal.text_color)
         hooks.draw_outlined_text(
             screen,
