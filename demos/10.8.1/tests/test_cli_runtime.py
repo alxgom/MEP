@@ -70,6 +70,26 @@ def test_cli_runtime_builds_core_simple_supply_tree():
     assert all(segment.width_mm > 0 and segment.height_mm > 0 for segment in result.supply_segments)
 
 
+def test_cli_runtime_sizes_only_supply_tree_from_downstream_room_area():
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION,
+        CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+    )
+
+    supply_tree = [segment for segment in result.supply_segments if segment.kind == "tree"]
+    return_tree = [segment for segment in result.return_segments if segment.kind == "tree"]
+    assert supply_tree
+    assert all(segment.sizing is not None for segment in supply_tree)
+    assert max(segment.sizing.airflow_m3h for segment in supply_tree) == 1260.0
+    assert all(segment.height_mm == 150 for segment in supply_tree)
+    assert all(segment.sizing is None for segment in return_tree)
+
+
 def test_cli_runtime_can_disable_return_ventilation():
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION,

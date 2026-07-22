@@ -36,6 +36,7 @@ class CliGrilleConnection:
     width_mm: int
     inward_normal: tuple[float, float]
     placement_type: str = "wall"
+    room_area_m2: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -327,5 +328,6 @@ def prepare_cli_grilles(
                 f"{room_name} {'Supply' if candidate.role == 'supply' else 'Return'}",
                 room_name, candidate.role, candidate.point, candidate.routing_point,
                 candidate.width_mm, candidate.inward_normal, placement_type,
+                float(room.polygon.area) / 1_000_000.0,
             ))
     return CliGrillePlan(tuple(connections))

@@ -14,6 +14,7 @@ from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
 from .placement import CliPlacementResult, CliPlacementRuntime
 from .solver_backends import solve_cli_tree
+from .sizing import CliSizingContext, CoreConstantFrictionSizing, size_tree_edges
 
 
 @dataclass(frozen=True)
@@ -42,11 +43,15 @@ class _SolvedTree:
 class CliInteractiveRuntime:
     """Compose Cli capabilities without consuming Sal placement or solver contracts."""
 
-    def __init__(self, definition, graph_config, terminal_config, placement=None):
+    def __init__(
+        self, definition, graph_config, terminal_config, placement=None,
+        sizing_policy_factory=CoreConstantFrictionSizing,
+    ):
         self.definition = definition
         self.graph_config = graph_config
         self.terminal_config = terminal_config
         self.placement = placement or CliPlacementRuntime()
+        self.sizing_policy_factory = sizing_policy_factory
         self.last_placement = None
         self.last_result = CliRoutingResult((), "Cli has not run", 0.0, 0, {}, {})
 
@@ -173,9 +178,22 @@ class CliInteractiveRuntime:
         )
         if tree is None:
             return None
+        edge_sizes = {}
+        if role == "supply" and machine.airflow_m3h and machine.pressure_loss_mmca:
+            area_by_route = {item.route_name: item.room_area_m2 for item in connections}
+            area_by_node = {}
+            for name, point in terminals.items():
+                node = int(runtime.spatial_index.query(point)[1])
+                area_by_node[node] = area_by_node.get(node, 0.0) + area_by_route.get(name, 0.0)
+            policy = self.sizing_policy_factory(CliSizingContext(
+                machine.airflow_m3h, machine.pressure_loss_mmca,
+            ))
+            root_node = int(runtime.spatial_index.query(access["access_point"])[1])
+            edge_sizes = size_tree_edges(tree.tree_edges, root_node, area_by_node, policy)
         segments = materialize_cli_tree(
             role=role, machine=machine, pins=pins, access_spec=access,
             graph_nodes=runtime.nodes, tree=tree, grille_connections=connections,
+            edge_sizes=edge_sizes,
         )
         return _SolvedTree(dwelling.workspace, segments, len(runtime.nodes))
 

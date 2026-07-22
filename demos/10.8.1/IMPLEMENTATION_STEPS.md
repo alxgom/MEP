@@ -834,6 +834,11 @@ Before each commit:
 - Ordered-installation context is applied during Coc search by a NumPy graph-occupancy filter that eliminates covered vertices and edges from numeric obstacle bounds. Shapely remains in normalized dwelling/graph construction adapters, not Coc obstacle avoidance or path search.
 - Validation: Python compilation, 14 focused Coc/graph/state/execution/frame contracts, the full 379-contract Demo suite, and direct routing of all seven exported dwelling cases (7/7 successful, four using the reported regular-grid fallback). The Pygame launch smoke remains unavailable in this shell because its interpreter does not include Pygame.
 
+- Ported routing-core's Cli supply sizing as an installation-owned, replaceable policy. The supply tree is rooted at the machine, accumulates conditioned-room polygon area in post-order, allocates verified machine airflow proportionally, and applies the core constant-friction formula with 150 mm height and 50 mm upward width increments.
+- Each sized supply segment retains downstream area, airflow, equivalent diameter, section, and nominal/actual velocity for comparison with future policies. Return sizing remains intentionally unchanged because routing-core provides no equivalent return-tree baseline.
+- Added verified routing-core project-input airflow/loss data for PEAD M71JA and M100JA. Other PEAD models remain explicitly unsourced and retain connector dimensions rather than receiving inferred engineering values.
+- Validation: Python compilation and focused Cli sizing/runtime contracts.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
