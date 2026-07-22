@@ -9,6 +9,7 @@ from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
 from .geometry import cli_air_access_spec, cli_machine_pins
+from .clearance import apply_cli_edge_weights, cli_minimum_clearance_weights
 from .duct_geometry import build_core_duct_polygon_projection
 from .graph_inputs import build_cli_simple_graph_inputs
 from .grilles import CliGrillePlan, prepare_cli_grilles
@@ -201,10 +202,20 @@ class CliInteractiveRuntime:
         if build is None or not len(build.runtime.nodes):
             return None
         runtime = build.runtime
+        corner_keys = ("c_tl", "c_tr", "c_br", "c_bl")
+        machine_center = (
+            sum(pins[key][0] for key in corner_keys) / len(corner_keys),
+            sum(pins[key][1] for key in corner_keys) / len(corner_keys),
+        )
+        clearance_weights = cli_minimum_clearance_weights(
+            prepared, machine, machine_center, angle, runtime,
+        )
+        weighted_adjacency = apply_cli_edge_weights(runtime.adjacency, clearance_weights)
+        dwelling.workspace.overlay.values = dict(clearance_weights)
         points = [access["access_point"], *terminals.values()]
         indices = tuple(dict.fromkeys(int(runtime.spatial_index.query(point)[1]) for point in points))
         tree = solve_cli_tree(
-            solver_backend_index, runtime.nodes, runtime.adjacency, indices,
+            solver_backend_index, runtime.nodes, weighted_adjacency, indices,
             bend_penalty=bend_penalty_mm,
             crossing_multiplier=crossing_penalty_multiplier,
             prior_segments=prior_segments,

@@ -857,6 +857,10 @@ Before each commit:
 - Cli no longer advertises a routing-weight projection it does not implement. Its solver-owned bend and crossing costs are unchanged; the global weight overlay is empty for Cli until a Cli-specific projection is added.
 - Validation: Python compilation, focused capability/workspace-overlay contracts, and the full Demo suite (390 passed).
 
+- Added a Cli-owned 75 mm minimum centerline-clearance field derived from the ported 150 mm minimum duct width. Wall-parallel edges and edges within 75 mm of the active machine receive the routing-core-compatible near-hard cost of 1,000,000 without rebuilding the selected graph.
+- All three Cli tree backends consume a copied weighted adjacency. The same field is retained in the Cli workspace for the active-installation `Weights` diagnostic; its refresh path no longer invokes Sal policy.
+- Validation: Python compilation, focused Cli clearance/runtime/projection contracts, and the full Demo suite (392 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

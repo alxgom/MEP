@@ -63,8 +63,8 @@ def test_disabled_active_installation_projects_no_machine():
     assert projection.active.pins == {}
 
 
-def test_cli_does_not_advertise_sal_routing_weight_projection():
-    assert not CliInstallationRuntime.capabilities.routing_weights
+def test_cli_advertises_its_own_routing_weight_projection():
+    assert CliInstallationRuntime.capabilities.routing_weights
 
 
 def test_weight_overlay_draw_uses_explicit_active_workspace():

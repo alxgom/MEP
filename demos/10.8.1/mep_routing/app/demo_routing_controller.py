@@ -154,6 +154,8 @@ class DemoRoutingController:
         if workspace.env is None:
             workspace.overlay.reset()
             return
+        if a.installation_header_state.active == "cli":
+            return
         machine = a.SAL_INSTALLATION.default_machine
         diameter = machine.small_duct_diameter_mm if a.edge_weight_view_mode_idx == 0 else machine.large_duct_diameter_mm
         self.routing_runtime(workspace.env).refresh_edge_weight_overlay(routes, diameter)
