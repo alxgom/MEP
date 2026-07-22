@@ -885,6 +885,10 @@ Before each commit:
 - Polygon work remains lazy and outside the routing loop. Alignment state selection is numeric; Shapely is used only when the selected overlay is rendered. The selector is retained in solution-log snapshots.
 - Validation: Python compilation, focused aligned-geometry/cache/selector/snapshot contracts, the full Demo suite (400 passed), a non-interactive startup solve, and a real dual-installation solve whose 17 Cli supply segments produced the aligned projection in about 1.2 ms before caching.
 
+- Corrected aligned offsets from the provisional `side * child_width / 2` displacement to face continuity based on `parent_offset + side * (parent_width - child_width) / 2`. A dominant straight leaf now retains the selected parent face through tees and later reductions without the artificial lateral jump; the machine-side first reduction remains centered as the lower-loss, simpler installation preference.
+- Hardened the projection for Regular Grid endpoint snapping. Machine, tree, and grille adapters may materialize as separate geometric components, so alignment now orients every component deterministically instead of assuming one connected tree. It deliberately does not invent bridging ducts across snapped gaps.
+- Validation: Python compilation, focused face-offset/centered-first-reduction/disconnected-adapter contracts, the full Demo suite (402 passed), and a live Regular Grid Cli solve with the Aligned overlay selected (11 supply segments, 14 polygons, no crash).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

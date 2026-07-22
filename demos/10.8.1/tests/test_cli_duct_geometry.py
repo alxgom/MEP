@@ -57,6 +57,7 @@ def test_aligned_projection_does_not_add_decisions_to_unchanged_straight_run():
     projection = build_aligned_duct_polygon_projection(segments)
 
     assert projection.alignment_states == (0, 0)
+    assert projection.alignment_offsets_mm == (0.0, 0.0)
     assert projection.event_count == 0
     assert projection.junction_polygons == ()
 
@@ -80,8 +81,9 @@ def test_aligned_projection_keeps_high_flow_tee_run_away_from_secondary_branch()
     projection = build_aligned_duct_polygon_projection(segments)
 
     assert projection.alignment_states == (0, -1, 0)
+    assert projection.alignment_offsets_mm == (0.0, -50.0, 0.0)
     assert projection.event_count == 1
-    assert projection.conducto_polygons[1].bounds == pytest.approx((0, -300, 1000, 0))
+    assert projection.conducto_polygons[1].bounds == pytest.approx((0, -200, 1000, 100))
 
 
 def test_aligned_projection_propagates_alignment_through_downstream_reduction():
@@ -107,8 +109,36 @@ def test_aligned_projection_propagates_alignment_through_downstream_reduction():
     projection = build_aligned_duct_polygon_projection(segments)
 
     assert projection.alignment_states == (0, -1, 0, -1)
+    assert projection.alignment_offsets_mm == (0.0, -50.0, 0.0, -100.0)
     assert projection.event_count == 2
     assert projection.conducto_polygons[3].bounds == pytest.approx((1000, -200, 2000, 0))
+
+
+def test_aligned_projection_keeps_machine_side_reduction_centered():
+    segments = (
+        CliDuctSegment((0, 0), (200, 0), 250, 150, "machine_stub", "Supply"),
+        CliDuctSegment((200, 0), (500, 0), 400, 150, "machine_branch", "Supply"),
+        CliDuctSegment((500, 0), (1000, 0), 400, 150, "tree", "Supply"),
+    )
+
+    projection = build_aligned_duct_polygon_projection(segments)
+
+    assert projection.alignment_states == (0, 0, 0)
+    assert projection.alignment_offsets_mm == (0.0, 0.0, 0.0)
+    assert projection.conducto_polygons[1].bounds == pytest.approx((200, -200, 500, 200))
+
+
+def test_aligned_projection_handles_disconnected_endpoint_adapters():
+    segments = (
+        CliDuctSegment((0, 0), (200, 0), 250, 150, "machine_stub", "Supply"),
+        CliDuctSegment((300, 0), (1000, 0), 400, 150, "tree", "Supply"),
+        CliDuctSegment((1000, 0), (1000, 800), 200, 150, "tree", "Branch"),
+    )
+
+    projection = build_aligned_duct_polygon_projection(segments)
+
+    assert len(projection.conducto_polygons) == 3
+    assert len(projection.alignment_offsets_mm) == 3
 
 
 def test_cli_runtime_reuses_aligned_projection_for_same_result():

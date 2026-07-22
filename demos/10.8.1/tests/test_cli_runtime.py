@@ -153,6 +153,7 @@ def test_cli_runtime_supports_its_declared_graph_modes(graph_mode):
     )
 
     assert result.routes
+    assert runtime.aligned_polygon_projection(result).conducto_polygons
 
 
 @pytest.mark.parametrize("backend_index", range(3))
