@@ -1,6 +1,6 @@
 ---
 name: mep-demo-10-8-1-refactor
-description: Workflow for refactoring Demo 10.8.1 into a modular interactive routing app. Use when modifying demos/10.8.1, its vent_router package, config taxonomy, routing/geometry/graph/placement/UI boundaries, validation plan, or git workflow for this refactor.
+description: Workflow for refactoring and extending Demo 10.8.1 as a low-latency MEP routing experimentation platform. Use when modifying demos/10.8.1, porting or comparing letsmep-routing-core behavior, developing Cli/Sal/Coc/San experiments, or changing config, routing, geometry, graphs, placement, UI, validation, performance, or git workflow.
 ---
 
 # Demo 10.8.1 Refactor Workflow
@@ -26,6 +26,8 @@ Follow this workflow before changing code in `demos/10.8.1`.
 - Do not let a temporary compatibility or legacy body block refactor progress; record it in `IMPLEMENTATION_STEPS.md` and remove it at the next safe cleanup boundary.
 - Keep pure computation independent from Pygame and filesystem adapters.
 - Use integer millimetres internally wherever practical.
+- Preserve comparable routing-core semantics and artifacts, not its implementation architecture.
+- Prefer low-latency numeric execution, graph reuse, and incremental dynamic state over literal ports.
 - Use English semantic config keys.
 - Treat current distances as feasibility, heuristic, solver, or performance values unless a regulation source is explicit.
 - Do not guess future Cli/Coc/San behavior.
@@ -33,6 +35,7 @@ Follow this workflow before changing code in `demos/10.8.1`.
 
 ## References
 
+- Read `references/interactive-platform.md` when porting routing-core behavior, changing graph lifecycle or obstacle handling, optimizing latency/memory, or designing an experiment intended for later upstream adoption.
 - Read `references/config-taxonomy.md` when changing config keys, defaults, units, or metadata.
 - Read `references/refactor-boundaries.md` when moving functions between modules.
 - Read `references/validation.md` before choosing test/manual validation for a step.
