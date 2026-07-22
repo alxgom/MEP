@@ -101,7 +101,6 @@ show_heatmap = False
 edge_weight_heatmap_enabled = False
 edge_weight_view_mode_idx = 0
 route_real_diameter_width_enabled = False
-show_cli_core_polygons = False
 preferred_terminal_tool_mode = None
 terminal_validity_overlay_enabled = False
 room_start_mode_idx = 0

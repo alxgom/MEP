@@ -94,3 +94,23 @@ def test_cli_weight_sliders_update_cli_values_without_changing_sal():
     assert app.workbench_state.cli.bend_penalty_mm == 2300
     assert app.workbench_state.cli.crossing_penalty_multiplier == 7.5
     assert (app.C_BEND, app.crossing_penalty_multiplier) == (4000, 5)
+
+
+def test_cli_duct_geometry_selector_cycles_off_core_aligned():
+    app, _rebuilds = _app()
+    app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
+    rect = SimpleNamespace(collidepoint=lambda _pos: True)
+    app.canvas_ui = SimpleNamespace(
+        toolbar_buttons=lambda: (("duct_geometry", rect, None),),
+        apply_view_action=lambda _action: None,
+    )
+    controller = WorkbenchCommandController(app, _pygame_keys())
+
+    selected = []
+    modes = []
+    for _ in range(3):
+        selected.append(controller.handle_canvas_tool_button_click((0, 0)))
+        modes.append(app.workbench_state.cli.duct_geometry_mode_idx)
+
+    assert selected == ["duct_geometry"] * 3
+    assert modes == [1, 2, 0]

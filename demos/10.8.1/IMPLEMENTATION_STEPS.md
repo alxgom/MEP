@@ -880,6 +880,11 @@ Before each commit:
 - Clicking a Cli log now restores those values before rerunning, so the active Cli controls and machine configuration visibly match the saved solution. Legacy snapshots retain their previous Sal-only fallback behavior.
 - Validation: Python compilation, focused Cli snapshot/restore contracts, and the full Demo suite (395 passed).
 
+- Replaced the binary Cli core-polygon toggle with an installation-owned `Off / Core / Aligned` selector. Core remains the routing-core comparison baseline; aligned geometry is a separately cached, post-route projection over the same sized supply skeleton.
+- The first aligned policy compresses unchanged collinear runs into trivial propagation. It creates decisions only at section changes, bends, and junctions; asymmetric tees favor directional continuity weighted by downstream airflow, offset the dominant run away from a secondary branch, and carry that face through downstream reductions. Ordinary bends remain centered in this first experiment.
+- Polygon work remains lazy and outside the routing loop. Alignment state selection is numeric; Shapely is used only when the selected overlay is rendered. The selector is retained in solution-log snapshots.
+- Validation: Python compilation, focused aligned-geometry/cache/selector/snapshot contracts, the full Demo suite (400 passed), a non-interactive startup solve, and a real dual-installation solve whose 17 Cli supply segments produced the aligned projection in about 1.2 ms before caching.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

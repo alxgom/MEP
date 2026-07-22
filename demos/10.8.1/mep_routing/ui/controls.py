@@ -13,8 +13,8 @@ def canvas_tool_button_bounds(canvas_left, canvas_top):
     cursor = x0 + 2 * (size + gap) + reset_width + gap
     ruler = (cursor, y0, 58, size)
     diameter = (ruler[0] + ruler[2] + gap, y0, 72, size)
-    core_ducts = (diameter[0] + diameter[2] + gap, y0, 82, size)
-    weights = (core_ducts[0] + core_ducts[2] + 14, y0, 72, size)
+    duct_geometry = (diameter[0] + diameter[2] + gap, y0, 108, size)
+    weights = (duct_geometry[0] + duct_geometry[2] + 14, y0, 72, size)
     weight_switch = weight_view_switch_bounds(weights)
     return (
         ("in", (x0, y0, size, size), "+"),
@@ -22,7 +22,7 @@ def canvas_tool_button_bounds(canvas_left, canvas_top):
         ("reset", (x0 + 2 * (size + gap), y0, reset_width, size), "1:1"),
         ("ruler", ruler, "Ruler"),
         ("diameter", diameter, "Actual Ø"),
-        ("core_ducts", core_ducts, "Core ducts"),
+        ("duct_geometry", duct_geometry, "Ducts"),
         ("weights", weights, "Weights"),
     )
 

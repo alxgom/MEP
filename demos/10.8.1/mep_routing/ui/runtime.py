@@ -226,7 +226,7 @@ class CanvasUiRuntime:
             ruler_enabled=state["ruler_enabled"],
             edge_weights_enabled=state["edge_weights_enabled"],
             diameter_width_enabled=state["diameter_width_enabled"],
-            core_ducts_enabled=state["core_ducts_enabled"],
+            duct_geometry_mode=state["duct_geometry_mode"],
             small_weight_view=state["small_weight_view"],
             zoom_level=self.viewport.zoom,
             dwelling_label=state["dwelling_label"],

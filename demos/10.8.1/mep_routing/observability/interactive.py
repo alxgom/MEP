@@ -152,6 +152,7 @@ class InteractiveObservationController:
                     "auto_placement_mode_idx": int(cli.auto_placement_mode_idx),
                     "bend_penalty_mm": float(cli.bend_penalty_mm),
                     "crossing_penalty_multiplier": float(cli.crossing_penalty_multiplier),
+                    "duct_geometry_mode_idx": int(cli.duct_geometry_mode_idx),
                 },
             },
             "preferred_terminal_points_by_room": {} if terminals is None else terminals.preferred_points_by_room,
@@ -235,6 +236,7 @@ class InteractiveObservationController:
                 "router_backend_idx", "heuristic_mode_idx", "room_start_mode_idx",
                 "auto_placement_mode_idx", "bend_penalty_mm",
                 "crossing_penalty_multiplier",
+                "duct_geometry_mode_idx",
             ):
                 if name in cli_saved:
                     setattr(cli, name, cli_saved[name])

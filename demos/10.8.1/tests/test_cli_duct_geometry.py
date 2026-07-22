@@ -2,7 +2,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from mep_routing.installations.cli import build_core_duct_polygon_projection
+from mep_routing.installations.cli import (
+    build_aligned_duct_polygon_projection,
+    build_core_duct_polygon_projection,
+)
 from mep_routing.installations.cli.materializer import CliDuctSegment
 
 
@@ -40,5 +43,85 @@ def test_cli_runtime_reuses_projection_for_same_result():
 
     first = runtime.core_polygon_projection(result)
     second = runtime.core_polygon_projection(result)
+
+    assert second is first
+
+
+def test_aligned_projection_does_not_add_decisions_to_unchanged_straight_run():
+    sizing = SimpleNamespace(airflow_m3h=500.0)
+    segments = (
+        CliDuctSegment((0, 0), (1000, 0), 300, 150, "machine_stub", "Supply", sizing),
+        CliDuctSegment((1000, 0), (2000, 0), 300, 150, "tree", "Supply", sizing),
+    )
+
+    projection = build_aligned_duct_polygon_projection(segments)
+
+    assert projection.alignment_states == (0, 0)
+    assert projection.event_count == 0
+    assert projection.junction_polygons == ()
+
+
+def test_aligned_projection_keeps_high_flow_tee_run_away_from_secondary_branch():
+    segments = (
+        CliDuctSegment(
+            (-1000, 0), (0, 0), 400, 150, "machine_stub", "Supply",
+            SimpleNamespace(airflow_m3h=1000.0),
+        ),
+        CliDuctSegment(
+            (1000, 0), (0, 0), 300, 150, "tree", "Main",
+            SimpleNamespace(airflow_m3h=800.0),
+        ),
+        CliDuctSegment(
+            (0, 0), (0, 1000), 150, 150, "tree", "Branch",
+            SimpleNamespace(airflow_m3h=200.0),
+        ),
+    )
+
+    projection = build_aligned_duct_polygon_projection(segments)
+
+    assert projection.alignment_states == (0, -1, 0)
+    assert projection.event_count == 1
+    assert projection.conducto_polygons[1].bounds == pytest.approx((0, -300, 1000, 0))
+
+
+def test_aligned_projection_propagates_alignment_through_downstream_reduction():
+    segments = (
+        CliDuctSegment(
+            (-1000, 0), (0, 0), 400, 150, "machine_stub", "Supply",
+            SimpleNamespace(airflow_m3h=1000.0),
+        ),
+        CliDuctSegment(
+            (0, 0), (1000, 0), 300, 150, "tree", "Main",
+            SimpleNamespace(airflow_m3h=800.0),
+        ),
+        CliDuctSegment(
+            (0, 0), (0, 1000), 150, 150, "tree", "Branch",
+            SimpleNamespace(airflow_m3h=200.0),
+        ),
+        CliDuctSegment(
+            (1000, 0), (2000, 0), 200, 150, "tree", "Main",
+            SimpleNamespace(airflow_m3h=500.0),
+        ),
+    )
+
+    projection = build_aligned_duct_polygon_projection(segments)
+
+    assert projection.alignment_states == (0, -1, 0, -1)
+    assert projection.event_count == 2
+    assert projection.conducto_polygons[3].bounds == pytest.approx((1000, -200, 2000, 0))
+
+
+def test_cli_runtime_reuses_aligned_projection_for_same_result():
+    from mep_routing.installations.cli.runtime import CliInteractiveRuntime
+
+    runtime = object.__new__(CliInteractiveRuntime)
+    runtime._aligned_polygon_result = None
+    runtime._aligned_polygon_projection = None
+    result = SimpleNamespace(supply_segments=(
+        CliDuctSegment((0, 0), (1000, 0), 300, 150, "tree", "Supply Air Tree"),
+    ))
+
+    first = runtime.aligned_polygon_projection(result)
+    second = runtime.aligned_polygon_projection(result)
 
     assert second is first

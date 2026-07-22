@@ -11,6 +11,7 @@ from mep_routing.graphs import GraphMode
 from .geometry import cli_air_access_spec, cli_machine_pins
 from .clearance import apply_cli_edge_weights, cli_minimum_clearance_weights
 from .duct_geometry import build_core_duct_polygon_projection
+from .aligned_duct_geometry import build_aligned_duct_polygon_projection
 from .graph_inputs import build_cli_simple_graph_inputs
 from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
@@ -62,6 +63,8 @@ class CliInteractiveRuntime:
         self.grille_sizing_policy_factory = grille_sizing_policy_factory
         self._core_polygon_result = None
         self._core_polygon_projection = None
+        self._aligned_polygon_result = None
+        self._aligned_polygon_projection = None
         self.last_placement = None
         self.last_result = CliRoutingResult((), "Cli has not run", 0.0, 0, {}, {})
 
@@ -263,6 +266,8 @@ class CliInteractiveRuntime:
         )
         self._core_polygon_result = None
         self._core_polygon_projection = None
+        self._aligned_polygon_result = None
+        self._aligned_polygon_projection = None
         return self.last_result
 
     def core_polygon_projection(self, result=None):
@@ -274,3 +279,13 @@ class CliInteractiveRuntime:
             )
             self._core_polygon_result = result
         return self._core_polygon_projection
+
+    def aligned_polygon_projection(self, result=None):
+        """Build the experimental projection once per routing result."""
+        result = self.last_result if result is None else result
+        if result is not self._aligned_polygon_result:
+            self._aligned_polygon_projection = build_aligned_duct_polygon_projection(
+                result.supply_segments,
+            )
+            self._aligned_polygon_result = result
+        return self._aligned_polygon_projection

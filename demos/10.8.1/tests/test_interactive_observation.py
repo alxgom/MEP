@@ -53,6 +53,7 @@ def _app():
 
 def test_snapshot_round_trip_restores_live_fields_and_preferences():
     app = _app()
+    app.workbench_state.cli.duct_geometry_mode_idx = 2
     controller = InteractiveObservationController(app, SimpleNamespace())
     snapshot = controller.runtime.snapshot(controller.current_state(), {}, "Saved", 5, 8)
     snapshot["id"] = 7
@@ -60,6 +61,7 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     app.workbench_state.installation("sal").pose.x_mm, app.C_BEND = -1, -1
     app.workbench_state.installation("cli").pose.set((-30, -40), 0)
     app.workbench_state.cli.bend_penalty_mm = -1
+    app.workbench_state.cli.duct_geometry_mode_idx = 0
     app.installation_header_state = InstallationHeaderState(
         order=("sal", "cli"), enabled=frozenset({"sal"}), active="sal",
     )
@@ -70,6 +72,7 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     assert app.C_BEND == 200.0
     assert app.workbench_state.installation("cli").pose.as_tuple() == (30.0, 40.0, 180.0)
     assert app.workbench_state.cli.bend_penalty_mm == 4000.0
+    assert app.workbench_state.cli.duct_geometry_mode_idx == 2
     assert app.installation_header_state.active == "cli"
     assert app.installation_header_state.enabled == frozenset({"sal", "cli"})
     assert app.installation_ui_session.selected_keys["cli"] == saved_cli_key

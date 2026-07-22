@@ -212,7 +212,7 @@ class DemoUiFacade:
         return a.canvas_ui.draw_toolbar(screen, font, state={
             "ruler_enabled": ruler_mode, "edge_weights_enabled": a.edge_weight_heatmap_enabled,
             "diameter_width_enabled": a.route_real_diameter_width_enabled,
-            "core_ducts_enabled": a.show_cli_core_polygons,
+            "duct_geometry_mode": a.workbench_state.cli.duct_geometry_mode_idx,
             "small_weight_view": a.edge_weight_view_mode_idx == 0,
             "dwelling_label": a.current_scenario_label,
             "dwelling_options": self.dwelling_selector_options(),
