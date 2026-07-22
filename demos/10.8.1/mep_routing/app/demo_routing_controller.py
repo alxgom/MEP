@@ -148,10 +148,11 @@ class DemoRoutingController:
     def route_diameter(self, route_name):
         return self.route_analysis().route_diameter(route_name)
 
-    def refresh_edge_weight_overlay(self, routes):
+    def refresh_edge_weight_overlay(self, routes, workspace=None):
         a = self.app
-        workspace = self._dwelling().workspace
+        workspace = workspace or self._dwelling().workspace
         if workspace.env is None:
+            workspace.overlay.reset()
             return
         machine = a.SAL_INSTALLATION.default_machine
         diameter = machine.small_duct_diameter_mm if a.edge_weight_view_mode_idx == 0 else machine.large_duct_diameter_mm

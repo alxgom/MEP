@@ -261,20 +261,21 @@ class DemoUiFacade:
             hatch_color=a.theme.machine_clearance_hatch,
         )
 
-    def draw_edge_weight_heatmap(self, screen):
+    def draw_edge_weight_heatmap(self, screen, workspace=None):
         a = self.app
+        workspace = workspace or a.workbench_state.dwelling.workspace
         if a.edge_weight_heatmap_enabled:
             return a.canvas_ui.draw_edge_heatmap(
-                screen, a.workbench_state.dwelling.workspace.overlay.values,
-                a.workbench_state.dwelling.workspace.env,
+                screen, workspace.overlay.values, workspace.env,
                 a.demo_config.overlap_block_weight, a.theme.blocked_edge,
             )
 
-    def draw_edge_weight_colorbar(self, screen):
+    def draw_edge_weight_colorbar(self, screen, workspace=None):
         a = self.app
+        workspace = workspace or a.workbench_state.dwelling.workspace
         if a.edge_weight_heatmap_enabled:
             return a.canvas_ui.draw_edge_colorbar(
-                screen, a.workbench_state.dwelling.workspace.overlay.values,
+                screen, workspace.overlay.values,
                 a.demo_config.overlap_block_weight,
                 a.theme.blocked_edge, a.theme.text,
             )

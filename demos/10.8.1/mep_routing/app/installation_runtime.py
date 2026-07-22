@@ -73,7 +73,7 @@ class SalInstallationRuntime:
 class CliInstallationRuntime:
     key = "cli"
     capabilities = InstallationCapabilities(
-        machine_selection=True, automatic_placement=True, routing_weights=True,
+        machine_selection=True, automatic_placement=True,
     )
 
     def __init__(self, app):

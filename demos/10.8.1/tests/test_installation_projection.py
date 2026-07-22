@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from mep_routing.app.installation_runtime import CliInstallationRuntime
+from mep_routing.ui.demo_facade import DemoUiFacade
 from mep_routing.ui.installation_projection import (
     InstallationProjection, ProjectedCapabilities, WorkbenchProjection, active_capabilities,
     project_workbench,
@@ -59,3 +61,31 @@ def test_disabled_active_installation_projects_no_machine():
 
     assert projection.visible == ()
     assert projection.active.pins == {}
+
+
+def test_cli_does_not_advertise_sal_routing_weight_projection():
+    assert not CliInstallationRuntime.capabilities.routing_weights
+
+
+def test_weight_overlay_draw_uses_explicit_active_workspace():
+    calls = []
+    canvas = SimpleNamespace(
+        draw_edge_heatmap=lambda *args: calls.append(args),
+    )
+    stale_sal = SimpleNamespace(
+        overlay=SimpleNamespace(values={(0, 1): 9.0}), env="sal-env",
+    )
+    active_cli = SimpleNamespace(
+        overlay=SimpleNamespace(values={}), env="cli-env",
+    )
+    app = SimpleNamespace(
+        edge_weight_heatmap_enabled=True, canvas_ui=canvas,
+        workbench_state=SimpleNamespace(dwelling=SimpleNamespace(workspace=stale_sal)),
+        demo_config=SimpleNamespace(overlap_block_weight=1e6),
+        theme=SimpleNamespace(blocked_edge=(1, 2, 3)),
+    )
+
+    DemoUiFacade(app, None).draw_edge_weight_heatmap("screen", active_cli)
+
+    assert calls[0][1] == {}
+    assert calls[0][2] == "cli-env"

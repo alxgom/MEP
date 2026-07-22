@@ -853,6 +853,10 @@ Before each commit:
 - The `Core ducts` baseline intentionally retains routing-core's max-width square union at the grille transition. Its oversized footprint is now documented as a core geometry artifact for the planned alternative geometry procedure, rather than being mistaken for a sizing error.
 - Validation: Python compilation, focused grille policy/runtime contracts, and the full Demo suite (388 passed).
 
+- Scoped the edge-weight diagnostic to the active installation workspace. Weight refresh and rendering no longer read the shared Sal workspace while Cli is active, so a disabled Sal machine cannot leave a ghost clearance field on Cli's graph view.
+- Cli no longer advertises a routing-weight projection it does not implement. Its solver-owned bend and crossing costs are unchanged; the global weight overlay is empty for Cli until a Cli-specific projection is added.
+- Validation: Python compilation, focused capability/workspace-overlay contracts, and the full Demo suite (390 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

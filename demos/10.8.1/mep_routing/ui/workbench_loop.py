@@ -66,8 +66,11 @@ def _render(app, screen, clock, fonts, state):
 
     def edge_overlay():
         if app.edge_weight_heatmap_enabled:
-            app.routing_controller.refresh_edge_weight_overlay(routes)
-        app.ui_facade.draw_edge_weight_heatmap(screen)
+            if active_view.can("routing_weights"):
+                app.routing_controller.refresh_edge_weight_overlay(routes, workspace)
+            else:
+                workspace.overlay.reset()
+        app.ui_facade.draw_edge_weight_heatmap(screen, workspace)
 
     scene = build_canvas_scene(CanvasFrameState(
         rooms=app.rooms, doors=app.doors, columns=app.columns, shafts=app.shafts,
@@ -101,7 +104,7 @@ def _render(app, screen, clock, fonts, state):
             screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores),
         ) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
         draw_edge_weight_heatmap=edge_overlay,
-        draw_edge_weight_colorbar=lambda: app.ui_facade.draw_edge_weight_colorbar(screen),
+        draw_edge_weight_colorbar=lambda: app.ui_facade.draw_edge_weight_colorbar(screen, workspace),
         draw_route_polygons=lambda: app.canvas_ui.draw_geometry(
             screen,
             app.cli_runtime.core_polygon_projection(active_view.result).polygons,
