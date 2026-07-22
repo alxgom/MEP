@@ -1,8 +1,12 @@
 from types import SimpleNamespace
 
-from mep_routing.app import WorkbenchState, build_demo_config
+from mep_routing.app import (
+    InstallationMachineUi, InstallationUiSession, WorkbenchState, build_demo_config,
+)
+from mep_routing.installations.cli import CLI_INSTALLATION
 from mep_routing.installations.sal import SAL_INSTALLATION
 from mep_routing.observability import InteractiveObservationController
+from mep_routing.ui.installation_header import InstallationHeaderState
 
 
 def _app():
@@ -10,6 +14,7 @@ def _app():
     terminal.restore_preferences = lambda points, areas: setattr(terminal, "restored", (points, areas))
     workbench_state = WorkbenchState.create()
     workbench_state.installation("sal").pose.set((10, 20), 90)
+    workbench_state.installation("cli").pose.set((30, 40), 180)
     workbench_state.dwelling.terminal_runtime = terminal
     app = SimpleNamespace(
         workbench_state=workbench_state,
@@ -25,6 +30,13 @@ def _app():
         C_BEND=200.0, crossing_penalty_multiplier=5.0,
         C_BEND_DEFAULT=100.0, CROSSING_MULTIPLIER_DEFAULT=2.0,
         rebuilt=None,
+        installation_header_state=InstallationHeaderState(
+            order=("sal", "cli"), enabled=frozenset({"sal", "cli"}), active="cli",
+        ),
+        installation_ui_session=InstallationUiSession.create({
+            "sal": InstallationMachineUi(SAL_INSTALLATION.machine_catalog, True),
+            "cli": InstallationMachineUi(CLI_INSTALLATION.machine_catalog, True),
+        }),
     )
     app.routing_controller = SimpleNamespace(
         solution_score=app.get_solution_score,
@@ -44,12 +56,23 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     controller = InteractiveObservationController(app, SimpleNamespace())
     snapshot = controller.runtime.snapshot(controller.current_state(), {}, "Saved", 5, 8)
     snapshot["id"] = 7
+    saved_cli_key = snapshot["installation_configs"]["cli"]["machine_key"]
     app.workbench_state.installation("sal").pose.x_mm, app.C_BEND = -1, -1
+    app.workbench_state.installation("cli").pose.set((-30, -40), 0)
+    app.workbench_state.cli.bend_penalty_mm = -1
+    app.installation_header_state = InstallationHeaderState(
+        order=("sal", "cli"), enabled=frozenset({"sal"}), active="sal",
+    )
 
     result = controller.restore_solution_log(snapshot)
 
     assert app.workbench_state.installation("sal").pose.as_tuple() == (10.0, 20.0, 90)
     assert app.C_BEND == 200.0
+    assert app.workbench_state.installation("cli").pose.as_tuple() == (30.0, 40.0, 180.0)
+    assert app.workbench_state.cli.bend_penalty_mm == 4000.0
+    assert app.installation_header_state.active == "cli"
+    assert app.installation_header_state.enabled == frozenset({"sal", "cli"})
+    assert app.installation_ui_session.selected_keys["cli"] == saved_cli_key
     assert app.workbench_state.dwelling.terminal_runtime.restored == ({"Bath": [(1, 2)]}, [])
     assert app.rebuilt == {"machine_pins": (10.0, 20.0, 90)}
     assert controller.logs.selected_log_id == 7

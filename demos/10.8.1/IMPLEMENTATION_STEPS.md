@@ -876,6 +876,10 @@ Before each commit:
 - Aggregate KPI history now sums each enabled installation's independently evaluated score instead of applying one installation's policy to mixed routes.
 - Validation: Python compilation, focused Cli score and aggregate-history contracts, and the full Demo suite (395 passed).
 
+- Extended solution-log snapshots with installation-header state and a Cli-owned configuration block: machine pose/family, return toggle, graph/backend modes, placement mode, bend penalty, and crossing multiplier.
+- Clicking a Cli log now restores those values before rerunning, so the active Cli controls and machine configuration visibly match the saved solution. Legacy snapshots retain their previous Sal-only fallback behavior.
+- Validation: Python compilation, focused Cli snapshot/restore contracts, and the full Demo suite (395 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

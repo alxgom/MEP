@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .runtime import RoutingObservationRuntime
 from .session import RoutingHistory
 from .snapshots import restored_snapshot_state
@@ -112,6 +114,8 @@ class InteractiveObservationController:
         a = self.app
         terminals = a.workbench_state.dwelling.terminal_runtime
         sal_pose = a.workbench_state.installation("sal").pose
+        cli_pose = a.workbench_state.installation("cli").pose
+        cli = a.workbench_state.cli
         return {
             "source_mode_idx": a.dwelling_source_idx,
             "real_scenario_idx": a.real_scenario_idx,
@@ -130,6 +134,26 @@ class InteractiveObservationController:
             "min_piece_factor": float(a.min_piece_factor),
             "bend_weight": float(a.C_BEND),
             "crossing_penalty_multiplier": float(a.crossing_penalty_multiplier),
+            "installation_header": {
+                "order": tuple(a.installation_header_state.order),
+                "enabled": tuple(sorted(a.installation_header_state.enabled)),
+                "active": a.installation_header_state.active,
+            },
+            "installation_configs": {
+                "cli": {
+                    "machine": tuple(map(float, cli_pose.as_tuple())),
+                    "machine_key": a.installation_ui_session.selected_keys["cli"],
+                    "return_ventilation_enabled": bool(cli.return_ventilation_enabled),
+                    "graph_type_idx": int(cli.graph_type_idx),
+                    "routing_strategy_idx": int(cli.routing_strategy_idx),
+                    "router_backend_idx": int(cli.router_backend_idx),
+                    "heuristic_mode_idx": int(cli.heuristic_mode_idx),
+                    "room_start_mode_idx": int(cli.room_start_mode_idx),
+                    "auto_placement_mode_idx": int(cli.auto_placement_mode_idx),
+                    "bend_penalty_mm": float(cli.bend_penalty_mm),
+                    "crossing_penalty_multiplier": float(cli.crossing_penalty_multiplier),
+                },
+            },
             "preferred_terminal_points_by_room": {} if terminals is None else terminals.preferred_points_by_room,
             "preferred_terminal_areas": [] if terminals is None else terminals.preferred_areas,
         }
@@ -187,6 +211,33 @@ class InteractiveObservationController:
         sal_pose.set(state["machine"][:2], state["machine"][2])
         a.C_BEND = state["bend_weight"]
         a.crossing_penalty_multiplier = state["crossing_penalty_multiplier"]
+        header = state.get("installation_header")
+        if header:
+            a.installation_header_state = replace(
+                a.installation_header_state,
+                order=tuple(header.get("order", a.installation_header_state.order)),
+                enabled=frozenset(header.get("enabled", a.installation_header_state.enabled)),
+                active=header.get("active", a.installation_header_state.active),
+            )
+        cli_saved = state.get("installation_configs", {}).get("cli")
+        if cli_saved:
+            cli_pose = a.workbench_state.installation("cli").pose
+            cli_machine = cli_saved.get("machine", cli_pose.as_tuple())
+            cli_pose.set(cli_machine[:2], cli_machine[2])
+            machine_key = cli_saved.get("machine_key")
+            if machine_key is not None:
+                a.installation_ui_session = a.installation_ui_session.choose(
+                    "cli", machine_key,
+                ).session
+            cli = a.workbench_state.cli
+            for name in (
+                "return_ventilation_enabled", "graph_type_idx", "routing_strategy_idx",
+                "router_backend_idx", "heuristic_mode_idx", "room_start_mode_idx",
+                "auto_placement_mode_idx", "bend_penalty_mm",
+                "crossing_penalty_multiplier",
+            ):
+                if name in cli_saved:
+                    setattr(cli, name, cli_saved[name])
         terminal_runtime = a.workbench_state.dwelling.terminal_runtime
         if terminal_runtime is not None:
             terminal_runtime.restore_preferences(
