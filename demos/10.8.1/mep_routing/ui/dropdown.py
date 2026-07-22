@@ -28,6 +28,29 @@ class DropdownTransition:
     changed: bool = False
 
 
+@dataclass(frozen=True)
+class DropdownPalette:
+    control_fill: tuple[int, int, int]
+    control_border: tuple[int, int, int]
+    option_fill: tuple[int, int, int]
+    selected_fill: tuple[int, int, int]
+    text: tuple[int, int, int]
+    muted: tuple[int, int, int]
+
+
+def dropdown_palette(opened, text_color=(236, 240, 241), muted_color=(149, 165, 166)):
+    """Reverse contrast while open so the option sheet reads as active UI."""
+    if opened:
+        return DropdownPalette(
+            (229, 234, 239), (126, 140, 152), (244, 247, 249),
+            (190, 215, 232), (28, 34, 41), (67, 78, 88),
+        )
+    return DropdownPalette(
+        (32, 36, 44), (150, 158, 166), (32, 36, 44),
+        (58, 80, 94), text_color, muted_color,
+    )
+
+
 def dropdown_transition(state: DropdownState, action: str, key: str | None = None) -> DropdownTransition:
     if action == "toggle":
         return DropdownTransition(replace(state, open=not state.open))
@@ -56,19 +79,20 @@ def draw_dropdown(screen, font, *, bounds: Bounds, options: Sequence[DropdownOpt
     control_bounds, option_bounds = dropdown_bounds(*bounds[:3], len(options), height=bounds[3])
     control = pygame.Rect(control_bounds)
     selected = next(option for option in options if option.key == state.selected_key)
-    pygame.draw.rect(screen, (32, 36, 44), control, border_radius=4)
-    pygame.draw.rect(screen, (150, 158, 166), control, 1, border_radius=4)
-    label = font.render(selected.label[:28], True, text_color)
+    palette = dropdown_palette(state.open, text_color, muted_color)
+    pygame.draw.rect(screen, palette.control_fill, control, border_radius=4)
+    pygame.draw.rect(screen, palette.control_border, control, 1, border_radius=4)
+    label = font.render(selected.label[:28], True, palette.text)
     screen.blit(label, (control.x + 8, control.centery - label.get_height() // 2))
     if len(options) > 1:
-        arrow = font.render("^" if state.open else "v", True, muted_color)
+        arrow = font.render("^" if state.open else "v", True, palette.muted)
         screen.blit(arrow, (control.right - arrow.get_width() - 8, control.centery - arrow.get_height() // 2))
     if state.open:
         for option, raw_bounds in zip(options, option_bounds):
             rect = pygame.Rect(raw_bounds)
-            fill = (58, 80, 94) if option.key == state.selected_key else (32, 36, 44)
+            fill = palette.selected_fill if option.key == state.selected_key else palette.option_fill
             pygame.draw.rect(screen, fill, rect)
-            pygame.draw.rect(screen, (95, 104, 112), rect, 1)
+            pygame.draw.rect(screen, palette.control_border, rect, 1)
             text = f"{option.label}  {option.detail}".strip()
-            rendered = font.render(text[:32], True, text_color)
+            rendered = font.render(text[:32], True, palette.text)
             screen.blit(rendered, (rect.x + 8, rect.centery - rendered.get_height() // 2))

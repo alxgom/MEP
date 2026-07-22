@@ -26,6 +26,7 @@ class InteractiveObservationController:
         )
         self._histories = {"all": self.runtime.history}
         self.kpi_scope = "all"
+        self.kpi_scope_open = False
 
     @property
     def history(self):
@@ -77,12 +78,23 @@ class InteractiveObservationController:
         return True
 
     def handle_kpi_scope_click(self, pos):
-        from ..ui.plots import kpi_scope_hit
+        from ..ui.plots import kpi_scope_action
         viewport = self.chrome.viewport
-        key = kpi_scope_hit(
-            pos, viewport.window_width, self.chrome.panel_width, self.kpi_scope_options(),
+        action = kpi_scope_action(
+            pos, viewport.window_width, self.chrome.panel_width,
+            self.kpi_scope_options(), self.kpi_scope_open,
         )
-        return key is not None and self.select_kpi_scope(key)
+        if action is None:
+            return False
+        command, key = action
+        if command == "toggle":
+            self.kpi_scope_open = not self.kpi_scope_open
+        elif command == "choose":
+            self.select_kpi_scope(key)
+            self.kpi_scope_open = False
+        else:
+            self.kpi_scope_open = False
+        return True
 
     def _history_for(self, key):
         return self._histories.setdefault(key, RoutingHistory(maxlen=self.history.maxlen))
@@ -188,6 +200,7 @@ class InteractiveObservationController:
                 history.clear()
         self._histories = {"all": self.history}
         self.kpi_scope = "all"
+        self.kpi_scope_open = False
 
     def log_current_solution(self, routes, status, elapsed_ms, total_nodes):
         if not routes:
@@ -260,7 +273,7 @@ class InteractiveObservationController:
     def draw_plots(self, screen, font_small, font_title, font_value, font_minimum):
         return self.chrome.draw_plots(
             screen, font_small, font_title, font_value, font_minimum, self.displayed_history,
-            self.kpi_scope, self.kpi_scope_options(),
+            self.kpi_scope, self.kpi_scope_options(), self.kpi_scope_open,
         )
 
     def draw_card_help_button(self, screen, card_id, rect, font):

@@ -162,11 +162,14 @@ class WorkbenchEventAdapter:
         a, s = self.app, self.state
         mx, my = pos
         if a.ui_facade.handle_cli_return_toggle_click(pos):
+            a.observation.kpi_scope_open = False
             self._solve()
             s.selected_route_name = None
             return
         handled, changed, field = a.ui_facade.handle_solver_dropdown_click(pos)
         if handled:
+            if getattr(a, "observation", None) is not None:
+                a.observation.kpi_scope_open = False
             if changed:
                 if field == "graph" and a.installation_header_state.active == "sal":
                     pose = a.workbench_state.installation("sal").pose
@@ -178,12 +181,15 @@ class WorkbenchEventAdapter:
             return
         handled, runtime_invalidation = a.ui_facade.handle_machine_selector_click(pos)
         if handled:
+            if getattr(a, "observation", None) is not None:
+                a.observation.kpi_scope_open = False
             if runtime_invalidation:
                 self._solve()
                 s.selected_route_name = None
             return
         installation_hit = installation_header_hit(a.ui_facade.installation_header_layout(), pos)
         if installation_hit is not None:
+            a.observation.kpi_scope_open = False
             kind, key = installation_hit
             if kind == "switch":
                 a.installation_header_state, changed = toggle_installation(
@@ -200,6 +206,9 @@ class WorkbenchEventAdapter:
                 s.installation_drag_position = pos if s.installation_drag_enabled else None
             return
         if a.observation.handle_kpi_scope_click(pos):
+            a.workbench_state.solver_dropdown_open_for = None
+            a.installation_ui_session = a.installation_ui_session.dismiss_dropdown()
+            s.dwelling_selector_open = False
             return
 
         selector, options = dwelling_selector_bounds(

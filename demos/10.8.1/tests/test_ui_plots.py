@@ -1,5 +1,6 @@
 from mep_routing.ui.plots import (
-    format_current_value, format_minimum_value, kpi_scope_hit, kpi_scope_layout,
+    format_current_value, format_minimum_value,
+    kpi_scope_action, kpi_scope_dropdown_bounds,
 )
 
 
@@ -19,11 +20,16 @@ def test_minimum_plot_values_keep_metric_units_without_decimal_noise():
     assert format_minimum_value(4, 110.44) == "Best 110.4 ms"
 
 
-def test_kpi_scope_layout_is_clickable_without_pygame_state():
+def test_kpi_scope_dropdown_toggles_and_selects_options():
     options = (("all", "All installations", (1, 2, 3)), ("sal", "Sal", (4, 5, 6)))
-    layout = kpi_scope_layout(1700, 280, options)
+    control, option_bounds = kpi_scope_dropdown_bounds(1700, 280, len(options))
 
-    assert [key for key, _bounds in layout] == ["all", "sal"]
-    sal_bounds = layout[1][1]
-    assert kpi_scope_hit((sal_bounds[0] + 1, sal_bounds[1] + 1), 1700, 280, options) == "sal"
-    assert kpi_scope_hit((0, 0), 1700, 280, options) is None
+    assert kpi_scope_action(
+        (control[0] + 1, control[1] + 1), 1700, 280, options, False,
+    ) == ("toggle", None)
+    sal_bounds = option_bounds[1]
+    assert kpi_scope_action(
+        (sal_bounds[0] + 1, sal_bounds[1] + 1), 1700, 280, options, True,
+    ) == ("choose", "sal")
+    assert kpi_scope_action((0, 0), 1700, 280, options, False) is None
+    assert kpi_scope_action((0, 0), 1700, 280, options, True) == ("dismiss", None)

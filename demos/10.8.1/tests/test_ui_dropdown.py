@@ -1,6 +1,8 @@
 import pytest
 
-from mep_routing.ui.dropdown import DropdownState, dropdown_bounds, dropdown_transition
+from mep_routing.ui.dropdown import (
+    DropdownState, dropdown_bounds, dropdown_palette, dropdown_transition,
+)
 
 
 def test_dropdown_layout_stacks_options_below_control():
@@ -26,3 +28,13 @@ def test_dropdown_transition_rejects_invalid_commands():
         dropdown_transition(DropdownState("a"), "choose")
     with pytest.raises(ValueError, match="unknown"):
         dropdown_transition(DropdownState("a"), "explode")
+
+
+def test_open_dropdown_reverses_to_light_surface_and_dark_text():
+    closed = dropdown_palette(False)
+    opened = dropdown_palette(True)
+
+    assert sum(opened.control_fill) > sum(closed.control_fill)
+    assert sum(opened.option_fill) > sum(closed.option_fill)
+    assert sum(opened.text) < sum(closed.text)
+    assert opened.selected_fill != opened.option_fill

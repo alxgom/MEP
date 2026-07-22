@@ -7,6 +7,7 @@ from mep_routing.installations.cli import CLI_INSTALLATION
 from mep_routing.installations.sal import SAL_INSTALLATION
 from mep_routing.observability import InteractiveObservationController
 from mep_routing.ui.installation_header import InstallationHeaderState
+from mep_routing.ui.plots import kpi_scope_dropdown_bounds
 
 
 def _app():
@@ -105,3 +106,22 @@ def test_kpi_histories_keep_aggregate_and_installation_samples_from_one_executio
     assert controller._histories["cli"].score[-1] == 20.0
     assert controller.select_kpi_scope("sal")
     assert controller.displayed_history is controller._histories["sal"]
+
+
+def test_kpi_scope_dropdown_opens_selects_and_closes():
+    app = _app()
+    chrome = SimpleNamespace(
+        viewport=SimpleNamespace(window_width=1700), panel_width=280,
+    )
+    controller = InteractiveObservationController(app, chrome)
+    controller._history_for("sal")
+    options = controller.kpi_scope_options()
+    control, option_bounds = kpi_scope_dropdown_bounds(1700, 280, len(options))
+
+    assert controller.handle_kpi_scope_click((control[0] + 1, control[1] + 1))
+    assert controller.kpi_scope_open
+    sal_index = next(index for index, option in enumerate(options) if option[0] == "sal")
+    sal_bounds = option_bounds[sal_index]
+    assert controller.handle_kpi_scope_click((sal_bounds[0] + 1, sal_bounds[1] + 1))
+    assert controller.kpi_scope == "sal"
+    assert not controller.kpi_scope_open

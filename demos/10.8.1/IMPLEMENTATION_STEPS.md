@@ -893,6 +893,10 @@ Before each commit:
 - Constraint evaluation remains lazy with the polygon overlay and does not change the routing skeleton. Intentional connector contact is excluded by evaluating the reduction's downstream run; if every candidate is obstructed, the centered invalid outcome is retained instead of silently inventing geometry.
 - Validation: Python compilation, focused centered/obstacle-forced/runtime-constraint contracts, the full Demo suite (404 passed), and a live Regular Grid Cli solve with Aligned geometry enabled.
 
+- Reversed the shared sidebar dropdown palette while a selector is open: the active control and downward option sheet use light surfaces with dark text, while the selected row retains a distinct blue-grey fill. Closed controls keep the previous dark workbench styling.
+- Replaced the permanent KPI-scope pills with the same dropdown interaction in the right rail. It opens downward over the plots, renders after the chart cards so it remains legible, dismisses competing machine/solver selectors, and retains the same aggregate/installation history semantics.
+- Validation: Python compilation, focused dropdown-palette/KPI-layout/KPI-controller/event contracts, the full Demo suite (406 passed), an off-screen visual check of both open option sheets, and a timed headless workbench render that completed without UI errors.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
