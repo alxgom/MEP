@@ -28,6 +28,9 @@ def _app():
     )
     app.routing_controller = SimpleNamespace(
         solution_score=app.get_solution_score,
+        installation_solution_score=lambda key, routes, crossings: {
+            "sal": 10.0, "cli": 20.0,
+        }.get(key, app.get_solution_score(routes, crossings)),
         count_short_pieces=app.count_solution_short_pieces,
         machine_pins=lambda *pose: pose,
         build_grid=lambda **kwargs: setattr(app, "rebuilt", kwargs),
@@ -67,9 +70,12 @@ def test_kpi_histories_keep_aggregate_and_installation_samples_from_one_executio
     assert controller.kpi_scope == "all"
     assert controller.history.length_m[-1] == 2.0
     assert controller.history.elapsed_ms[-1] == 11.0
+    assert controller.history.score[-1] == 30.0
     assert controller._histories["sal"].length_m[-1] == 1.0
     assert controller._histories["cli"].length_m[-1] == 1.0
     assert controller._histories["sal"].elapsed_ms[-1] == 4.0
     assert controller._histories["cli"].elapsed_ms[-1] == 7.0
+    assert controller._histories["sal"].score[-1] == 10.0
+    assert controller._histories["cli"].score[-1] == 20.0
     assert controller.select_kpi_scope("sal")
     assert controller.displayed_history is controller._histories["sal"]

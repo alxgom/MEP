@@ -38,12 +38,21 @@ class InteractiveObservationController:
     def logs(self):
         return self.runtime.logs
 
-    def current_kpis(self, routes, elapsed_ms):
+    def current_kpis(self, routes, elapsed_ms, *, installation_key=None, score_override=None):
         a = self.app
+        score_fn = (
+            (lambda current_routes, crossings: score_override)
+            if score_override is not None
+            else (
+                lambda current_routes, crossings: a.routing_controller.installation_solution_score(
+                    installation_key, current_routes, crossings,
+                )
+            ) if installation_key is not None else a.routing_controller.solution_score
+        )
         return solution_kpis(
             routes, elapsed_ms, a.count_segment_crossings, a._total_route_length_m,
             a.count_solution_turns, a.routing_controller.count_short_pieces,
-            a.routing_controller.solution_score,
+            score_fn,
         )
 
     def kpi_scope_options(self):
@@ -86,8 +95,18 @@ class InteractiveObservationController:
 
     def _record_sample(self, key, routes, elapsed_ms):
         history = self._history_for(key)
-        history.append(self.current_kpis(routes, elapsed_ms))
+        history.append(self.current_kpis(routes, elapsed_ms, installation_key=key))
         return history
+
+    def _aggregate_score(self, runs):
+        total = 0.0
+        for key, result in runs.items():
+            routes = getattr(result, "routes", ()) or ()
+            crossings = self.app.count_segment_crossings(routes) if routes else 0
+            total += self.app.routing_controller.installation_solution_score(
+                key, routes, crossings,
+            )
+        return total
 
     def current_state(self):
         a = self.app
@@ -120,11 +139,16 @@ class InteractiveObservationController:
         if runs:
             all_routes = self._combined_routes(runs)
             all_elapsed_ms = sum(float(getattr(result, "elapsed_ms", 0.0)) for result in runs.values())
+            aggregate_score = self._aggregate_score(runs)
             for key, result in runs.items():
                 self._record_sample(key, getattr(result, "routes", ()) or (), getattr(result, "elapsed_ms", 0.0))
         else:
             all_routes, all_elapsed_ms = routes, elapsed_ms
-        self._record_sample("all", all_routes, all_elapsed_ms)
+            aggregate_score = None
+        history = self._history_for("all")
+        history.append(self.current_kpis(
+            all_routes, all_elapsed_ms, score_override=aggregate_score,
+        ))
         if all_routes:
             self.runtime.update_auto_bests(self.current_state(), all_routes, "Auto best", all_elapsed_ms, 0)
 

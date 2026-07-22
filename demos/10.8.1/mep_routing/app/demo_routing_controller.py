@@ -185,6 +185,17 @@ class DemoRoutingController:
     def solution_score(self, routes, crossings, *, policy=None):
         return self.route_analysis(policy).score(routes, crossings)
 
+    def installation_solution_score(self, installation_key, routes, crossings=None):
+        if installation_key == "cli":
+            from mep_routing.installations.cli import CliRouteAnalysis
+
+            state = self.app.workbench_state.cli
+            return CliRouteAnalysis(
+                state.bend_penalty_mm,
+                state.crossing_penalty_multiplier,
+            ).score(routes, crossings)
+        return self.solution_score(routes, crossings)
+
     def validation_warnings(self, routes):
         a = self.app
         warnings = self.route_analysis().quality_warnings(routes)

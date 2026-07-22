@@ -872,6 +872,10 @@ Before each commit:
 - Horizontal ceiling returns intentionally omit a plan arrow because their airflow direction is vertical.
 - Validation: Python compilation, focused grille colour/airflow projection/frame contracts, and the full Demo suite.
 
+- Replaced the Sal-derived score in Cli KPI histories with a Cli-owned post-route score: physical route length plus the active Cli bend penalty per turn and `bend penalty × crossing multiplier` per crossing. It deliberately excludes Sal diameters, clearances, overlaps, and short-piece policy.
+- Aggregate KPI history now sums each enabled installation's independently evaluated score instead of applying one installation's policy to mixed routes.
+- Validation: Python compilation, focused Cli score and aggregate-history contracts, and the full Demo suite (395 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
