@@ -55,5 +55,5 @@ def cli_air_access_specs(machine, pins, angle_degrees, connector_keys=("air_out"
     return tuple(cli_air_access_spec(machine, pins, angle_degrees, key) for key in connector_keys)
 
 
-def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=20):
+def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=500):
     return (cli_air_access_spec(machine, pins, angle_degrees, "air_out", stub_length_mm),)

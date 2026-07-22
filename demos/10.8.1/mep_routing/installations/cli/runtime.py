@@ -149,7 +149,10 @@ class CliInteractiveRuntime:
         if not connections:
             return None
         connector_key = "air_out" if role == "supply" else "air_in"
-        access = cli_air_access_spec(machine, pins, angle, connector_key)
+        access_length_mm = 500 if role == "supply" else 20
+        access = cli_air_access_spec(
+            machine, pins, angle, connector_key, access_length_mm,
+        )
         terminals = {item.route_name: item.routing_point for item in connections}
         role_prepared = replace(prepared, terminals=terminals, wet_room_names=[])
 
@@ -160,7 +163,10 @@ class CliInteractiveRuntime:
 
         profile = InstallationGraphProfile(
             port_access_specs=lambda current_pins, current_angle: (
-                cli_air_access_spec(machine, current_pins, current_angle, connector_key),
+                cli_air_access_spec(
+                    machine, current_pins, current_angle, connector_key,
+                    access_length_mm,
+                ),
             ),
             simple_input_builder=simple_inputs,
         )
@@ -182,6 +188,8 @@ class CliInteractiveRuntime:
         if tree is None:
             return None
         edge_sizes = {}
+        machine_sizing = None
+        grille_sizes = {}
         if role == "supply" and machine.airflow_m3h and machine.pressure_loss_mmca:
             area_by_route = {item.route_name: item.room_area_m2 for item in connections}
             area_by_node = {}
@@ -191,12 +199,20 @@ class CliInteractiveRuntime:
             policy = self.sizing_policy_factory(CliSizingContext(
                 machine.airflow_m3h, machine.pressure_loss_mmca,
             ))
+            total_area = float(sum(area_by_route.values()))
+            if total_area > 0:
+                machine_sizing = policy.size(total_area, total_area)
+                grille_sizes = {
+                    item.route_name: policy.size(item.room_area_m2, total_area)
+                    for item in connections
+                }
             root_node = int(runtime.spatial_index.query(access["access_point"])[1])
             edge_sizes = size_tree_edges(tree.tree_edges, root_node, area_by_node, policy)
         segments = materialize_cli_tree(
             role=role, machine=machine, pins=pins, access_spec=access,
             graph_nodes=runtime.nodes, tree=tree, grille_connections=connections,
-            edge_sizes=edge_sizes,
+            edge_sizes=edge_sizes, machine_sizing=machine_sizing,
+            grille_sizes=grille_sizes,
         )
         return _SolvedTree(dwelling.workspace, segments, len(runtime.nodes))
 

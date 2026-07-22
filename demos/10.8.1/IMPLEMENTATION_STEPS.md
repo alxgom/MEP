@@ -843,6 +843,11 @@ Before each commit:
 - Polygon projection is installation-owned, measured independently, and cached by `CliRoutingResult`; repeated render frames do not rebuild Shapely geometry, and a new solve invalidates the cache. Conducto and union polygons remain separate artifacts for comparison with future geometry procedures.
 - Validation: Python compilation, focused conducto/union/cache and toolbar contracts, and the full Demo suite (386 passed).
 
+- Ported routing-core's supply endpoint materialization around the sized tree. Supply routing now starts 500 mm from the machine air connector; the final 200 mm uses the physical connector width, while a remaining run longer than 150 mm uses full-flow calculated sizing.
+- Grille connections now retain calculated room-flow sizing until the final 100 mm physical-width stub. Machine and grille stubs inherit the core duct height of 150 mm; endpoint sizing artifacts remain attached to calculated branch segments for comparison and alternative-policy development.
+- Return endpoint behavior remains intentionally unchanged because the current port scope is supply-only.
+- Validation: Python compilation, focused endpoint sizing/length contracts, and the full Demo suite (387 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
