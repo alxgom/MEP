@@ -43,6 +43,26 @@ class InstallationProjection:
     def routes(self):
         return getattr(self.result, "routes", ()) or ()
 
+    @property
+    def terminal_segments(self):
+        plan = getattr(self.result, "grille_plan", None)
+        connections = getattr(plan, "connections", ()) if plan is not None else ()
+        result = {}
+        for item in connections:
+            center_x, center_y = item.grille_point
+            normal_x, normal_y = item.inward_normal
+            tangent_x, tangent_y = -float(normal_y), float(normal_x)
+            magnitude = (tangent_x * tangent_x + tangent_y * tangent_y) ** 0.5
+            if magnitude <= 1e-9:
+                tangent_x, tangent_y, magnitude = 1.0, 0.0, 1.0
+            half = float(item.width_mm) / 2.0
+            dx, dy = tangent_x / magnitude * half, tangent_y / magnitude * half
+            result[item.route_name] = tuple(sorted((
+                (center_x - dx, center_y - dy),
+                (center_x + dx, center_y + dy),
+            )))
+        return result
+
     def can(self, name):
         return self.active and bool(getattr(self.capabilities, name))
 
@@ -55,7 +75,10 @@ class WorkbenchProjection:
     @property
     def context_layers(self):
         return tuple(
-            CanvasContextLayer(item.key, item.terminals, item.routes, item.pins, item.color)
+            CanvasContextLayer(
+                item.key, item.terminals, item.routes, item.pins, item.color,
+                item.terminal_segments,
+            )
             for item in self.visible if not item.active
         )
 

@@ -26,6 +26,22 @@ def test_projection_keeps_all_enabled_results_visible_but_only_active_interactiv
     assert [layer.installation for layer in projection.context_layers] == ["cli"]
 
 
+def test_cli_projection_builds_physical_width_grille_segment_from_wall_normal():
+    connection = SimpleNamespace(
+        route_name="Living Supply", grille_point=(1000, 2000),
+        inward_normal=(0.0, 1.0), width_mm=800,
+    )
+    item = InstallationProjection(
+        "cli", True, ProjectedCapabilities(),
+        SimpleNamespace(routes=(), grille_plan=SimpleNamespace(connections=(connection,))),
+        SimpleNamespace(), {"Living Supply": connection.grille_point}, (0, 0, 0), {},
+    )
+
+    assert item.terminal_segments["Living Supply"] == (
+        (600.0, 2000.0), (1400.0, 2000.0),
+    )
+
+
 def test_disabled_active_installation_has_no_effective_capabilities():
     runtime = SimpleNamespace(capabilities=SimpleNamespace(machine_edit=True, solver_controls=True))
     app = SimpleNamespace(

@@ -864,6 +864,10 @@ Before each commit:
 - Hardened the shared machine-clearance field for Cli's hard-only 75 mm policy. A zero soft margin now skips soft-band arithmetic, preventing boundary-tolerance cases during machine dragging from dividing by zero and emitting non-finite solver costs.
 - Validation: Python compilation, focused clearance and Cli drag-equivalent routing contracts, and the full Demo suite (393 passed).
 
+- Replaced Cli grille dots with thick plan-line symbols derived from each connection's physical width and wall normal. Calculated supply widths and configured return widths now scale with the viewport; ceiling returns without a wall normal use a deterministic horizontal symbol.
+- The installation projection carries the same grille geometry for active and subdued context layers while routing continues to consume the existing point terminals.
+- Validation: Python compilation, focused grille projection/frame contracts, and the full Demo suite (394 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

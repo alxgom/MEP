@@ -56,6 +56,7 @@ class CanvasContextLayer:
     routes: Sequence[tuple[str, Sequence]]
     global_pins: Mapping[str, tuple[float, float]]
     color: Color = (105, 113, 124)
+    terminal_segments: Mapping[str, tuple[tuple[float, float], tuple[float, float]]] | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ class CanvasFrameState:
     graph_env: Any
     show_grid_graph: bool
     terminals: Mapping[str, tuple[float, float]]
+    terminal_segments: Mapping[str, tuple[tuple[float, float], tuple[float, float]]]
     routes: Sequence[tuple[str, Sequence]]
     selected_route_name: str | None
     selected_room_polygon: Any
@@ -147,9 +149,11 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         context_color = tuple(int(channel * 0.62 + 128 * 0.38) for channel in layer.color)
         context_dark = tuple(max(0, channel - 35) for channel in context_color)
         for route_name, point in layer.terminals.items():
+            segment = (layer.terminal_segments or {}).get(route_name)
             terminal_markers.append(TerminalMarker(
                 to_screen(*point), context_color, context_dark, context_dark,
                 route_name,
+                None if segment is None else (to_screen(*segment[0]), to_screen(*segment[1])),
             ))
         for route_name, segments in layer.routes:
             route_strokes.append(RouteStroke(
@@ -170,6 +174,10 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         terminal_markers.append(TerminalMarker(
             to_screen(*point), core, ring, text,
             route_name.replace("Bathroom", "Bath").replace("Washroom", "Wash"),
+            (
+                to_screen(*state.terminal_segments[route_name][0]),
+                to_screen(*state.terminal_segments[route_name][1]),
+            ) if route_name in state.terminal_segments else None,
         ))
 
     shaft_marker = None

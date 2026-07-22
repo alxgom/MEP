@@ -43,6 +43,7 @@ class TerminalMarker:
     ring_color: Color
     text_color: Color
     label: str
+    segment: ScreenSegment | None = None
 
 
 @dataclass(frozen=True)
@@ -171,8 +172,12 @@ def draw_canvas_scene(
         pygame.draw.circle(screen, scene.grid_node_color, point, 2)
 
     for terminal in scene.terminals:
-        pygame.draw.circle(screen, terminal.ring_color, terminal.point, 7)
-        pygame.draw.circle(screen, terminal.core_color, terminal.point, 5)
+        if terminal.segment is None:
+            pygame.draw.circle(screen, terminal.ring_color, terminal.point, 7)
+            pygame.draw.circle(screen, terminal.core_color, terminal.point, 5)
+        else:
+            pygame.draw.line(screen, terminal.ring_color, *terminal.segment, 8)
+            pygame.draw.line(screen, terminal.core_color, *terminal.segment, 5)
         label_surface = fonts.small.render(terminal.label, True, terminal.text_color)
         hooks.draw_outlined_text(
             screen,
