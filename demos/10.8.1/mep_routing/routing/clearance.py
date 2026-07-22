@@ -201,7 +201,11 @@ def add_machine_clearance_weights(
     radius = float(buffered_radius_mm(route_diameter_mm, buffer_ratio))
     soft_limit = radius + float(soft_margin_mm)
     hard_mask = distances < radius - 1e-7
-    soft_mask = (distances >= radius - 1e-7) & (distances < soft_limit)
+    soft_mask = (
+        (distances >= radius - 1e-7) & (distances < soft_limit)
+        if soft_margin_mm > 0
+        else np.zeros(len(distances), dtype=bool)
+    )
 
     for edge_index in np.flatnonzero(hard_mask):
         u, v, _, _ = edge_list[int(edge_index)]

@@ -173,6 +173,31 @@ def test_machine_clearance_blocks_envelope_edges_and_penalizes_soft_margin_edges
     assert weights[(2, 3)] == 125.0
 
 
+def test_machine_clearance_zero_soft_margin_never_creates_nonfinite_costs():
+    edge_list = [(0, 1, 100.0, "E")]
+    edge_coords = np.array([[0.0, 124.99999995, 100.0, 124.99999995]])
+    nodes = np.array([[0.0, 124.99999995], [100.0, 124.99999995]])
+    weights = {}
+
+    add_machine_clearance_weights(
+        weights,
+        edge_list,
+        edge_coords,
+        nodes,
+        route_diameter_mm=150,
+        buffer_ratio=1.0,
+        machine_center=(50.0, 0.0),
+        machine_angle_deg=0.0,
+        machine_overall_width_mm=100,
+        machine_body_height_mm=100,
+        soft_margin_mm=0,
+        clearance_penalty=0,
+        block_weight=1_000_000.0,
+    )
+
+    assert all(np.isfinite(cost) for cost in weights.values())
+
+
 def test_route_interactions_block_overlaps_and_penalize_crossings_and_clearance():
     edge_list = [
         (0, 1, 0.0, "E"),

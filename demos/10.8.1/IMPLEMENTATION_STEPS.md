@@ -861,6 +861,9 @@ Before each commit:
 - All three Cli tree backends consume a copied weighted adjacency. The same field is retained in the Cli workspace for the active-installation `Weights` diagnostic; its refresh path no longer invokes Sal policy.
 - Validation: Python compilation, focused Cli clearance/runtime/projection contracts, and the full Demo suite (392 passed).
 
+- Hardened the shared machine-clearance field for Cli's hard-only 75 mm policy. A zero soft margin now skips soft-band arithmetic, preventing boundary-tolerance cases during machine dragging from dividing by zero and emitting non-finite solver costs.
+- Validation: Python compilation, focused clearance and Cli drag-equivalent routing contracts, and the full Demo suite (393 passed).
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
