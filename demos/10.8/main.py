@@ -1519,12 +1519,11 @@ def _get_hannan_static_template(shift_walls=False):
         ]:
             add_required(pt)
 
-    for room in rooms:
-        if room.has_cover:
-            inset = room.polygon.buffer(-ROUTING_WALL_CLEARANCE_MM, join_style=2)
-            if not inset.is_empty:
-                _add_bounds_axes(xs, ys, inset)
-                _add_polygon_vertex_axes(xs, ys, inset)
+    for cover in covers:
+        inset = cover.buffer(-ROUTING_WALL_CLEARANCE_MM, join_style=2)
+        if not inset.is_empty:
+            _add_bounds_axes(xs, ys, inset)
+            _add_polygon_vertex_axes(xs, ys, inset)
 
     for col in columns:
         _add_bounds_axes(xs, ys, col, clearance=ROUTING_WALL_CLEARANCE_MM)
@@ -1757,9 +1756,8 @@ def build_epsilon_grid(machine_pins=None):
         xs.update(round(float(x)) for x in scaffold_xs)
         ys.update(round(float(y)) for y in scaffold_ys)
 
-    for room in rooms:
-        if getattr(room, "has_cover", False):
-            _add_epsilon_geometry_axes(xs, ys, room.polygon, eps)
+    for cover in covers:
+        _add_epsilon_geometry_axes(xs, ys, cover, eps)
 
     for geom in list(columns) + list(shafts) + list(wall_polys):
         _add_epsilon_geometry_axes(xs, ys, geom, eps)
@@ -2612,15 +2610,64 @@ def _room_polygon_by_name(room_name):
             return room.polygon
     return None
 
-def _room_terminal_boundary_segments(room_name):
-    cache_key = ("room_terminal_boundary", room_name, id(routing_region_base), len(rooms), len(wall_polys))
+def _room_cover_geometry(room_name):
+    cache_key = ("room_cover_geometry", room_name, tuple(id(cover) for cover in covers), len(covers))
     if cache_key in geometry_distance_cache:
         return geometry_distance_cache[cache_key]
 
     room_poly = _room_polygon_by_name(room_name)
+    if room_poly is None or room_poly.is_empty or not covers:
+        geometry_distance_cache[cache_key] = None
+        return None
+
+    cover_parts = []
+    for cover in covers:
+        if cover is None or cover.is_empty or not cover.intersects(room_poly):
+            continue
+        part = cover.intersection(room_poly)
+        if not part.is_empty and getattr(part, "area", 0.0) > 1e-6:
+            cover_parts.append(part)
+
+    if not cover_parts:
+        geometry_distance_cache[cache_key] = None
+        return None
+
+    cover_geom = unary_union(cover_parts)
+    geometry_distance_cache[cache_key] = cover_geom
+    return cover_geom
+
+def _room_terminal_valid_region(room_name):
+    room_poly = _room_polygon_by_name(room_name)
+    if room_poly is None or routing_region_base is None:
+        return room_poly
+
+    valid_region = room_poly.intersection(routing_region_base)
+    cover_geom = _room_cover_geometry(room_name)
+    if cover_geom is not None and not cover_geom.is_empty:
+        valid_region = valid_region.intersection(cover_geom)
+    return valid_region
+
+def _room_terminal_boundary_segments(room_name):
+    cache_key = (
+        "room_terminal_boundary",
+        room_name,
+        id(routing_region_base),
+        len(rooms),
+        len(wall_polys),
+        tuple(id(cover) for cover in covers),
+    )
+    if cache_key in geometry_distance_cache:
+        return geometry_distance_cache[cache_key]
+
+    room_poly = _room_polygon_by_name(room_name)
+    cover_geom = _room_cover_geometry(room_name)
     segments = []
     if room_poly is not None:
         bnd = _extract_bnd_segs(room_poly)
+        if len(bnd):
+            segments.append(bnd)
+    if cover_geom is not None and not cover_geom.is_empty:
+        bnd = _extract_bnd_segs(cover_geom)
         if len(bnd):
             segments.append(bnd)
     for room in rooms:
@@ -2670,7 +2717,10 @@ def get_room_candidate_start_nodes(route_name):
         room_start_node_cache[route_name] = nodes
         return list(nodes)
 
-    valid_region = room_poly.intersection(routing_region_base)
+    valid_region = _room_terminal_valid_region(route_name)
+    if valid_region is None or valid_region.is_empty:
+        room_start_node_cache[route_name] = []
+        return []
 
     prepared = shapely_prep(valid_region)
     nodes = [
@@ -2998,6 +3048,7 @@ def _terminal_validity_cache_key():
         len(rooms),
         len(walls),
         len(wall_polys),
+        tuple(id(cover) for cover in covers),
     )
 
 def get_terminal_validity_entries():
@@ -3019,8 +3070,8 @@ def get_terminal_validity_entries():
             if room_poly is None or room_poly.is_empty:
                 continue
 
-            valid_region = room_poly.intersection(routing_region_base)
-            if valid_region.is_empty:
+            valid_region = _room_terminal_valid_region(room_name)
+            if valid_region is None or valid_region.is_empty:
                 continue
 
             prepared = shapely_prep(valid_region)

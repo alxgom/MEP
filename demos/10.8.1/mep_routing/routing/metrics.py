@@ -97,8 +97,49 @@ def count_ordered_route_turns(route_name, segs):
     return turns
 
 
+def count_tree_route_turns(route_name, segs):
+    """Count directed branch turns in a rooted, flattened tree geometry."""
+    adjacency = {}
+    root = None
+    for idx, (p1, p2) in enumerate(segs):
+        direction = segment_metric_dir(route_name, idx, p1, p2)
+        if direction is None or not isinstance(direction, str):
+            continue
+        left = (round(float(p1[0]), 6), round(float(p1[1]), 6))
+        right = (round(float(p2[0]), 6), round(float(p2[1]), 6))
+        if left == right:
+            continue
+        root = left if root is None else root
+        adjacency.setdefault(left, set()).add(right)
+        adjacency.setdefault(right, set()).add(left)
+    if root is None:
+        return 0
+
+    turns, visited = 0, {root}
+    pending = [(root, None)]
+    while pending:
+        node, parent = pending.pop()
+        incoming = None if parent is None else segment_metric_dir(
+            route_name, 0, parent, node,
+        )
+        for child in adjacency.get(node, ()):
+            if child in visited:
+                continue
+            visited.add(child)
+            outgoing = segment_metric_dir(route_name, 0, node, child)
+            if incoming is not None and outgoing is not None and incoming != outgoing:
+                turns += 1
+            pending.append((child, node))
+    return turns
+
+
 def count_solution_turns(routes):
-    return sum(count_ordered_route_turns(name, segs) for name, segs in routes)
+    return sum(
+        count_tree_route_turns(name, segs)
+        if name in ("Supply Air Tree", "Return Air Tree")
+        else count_ordered_route_turns(name, segs)
+        for name, segs in routes
+    )
 
 
 def merged_route_piece_lengths(route_name, segs):

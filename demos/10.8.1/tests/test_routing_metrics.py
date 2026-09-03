@@ -50,6 +50,26 @@ def test_count_solution_turns_ignores_non_shaft_diagonal_artifacts():
     assert count_solution_turns(routes) == 2
 
 
+def test_air_tree_turns_count_only_the_turning_tee_branch():
+    routes = [("Supply Air Tree", [
+        ((0, 0), (10, 0)),
+        ((10, 0), (10, 10)),
+        ((10, 0), (20, 0)),
+    ])]
+
+    assert count_solution_turns(routes) == 1
+
+
+def test_air_tree_turns_count_both_branches_when_flow_enters_tee_stem():
+    routes = [("Supply Air Tree", [
+        ((10, -10), (10, 0)),
+        ((10, 0), (0, 0)),
+        ((10, 0), (20, 0)),
+    ])]
+
+    assert count_solution_turns(routes) == 2
+
+
 def test_route_short_pieces_uses_injected_min_piece_length():
     segs = [((0, 0), (10, 0)), ((10, 0), (20, 0)), ((20, 0), (20, 25))]
 

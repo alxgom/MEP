@@ -19,7 +19,7 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, '..', '08-bend-aware-n
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..', '..')))
 
 import generative_layout
-from solver import state_expanded_astar
+from solver import state_expanded_astar, estimate_turns
 
 # Constants
 SCALE_TO_MM    = 1000.0
@@ -57,7 +57,8 @@ routing_strategy_idx = 1
 
 ROUTER_BACKENDS = [
     "State-expanded A*",
-    "Line graph L(G)"
+    "Line graph L(G) A*",
+    "Line graph L(G) GBFS"
 ]
 router_backend_idx = 0
 
@@ -1212,7 +1213,7 @@ def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_n
     search_env = EnvView(search_nodes, search_adj)
     
     try:
-        path, path_len = state_expanded_astar(search_env, super_source_idx, super_sink_idx, C_bend=C_bend, edge_weights=edge_weights)
+        path, _ = state_expanded_astar(search_env, super_source_idx, super_sink_idx, C_bend=C_bend, edge_weights=edge_weights)
     except Exception as e:
         print(f"Super Source/Sink A* error: {e}")
         return None, 0.0, None, None
@@ -1225,7 +1226,7 @@ def _run_super_sink_state_astar(env, start_node_indices, target_pin_names, pin_n
     chosen_pin_name = chosen_target["pin"] if chosen_target else target_pin_names[0]
     path_without_virtual = path[1:-1]
     
-    return path_without_virtual, path_len, chosen_pin_name, chosen_target
+    return path_without_virtual, _path_physical_length(env, path_without_virtual), chosen_pin_name, chosen_target
 
 def _weighted_edge_cost(edge_weights, u, v, dist):
     if edge_weights is None:
@@ -1241,7 +1242,30 @@ def _line_graph_dir_from_points(env, u, v):
         return "E" if dx > 0 else "W"
     return "N" if dy > 0 else "S"
 
-def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
+def _path_physical_length(env, path):
+    return float(sum(
+        np.hypot(
+            env.nodes[path[i + 1]][0] - env.nodes[path[i]][0],
+            env.nodes[path[i + 1]][1] - env.nodes[path[i]][1],
+        )
+        for i in range(len(path) - 1)
+    ))
+
+def _line_graph_target_heuristic(env, node_idx, incoming_dir, target_specs, C_bend):
+    p = env.nodes[node_idx]
+    best = float("inf")
+    for target in target_specs:
+        t = env.nodes[int(target["node_idx"])]
+        h = (
+            abs(float(t[0] - p[0]))
+            + abs(float(t[1] - p[1]))
+            + C_bend * estimate_turns(p, incoming_dir, t)
+        )
+        if h < best:
+            best = h
+    return 0.0 if best == float("inf") else float(best)
+
+def _run_super_sink_line_graph_search(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None, greedy=False):
     if isinstance(start_node_indices, (int, np.integer)):
         start_node_indices = [start_node_indices]
     if not target_pin_names or not start_node_indices:
@@ -1256,19 +1280,9 @@ def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, 
         return None, 0.0, None, None
 
     targets_by_node = {}
-    target_nodes = []
     for target in target_specs:
         node_idx = int(target["node_idx"])
         targets_by_node.setdefault(node_idx, []).append(target)
-        target_nodes.append(node_idx)
-
-    target_coords = env.nodes[target_nodes]
-
-    def heuristic(node_idx):
-        p = env.nodes[node_idx]
-        if len(target_coords) == 0:
-            return 0.0
-        return float(np.min(np.abs(target_coords[:, 0] - p[0]) + np.abs(target_coords[:, 1] - p[1])))
 
     pq = []
     counter = 0
@@ -1282,8 +1296,11 @@ def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, 
             state = (int(start_node), int(v))
             if cost < g_scores.get(state, float("inf")):
                 g_scores[state] = cost
-                state_dirs[state] = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, int(start_node), int(v))
-                heapq.heappush(pq, (cost + heuristic(int(v)), cost, counter, state))
+                state_dir = edge_dir if edge_dir is not None else _line_graph_dir_from_points(env, int(start_node), int(v))
+                state_dirs[state] = state_dir
+                h = _line_graph_target_heuristic(env, int(v), state_dir, target_specs, C_bend)
+                priority = h if greedy else cost + h
+                heapq.heappush(pq, (priority, cost, counter, state))
                 counter += 1
 
     best_final_cost = float("inf")
@@ -1293,7 +1310,7 @@ def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, 
 
     while pq:
         f_score, g, _, state = heapq.heappop(pq)
-        if f_score >= best_final_cost:
+        if not greedy and f_score >= best_final_cost:
             break
         if state in visited:
             continue
@@ -1309,6 +1326,8 @@ def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, 
                 best_final_cost = final_cost
                 best_final_state = state
                 best_target = target
+        if greedy and best_final_state is not None:
+            break
 
         for w, dist, next_dir in env.adj.get(v, []):
             w = int(w)
@@ -1322,7 +1341,9 @@ def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, 
                 g_scores[next_state] = next_g
                 came_from[next_state] = state
                 state_dirs[next_state] = next_dir
-                heapq.heappush(pq, (next_g + heuristic(w), next_g, counter, next_state))
+                h = _line_graph_target_heuristic(env, w, next_dir, target_specs, C_bend)
+                priority = h if greedy else next_g + h
+                heapq.heappush(pq, (priority, next_g, counter, next_state))
                 counter += 1
 
     if best_final_state is None or best_target is None:
@@ -1338,11 +1359,25 @@ def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, 
 
     path = [states[0][0]]
     path.extend(state[1] for state in states)
-    return path, best_final_cost, best_target["pin"], best_target
+    return path, _path_physical_length(env, path), best_target["pin"], best_target
+
+def _run_super_sink_line_graph_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
+    return _run_super_sink_line_graph_search(
+        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=False
+    )
+
+def _run_super_sink_line_graph_gbfs(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
+    return _run_super_sink_line_graph_search(
+        env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights, greedy=True
+    )
 
 def run_super_sink_astar(env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights=None):
     if router_backend_idx == 1:
         return _run_super_sink_line_graph_astar(
+            env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
+        )
+    if router_backend_idx == 2:
+        return _run_super_sink_line_graph_gbfs(
             env, start_node_indices, target_pin_names, pin_node_map, global_pins, machine_angle, C_bend, edge_weights
         )
     return _run_super_sink_state_astar(

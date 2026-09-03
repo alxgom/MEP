@@ -13,6 +13,7 @@ from mep_routing.graphs import GraphMode
 from .geometry import cli_air_access_spec, cli_machine_pins
 from .clearance import apply_cli_edge_weights, cli_minimum_clearance_weights
 from .duct_geometry import build_core_duct_polygon_projection
+from .directed_wall_graph import solve_directed_wall_steiner, solve_directed_wall_tree
 from .aligned_duct_geometry import (
     CliDuctAlignmentConstraints, build_aligned_duct_polygon_projection,
 )
@@ -50,6 +51,7 @@ class _SolvedTree:
     workspace: object
     segments: tuple[CliDuctSegment, ...]
     node_count: int
+    connections: tuple = ()
 
 
 class CliInteractiveRuntime:
@@ -89,6 +91,7 @@ class CliInteractiveRuntime:
         context_obstacles=(), return_enabled=True, graph_mode=GraphMode.CORE_SIMPLE,
         solver_backend_index=0, bend_penalty_mm=4000.0,
         crossing_penalty_multiplier=5.0,
+        start_mode_index=0,
     ):
         started = perf_counter()
         pins = cli_machine_pins(machine, center, angle_degrees)
@@ -110,6 +113,7 @@ class CliInteractiveRuntime:
             "supply", prepared_dwelling, machine, pins, angle_degrees,
             grilles, context_obstacles, graph_mode, solver_backend_index,
             bend_penalty_mm, crossing_penalty_multiplier,
+            start_mode_index=start_mode_index,
         )
         if supply is None:
             if context_obstacles:
@@ -119,6 +123,7 @@ class CliInteractiveRuntime:
                     solver_backend_index=solver_backend_index,
                     bend_penalty_mm=bend_penalty_mm,
                     crossing_penalty_multiplier=crossing_penalty_multiplier,
+                    start_mode_index=start_mode_index,
                 )
                 if relaxed.routes:
                     self.last_result = replace(
@@ -138,8 +143,14 @@ class CliInteractiveRuntime:
                 "return", prepared_dwelling, machine, pins, angle_degrees,
                 grilles, context_obstacles, graph_mode, solver_backend_index,
                 bend_penalty_mm, crossing_penalty_multiplier,
+                start_mode_index=0,
                 prior_segments=tuple(segment.line for segment in supply.segments),
             )
+        if supply.connections:
+            selected = {item.route_name: item for item in supply.connections}
+            grilles = CliGrillePlan(tuple(
+                selected.get(item.route_name, item) for item in grilles.connections
+            ))
         routes = (("Supply Air Tree", [segment.line for segment in supply.segments]),)
         status = f"Cli supply solved: {len(grilles.supply)} grilles"
         return_segments = ()
@@ -177,7 +188,7 @@ class CliInteractiveRuntime:
     def _solve_tree(
         self, role, prepared, machine, pins, angle, grilles, context_obstacles,
         graph_mode, solver_backend_index, bend_penalty_mm,
-        crossing_penalty_multiplier, prior_segments=(),
+        crossing_penalty_multiplier, prior_segments=(), start_mode_index=0,
     ):
         connections = grilles.supply if role == "supply" else grilles.returns
         if not connections:
@@ -221,14 +232,37 @@ class CliInteractiveRuntime:
         )
         weighted_adjacency = apply_cli_edge_weights(runtime.adjacency, clearance_weights)
         dwelling.workspace.overlay.values = dict(clearance_weights)
-        points = [access["access_point"], *terminals.values()]
-        indices = tuple(dict.fromkeys(int(runtime.spatial_index.query(point)[1]) for point in points))
-        tree = solve_cli_tree(
-            solver_backend_index, runtime.nodes, weighted_adjacency, indices,
-            bend_penalty=bend_penalty_mm,
-            crossing_multiplier=crossing_penalty_multiplier,
-            prior_segments=prior_segments,
-        )
+        root_node = int(runtime.spatial_index.query(access["access_point"])[1])
+        graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
+        selected_connections = tuple(connections)
+        if role == "supply" and start_mode_index == 1 and solver_backend_index in (3, 4):
+            targets = [room for room in prepared.rooms if is_cli_supply_room(room)]
+            rooms_by_name = {
+                item.room_name: room for item, room in zip(connections, targets)
+            }
+            directed_solver = (
+                solve_directed_wall_steiner if solver_backend_index == 4
+                else solve_directed_wall_tree
+            )
+            directed = directed_solver(
+                runtime.nodes, weighted_adjacency, root_node, rooms_by_name,
+                connections, bend_penalty_mm,
+            )
+            if directed is None:
+                return None
+            tree, graph_nodes, graph_adjacency = directed.tree, directed.nodes, directed.adjacency
+            selected_connections = directed.selected_connections
+            terminals = {item.route_name: item.routing_point for item in selected_connections}
+        else:
+            points = [access["access_point"], *terminals.values()]
+            indices = tuple(dict.fromkeys(int(runtime.spatial_index.query(point)[1]) for point in points))
+            effective_backend = 2 if solver_backend_index in (3, 4) else solver_backend_index
+            tree = solve_cli_tree(
+                effective_backend, runtime.nodes, weighted_adjacency, indices,
+                bend_penalty=bend_penalty_mm,
+                crossing_multiplier=crossing_penalty_multiplier,
+                prior_segments=prior_segments,
+            )
         if tree is None:
             return None
         edge_sizes = {}
@@ -238,7 +272,8 @@ class CliInteractiveRuntime:
             area_by_route = {item.route_name: item.room_area_m2 for item in connections}
             area_by_node = {}
             for name, point in terminals.items():
-                node = int(runtime.spatial_index.query(point)[1])
+                distances = ((graph_nodes[:, :2] - point) ** 2).sum(axis=1)
+                node = int(distances.argmin())
                 area_by_node[node] = area_by_node.get(node, 0.0) + area_by_route.get(name, 0.0)
             policy = self.sizing_policy_factory(CliSizingContext(
                 machine.airflow_m3h, machine.pressure_loss_mmca,
@@ -250,15 +285,14 @@ class CliInteractiveRuntime:
                     item.route_name: policy.size(item.room_area_m2, total_area)
                     for item in connections
                 }
-            root_node = int(runtime.spatial_index.query(access["access_point"])[1])
             edge_sizes = size_tree_edges(tree.tree_edges, root_node, area_by_node, policy)
         segments = materialize_cli_tree(
             role=role, machine=machine, pins=pins, access_spec=access,
-            graph_nodes=runtime.nodes, tree=tree, grille_connections=connections,
+            graph_nodes=graph_nodes, tree=tree, grille_connections=selected_connections,
             edge_sizes=edge_sizes, machine_sizing=machine_sizing,
             grille_sizes=grille_sizes,
         )
-        return _SolvedTree(dwelling.workspace, segments, len(runtime.nodes))
+        return _SolvedTree(dwelling.workspace, segments, len(graph_nodes), selected_connections)
 
     def _finish(
         self, routes, status, started, total_nodes, grilles, pins, *, workspace=None,

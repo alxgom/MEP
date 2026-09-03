@@ -98,6 +98,7 @@ class CliInstallationRuntime:
                 self.app.workbench_state.cli.graph_type_idx
             ],
             solver_backend_index=self.app.workbench_state.cli.router_backend_idx,
+            start_mode_index=self.app.workbench_state.cli.room_start_mode_idx,
             bend_penalty_mm=self.app.workbench_state.cli.bend_penalty_mm,
             crossing_penalty_multiplier=(
                 self.app.workbench_state.cli.crossing_penalty_multiplier

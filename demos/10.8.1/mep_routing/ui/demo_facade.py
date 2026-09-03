@@ -95,6 +95,13 @@ class DemoUiFacade:
                 target = getattr(a.workbench_state, active) if active in ("cli", "coc") else a
                 changed = getattr(target, attribute) != selected
                 setattr(target, attribute, selected)
+                if active == "cli":
+                    if opened.key == "starts" and selected == 1:
+                        target.router_backend_idx = 4
+                    elif opened.key == "router" and selected not in (3, 4):
+                        target.room_start_mode_idx = 0
+                    elif opened.key == "router" and selected in (3, 4):
+                        target.room_start_mode_idx = 1
                 a.workbench_state.solver_dropdown_open_for = None
                 return True, changed, opened.key
         for index, dropdown in enumerate(dropdowns):

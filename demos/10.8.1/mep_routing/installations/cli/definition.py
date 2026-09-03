@@ -24,9 +24,11 @@ CLI_SEARCH_BACKEND_LABELS = (
     "Routing-Core Port: Kou Steiner",
     "Kou nonnegative heuristics",
     "Line graph L(G) metric MST",
+    "Directed root-path union (baseline)",
+    "Directed Steiner arborescence (exact)",
 )
 CLI_HEURISTIC_MODE_LABELS = ("Shortest-path distance",)
-CLI_START_MODE_LABELS = ("Supply/return grilles",)
+CLI_START_MODE_LABELS = ("Grille center", "Wall candidates")
 CLI_AUTO_PLACEMENT_LABELS = ("Manual", "Routing-Core Workflow")
 
 

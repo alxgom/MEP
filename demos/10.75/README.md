@@ -1,6 +1,6 @@
 # MEP Ventilation Router Dashboard (Demo 10.75)
 
-Interactive Pygame prototype for routing ventilation ducts from a compact ventilation machine to room terminals and shafts. Demo 10.75 starts from the Demo 10.7 baseline and is intended for the routing-backend refactor, including a line-graph `L(G)` turn-aware A* option.
+Interactive Pygame prototype for routing ventilation ducts from a compact ventilation machine to room terminals and shafts. Demo 10.75 starts from the Demo 10.7 baseline and is intended for the routing-backend refactor, including line-graph `L(G)` turn-aware A* and GBFS options.
 
 ## Run
 
@@ -31,7 +31,7 @@ Machine placement:
 Routing and display:
 
 - `C`: cycle solver strategy.
-- `L`: cycle routing backend between state-expanded A* and line graph `L(G)` A*.
+- `L`: cycle routing backend between state-expanded A*, line graph `L(G)` A*, and line graph `L(G)` GBFS.
 - `Tab`: cycle routing grid.
 - `G`: toggle grid nodes and edges.
 - `V`: toggle the placement heatmap.
@@ -54,7 +54,8 @@ The sequential strategies route the shaft first, then the kitchen, then the rema
 The router backend selector is independent of strategy:
 
 - State-expanded A*: routes with `(node, incoming_direction)` states.
-- Line graph `L(G)`: routes with directed-edge states, so turns are modeled as transitions from one physical edge to the next.
+- Line graph `L(G)` A*: routes with directed-edge states, so turns are modeled as transitions from one physical edge to the next.
+- Line graph `L(G)` GBFS: uses the same super-sink target model and accumulated bend/crossing/clearance weights, but orders expansion by the line-graph heuristic only. This follows the high-speed Demo 08 variant and is faster but not optimal.
 
 ## Routing Grids
 

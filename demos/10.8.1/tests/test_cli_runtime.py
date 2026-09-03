@@ -139,6 +139,27 @@ def test_cli_runtime_can_disable_return_ventilation():
     assert result.status.startswith("Cli supply solved")
 
 
+@pytest.mark.parametrize("backend_index", (3, 4))
+def test_cli_directed_wall_candidates_choose_one_sized_supply_grille_per_room(backend_index):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION,
+        CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        return_enabled=False, solver_backend_index=backend_index, start_mode_index=1,
+    )
+
+    assert result.routes
+    assert len(result.grille_plan.supply) == 2
+    assert all(item.placement_type == "wall_candidate" for item in result.grille_plan.supply)
+    assert all(item.grille_point == item.routing_point for item in result.grille_plan.supply)
+    assert {item.width_mm for item in result.grille_plan.supply} == {800}
+    assert all(item.sizing.airflow_m3h == 630.0 for item in result.grille_plan.supply)
+
+
 @pytest.mark.parametrize("graph_mode", tuple(GraphMode))
 def test_cli_runtime_supports_its_declared_graph_modes(graph_mode):
     runtime = CliInteractiveRuntime(
