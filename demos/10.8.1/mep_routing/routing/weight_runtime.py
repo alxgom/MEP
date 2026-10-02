@@ -213,7 +213,7 @@ def route_axis_records_for_routes(
     route_segments,
     context: RoutingWeightRuntimeContext,
 ):
-    return route_axis_records(route_name, route_segments, context.route_diameter)
+    return route_axis_records(route_name, route_segments, context.route_diameter, include_diagonal=True)
 
 
 def add_static_clearance_weights(

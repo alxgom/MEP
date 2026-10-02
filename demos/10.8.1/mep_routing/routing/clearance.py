@@ -11,6 +11,7 @@ from mep_routing.geometry import (
     extract_line_segments,
     normalize_axis_segment,
 )
+from .segments import merged_axis_segments
 
 
 def buffered_radius_mm(diameter_mm, buffer_ratio):
@@ -21,13 +22,20 @@ def required_clearance_mm(diameter_a, diameter_b, buffer_ratio):
     return buffered_radius_mm(diameter_a, buffer_ratio) + buffered_radius_mm(diameter_b, buffer_ratio)
 
 
-def route_axis_records(route_name, route_segs, route_diameter):
+def route_axis_records(route_name, route_segs, route_diameter, *, include_diagonal=False):
+    """Build interaction geometry; the legacy default returns axis fragments.
+
+    Full interaction records merge axis fragments and retain physical diagonal
+    adapters so subdivision and connector orientation do not hide crossings.
+    """
     diameter = route_diameter(route_name)
-    records = []
+    records = [(seg, diameter) for seg in merged_axis_segments(route_segs)] if include_diagonal else []
     for p1, p2 in route_segs:
         seg = normalize_axis_segment(p1, p2)
-        if seg is not None:
+        if seg is not None and not include_diagonal:
             records.append((seg, diameter))
+        elif seg is None and include_diagonal and math.dist(p1, p2) > 1e-7:
+            records.append(((float(p1[0]), float(p1[1]), float(p2[0]), float(p2[1]), "D"), diameter))
     return records
 
 
@@ -249,6 +257,41 @@ def add_machine_clearance_weights(
         edge_weights[edge] = edge_weights.get(edge, base_dist) + float(penalty)
 
 
+def _diagonal_interaction_fields(coords, segment, required, eps=1e-7):
+    """Exact numeric edge/segment intersection and proximity, without sampling."""
+    start, end = coords[:, :2], coords[:, 2:]
+    edge = end - start
+    a, b = np.asarray(segment[:2]), np.asarray(segment[2:4])
+    prior = b - a
+    offset = a - start
+    prior_sq = float(prior @ prior)
+    edge_sq = np.sum(edge * edge, axis=1)
+    denom = edge[:, 0] * prior[1] - edge[:, 1] * prior[0]
+    transverse = np.abs(denom) > eps
+    t = np.divide(offset[:, 0] * prior[1] - offset[:, 1] * prior[0], denom,
+                  out=np.zeros(len(coords)), where=transverse)
+    u = np.divide(offset[:, 0] * edge[:, 1] - offset[:, 1] * edge[:, 0], denom,
+                  out=np.zeros(len(coords)), where=transverse)
+    cross = transverse & (t >= -eps) & (t <= 1 + eps) & (u >= -eps) & (u <= 1 + eps)
+    collinear = ~transverse & (np.abs(offset[:, 0] * prior[1] - offset[:, 1] * prior[0]) < eps)
+    projection_start = np.sum((start - a) * prior, axis=1) / prior_sq
+    projection_end = np.sum((end - a) * prior, axis=1) / prior_sq
+    overlap = collinear & (
+        np.minimum(np.maximum(projection_start, projection_end), 1)
+        - np.maximum(np.minimum(projection_start, projection_end), 0) > eps
+    )
+    distances_sq = np.full(len(coords), np.inf)
+    for points in (start, end):
+        projection = np.clip(np.sum((points - a) * prior, axis=1) / prior_sq, 0, 1)
+        distances_sq = np.minimum(distances_sq, np.sum((points - a - projection[:, None] * prior) ** 2, axis=1))
+    for point in (a, b):
+        projection = np.clip(np.sum((point - start) * edge, axis=1) / np.maximum(edge_sq, eps), 0, 1)
+        distances_sq = np.minimum(distances_sq, np.sum((point - start - projection[:, None] * edge) ** 2, axis=1))
+    clearance = (distances_sq < required ** 2) & ~overlap & ~cross
+    share = np.where((np.abs(t) < eps) | (np.abs(t - 1) < eps), 0.5, 1.0)
+    return overlap, cross, clearance, share
+
+
 def add_route_interaction_weights(
     prior_axis_records,
     current_diameter_mm,
@@ -293,7 +336,7 @@ def add_route_interaction_weights(
                 & (edge_y1 <= py1 + 1e-7)
                 & (edge_y2 >= py1 - 1e-7)
             )
-        else:
+        elif prior_dir == "V":
             overlap_mask = (
                 ~edge_is_h
                 & (np.abs(edge_x1 - px1) < 1e-7)
@@ -307,9 +350,21 @@ def add_route_interaction_weights(
                 & (edge_x2 >= px1 - 1e-7)
             )
 
-        dx = np.maximum.reduce([px1 - edge_x2, edge_x1 - px2, np.zeros_like(edge_x1)])
-        dy = np.maximum.reduce([py1 - edge_y2, edge_y1 - py2, np.zeros_like(edge_y1)])
-        clearance_mask = (np.hypot(dx, dy) < required) & ~overlap_mask & ~cross_mask
+        else:
+            overlap_mask, cross_mask, clearance_mask, cross_share = _diagonal_interaction_fields(
+                coords, prior_seg, required,
+            )
+
+        if prior_dir in ("H", "V"):
+            dx = np.maximum.reduce([px1 - edge_x2, edge_x1 - px2, np.zeros_like(edge_x1)])
+            dy = np.maximum.reduce([py1 - edge_y2, edge_y1 - py2, np.zeros_like(edge_y1)])
+            clearance_mask = (np.hypot(dx, dy) < required) & ~overlap_mask & ~cross_mask
+            # Two adjoining edges traversed through a crossing node together
+            # pay one crossing penalty, symmetrically in either direction.
+            endpoint = ((np.abs(edge_y1 - py1) < 1e-7) | (np.abs(edge_y2 - py1) < 1e-7)) if prior_dir == "H" else (
+                (np.abs(edge_x1 - px1) < 1e-7) | (np.abs(edge_x2 - px1) < 1e-7)
+            )
+            cross_share = np.where(endpoint, 0.5, 1.0)
 
         for edge_index in np.flatnonzero(overlap_mask):
             u, v, _, _ = edge_list[int(edge_index)]
@@ -317,7 +372,7 @@ def add_route_interaction_weights(
         for edge_index in np.flatnonzero(cross_mask):
             u, v, _, _ = edge_list[int(edge_index)]
             edge = normalized_edge(u, v)
-            crossing_counts[edge] = crossing_counts.get(edge, 0) + 1
+            crossing_counts[edge] = crossing_counts.get(edge, 0) + float(cross_share[int(edge_index)])
         for edge_index in np.flatnonzero(clearance_mask):
             u, v, _, _ = edge_list[int(edge_index)]
             edge = normalized_edge(u, v)
