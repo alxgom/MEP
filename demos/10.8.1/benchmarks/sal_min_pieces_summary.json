@@ -1,0 +1,88 @@
+{
+  "python": "3.12.14",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "graph": "Hannan Grid (numpy)",
+  "min_piece_factor": 1.05,
+  "diameters_mm": [
+    80,
+    125
+  ],
+  "repeats": 3,
+  "summary": {
+    "STATE_ASTAR": {
+      "samples": 126,
+      "successful": 90,
+      "median_ms": 109.99435000121593,
+      "p95_ms": 188.15979998908006,
+      "max_ms": 240.13769999146461,
+      "over_200_ms": 4,
+      "max_labels_per_state": 0,
+      "max_short_pieces": 2
+    },
+    "LINE_GRAPH_ASTAR": {
+      "samples": 126,
+      "successful": 90,
+      "median_ms": 106.89434999949299,
+      "p95_ms": 190.64230000367388,
+      "max_ms": 230.65240000141785,
+      "over_200_ms": 4,
+      "max_labels_per_state": 0,
+      "max_short_pieces": 3
+    },
+    "STATE_ASTAR_MIN_PIECES": {
+      "samples": 126,
+      "successful": 69,
+      "median_ms": 82.88835000712425,
+      "p95_ms": 158.17829998559318,
+      "max_ms": 192.12619998143055,
+      "over_200_ms": 0,
+      "max_labels_per_state": 5,
+      "max_short_pieces": 0
+    },
+    "LINE_GRAPH_ASTAR_MIN_PIECES": {
+      "samples": 126,
+      "successful": 69,
+      "median_ms": 81.13309998589102,
+      "p95_ms": 155.08249998674728,
+      "max_ms": 204.12090001627803,
+      "over_200_ms": 1,
+      "max_labels_per_state": 5,
+      "max_short_pieces": 0
+    }
+  },
+  "measurement_scope": "Sal-only scene recompute: graph refresh, weights, all routes; excludes drawing, plotting and initial dwelling preparation",
+  "strategy": "First Fit",
+  "pose_offsets_mm_degrees": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      100,
+      0,
+      0
+    ],
+    [
+      -100,
+      0,
+      0
+    ],
+    [
+      0,
+      100,
+      0
+    ],
+    [
+      0,
+      -100,
+      0
+    ],
+    [
+      0,
+      0,
+      90
+    ]
+  ],
+  "note": "Wall-clock timings vary with system load. Failed/blocked configurations are included. Compare successful configurations separately before making solver-speed claims."
+}

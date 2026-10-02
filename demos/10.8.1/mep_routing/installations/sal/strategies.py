@@ -120,6 +120,7 @@ def run_sequential_routing(
             machine_angle,
             bend_cost,
             edge_weights=weights_for_route(route_plan.kitchen_route),
+            route_name=route_plan.kitchen_route,
         )
         if kitchen_path is None:
             return False, None, "No path to Kitchen", 0
@@ -152,6 +153,7 @@ def run_sequential_routing(
             machine_angle,
             bend_cost,
             edge_weights=weights_for_route(route_name),
+            route_name=route_name,
         )
         if route_path is None:
             return False, None, f"No path to {route_name}", 0

@@ -37,6 +37,8 @@ SAL_SEARCH_BACKEND_LABELS = (
     "State-expanded A*",
     "Line graph L(G) A*",
     "Line graph L(G) GBFS",
+    "State A* (hard min pieces)",
+    "Line graph A* (hard min pieces)",
 )
 
 SAL_HEURISTIC_MODE_LABELS = (

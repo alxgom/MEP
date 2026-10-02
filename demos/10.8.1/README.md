@@ -7,7 +7,7 @@ Interactive Pygame prototype for routing ventilation ducts from a compact ventil
 Use the existing Demo 10.7 virtual environment while 10.8 is still a refactor copy:
 
 ```powershell
-cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.8"
+cd "C:\Users\ALEXIS GOMEL\Documents\mep_alexis_prehire\MEP\demos\10.8.1"
 ..\10.7\.venv\Scripts\python.exe main.py
 ```
 
@@ -161,7 +161,27 @@ internal segment minimum = diameter * 2.0 * factor
 
 The default factor is `1.05`, matching `FACTOR_CONDUCTO_MINIMA_LONGITUD` in the local routing-core config. The sidebar slider sweeps this factor from `0.50` to `2.00`.
 
-Short-piece handling is intentionally post-route, matching routing-core's current validation phase. The demo merges consecutive collinear graph edges into physical duct pieces before counting, so the metric is not inflated by grid discretization. The count contributes to `Total Cost Score` and is shown as `Short Pieces` in the KPI card, but it no longer expands A* search state. This keeps First Fit/Best Fit interactive while preserving comparability with routing-core validation.
+The baseline backends handle short pieces post-route, matching routing-core's current validation phase. The demo merges consecutive collinear graph edges into physical duct pieces before counting, so the metric is not inflated by grid discretization. The count contributes to `Total Cost Score` and is shown as `Short Pieces` in the KPI card. The experimental hard-minimum backends below enforce the same centerline criteria during search.
+
+### Hard Minimum-Piece Experiment
+
+With Sal active, select `First Fit` and choose either `State A* (hard min pieces)` or `Line graph A* (hard min pieces)` in the Router dropdown. `[L]` also cycles to these two additional choices. Existing backends and the default router remain available.
+
+Both experiments accumulate physical length until a direction change, reject a turn that closes a short piece, and use the smaller endpoint minimum at the start/end. Length saturates at the largest relevant minimum; only nondominated cost/length arrivals are retained per state. State A* groups arrivals by node/direction, while line-graph A* also retains the incoming directed edge. Physical machine stubs, snap adapters and shaft-entry segments participate in the checks. These are centerline experiments, not fitting or fabrication-length checks, and no later sanitization is performed.
+
+Thresholds follow the current machine catalog and `Min pieces factor` slider. The checked-in Ozeo Flat now has 80 mm small ducts and 125 mm large ducts: at factor 1.05, endpoint/internal minima are 84/168 mm and 131.25/262.5 mm respectively. Some older dimension tables in this README describe an earlier machine baseline; the catalog is authoritative.
+
+Sequential and negotiated strategies use these backends. Min-cost-flow combinations explicitly report unsupported because flow stages bypass the selected A* backend. A failed search/order reports blocked; it does not establish that every possible joint installation configuration is infeasible. There is no automatic relaxation, new grid discretization or fixed time cutoff.
+
+The runtime reuses numeric edge geometry within each scene solve, caches relaxed heuristics per arrival direction, and memoizes up to 64 exact weighted route requests across routing-order retries. These caches are discarded on the next scene solve. Saturation limits length-history distinctions, not absolute total memory.
+
+Repeat a no-window comparison, including graph refresh, clearance weights and all Sal routes:
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_sal_min_pieces.py --cases 7 --repeats 3 --output sal_min_pieces_results.json
+```
+
+The benchmark uses exported cases when available, otherwise one synthetic scene. It compares both baseline A* representations with both hard-minimum variants at the same machine poses, records materialized short-piece counts, and reports median/p95/max scene latency. Drawing and KPI plotting are outside the measured scene solve.
 
 ## Room Starts
 

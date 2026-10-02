@@ -58,7 +58,8 @@ def test_live_session_derives_adapter_machine_and_workspace_hooks():
     )
     settings = SalSolverSettings(1, 1, 0, 0, 0, 99, 1, 0, 0)
     session = SimpleNamespace(
-        installation=object(), machine_spec=spec, workspace=workspace,
+        installation=SimpleNamespace(search_backends=(0,)), search_backend_index=0,
+        machine_spec=spec, workspace=workspace,
         machine_center=(10, 20), machine_angle=90, settings=settings,
         routing_runtime=lambda _env, _policy: object(),
     )

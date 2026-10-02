@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from dataclasses import replace
+
+import pytest
 
 from mep_routing.installations.sal.application import (
     SalApplicationAdapter,
@@ -73,3 +76,19 @@ def test_sal_application_preflight_stops_before_live_graph_adapters():
     assert calls == [({"Kitchen": (10, 20)}, (30, 40))]
     assert result.routes is None
     assert result.status.startswith("Blocked: test")
+
+
+@pytest.mark.parametrize("backend", (3, 4))
+@pytest.mark.parametrize("strategy", (5, 6))
+def test_hard_piece_backends_do_not_silently_bypass_constraints_in_flow(backend, strategy):
+    from mep_routing.installations.sal import SAL_INSTALLATION
+
+    adapter = SalApplicationAdapter(
+        installation=SAL_INSTALLATION, terminals={}, machine_center=(0, 0),
+        machine_angle=0, small_diameter=80, large_diameter=125,
+        settings=replace(_settings(), routing_strategy=strategy),
+        hooks=SimpleNamespace(search_backend=backend),
+    )
+    result = adapter.solve()
+    assert result.routes is None
+    assert result.status.startswith("Unsupported: hard min pieces")

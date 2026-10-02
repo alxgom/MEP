@@ -88,6 +88,7 @@ class RoutingRuntime:
         self.heuristic_mode = heuristic_mode
         self.bend_cost = bend_cost
         self.estimate_turns_fn = estimate_turns_fn
+        self._piece_geometry = None
 
     def route_axis_records(self, route_name, route_segments):
         return route_axis_records_for_routes(route_name, route_segments, self.context)
@@ -147,8 +148,14 @@ class RoutingRuntime:
         *,
         edge_weights=None,
         bend_cost=None,
+        piece_policy=None,
+        source_segments=None,
     ):
         self.record_edge_weight_overlay(edge_weights)
+        if piece_policy is not None and self._piece_geometry is None:
+            from .piece_search import PieceSearchGraph
+
+            self._piece_geometry = PieceSearchGraph.from_env(self.env)
         return run_super_sink_search(
             self.search_backend,
             self.env,
@@ -160,6 +167,9 @@ class RoutingRuntime:
             heuristic_mode=self.heuristic_mode,
             machine_center=self.context.machine_center,
             estimate_turns_fn=self.estimate_turns_fn,
+            piece_policy=piece_policy,
+            source_segments=source_segments,
+            piece_geometry=self._piece_geometry,
         )
 
 

@@ -9,6 +9,9 @@ from .controller import SalRoutingControllerContext, SalRoutingResult, solve_rou
 from .flow_runtime import SalFlowRuntime
 from .policy import SalSolverPolicy
 from .strategy_dispatch import SalStrategyRuntime
+from .orchestration import SalRoutingStrategy
+from mep_routing.routing.search import SearchBackend
+from mep_routing.routing.piece_search import PieceLengthPolicy
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,7 @@ class SalApplicationHooks:
     count_crossings: Callable[[Any], int]
     score_routes: Callable[[Any, int, SalSolverPolicy], float]
     conflict_summary: Callable[[Any], str]
+    search_backend: int = 0
 
 
 @dataclass
@@ -76,8 +80,45 @@ class SalApplicationAdapter:
     def solve(self) -> SalRoutingResult:
         policy = self.settings.policy()
         route_plan = self.installation.build_route_plan(self.terminals, self.machine_center)
+        hard_lengths = SearchBackend(self.hooks.search_backend).enforces_min_pieces
+        if hard_lengths and self.settings.routing_strategy in (
+            SalRoutingStrategy.MIN_COST_FLOW_SMALL_PINS,
+            SalRoutingStrategy.MIN_COST_FLOW_TWO_STAGE,
+        ):
+            return SalRoutingResult(
+                None, "Unsupported: hard min pieces requires sequential or negotiated routing",
+                0.0, 0, frozenset(),
+            )
         routing_runtime = None
         flow_runtime = None
+        search_cache = {}
+
+        def search_route(route_name, starts, pins, pin_map, bend, **kwargs):
+            cache_key = None
+            if hard_lengths:
+                starts = tuple(starts)
+                # First Fit/Best Fit repeat shared route prefixes across orders.
+                # Weights are part of the key: changed prior routes cannot reuse
+                # a stale answer. The cache lives for one scene solve only.
+                cache_key = (route_name, starts, tuple(pins), bend,
+                             frozenset((kwargs.get("edge_weights") or {}).items()))
+                if cache_key in search_cache:
+                    return search_cache[cache_key]
+                minimum = self.hooks.route_diameter(route_name) * policy.min_piece_factor
+                kwargs["piece_policy"] = PieceLengthPolicy(minimum, 2 * minimum, route_name)
+                if route_name == route_plan.shaft_route:
+                    kwargs["source_segments"] = {
+                        int(node): self.hooks.route_segments_from_path(route_plan, route_name, [int(node)])
+                        for node in starts
+                    }
+            result = get_routing_runtime().run_super_sink_search(
+                starts, pins, pin_map, bend_cost=bend, **kwargs,
+            )
+            if cache_key is not None:
+                if len(search_cache) >= 64:
+                    del search_cache[next(iter(search_cache))]
+                search_cache[cache_key] = result
+            return result
 
         def get_routing_runtime():
             nonlocal routing_runtime
@@ -118,8 +159,8 @@ class SalApplicationAdapter:
                         axes, diameter, weights,
                     ),
                     route_diameter=self.hooks.route_diameter,
-                    run_search=lambda _env, starts, pins, pin_map, _global_pins, _angle, bend, **kwargs: runtime.run_super_sink_search(
-                        starts, pins, pin_map, bend_cost=bend, **kwargs,
+                    run_search=lambda _env, starts, pins, pin_map, _global_pins, _angle, bend, route_name=None, **kwargs: search_route(
+                        route_name, starts, pins, pin_map, bend, **kwargs,
                     ),
                     count_crossings=self.hooks.count_crossings,
                     score_routes=lambda routes, crossings: self.hooks.score_routes(routes, crossings, policy),
@@ -162,8 +203,8 @@ class SalApplicationAdapter:
             add_shaft_clearance_weights=lambda weights: get_routing_runtime().add_route_clearance_weights(
                 weights, route_plan.shaft_route, shaft_route_name=route_plan.shaft_route,
             ),
-            run_shaft_search=lambda boundary, pin_map, global_pins, bend, weights: get_routing_runtime().run_super_sink_search(
-                boundary, list(route_plan.large_ports), pin_map, bend_cost=bend, edge_weights=weights,
+            run_shaft_search=lambda boundary, pin_map, global_pins, bend, weights: search_route(
+                route_plan.shaft_route, boundary, list(route_plan.large_ports), pin_map, bend, edge_weights=weights,
             ),
             routing_strategy=self.settings.routing_strategy,
             policy=policy,

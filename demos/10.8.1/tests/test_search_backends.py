@@ -12,7 +12,7 @@ def test_search_backend_keeps_the_existing_selector_indices():
     assert coerce_search_backend(1) is SearchBackend.LINE_GRAPH_ASTAR
     assert coerce_search_backend(2) is SearchBackend.LINE_GRAPH_GBFS
     with pytest.raises(ValueError):
-        coerce_search_backend(3)
+        coerce_search_backend(5)
 
 
 @pytest.mark.parametrize(

@@ -93,6 +93,7 @@ def solve_negotiated(
                 machine_angle,
                 bend_cost,
                 edge_weights=edge_weights,
+                route_name=network_name,
             )
             if path is not None:
                 current_paths[network_name] = path

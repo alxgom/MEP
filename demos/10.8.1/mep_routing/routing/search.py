@@ -14,6 +14,12 @@ class SearchBackend(IntEnum):
     STATE_ASTAR = 0
     LINE_GRAPH_ASTAR = 1
     LINE_GRAPH_GBFS = 2
+    STATE_ASTAR_MIN_PIECES = 3
+    LINE_GRAPH_ASTAR_MIN_PIECES = 4
+
+    @property
+    def enforces_min_pieces(self):
+        return self in (self.STATE_ASTAR_MIN_PIECES, self.LINE_GRAPH_ASTAR_MIN_PIECES)
 
 
 def coerce_search_backend(backend):
@@ -339,6 +345,11 @@ def run_super_sink_search(
     heuristic_mode=0,
     machine_center=(0.0, 0.0),
     estimate_turns_fn=None,
+    *,
+    piece_policy=None,
+    source_segments=None,
+    stats=None,
+    piece_geometry=None,
 ):
     """Run one of the existing super-sink algorithms by stable selector."""
     selected = coerce_search_backend(backend)
@@ -348,6 +359,16 @@ def run_super_sink_search(
         machine_center=machine_center,
         estimate_turns_fn=estimate_turns_fn,
     )
+    if selected.enforces_min_pieces:
+        from .piece_search import run_piece_length_astar
+
+        return run_piece_length_astar(
+            env, start_node_indices, target_pin_names, pin_node_map, bend_cost,
+            piece_policy=piece_policy, source_segments=source_segments, stats=stats,
+            geometry=piece_geometry,
+            line_graph=selected is SearchBackend.LINE_GRAPH_ASTAR_MIN_PIECES,
+            **common,
+        )
     if selected is SearchBackend.STATE_ASTAR:
         return run_super_sink_state_astar(
             env,

@@ -64,6 +64,7 @@ class SalLiveRoutingSession:
             count_crossings=callbacks.count_crossings,
             score_routes=callbacks.score_routes,
             conflict_summary=callbacks.conflict_summary,
+            search_backend=self.installation.search_backends[self.search_backend_index],
         )
         return SalApplicationAdapter(
             installation=self.installation,
