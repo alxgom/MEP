@@ -184,8 +184,14 @@ def add_machine_clearance_weights(
     soft_margin_mm,
     clearance_penalty,
     block_weight,
+    port_access_specs=(),
 ):
-    """Block or penalize graph edges near the active machine envelope."""
+    """Block envelope collisions; penalize proximity outside legal approaches.
+
+    Outward rays from physical access points are intentional connections, not
+    traffic skirting the machine. Exempt only their collinear edges from the
+    soft preference; radius-based hard clearance and existing weights remain.
+    """
     if edge_coords is None or edge_list is None:
         return
     distances = machine_edge_clearance_distances(
@@ -206,6 +212,24 @@ def add_machine_clearance_weights(
         if soft_margin_mm > 0
         else np.zeros(len(distances), dtype=bool)
     )
+    if soft_margin_mm > 0 and port_access_specs:
+        coords = np.asarray(edge_coords, dtype=np.float64)
+        for access in port_access_specs:
+            if access.get("diameter_mm", route_diameter_mm) != route_diameter_mm:
+                continue
+            x, y = access["access_point"]
+            direction = access["out_dir"]
+            if direction in ("E", "W"):
+                collinear = (np.abs(coords[:, 1] - y) < 1e-7) & (np.abs(coords[:, 3] - y) < 1e-7)
+                outward = (np.minimum(coords[:, 0], coords[:, 2]) >= x - 1e-7) if direction == "E" else (
+                    np.maximum(coords[:, 0], coords[:, 2]) <= x + 1e-7
+                )
+            else:
+                collinear = (np.abs(coords[:, 0] - x) < 1e-7) & (np.abs(coords[:, 2] - x) < 1e-7)
+                outward = (np.minimum(coords[:, 1], coords[:, 3]) >= y - 1e-7) if direction == "N" else (
+                    np.maximum(coords[:, 1], coords[:, 3]) <= y + 1e-7
+                )
+            soft_mask &= ~(collinear & outward)
 
     for edge_index in np.flatnonzero(hard_mask):
         u, v, _, _ = edge_list[int(edge_index)]

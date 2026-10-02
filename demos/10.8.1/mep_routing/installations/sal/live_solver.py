@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from mep_routing.domain import machine_pins, port_access_specs
 from mep_routing.routing import RoutingRuntime, RoutingWeightRuntimeContext
 
 from .application import SalApplicationAdapter, SalApplicationHooks, SalSolverSettings
@@ -83,6 +84,15 @@ class SalLiveRoutingSession:
 
     def weight_context(self, env, policy=None):
         policy = policy or self.policy
+        pins = machine_pins(self.machine_spec, *self.machine_center, self.machine_angle)
+        accesses = tuple(
+            dict(access, diameter_mm=(
+                self.machine_spec.large_duct_diameter_mm
+                if access["pin"] in ("left_mid", "right_mid")
+                else self.machine_spec.small_duct_diameter_mm
+            ))
+            for access in port_access_specs(self.machine_spec, pins, self.machine_angle)
+        )
         return RoutingWeightRuntimeContext(
             edge_list=self.workspace.edge_list,
             edge_coords=self.workspace.edge_coords,
@@ -103,6 +113,7 @@ class SalLiveRoutingSession:
             clearance_penalty=policy.clearance_penalty,
             block_weight=policy.overlap_block_weight,
             route_diameter=self.machine_spec.route_diameter_mm,
+            machine_port_access_specs=accesses,
         )
 
     def routing_runtime(self, env, policy=None):

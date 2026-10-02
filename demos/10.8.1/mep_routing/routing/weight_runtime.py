@@ -63,6 +63,7 @@ class RoutingWeightRuntimeContext:
     clearance_penalty: float
     block_weight: float
     route_diameter: Callable[[str], float]
+    machine_port_access_specs: Sequence[Mapping[str, Any]] = ()
 
 
 class RoutingRuntime:
@@ -256,6 +257,7 @@ def add_machine_clearance_weights(
         soft_margin_mm=context.machine_soft_margin_mm,
         clearance_penalty=context.clearance_penalty,
         block_weight=context.block_weight,
+        port_access_specs=context.machine_port_access_specs,
     )
 
 
