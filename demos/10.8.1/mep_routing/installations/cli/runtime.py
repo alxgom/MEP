@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import math
 from time import perf_counter
 
 from shapely.geometry import Polygon
@@ -20,6 +21,7 @@ from .aligned_duct_geometry import (
 from .graph_inputs import build_cli_simple_graph_inputs
 from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
+from .length_steiner import LengthSteinerStats, TreeLengthPolicy, validate_tree_lengths
 from .placement import CliPlacementResult, CliPlacementRuntime
 from .solver_backends import solve_cli_tree
 from .sizing import (
@@ -44,6 +46,8 @@ class CliRoutingResult:
     placement: CliPlacementResult | None = None
     context_obstacle_count: int = 0
     context_obstacles: tuple = ()
+    supply_minimum_length_mm: float | None = None
+    supply_length_stats: LengthSteinerStats | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,8 @@ class _SolvedTree:
     segments: tuple[CliDuctSegment, ...]
     node_count: int
     connections: tuple = ()
+    minimum_length_mm: float | None = None
+    length_stats: LengthSteinerStats | None = None
 
 
 class CliInteractiveRuntime:
@@ -94,6 +100,9 @@ class CliInteractiveRuntime:
         start_mode_index=0,
     ):
         started = perf_counter()
+        self._length_failure = None
+        self._length_stats = None
+        self._length_minimum = None
         pins = cli_machine_pins(machine, center, angle_degrees)
         grille_sizes = self._size_supply_grilles(prepared_dwelling.rooms, machine)
         grilles = prepare_cli_grilles(
@@ -108,6 +117,18 @@ class CliInteractiveRuntime:
                 (), "Blocked: no Cli supply grilles", started, 0, grilles, pins,
                 context_obstacles=context_obstacles,
             )
+
+        if solver_backend_index in (5, 6):
+            reason = None
+            if start_mode_index != 1:
+                reason = "choose Wall candidates for hard Steiner lengths"
+            elif not (machine.airflow_m3h and machine.pressure_loss_mmca):
+                reason = "selected machine has no calculated duct width"
+            if reason:
+                return self._finish(
+                    (), f"Unsupported: {reason}", started, 0, grilles, pins,
+                    context_obstacles=context_obstacles,
+                )
 
         supply = self._solve_tree(
             "supply", prepared_dwelling, machine, pins, angle_degrees,
@@ -134,7 +155,10 @@ class CliInteractiveRuntime:
                     )
                     return self.last_result
             return self._finish(
-                (), "Blocked: no Cli supply tree", started, 0, grilles, pins,
+                (), self._length_failure or (
+                    "Blocked: hard-length search found no supply tree" if solver_backend_index in (5, 6)
+                    else "Blocked: no Cli supply tree"
+                ), started, 0, grilles, pins,
                 context_obstacles=context_obstacles,
             )
         returned = None
@@ -165,6 +189,9 @@ class CliInteractiveRuntime:
             )
         elif return_enabled:
             status += "; return tree blocked"
+        if supply.minimum_length_mm is not None:
+            mode = "bends + tees" if solver_backend_index == 6 else "bends"
+            status += f"; hard {mode} min {supply.minimum_length_mm:g} mm"
         return self._finish(
             routes, status, started, total_nodes, grilles, pins,
             workspace=supply.workspace, supply_segments=supply.segments,
@@ -194,6 +221,19 @@ class CliInteractiveRuntime:
         if not connections:
             return None
         connector_key = "air_out" if role == "supply" else "air_in"
+        policy, machine_sizing, grille_sizes = None, None, {}
+        area_by_route = {item.route_name: item.room_area_m2 for item in connections}
+        if role == "supply" and machine.airflow_m3h and machine.pressure_loss_mmca:
+            policy = self.sizing_policy_factory(CliSizingContext(
+                machine.airflow_m3h, machine.pressure_loss_mmca,
+            ))
+            total_area = float(sum(area_by_route.values()))
+            if total_area > 0:
+                machine_sizing = policy.size(total_area, total_area)
+                grille_sizes = {
+                    item.route_name: policy.size(item.room_area_m2, total_area)
+                    for item in connections
+                }
         access_length_mm = 500 if role == "supply" else 20
         access = cli_air_access_spec(
             machine, pins, angle, connector_key, access_length_mm,
@@ -235,20 +275,38 @@ class CliInteractiveRuntime:
         root_node = int(runtime.spatial_index.query(access["access_point"])[1])
         graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
         selected_connections = tuple(connections)
-        if role == "supply" and start_mode_index == 1 and solver_backend_index in (3, 4):
+        length_policy, length_stats = None, None
+        if role == "supply" and solver_backend_index in (5, 6):
+            if machine_sizing is None:
+                self._length_failure = "Unsupported: no calculated full-flow duct width"
+                return None
+            self._length_minimum = machine_sizing.width_mm
+            length_policy = TreeLengthPolicy(machine_sizing.width_mm, solver_backend_index == 6)
+            length_stats = self._length_stats = LengthSteinerStats()
+            if math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-7:
+                self._length_failure = "Unsupported: graph snaps the machine access; use Hannan or Core Simple"
+                return None
+        if role == "supply" and start_mode_index == 1 and solver_backend_index in (3, 4, 5, 6):
             targets = [room for room in prepared.rooms if is_cli_supply_room(room)]
             rooms_by_name = {
                 item.room_name: room for item, room in zip(connections, targets)
             }
             directed_solver = (
-                solve_directed_wall_steiner if solver_backend_index == 4
+                solve_directed_wall_steiner if solver_backend_index in (4, 5, 6)
                 else solve_directed_wall_tree
+            )
+            extra = {} if length_policy is None else dict(
+                length_policy=length_policy,
+                root_prefix=((pins[connector_key], access["access_point"]),),
+                stats=length_stats,
             )
             directed = directed_solver(
                 runtime.nodes, weighted_adjacency, root_node, rooms_by_name,
-                connections, bend_penalty_mm,
+                connections, bend_penalty_mm, **extra,
             )
             if directed is None:
+                if length_stats is not None and length_stats.rejected_physical_tree:
+                    self._length_failure = "Blocked: constrained candidate failed physical-tree check"
                 return None
             tree, graph_nodes, graph_adjacency = directed.tree, directed.nodes, directed.adjacency
             selected_connections = directed.selected_connections
@@ -256,7 +314,7 @@ class CliInteractiveRuntime:
         else:
             points = [access["access_point"], *terminals.values()]
             indices = tuple(dict.fromkeys(int(runtime.spatial_index.query(point)[1]) for point in points))
-            effective_backend = 2 if solver_backend_index in (3, 4) else solver_backend_index
+            effective_backend = 2 if solver_backend_index in (3, 4, 5, 6) else solver_backend_index
             tree = solve_cli_tree(
                 effective_backend, runtime.nodes, weighted_adjacency, indices,
                 bend_penalty=bend_penalty_mm,
@@ -266,25 +324,12 @@ class CliInteractiveRuntime:
         if tree is None:
             return None
         edge_sizes = {}
-        machine_sizing = None
-        grille_sizes = {}
-        if role == "supply" and machine.airflow_m3h and machine.pressure_loss_mmca:
-            area_by_route = {item.route_name: item.room_area_m2 for item in connections}
+        if policy is not None:
             area_by_node = {}
             for name, point in terminals.items():
                 distances = ((graph_nodes[:, :2] - point) ** 2).sum(axis=1)
                 node = int(distances.argmin())
                 area_by_node[node] = area_by_node.get(node, 0.0) + area_by_route.get(name, 0.0)
-            policy = self.sizing_policy_factory(CliSizingContext(
-                machine.airflow_m3h, machine.pressure_loss_mmca,
-            ))
-            total_area = float(sum(area_by_route.values()))
-            if total_area > 0:
-                machine_sizing = policy.size(total_area, total_area)
-                grille_sizes = {
-                    item.route_name: policy.size(item.room_area_m2, total_area)
-                    for item in connections
-                }
             edge_sizes = size_tree_edges(tree.tree_edges, root_node, area_by_node, policy)
         segments = materialize_cli_tree(
             role=role, machine=machine, pins=pins, access_spec=access,
@@ -292,7 +337,17 @@ class CliInteractiveRuntime:
             edge_sizes=edge_sizes, machine_sizing=machine_sizing,
             grille_sizes=grille_sizes,
         )
-        return _SolvedTree(dwelling.workspace, segments, len(graph_nodes), selected_connections)
+        if length_policy is not None and not validate_tree_lengths(
+            [item.line for item in segments], pins[connector_key],
+            [item.grille_point for item in selected_connections], length_policy,
+        ):
+            length_stats.rejected_physical_tree = True
+            self._length_failure = "Blocked: materialized tree failed hard length check"
+            return None
+        return _SolvedTree(
+            dwelling.workspace, segments, len(graph_nodes), selected_connections,
+            length_policy.minimum_mm if length_policy is not None else None, length_stats,
+        )
 
     def _finish(
         self, routes, status, started, total_nodes, grilles, pins, *, workspace=None,
@@ -304,6 +359,7 @@ class CliInteractiveRuntime:
             grilles.grille_terminals(), dict(pins), workspace, grilles,
             tuple(supply_segments), tuple(return_segments), placement or self.last_placement,
             len(context_obstacles), context_obstacles,
+            self._length_minimum, self._length_stats,
         )
         self._core_polygon_result = None
         self._core_polygon_projection = None

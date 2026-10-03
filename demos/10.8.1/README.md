@@ -183,6 +183,53 @@ Repeat a no-window comparison, including graph refresh, clearance weights and al
 
 The benchmark uses exported cases when available, otherwise one synthetic scene. It compares both baseline A* representations with both hard-minimum variants at the same machine poses, records materialized short-piece counts, and reports median/p95/max scene latency. Drawing and KPI plotting are outside the measured scene solve.
 
+## Experimental Cli Directed Steiner Minimum Lengths
+
+With Cli active, the Router dropdown offers `Steiner: min bends` and
+`Steiner: min bends + tees`, alongside `Directed Steiner arborescence (exact)`.
+Selecting a directed router sets Starts to `Wall candidates`; `[L]` also cycles
+through the choices. Keep the same machine pose, graph and bend weight when
+comparing them. These experiments constrain the supply tree; optional return
+routing retains the existing line-graph MST backend.
+
+The fixed minimum for each solve is the calculated full-flow trunk width,
+using the existing duct-sizing policy. PEAD M71JA currently gives 600 mm.
+Machine/grille face widths do not determine this minimum. Models without
+sourced airflow and pressure-loss inputs report unsupported. A graph that snaps
+the machine access away from its physical point also reports unsupported;
+Core Simple includes the exact access node used in the comparison benchmark.
+
+The bends mode measures uninterrupted centerline runs along every root-to-grille
+path. The tees mode also ends the incoming piece at each branch and starts every
+outgoing piece afresh, including straight continuation. A grille takeoff on a
+continuing trunk is a branch. Collinear graph subdivisions and duct-size changes
+do not end a run. Physical machine and grille adapters count toward the lengths;
+fitting deductions and fabrication lengths are outside this lab experiment.
+
+Both modes use the baseline's weighted adjacency, bend costs and terminal costs.
+Physical distances are separate from costs, and attained length saturates at the
+minimum. Tee merges retain occupied departure directions and require distinct
+physical branches, including through zero-length wall split edges. An independent
+check validates the reconstructed and materialized physical tree before accepting it.
+
+These are experimental state-expanded subset solvers. The chosen expanded-state
+tree can still collapse into overlapping physical paths or an invalid physical
+arborescence. Such candidates are reported as blocked; the solver does not
+enumerate alternative trees after that rejection. **Blocked does not certify
+infeasibility**, and these variants do not claim exact physical-tree optimality.
+There is no fallback to unconstrained supply routing or length relaxation.
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_cli_hard_lengths.py --cases 7 --repeats 3 --output cli_hard_lengths_results.json
+```
+
+The benchmark measures Cli scene recomputation, including graph construction,
+wall candidates, search and sizing, at identical poses. It excludes initial
+dwelling preparation, automatic placement, rendering and history. Checked-in
+`benchmarks/cli_hard_lengths_summary.json` records both the final run and a slower
+repeat. Timings vary substantially with machine load; saturation does not impose
+an absolute memory cap, and terminal subsets still grow exponentially with room count.
+
 ## Room Starts
 
 The default start mode is `Room node set`. Instead of snapping each wet room to a single centroid terminal, each route starts from a virtual source connected to every valid graph node inside that room and inside the false-ceiling region. This keeps the current room-to-machine routing direction but removes unnecessary dependence on a centroid point.

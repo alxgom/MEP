@@ -66,6 +66,21 @@ def test_cli_graph_hotkey_cycles_cli_state_without_changing_sal():
     assert app.graph_type_idx == 0
 
 
+def test_cli_router_hotkey_selects_wall_candidates_for_hard_steiner_modes():
+    app, _ = _app()
+    app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
+    app.workbench_state.cli.router_backend_idx = 4
+    controller = WorkbenchCommandController(app, _pygame_keys())
+    for backend in (5, 6):
+        controller.apply_routing_key_command(_pygame_keys().K_l)
+        assert app.workbench_state.cli.router_backend_idx == backend
+        assert app.workbench_state.cli.room_start_mode_idx == 1
+    controller.apply_routing_key_command(_pygame_keys().K_l)
+    assert app.workbench_state.cli.router_backend_idx == 0
+    assert app.workbench_state.cli.room_start_mode_idx == 0
+    assert app.router_backend_idx == 0
+
+
 def test_cli_auto_placement_hotkeys_update_only_cli_mode():
     app, _rebuilds = _app()
     app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})

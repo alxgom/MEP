@@ -82,3 +82,22 @@ def test_solver_dropdown_updates_only_active_installation_state():
 
     assert (handled, changed, field) == (True, True, "graph")
     assert workbench_state.cli.graph_type_idx == 1
+
+
+def test_hard_steiner_dropdown_selects_wall_candidates_and_preserves_mode():
+    state = WorkbenchState.create()
+    app = SimpleNamespace(
+        installation_header_state=SimpleNamespace(active="cli"), workbench_state=state,
+        CLI_INSTALLATION=CLI_INSTALLATION, demo_config=build_demo_config(SAL_INSTALLATION),
+    )
+    facade = DemoUiFacade(app, SimpleNamespace(Rect=_Rect))
+    control, options = solver_dropdown_bounds(1, len(CLI_INSTALLATION.search_backend_labels))
+    for backend in (5, 6):
+        facade.handle_solver_dropdown_click((control[0] + 1, control[1] + 1))
+        facade.handle_solver_dropdown_click((options[backend][0] + 1, options[backend][1] + 1))
+        assert state.cli.router_backend_idx == backend
+        assert state.cli.room_start_mode_idx == 1
+    starts, options = solver_dropdown_bounds(4, len(CLI_INSTALLATION.start_mode_labels))
+    facade.handle_solver_dropdown_click((starts[0] + 1, starts[1] + 1))
+    facade.handle_solver_dropdown_click((options[1][0] + 1, options[1][1] + 1))
+    assert state.cli.router_backend_idx == 6

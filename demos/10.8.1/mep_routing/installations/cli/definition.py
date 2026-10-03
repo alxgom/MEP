@@ -26,6 +26,8 @@ CLI_SEARCH_BACKEND_LABELS = (
     "Line graph L(G) metric MST",
     "Directed root-path union (baseline)",
     "Directed Steiner arborescence (exact)",
+    "Steiner: min bends",
+    "Steiner: min bends + tees",
 )
 CLI_HEURISTIC_MODE_LABELS = ("Shortest-path distance",)
 CLI_START_MODE_LABELS = ("Grille center", "Wall candidates")

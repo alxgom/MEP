@@ -139,7 +139,7 @@ def test_cli_runtime_can_disable_return_ventilation():
     assert result.status.startswith("Cli supply solved")
 
 
-@pytest.mark.parametrize("backend_index", (3, 4))
+@pytest.mark.parametrize("backend_index", (3, 4, 5, 6))
 def test_cli_directed_wall_candidates_choose_one_sized_supply_grille_per_room(backend_index):
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION,
@@ -158,6 +158,66 @@ def test_cli_directed_wall_candidates_choose_one_sized_supply_grille_per_room(ba
     assert all(item.grille_point == item.routing_point for item in result.grille_plan.supply)
     assert {item.width_mm for item in result.grille_plan.supply} == {800}
     assert all(item.sizing.airflow_m3h == 630.0 for item in result.grille_plan.supply)
+    if backend_index in (5, 6):
+        assert result.supply_minimum_length_mm == 600
+        assert result.supply_length_stats.state_count > 0
+        assert not result.supply_length_stats.rejected_physical_tree
+        assert "min 600 mm" in result.status
+
+
+@pytest.mark.parametrize("backend_index", (5, 6))
+def test_cli_hard_lengths_report_unsupported_without_sizing_or_wall_candidates(backend_index):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    result = runtime.solve(_prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+                           return_enabled=False, solver_backend_index=backend_index)
+    assert not result.routes and "choose Wall candidates" in result.status
+    unsourced = CLI_INSTALLATION.machine_catalog.value("pead-m35ja")
+    result = runtime.solve(_prepared(), unsourced, (3000, 3500), return_enabled=False,
+                           solver_backend_index=backend_index, start_mode_index=1)
+    assert not result.routes and "no calculated duct width" in result.status
+
+
+@pytest.mark.parametrize("backend_index", (5, 6))
+def test_cli_hard_lengths_keep_return_tree_unconstrained(backend_index):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    result = runtime.solve(_prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+                           solver_backend_index=backend_index, start_mode_index=1)
+    assert result.supply_segments and result.return_segments
+    assert result.supply_minimum_length_mm == 600
+    assert all(segment.sizing is None for segment in result.return_segments)
+
+
+def test_cli_length_backends_receive_identical_graph_weights_and_grille_candidates(monkeypatch):
+    import numpy as np
+    from mep_routing.installations.cli import directed_wall_graph
+
+    original, graphs = directed_wall_graph._prepare_wall_graph, []
+
+    def capture(*args):
+        graph = original(*args)
+        graphs.append(graph)
+        return graph
+
+    monkeypatch.setattr(directed_wall_graph, "_prepare_wall_graph", capture)
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    for backend in (4, 5, 6):
+        result = runtime.solve(_prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+                               return_enabled=False, solver_backend_index=backend, start_mode_index=1)
+        assert result.routes
+    for graph in graphs[1:]:
+        assert np.array_equal(graph.nodes, graphs[0].nodes)
+        assert graph.adjacency == graphs[0].adjacency
+        assert graph.candidates == graphs[0].candidates
+        assert graph.wall_points == graphs[0].wall_points
 
 
 @pytest.mark.parametrize("graph_mode", tuple(GraphMode))

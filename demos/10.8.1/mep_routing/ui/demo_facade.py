@@ -96,11 +96,11 @@ class DemoUiFacade:
                 changed = getattr(target, attribute) != selected
                 setattr(target, attribute, selected)
                 if active == "cli":
-                    if opened.key == "starts" and selected == 1:
+                    if opened.key == "starts" and selected == 1 and target.router_backend_idx not in (3, 4, 5, 6):
                         target.router_backend_idx = 4
-                    elif opened.key == "router" and selected not in (3, 4):
+                    elif opened.key == "router" and selected not in (3, 4, 5, 6):
                         target.room_start_mode_idx = 0
-                    elif opened.key == "router" and selected in (3, 4):
+                    elif opened.key == "router" and selected in (3, 4, 5, 6):
                         target.room_start_mode_idx = 1
                 a.workbench_state.solver_dropdown_open_for = None
                 return True, changed, opened.key
@@ -159,7 +159,11 @@ class DemoUiFacade:
         a = self.app
         if a.installation_header_state.active != "sal":
             a.canvas_ui.controls.min_piece = self.pygame.Rect(0, 0, 1, 1)
-            label = font.render("Piece validation: scope pending", True, a.theme.muted)
+            text = "Piece validation: scope pending"
+            if a.installation_header_state.active == "cli" and a.workbench_state.cli.router_backend_idx in (5, 6):
+                minimum = a.cli_runtime.last_result.supply_minimum_length_mm
+                text = f"Hard minimum: {minimum:g} mm" if minimum is not None else "Hard minimum: sizing unavailable"
+            label = font.render(text, True, a.theme.muted)
             screen.blit(label, (x, y))
             return
         a.canvas_ui.draw_min_piece_slider(

@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-03",
+  "python": "3.12.14",
+  "graph": "Routing-Core Port: Simple Grid",
+  "machine": "PEAD M71JA",
+  "minimum_mm": 600,
+  "return_enabled": false,
+  "cases": 7,
+  "poses_per_case": 6,
+  "repeats": 3,
+  "scope": "Cli scene solve excluding dwelling preparation, automatic placement, rendering and history",
+  "notes": [
+    "Different acceptance sets prevent a like-for-like speed ranking.",
+    "Blocked physical union does not certify infeasibility; no alternate-tree retry.",
+    "System load can substantially change timings; no fixed 200 ms guarantee."
+  ],
+  "runs": [
+    {
+      "name": "final",
+      "summary": {
+        "Directed Steiner arborescence (exact)": {
+          "samples": 126,
+          "successful": 123,
+          "median_ms": 55.053400006727315,
+          "p95_ms": 113.41879999963567,
+          "max_ms": 156.74220002256334,
+          "over_200_ms": 0,
+          "max_states": 0,
+          "rejected_trees": 0,
+          "max_subset_labels": 0,
+          "max_branch_labels": 0
+        },
+        "Steiner: min bends": {
+          "samples": 126,
+          "successful": 102,
+          "median_ms": 61.572000005980954,
+          "p95_ms": 138.1559000001289,
+          "max_ms": 146.87450000201352,
+          "over_200_ms": 0,
+          "max_states": 2271,
+          "rejected_trees": 15,
+          "max_subset_labels": 29151,
+          "max_branch_labels": 0
+        },
+        "Steiner: min bends + tees": {
+          "samples": 126,
+          "successful": 90,
+          "median_ms": 75.63475001370534,
+          "p95_ms": 204.84639998176135,
+          "max_ms": 213.53839998482727,
+          "over_200_ms": 10,
+          "max_states": 3144,
+          "rejected_trees": 27,
+          "max_subset_labels": 42246,
+          "max_branch_labels": 35123
+        }
+      }
+    },
+    {
+      "name": "slower_repeat",
+      "summary": {
+        "Directed Steiner arborescence (exact)": {
+          "samples": 126,
+          "successful": 123,
+          "median_ms": 157.9864999948768,
+          "p95_ms": 327.49450000119396,
+          "max_ms": 368.1436000042595,
+          "over_200_ms": 41,
+          "max_states": 0,
+          "rejected_trees": 0,
+          "max_subset_labels": 0,
+          "max_branch_labels": 0
+        },
+        "Steiner: min bends": {
+          "samples": 126,
+          "successful": 102,
+          "median_ms": 176.32835000404157,
+          "p95_ms": 372.53469999996014,
+          "max_ms": 397.2964000131469,
+          "over_200_ms": 57,
+          "max_states": 2271,
+          "rejected_trees": 15,
+          "max_subset_labels": 29151,
+          "max_branch_labels": 0
+        },
+        "Steiner: min bends + tees": {
+          "samples": 126,
+          "successful": 90,
+          "median_ms": 205.14360000379384,
+          "p95_ms": 498.85980001999997,
+          "max_ms": 552.846699982183,
+          "over_200_ms": 66,
+          "max_states": 3144,
+          "rejected_trees": 27,
+          "max_subset_labels": 42246,
+          "max_branch_labels": 35123
+        }
+      }
+    }
+  ]
+}

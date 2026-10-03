@@ -231,11 +231,26 @@ def solve_directed_wall_tree(nodes, adjacency, root, rooms_by_name, connections,
     return DirectedWallResult(positions, result_adj, tree, selected)
 
 
-def solve_directed_wall_steiner(nodes, adjacency, root, rooms_by_name, connections, bend_penalty):
+def solve_directed_wall_steiner(nodes, adjacency, root, rooms_by_name, connections, bend_penalty,
+                               *, length_policy=None, root_prefix=(), stats=None):
     """Exact directed-Steiner subset DP on the turn-aware line graph."""
     prepared = _prepare_wall_graph(nodes, adjacency, rooms_by_name, connections)
     if prepared is None:
         return None
+    if length_policy is not None:
+        from .length_steiner import solve_length_steiner
+
+        solved = solve_length_steiner(
+            prepared, root, tuple(item.route_name for item in connections), bend_penalty,
+            length_policy, root_prefix=root_prefix, stats=stats,
+        )
+        if solved is None:
+            return None
+        tree, selected_nodes = solved
+        selected = _selected_connections(
+            connections, rooms_by_name, prepared.nodes, prepared.wall_points, selected_nodes,
+        )
+        return DirectedWallResult(prepared.nodes, prepared.adjacency, tree, selected)
     positions, graph = prepared.nodes, prepared.adjacency
     names = tuple(item.route_name for item in connections)
 
