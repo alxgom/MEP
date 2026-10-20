@@ -2,6 +2,9 @@
 
 Interactive Pygame prototype for routing ventilation ducts from a compact ventilation machine to room starts, machine pins, and shafts. Demo 10.8 uses Demo 10.79 as its base, preserving the line-graph backends, min-cost-flow strategies, real/synthetic dwelling source selection, and room-node-set starts.
 
+See [SOLVERS.md](SOLVERS.md) for a comparative guide to every current solver:
+what it does, how it works, why it exists, its objective and its limitations.
+
 ## Run
 
 Use the existing Demo 10.7 virtual environment while 10.8 is still a refactor copy:
@@ -59,7 +62,7 @@ Routing and display:
 - Preferred areas are drawn as translucent filled regions with dotted borders. Nodes inside preferred areas are hollow; the node actually used by the routed solution is filled.
 - Right-side `Log` button: store the current session-local routing state, add a marker to the KPI plots, and list the logged KPIs. Click a log row to restore that configuration and recompute the route.
 - Click a duct or room to highlight its route. Other routes keep their width but turn black; unrelated rooms and pins are desaturated. Click empty canvas, or press `Esc` when not in ruler mode, to clear selection.
-- The solver card includes sliders for `Min pieces factor`, bend weight, and crossing multiplier. Bend weight moves in 100-unit integer steps. The bend and crossing sliders include icon-only reset buttons.
+- The solver card includes sliders for `Min pieces factor` (Sal), `Hard min` in mm (Cli hard-length modes), bend weight, and crossing multiplier. Cli's minimum moves in 10 mm steps from 50 to 2000 mm; its reset icon restores the calculated trunk width. Bend weight moves in 100-unit integer steps. The bend and crossing sliders include icon-only reset buttons.
 
 ## Current Solvers
 
@@ -192,8 +195,13 @@ through the choices. Keep the same machine pose, graph and bend weight when
 comparing them. These experiments constrain the supply tree; optional return
 routing retains the existing line-graph MST backend.
 
-The fixed minimum for each solve is the calculated full-flow trunk width,
+The default minimum for each solve is the calculated full-flow trunk width,
 using the existing duct-sizing policy. PEAD M71JA currently gives 600 mm.
+The `Hard min (auto)` slider lets you override it with an absolute 50–2000 mm
+minimum in 10 mm steps. Reset restores calculated-width mode. The setting is
+shared by all three hard-length variants and saved in solution logs; it does
+not change duct sizing or the graph's costs. Sal's separate factor slider keeps
+its existing diameter-based rules.
 Machine/grille face widths do not determine this minimum. Models without
 sourced airflow and pressure-loss inputs report unsupported. A graph that snaps
 the machine access away from its physical point also reports unsupported;

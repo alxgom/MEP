@@ -308,6 +308,7 @@ class PanelHit:
 
     help_card: str | None = None
     min_piece_slider: bool = False
+    min_piece_reset: bool = False
     bend_slider: bool = False
     bend_reset: bool = False
     crossing_slider: bool = False
@@ -345,6 +346,8 @@ def begin_panel_interaction(
             replace(state, active_slider="min_piece"),
             (PanelCommand("set_slider", ("min_piece", screen_x)),),
         )
+    if hit.min_piece_reset:
+        return PanelInteractionTransition(state, (PanelCommand("reset_slider", "min_piece"),))
     if hit.bend_slider:
         return PanelInteractionTransition(
             replace(state, active_slider="bend"),

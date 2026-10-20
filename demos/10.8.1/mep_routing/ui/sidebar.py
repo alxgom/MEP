@@ -70,6 +70,7 @@ class SolverCard:
     crossing_min: float
     crossing_max: float
     dropdowns: tuple["SolverDropdown", ...] = ()
+    detail: str | None = None
 
 
 @dataclass(frozen=True)
@@ -233,7 +234,7 @@ def draw_sidebar(
         screen.blit(fonts.small.render(dropdown.label, True, colors.muted), (text_x, y))
     screen.blit(
         fonts.small.render(
-            format_selected_route(
+            view.solver.detail or format_selected_route(
                 view.solver.selected_route, view.solver.preferred_terminal_count,
             ),
             True, colors.text,

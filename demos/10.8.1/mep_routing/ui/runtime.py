@@ -128,6 +128,7 @@ class CanvasViewport:
 @dataclass
 class CanvasControlRects:
     min_piece: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))
+    min_piece_reset: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
     bend: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))
     crossing: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))
     bend_reset: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))

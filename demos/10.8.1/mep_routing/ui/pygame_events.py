@@ -240,12 +240,13 @@ class WorkbenchEventAdapter:
         panel_hit = PanelHit(
             help_card=help_card,
             min_piece_slider=controls.min_piece.collidepoint(pos),
+            min_piece_reset=controls.min_piece_reset.collidepoint(pos),
             bend_slider=controls.bend.collidepoint(pos),
             bend_reset=controls.bend_reset.collidepoint(pos),
             crossing_slider=controls.crossing.collidepoint(pos),
             crossing_reset=controls.crossing_reset.collidepoint(pos),
         )
-        occupied = any((panel_hit.help_card, panel_hit.min_piece_slider, panel_hit.bend_slider,
+        occupied = any((panel_hit.help_card, panel_hit.min_piece_slider, panel_hit.min_piece_reset, panel_hit.bend_slider,
                         panel_hit.bend_reset, panel_hit.crossing_slider, panel_hit.crossing_reset))
         if not occupied:
             panel_hit = replace(panel_hit, canvas_tool=a.commands.handle_canvas_tool_button_click(pos))
@@ -309,7 +310,9 @@ class WorkbenchEventAdapter:
             if not active_capabilities(a).routing_weights:
                 a.observation.set_transient_message("Routing weights are not available here")
                 return
-            if command.value == "bend":
+            if command.value == "min_piece":
+                a.commands.reset_minimum_segment_length(); marker = ("Min:auto", (241, 196, 15))
+            elif command.value == "bend":
                 a.commands.reset_bend_weight(); marker = ("B:reset", (155, 89, 182))
             else:
                 a.commands.reset_crossing_weight(); marker = ("X:reset", (230, 126, 34))
@@ -350,7 +353,12 @@ class WorkbenchEventAdapter:
     def _set_slider(self, name, x):
         a = self.app
         if name == "min_piece":
-            a.commands.set_min_piece_factor_from_slider_x(x); return f"Min:{a.min_piece_factor:.2f}", (241, 196, 15)
+            a.commands.set_min_piece_from_slider_x(x)
+            label = (
+                f"Min:{a.workbench_state.cli.minimum_segment_length_mm}mm"
+                if a.installation_header_state.active == "cli" else f"Min:{a.min_piece_factor:.2f}"
+            )
+            return label, (241, 196, 15)
         if name == "bend":
             a.commands.set_bend_weight_from_slider_x(x); return f"B:{a.C_BEND:.0f}", (155, 89, 182)
         a.commands.set_crossing_weight_from_slider_x(x); return f"X:{a.crossing_penalty_multiplier:.1f}", (230, 126, 34)

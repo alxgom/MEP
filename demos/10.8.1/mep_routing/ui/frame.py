@@ -323,6 +323,7 @@ class SidebarFrameState:
     placement_weights_label: str | None = None
     placement_rotation_label: str | None = None
     placement_shortcuts_label: str | None = None
+    solver_detail: str | None = None
 
 
 def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
@@ -361,6 +362,7 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
             state.bend_value, state.bend_min, state.bend_max,
             state.crossing_value, state.crossing_min, state.crossing_max,
             state.solver_dropdowns,
+            state.solver_detail,
         ),
         MachineCard(
             frame_name, state.machine_position, rotation, state.machine_options,

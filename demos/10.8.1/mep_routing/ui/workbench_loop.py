@@ -151,12 +151,18 @@ def _render(app, screen, clock, fonts, state):
     solver_dropdowns = app.ui_facade.solver_dropdowns()
     available = app.installation_ui_session.installations[active].runtime_available
     cli_state = app.workbench_state.cli
+    solver_detail = None
     if active == "cli":
         auto_placement_mode = app.CLI_INSTALLATION.auto_placement_labels[
             cli_state.auto_placement_mode_idx
         ]
         bend_value = cli_state.bend_penalty_mm
         crossing_value = cli_state.crossing_penalty_multiplier
+        if cli_state.router_backend_idx in app.CLI_INSTALLATION.length_backend_indices:
+            stats = app.cli_runtime.last_result.supply_length_stats
+            if stats is not None and stats.fittings is not None:
+                fits = stats.fittings
+                solver_detail = f"Fittings: {fits.total}  (E {fits.elbows}, T {fits.tees}, X {fits.crosses})"
     elif active == "coc":
         auto_placement_mode = "Fixed exported source"
         bend_value = 0.0
@@ -193,6 +199,7 @@ def _render(app, screen, clock, fonts, state):
             app.workbench_state.cli.return_ventilation_enabled if active == "cli" else None
         ),
         solver_dropdowns=solver_dropdowns,
+        solver_detail=solver_detail,
         placement_heatmap_label=("Not available" if active in ("cli", "coc") else None),
         placement_weights_label=("Grille-distance ranking" if active == "cli" else "Not applicable" if active == "coc" else None),
         placement_rotation_label=("Machine-aligned" if active == "cli" else "Exported geometry" if active == "coc" else None),

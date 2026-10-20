@@ -164,6 +164,7 @@ class InteractiveObservationController:
                     "auto_placement_mode_idx": int(cli.auto_placement_mode_idx),
                     "bend_penalty_mm": float(cli.bend_penalty_mm),
                     "crossing_penalty_multiplier": float(cli.crossing_penalty_multiplier),
+                    "minimum_segment_length_mm": cli.minimum_segment_length_mm,
                     "duct_geometry_mode_idx": int(cli.duct_geometry_mode_idx),
                 },
             },
@@ -244,6 +245,8 @@ class InteractiveObservationController:
                     "cli", machine_key,
                 ).session
             cli = a.workbench_state.cli
+            # Older logs used only the calculated trunk width.
+            cli.minimum_segment_length_mm = cli_saved.get("minimum_segment_length_mm")
             for name in (
                 "return_ventilation_enabled", "graph_type_idx", "routing_strategy_idx",
                 "router_backend_idx", "heuristic_mode_idx", "room_start_mode_idx",

@@ -78,6 +78,7 @@ class CliWorkbenchState:
     auto_placement_mode_idx: int = 1
     bend_penalty_mm: float = 4000.0
     crossing_penalty_multiplier: float = 5.0
+    minimum_segment_length_mm: int | None = None  # None follows the calculated trunk width.
     duct_geometry_mode_idx: int = 0
 
 

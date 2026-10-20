@@ -102,6 +102,7 @@ class CliInteractiveRuntime:
         solver_backend_index=0, bend_penalty_mm=4000.0,
         crossing_penalty_multiplier=5.0,
         start_mode_index=0,
+        minimum_segment_length_mm=None,
     ):
         started = perf_counter()
         self._length_failure = None
@@ -123,6 +124,9 @@ class CliInteractiveRuntime:
             )
 
         if solver_backend_index in CLI_LENGTH_BACKENDS:
+            if minimum_segment_length_mm is not None:
+                # Apply the same public contract as the pure length policy.
+                TreeLengthPolicy(minimum_segment_length_mm)
             reason = None
             if start_mode_index != 1:
                 reason = "choose Wall candidates for hard Steiner lengths"
@@ -139,6 +143,7 @@ class CliInteractiveRuntime:
             grilles, context_obstacles, graph_mode, solver_backend_index,
             bend_penalty_mm, crossing_penalty_multiplier,
             start_mode_index=start_mode_index,
+            minimum_segment_length_mm=minimum_segment_length_mm,
         )
         if supply is None:
             if context_obstacles:
@@ -149,6 +154,7 @@ class CliInteractiveRuntime:
                     bend_penalty_mm=bend_penalty_mm,
                     crossing_penalty_multiplier=crossing_penalty_multiplier,
                     start_mode_index=start_mode_index,
+                    minimum_segment_length_mm=minimum_segment_length_mm,
                 )
                 if relaxed.routes:
                     self.last_result = replace(
@@ -222,6 +228,7 @@ class CliInteractiveRuntime:
         self, role, prepared, machine, pins, angle, grilles, context_obstacles,
         graph_mode, solver_backend_index, bend_penalty_mm,
         crossing_penalty_multiplier, prior_segments=(), start_mode_index=0,
+        minimum_segment_length_mm=None,
     ):
         connections = grilles.supply if role == "supply" else grilles.returns
         if not connections:
@@ -286,8 +293,11 @@ class CliInteractiveRuntime:
             if machine_sizing is None:
                 self._length_failure = "Unsupported: no calculated full-flow duct width"
                 return None
-            self._length_minimum = machine_sizing.width_mm
-            length_policy = TreeLengthPolicy(machine_sizing.width_mm, solver_backend_index in CLI_TEE_LENGTH_BACKENDS)
+            self._length_minimum = (
+                machine_sizing.width_mm if minimum_segment_length_mm is None
+                else minimum_segment_length_mm
+            )
+            length_policy = TreeLengthPolicy(self._length_minimum, solver_backend_index in CLI_TEE_LENGTH_BACKENDS)
             length_stats = self._length_stats = LengthSteinerStats()
             if math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-7:
                 self._length_failure = "Unsupported: graph snaps the machine access; use Hannan or Core Simple"

@@ -157,20 +157,29 @@ class DemoUiFacade:
 
     def draw_min_piece_slider(self, screen, font, x, y, width):
         a = self.app
+        a.canvas_ui.controls.min_piece_reset = self.pygame.Rect(0, 0, 0, 0)
         if a.installation_header_state.active != "sal":
-            a.canvas_ui.controls.min_piece = self.pygame.Rect(0, 0, 1, 1)
+            a.canvas_ui.controls.min_piece = self.pygame.Rect(0, 0, 0, 0)
             text = "Piece validation: scope pending"
             if a.installation_header_state.active == "cli" and a.workbench_state.cli.router_backend_idx in a.CLI_INSTALLATION.length_backend_indices:
-                minimum = a.cli_runtime.last_result.supply_minimum_length_mm
-                text = f"Hard minimum: {minimum:g} mm" if minimum is not None else "Hard minimum: sizing unavailable"
+                state, definition = a.workbench_state.cli, a.CLI_INSTALLATION
+                minimum = state.minimum_segment_length_mm
+                automatic = minimum is None
+                if automatic:
+                    minimum = a.cli_runtime.last_result.supply_minimum_length_mm
+                if minimum is not None:
+                    a.canvas_ui.draw_weight_slider(
+                        screen, font, x, y, width,
+                        "Hard min (auto)" if automatic else "Hard min", minimum,
+                        definition.minimum_segment_length_min_mm,
+                        definition.minimum_segment_length_max_mm,
+                        a.theme.text, a.theme.muted,
+                        name="min_piece", suffix=" mm", integer=True,
+                    )
+                    return
+                text = "Hard minimum: sizing unavailable"
             label = font.render(text, True, a.theme.muted)
             screen.blit(label, (x, y))
-            if a.installation_header_state.active == "cli" and a.workbench_state.cli.router_backend_idx in a.CLI_INSTALLATION.length_backend_indices:
-                stats = a.cli_runtime.last_result.supply_length_stats
-                if stats is not None and stats.fittings is not None:
-                    fits = stats.fittings
-                    text = f"Fittings: {fits.total}  (E {fits.elbows}, T {fits.tees}, X {fits.crosses})"
-                    screen.blit(font.render(text, True, a.theme.muted), (x, y + font.get_height() + 3))
             return
         a.canvas_ui.draw_min_piece_slider(
             screen, font, x, y, width, a.min_piece_factor,

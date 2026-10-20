@@ -200,6 +200,69 @@ def test_cli_hard_lengths_keep_return_tree_unconstrained(backend_index):
     assert all(segment.sizing is None for segment in result.return_segments)
 
 
+@pytest.mark.parametrize("backend_index", (5, 6, 7))
+def test_cli_hard_minimum_override_controls_search_and_materialized_validation(backend_index):
+    from mep_routing.installations.cli.length_steiner import TreeLengthPolicy, validate_tree_lengths
+
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+        return_enabled=False, solver_backend_index=backend_index, start_mode_index=1,
+        minimum_segment_length_mm=300,
+    )
+    assert result.routes
+    assert result.supply_minimum_length_mm == 300
+    assert "min 300 mm" in result.status
+    assert validate_tree_lengths(
+        [item.line for item in result.supply_segments], result.machine_pins["air_out"],
+        [item.grille_point for item in result.grille_plan.supply],
+        TreeLengthPolicy(300, split_at_tees=backend_index in (6, 7)),
+    )
+    automatic = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+        return_enabled=False, solver_backend_index=backend_index, start_mode_index=1,
+    )
+    assert automatic.routes and automatic.supply_minimum_length_mm == 600
+
+
+def test_cli_context_retry_preserves_hard_minimum_override(monkeypatch):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    solve_tree, attempted_minima = runtime._solve_tree, []
+
+    def fail_first(*args, **kwargs):
+        attempted_minima.append(kwargs.get("minimum_segment_length_mm"))
+        return None if len(attempted_minima) == 1 else solve_tree(*args, **kwargs)
+
+    monkeypatch.setattr(runtime, "_solve_tree", fail_first)
+    result = runtime.solve(
+        _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+        return_enabled=False, solver_backend_index=7, start_mode_index=1,
+        context_obstacles=(box(50, 50, 100, 100),), minimum_segment_length_mm=300,
+    )
+    assert attempted_minima == [300, 300]
+    assert result.routes and result.supply_minimum_length_mm == 300
+    assert "context relaxed" in result.status
+
+
+@pytest.mark.parametrize("minimum", (0, -10, math.inf, math.nan))
+def test_cli_hard_minimum_override_rejects_invalid_values(minimum):
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    with pytest.raises(ValueError, match="finite and positive"):
+        runtime.solve(
+            _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
+            solver_backend_index=7, start_mode_index=1, minimum_segment_length_mm=minimum,
+        )
+
+
 def test_cli_length_backends_receive_identical_graph_weights_and_grille_candidates(monkeypatch):
     import numpy as np
     from mep_routing.installations.cli import directed_wall_graph

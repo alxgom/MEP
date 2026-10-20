@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from mep_routing.app import (
     InstallationMachineUi, InstallationUiSession, WorkbenchState, build_demo_config,
 )
@@ -52,9 +54,11 @@ def _app():
     return app
 
 
-def test_snapshot_round_trip_restores_live_fields_and_preferences():
+@pytest.mark.parametrize("minimum", (None, 740))
+def test_snapshot_round_trip_restores_live_fields_and_preferences(minimum):
     app = _app()
     app.workbench_state.cli.duct_geometry_mode_idx = 2
+    app.workbench_state.cli.minimum_segment_length_mm = minimum
     controller = InteractiveObservationController(app, SimpleNamespace())
     snapshot = controller.runtime.snapshot(controller.current_state(), {}, "Saved", 5, 8)
     snapshot["id"] = 7
@@ -63,6 +67,7 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     app.workbench_state.installation("cli").pose.set((-30, -40), 0)
     app.workbench_state.cli.bend_penalty_mm = -1
     app.workbench_state.cli.duct_geometry_mode_idx = 0
+    app.workbench_state.cli.minimum_segment_length_mm = 1200
     app.installation_header_state = InstallationHeaderState(
         order=("sal", "cli"), enabled=frozenset({"sal"}), active="sal",
     )
@@ -74,6 +79,7 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     assert app.workbench_state.installation("cli").pose.as_tuple() == (30.0, 40.0, 180.0)
     assert app.workbench_state.cli.bend_penalty_mm == 4000.0
     assert app.workbench_state.cli.duct_geometry_mode_idx == 2
+    assert app.workbench_state.cli.minimum_segment_length_mm == minimum
     assert app.installation_header_state.active == "cli"
     assert app.installation_header_state.enabled == frozenset({"sal", "cli"})
     assert app.installation_ui_session.selected_keys["cli"] == saved_cli_key
@@ -81,6 +87,17 @@ def test_snapshot_round_trip_restores_live_fields_and_preferences():
     assert app.rebuilt == {"machine_pins": (10.0, 20.0, 90)}
     assert controller.logs.selected_log_id == 7
     assert result[1] == "Solved"
+
+
+def test_older_cli_log_restores_calculated_minimum_instead_of_current_override():
+    app = _app()
+    controller = InteractiveObservationController(app, SimpleNamespace())
+    snapshot = controller.runtime.snapshot(controller.current_state(), {}, "Saved", 5, 8)
+    snapshot["id"] = 7
+    del snapshot["installation_configs"]["cli"]["minimum_segment_length_mm"]
+    app.workbench_state.cli.minimum_segment_length_mm = 740
+    controller.restore_solution_log(snapshot)
+    assert app.workbench_state.cli.minimum_segment_length_mm is None
 
 
 def test_kpi_histories_keep_aggregate_and_installation_samples_from_one_execution():

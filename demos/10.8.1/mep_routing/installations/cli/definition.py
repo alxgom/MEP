@@ -56,6 +56,9 @@ class CliInstallationDefinition:
     interactive_runtime_available: bool = True
     directed_backend_indices: tuple[int, ...] = CLI_DIRECTED_BACKENDS
     length_backend_indices: tuple[int, ...] = CLI_LENGTH_BACKENDS
+    minimum_segment_length_min_mm: int = 50
+    minimum_segment_length_max_mm: int = 2000
+    minimum_segment_length_step_mm: int = 10
 
     @property
     def default_machine(self) -> CliMachine:

@@ -173,6 +173,12 @@ def test_panel_interaction_uses_click_priority_before_slider_or_tool_actions():
     assert reset.commands[0].name == "reset_slider"
     assert reset.commands[0].value == "bend"
 
+    minimum_reset = begin_panel_interaction(
+        PanelInteractionState(), hit=PanelHit(min_piece_reset=True), screen_x=120,
+    )
+    assert minimum_reset.commands[0].value == "min_piece"
+    assert minimum_reset.state.active_slider is None
+
 
 def test_panel_slider_drag_emits_initial_and_motion_updates_then_releases():
     started = begin_panel_interaction(
