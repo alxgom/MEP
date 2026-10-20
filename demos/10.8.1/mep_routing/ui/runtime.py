@@ -212,11 +212,11 @@ class CanvasUiRuntime:
 
     def draw_weight_slider(
         self, screen, font, x, y, width, label, value, minimum, maximum,
-        text, muted, *, name, suffix="", integer=False,
+        text, muted, *, name, suffix="", integer=False, decimals=1,
     ):
         rect, reset = draw_weight_slider(
             screen, font, x, y, width, label, value, minimum, maximum,
-            text, muted, suffix=suffix, integer=integer,
+            text, muted, suffix=suffix, integer=integer, decimals=decimals,
         )
         setattr(self.controls, name, rect)
         setattr(self.controls, f"{name}_reset", reset)

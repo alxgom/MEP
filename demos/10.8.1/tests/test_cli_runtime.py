@@ -1,4 +1,5 @@
 import math
+from dataclasses import replace
 from types import SimpleNamespace
 
 from shapely.geometry import Point, box
@@ -201,7 +202,7 @@ def test_cli_hard_lengths_keep_return_tree_unconstrained(backend_index):
 
 
 @pytest.mark.parametrize("backend_index", (5, 6, 7))
-def test_cli_hard_minimum_override_controls_search_and_materialized_validation(backend_index):
+def test_cli_hard_minimum_factor_controls_search_and_materialized_validation(backend_index):
     from mep_routing.installations.cli.length_steiner import TreeLengthPolicy, validate_tree_lengths
 
     runtime = CliInteractiveRuntime(
@@ -211,7 +212,7 @@ def test_cli_hard_minimum_override_controls_search_and_materialized_validation(b
     result = runtime.solve(
         _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
         return_enabled=False, solver_backend_index=backend_index, start_mode_index=1,
-        minimum_segment_length_mm=300,
+        minimum_segment_length_factor=0.5,
     )
     assert result.routes
     assert result.supply_minimum_length_mm == 300
@@ -228,7 +229,29 @@ def test_cli_hard_minimum_override_controls_search_and_materialized_validation(b
     assert automatic.routes and automatic.supply_minimum_length_mm == 600
 
 
-def test_cli_context_retry_preserves_hard_minimum_override(monkeypatch):
+def test_cli_minimum_factor_follows_recalculated_trunk_width():
+    from mep_routing.installations.cli.sizing import CliSizingContext, CoreConstantFrictionSizing
+
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    widths = []
+    for airflow in (1260, 1800):
+        machine = replace(CLI_INSTALLATION.default_machine, airflow_m3h=airflow)
+        width = CoreConstantFrictionSizing(
+            CliSizingContext(airflow, machine.pressure_loss_mmca),
+        ).size(1, 1).width_mm
+        result = runtime.solve(
+            _prepared(), machine, (3000, 3500), return_enabled=False,
+            solver_backend_index=7, start_mode_index=1, minimum_segment_length_factor=0.75,
+        )
+        assert result.supply_minimum_length_mm == pytest.approx(width * 0.75)
+        widths.append(width)
+    assert widths[0] != widths[1]
+
+
+def test_cli_context_retry_preserves_hard_minimum_factor(monkeypatch):
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
         TerminalRuntimeConfig(100, 100, 300),
@@ -236,22 +259,22 @@ def test_cli_context_retry_preserves_hard_minimum_override(monkeypatch):
     solve_tree, attempted_minima = runtime._solve_tree, []
 
     def fail_first(*args, **kwargs):
-        attempted_minima.append(kwargs.get("minimum_segment_length_mm"))
+        attempted_minima.append(kwargs.get("minimum_segment_length_factor"))
         return None if len(attempted_minima) == 1 else solve_tree(*args, **kwargs)
 
     monkeypatch.setattr(runtime, "_solve_tree", fail_first)
     result = runtime.solve(
         _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
         return_enabled=False, solver_backend_index=7, start_mode_index=1,
-        context_obstacles=(box(50, 50, 100, 100),), minimum_segment_length_mm=300,
+        context_obstacles=(box(50, 50, 100, 100),), minimum_segment_length_factor=0.5,
     )
-    assert attempted_minima == [300, 300]
+    assert attempted_minima == [0.5, 0.5]
     assert result.routes and result.supply_minimum_length_mm == 300
     assert "context relaxed" in result.status
 
 
-@pytest.mark.parametrize("minimum", (0, -10, math.inf, math.nan))
-def test_cli_hard_minimum_override_rejects_invalid_values(minimum):
+@pytest.mark.parametrize("factor", (0, -10, math.inf, math.nan))
+def test_cli_hard_minimum_factor_rejects_invalid_values(factor):
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
         TerminalRuntimeConfig(100, 100, 300),
@@ -259,7 +282,7 @@ def test_cli_hard_minimum_override_rejects_invalid_values(minimum):
     with pytest.raises(ValueError, match="finite and positive"):
         runtime.solve(
             _prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
-            solver_backend_index=7, start_mode_index=1, minimum_segment_length_mm=minimum,
+            solver_backend_index=7, start_mode_index=1, minimum_segment_length_factor=factor,
         )
 
 

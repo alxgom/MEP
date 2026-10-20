@@ -111,31 +111,31 @@ def test_cli_weight_sliders_update_cli_values_without_changing_sal():
     assert (app.C_BEND, app.crossing_penalty_multiplier) == (4000, 5)
 
 
-def test_minimum_piece_slider_scopes_units_clamps_and_resets_cli_to_automatic():
+def test_minimum_piece_slider_scopes_factors_clamps_and_resets_cli_to_one():
     app, _ = _app()
     app.min_piece_factor = 1.05
     app.installation_header_state.active = "cli"
     state = app.workbench_state.cli
     state.router_backend_idx = 7
     controller = WorkbenchCommandController(app, _pygame_keys())
-    for raw, expected in ((735, 740), (-20, 50), (3000, 2000)):
+    for raw, expected in ((0.73, 0.75), (-20, 0.25), (3000, 3.0)):
         app.canvas_ui = SimpleNamespace(slider_value=lambda *_args, raw=raw: raw)
         controller.set_min_piece_from_slider_x(100)
-        assert state.minimum_segment_length_mm == expected
+        assert state.minimum_segment_length_factor == expected
         assert app.min_piece_factor == 1.05
     controller.reset_minimum_segment_length()
-    assert state.minimum_segment_length_mm is None
+    assert state.minimum_segment_length_factor == 1.0
 
     app.installation_header_state.active = "sal"
     app.canvas_ui = SimpleNamespace(slider_value=lambda *_args: 1.5)
     controller.set_min_piece_from_slider_x(100)
     assert app.min_piece_factor == 1.5
-    assert state.minimum_segment_length_mm is None
+    assert state.minimum_segment_length_factor == 1.0
 
     app.installation_header_state.active = "cli"
     state.router_backend_idx = 4
     controller.set_min_piece_from_slider_x(100)
-    assert state.minimum_segment_length_mm is None
+    assert state.minimum_segment_length_factor == 1.0
 
 
 def test_cli_duct_geometry_selector_cycles_off_core_aligned():

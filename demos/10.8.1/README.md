@@ -62,7 +62,7 @@ Routing and display:
 - Preferred areas are drawn as translucent filled regions with dotted borders. Nodes inside preferred areas are hollow; the node actually used by the routed solution is filled.
 - Right-side `Log` button: store the current session-local routing state, add a marker to the KPI plots, and list the logged KPIs. Click a log row to restore that configuration and recompute the route.
 - Click a duct or room to highlight its route. Other routes keep their width but turn black; unrelated rooms and pins are desaturated. Click empty canvas, or press `Esc` when not in ruler mode, to clear selection.
-- The solver card includes sliders for `Min pieces factor` (Sal), `Hard min` in mm (Cli hard-length modes), bend weight, and crossing multiplier. Cli's minimum moves in 10 mm steps from 50 to 2000 mm; its reset icon restores the calculated trunk width. Bend weight moves in 100-unit integer steps. The bend and crossing sliders include icon-only reset buttons.
+- The solver card includes sliders for `Min pieces factor` (Sal), `Hard min` as a trunk-width multiplier (Cli hard-length modes), bend weight, and crossing multiplier. Cli's multiplier ranges from 0.25x to 3.00x in 0.05x steps; the label also shows the resulting mm minimum, and reset restores 1.00x. Bend weight moves in 100-unit integer steps. The bend and crossing sliders include icon-only reset buttons.
 
 ## Current Solvers
 
@@ -197,8 +197,9 @@ routing retains the existing line-graph MST backend.
 
 The default minimum for each solve is the calculated full-flow trunk width,
 using the existing duct-sizing policy. PEAD M71JA currently gives 600 mm.
-The `Hard min (auto)` slider lets you override it with an absolute 50–2000 mm
-minimum in 10 mm steps. Reset restores calculated-width mode. The setting is
+The `Hard min` slider multiplies it by 0.25–3.00x in 0.05x steps and displays
+the resulting minimum in mm. Reset restores 1.00x. The setting always follows
+the recalculated trunk width. It is
 shared by all three hard-length variants and saved in solution logs; it does
 not change duct sizing or the graph's costs. Sal's separate factor slider keeps
 its existing diameter-based rules.

@@ -108,17 +108,19 @@ joint tree problem. Do not interpret backend score values as interchangeable.
 
 ### Cli hard minimum control
 
-With a hard-length router active, **Hard min (auto)** initially uses the largest
-calculated supply width: the full-flow trunk width from the existing sizing
-policy. It is currently 600 mm for the sourced M71JA inputs.
+With a hard-length router active, **Hard min** multiplies the largest calculated
+supply width: the full-flow trunk width from the existing sizing policy.
+The slider initially uses **1.00x**, currently 600 mm for the sourced M71JA inputs.
 
-Dragging the slider sets an absolute minimum of **50–2000 mm in 10 mm steps**.
-The reset icon restores the calculated width, so subsequent sizing changes are
-followed automatically. The choice is shared by all three hard-length variants,
-saved/restored with solution logs, and retained across router changes. Baseline
-routers ignore it. Sal retains its separate diameter-factor control.
+Dragging the slider sets a multiplier of **0.25–3.00x in 0.05x steps**. The label
+shows both the multiplier and resulting minimum in mm. For a 600 mm trunk,
+0.50x means 300 mm and 1.50x means 900 mm. Reset restores 1.00x. Every setting
+follows subsequent sizing changes automatically. The choice is shared by all
+three hard-length variants, saved/restored with solution logs, and retained
+across router changes. Baseline routers ignore it. Sal retains its separate
+diameter-factor control.
 
-The override changes feasibility only. It does not resize ducts, change graph
+The multiplier changes feasibility only. It does not resize ducts, change graph
 weights or relax the minimum automatically. Physical machine/grille adapters
 count; collinear graph edges and section changes do not end a piece. Supply
 sizing must still be available. Exact machine access is required; a graph that

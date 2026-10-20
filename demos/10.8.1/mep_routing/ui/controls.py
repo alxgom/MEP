@@ -91,6 +91,7 @@ def draw_weight_slider(
     muted_color,
     suffix="",
     integer=False,
+    decimals=1,
 ):
     """Draw a weight slider and its reset button, returning both hit rectangles."""
     import pygame
@@ -99,7 +100,7 @@ def draw_weight_slider(
     slider_width = int(width) - reset_size - 8
     rect = pygame.Rect(int(x), int(y + 18), int(slider_width), 8)
     reset_rect = pygame.Rect(rect.right + 8, int(y + 13), reset_size, reset_size)
-    value_text = f"{int(round(value))}" if integer else f"{value:.1f}"
+    value_text = f"{int(round(value))}" if integer else f"{value:.{decimals}f}"
     label_surface = font_small.render(f"{label}: {value_text}{suffix}", True, text_color)
     screen.blit(label_surface, (x, y))
     pygame.draw.rect(screen, (22, 22, 30), rect, border_radius=4)

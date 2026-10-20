@@ -37,15 +37,15 @@ class WorkbenchCommandController:
             if state.router_backend_idx not in definition.length_backend_indices:
                 return
             raw = a.canvas_ui.slider_value(
-                "min_piece", x, definition.minimum_segment_length_min_mm,
-                definition.minimum_segment_length_max_mm,
-                state.minimum_segment_length_mm or definition.minimum_segment_length_min_mm,
+                "min_piece", x, definition.minimum_segment_length_factor_min,
+                definition.minimum_segment_length_factor_max,
+                state.minimum_segment_length_factor,
             )
-            step = definition.minimum_segment_length_step_mm
-            state.minimum_segment_length_mm = int(max(
-                definition.minimum_segment_length_min_mm,
-                min(definition.minimum_segment_length_max_mm, round(raw / step) * step),
-            ))
+            step = definition.minimum_segment_length_factor_step
+            state.minimum_segment_length_factor = round(max(
+                definition.minimum_segment_length_factor_min,
+                min(definition.minimum_segment_length_factor_max, round(raw / step) * step),
+            ), 2)
             return
         if a.installation_header_state.active != "sal":
             return
@@ -56,7 +56,7 @@ class WorkbenchCommandController:
 
     def reset_minimum_segment_length(self):
         if self.app.installation_header_state.active == "cli":
-            self.app.workbench_state.cli.minimum_segment_length_mm = None
+            self.app.workbench_state.cli.minimum_segment_length_factor = 1.0
 
     def set_bend_weight_from_slider_x(self, x):
         a = self.app

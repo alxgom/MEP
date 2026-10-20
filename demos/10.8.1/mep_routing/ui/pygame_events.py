@@ -311,7 +311,7 @@ class WorkbenchEventAdapter:
                 a.observation.set_transient_message("Routing weights are not available here")
                 return
             if command.value == "min_piece":
-                a.commands.reset_minimum_segment_length(); marker = ("Min:auto", (241, 196, 15))
+                a.commands.reset_minimum_segment_length(); marker = ("Min:1x", (241, 196, 15))
             elif command.value == "bend":
                 a.commands.reset_bend_weight(); marker = ("B:reset", (155, 89, 182))
             else:
@@ -355,7 +355,7 @@ class WorkbenchEventAdapter:
         if name == "min_piece":
             a.commands.set_min_piece_from_slider_x(x)
             label = (
-                f"Min:{a.workbench_state.cli.minimum_segment_length_mm}mm"
+                f"Min:{a.workbench_state.cli.minimum_segment_length_factor:.2f}x"
                 if a.installation_header_state.active == "cli" else f"Min:{a.min_piece_factor:.2f}"
             )
             return label, (241, 196, 15)

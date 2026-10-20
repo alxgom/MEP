@@ -163,21 +163,16 @@ class DemoUiFacade:
             text = "Piece validation: scope pending"
             if a.installation_header_state.active == "cli" and a.workbench_state.cli.router_backend_idx in a.CLI_INSTALLATION.length_backend_indices:
                 state, definition = a.workbench_state.cli, a.CLI_INSTALLATION
-                minimum = state.minimum_segment_length_mm
-                automatic = minimum is None
-                if automatic:
-                    minimum = a.cli_runtime.last_result.supply_minimum_length_mm
-                if minimum is not None:
-                    a.canvas_ui.draw_weight_slider(
-                        screen, font, x, y, width,
-                        "Hard min (auto)" if automatic else "Hard min", minimum,
-                        definition.minimum_segment_length_min_mm,
-                        definition.minimum_segment_length_max_mm,
-                        a.theme.text, a.theme.muted,
-                        name="min_piece", suffix=" mm", integer=True,
-                    )
-                    return
-                text = "Hard minimum: sizing unavailable"
+                minimum = a.cli_runtime.last_result.supply_minimum_length_mm
+                suffix = f"x ({minimum:g} mm)" if minimum is not None else "x"
+                a.canvas_ui.draw_weight_slider(
+                    screen, font, x, y, width, "Hard min", state.minimum_segment_length_factor,
+                    definition.minimum_segment_length_factor_min,
+                    definition.minimum_segment_length_factor_max,
+                    a.theme.text, a.theme.muted,
+                    name="min_piece", suffix=suffix, decimals=2,
+                )
+                return
             label = font.render(text, True, a.theme.muted)
             screen.blit(label, (x, y))
             return
