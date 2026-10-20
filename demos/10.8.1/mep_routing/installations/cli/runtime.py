@@ -12,6 +12,10 @@ from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
 from .geometry import cli_air_access_spec, cli_machine_pins
+from .definition import (
+    CLI_DIRECTED_BACKENDS, CLI_FITTING_BACKEND, CLI_LENGTH_BACKENDS, CLI_TEE_LENGTH_BACKENDS,
+)
+from .fittings import FITTING_PERTURBATION_MM
 from .clearance import apply_cli_edge_weights, cli_minimum_clearance_weights
 from .duct_geometry import build_core_duct_polygon_projection
 from .directed_wall_graph import solve_directed_wall_steiner, solve_directed_wall_tree
@@ -118,7 +122,7 @@ class CliInteractiveRuntime:
                 context_obstacles=context_obstacles,
             )
 
-        if solver_backend_index in (5, 6):
+        if solver_backend_index in CLI_LENGTH_BACKENDS:
             reason = None
             if start_mode_index != 1:
                 reason = "choose Wall candidates for hard Steiner lengths"
@@ -156,7 +160,7 @@ class CliInteractiveRuntime:
                     return self.last_result
             return self._finish(
                 (), self._length_failure or (
-                    "Blocked: hard-length search found no supply tree" if solver_backend_index in (5, 6)
+                    "Blocked: hard-length search found no supply tree" if solver_backend_index in CLI_LENGTH_BACKENDS
                     else "Blocked: no Cli supply tree"
                 ), started, 0, grilles, pins,
                 context_obstacles=context_obstacles,
@@ -190,8 +194,10 @@ class CliInteractiveRuntime:
         elif return_enabled:
             status += "; return tree blocked"
         if supply.minimum_length_mm is not None:
-            mode = "bends + tees" if solver_backend_index == 6 else "bends"
+            mode = "bends + tees" if solver_backend_index in CLI_TEE_LENGTH_BACKENDS else "bends"
             status += f"; hard {mode} min {supply.minimum_length_mm:g} mm"
+            if solver_backend_index == CLI_FITTING_BACKEND:
+                status += f"; fittings {supply.length_stats.fittings.total}, eps {FITTING_PERTURBATION_MM:g}"
         return self._finish(
             routes, status, started, total_nodes, grilles, pins,
             workspace=supply.workspace, supply_segments=supply.segments,
@@ -276,29 +282,30 @@ class CliInteractiveRuntime:
         graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
         selected_connections = tuple(connections)
         length_policy, length_stats = None, None
-        if role == "supply" and solver_backend_index in (5, 6):
+        if role == "supply" and solver_backend_index in CLI_LENGTH_BACKENDS:
             if machine_sizing is None:
                 self._length_failure = "Unsupported: no calculated full-flow duct width"
                 return None
             self._length_minimum = machine_sizing.width_mm
-            length_policy = TreeLengthPolicy(machine_sizing.width_mm, solver_backend_index == 6)
+            length_policy = TreeLengthPolicy(machine_sizing.width_mm, solver_backend_index in CLI_TEE_LENGTH_BACKENDS)
             length_stats = self._length_stats = LengthSteinerStats()
             if math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-7:
                 self._length_failure = "Unsupported: graph snaps the machine access; use Hannan or Core Simple"
                 return None
-        if role == "supply" and start_mode_index == 1 and solver_backend_index in (3, 4, 5, 6):
+        if role == "supply" and start_mode_index == 1 and solver_backend_index in CLI_DIRECTED_BACKENDS:
             targets = [room for room in prepared.rooms if is_cli_supply_room(room)]
             rooms_by_name = {
                 item.room_name: room for item, room in zip(connections, targets)
             }
             directed_solver = (
-                solve_directed_wall_steiner if solver_backend_index in (4, 5, 6)
+                solve_directed_wall_steiner if solver_backend_index != 3
                 else solve_directed_wall_tree
             )
             extra = {} if length_policy is None else dict(
                 length_policy=length_policy,
                 root_prefix=((pins[connector_key], access["access_point"]),),
                 stats=length_stats,
+                fitting_weight=FITTING_PERTURBATION_MM if solver_backend_index == CLI_FITTING_BACKEND else 0.0,
             )
             directed = directed_solver(
                 runtime.nodes, weighted_adjacency, root_node, rooms_by_name,
@@ -314,7 +321,7 @@ class CliInteractiveRuntime:
         else:
             points = [access["access_point"], *terminals.values()]
             indices = tuple(dict.fromkeys(int(runtime.spatial_index.query(point)[1]) for point in points))
-            effective_backend = 2 if solver_backend_index in (3, 4, 5, 6) else solver_backend_index
+            effective_backend = 2 if solver_backend_index in CLI_DIRECTED_BACKENDS else solver_backend_index
             tree = solve_cli_tree(
                 effective_backend, runtime.nodes, weighted_adjacency, indices,
                 bend_penalty=bend_penalty_mm,

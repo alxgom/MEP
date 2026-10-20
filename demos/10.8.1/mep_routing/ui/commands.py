@@ -171,8 +171,8 @@ class WorkbenchCommandController:
         value = (getattr(state, attribute) + 1) % count
         setattr(state, attribute, value)
         if attribute == "router_backend_idx":
-            state.room_start_mode_idx = 1 if value in (3, 4, 5, 6) else 0
-        elif attribute == "room_start_mode_idx" and value == 1 and state.router_backend_idx not in (3, 4, 5, 6):
+            state.room_start_mode_idx = 1 if value in definition.directed_backend_indices else 0
+        elif attribute == "room_start_mode_idx" and value == 1 and state.router_backend_idx not in definition.directed_backend_indices:
             state.router_backend_idx = 4
         return RoutingKeyTransition(
             {}, markers=((f"{label}:{value}", (52, 152, 219)),),

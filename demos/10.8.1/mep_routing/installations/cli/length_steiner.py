@@ -12,6 +12,8 @@ import math
 
 from mep_routing.routing import SteinerScore, SteinerTreeResult
 
+from .fittings import FittingCounts, count_tree_fittings, junction_fitting_count
+
 
 @dataclass
 class LengthSteinerStats:
@@ -19,6 +21,10 @@ class LengthSteinerStats:
     subset_labels: int = 0
     branch_labels: int = 0
     rejected_physical_tree: bool = False
+    fittings: FittingCounts | None = None
+    fitting_weight: float = 0.0
+    primary_cost: float | None = None
+    search_cost: float | None = None
 
 
 @dataclass(frozen=True)
@@ -96,7 +102,7 @@ def validate_tree_lengths(lines, root_point, terminal_points, policy):
 
 
 def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
-                         root_prefix=(), stats=None):
+                         root_prefix=(), stats=None, fitting_weight=0.0):
     """Use the baseline's weighted arcs and terminal costs, adding feasibility.
 
     Tee resets are available exclusively to subset merges, never ordinary
@@ -104,6 +110,11 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
     a rejected union is reported as blocked, with no unconstrained fallback.
     """
     stats = stats if stats is not None else LengthSteinerStats()
+    if not math.isfinite(fitting_weight) or fitting_weight < 0:
+        raise ValueError("fitting weight must be finite and nonnegative")
+    if fitting_weight and not policy.split_at_tees:
+        raise ValueError("fitting perturbation requires lengths at bends and tees")
+    stats.fitting_weight = fitting_weight
     positions, graph = prepared.nodes, prepared.adjacency
     root = int(root)
     initial_run = (None, 0.0)
@@ -152,6 +163,8 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
             cost = float(edge[1]) + (
                 float(bend_penalty) if incoming is not None and incoming != cost_direction else 0.0
             )
+            if fitting_weight and geometry[(node, nxt)][1] > 1e-7 and direction is not None and direction != updated[0]:
+                cost += fitting_weight
             reverse[following].append((current, cost, node, nxt))
             forward[current].append((following, cost, node, nxt, *geometry[(node, nxt)]))
         current += 1
@@ -168,6 +181,7 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
         if len(directions) == 1 and None not in directions:
             direction = next(iter(directions))
             forbidden_departures[reset] = direction_bit(tuple(-value for value in direction))
+    junction_charges = {}
     departures, local_endings = {}, {}
     for start in branch_starts:
         # Zero-length wall split arcs do not define distinct physical branches.
@@ -219,10 +233,20 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
                     float(bend_penalty) if connector[1] > 1e-7 and incoming is not None
                     and incoming != cost_direction else 0.0
                 )
+                if fitting_weight and connector[1] > 1e-7 and direction is not None and direction != connector[0]:
+                    value += fitting_weight
                 if value < costs[mask].get(index, math.inf):
                     costs[mask][index] = value
                     choices[mask][index] = ("terminal", name, node)
                     terminal_seeds[mask][index] = (value, choices[mask][index], direction_bit(connector[0]))
+
+    straight_masks = set()
+    if fitting_weight:
+        for direction, bit in tuple(direction_bits.items()):
+            if direction is not None:
+                opposite = direction_bits.get(tuple(-value for value in direction))
+                if opposite is not None:
+                    straight_masks.add(bit | opposite)
 
     for mask in range(1, full + 1):
         merged_branches = {}
@@ -261,10 +285,23 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
                 forbidden = direction_bit(tuple(-value for value in direction)) if direction is not None else 0
                 key = reset, forbidden
                 if key not in best_branches:
-                    best_branches[key] = min(
-                        (value for occupied, value in merged_branches.get(reset, {}).items()
-                         if not occupied & forbidden), key=lambda item: item[0], default=None,
-                    )
+                    if fitting_weight:
+                        candidates = []
+                        for occupied, (value, choice) in merged_branches.get(reset, {}).items():
+                            if occupied & forbidden:
+                                continue
+                            ports = occupied, forbidden
+                            charge = junction_charges.get(ports)
+                            if charge is None:
+                                charge = fitting_weight * junction_fitting_count(occupied, forbidden, straight_masks)
+                                junction_charges[ports] = charge
+                            candidates.append((value + charge, choice))
+                        best_branches[key] = min(candidates, key=lambda item: item[0], default=None)
+                    else:
+                        best_branches[key] = min(
+                            (value for occupied, value in merged_branches.get(reset, {}).items()
+                             if not occupied & forbidden), key=lambda item: item[0], default=None,
+                        )
                 branch = best_branches[key]
                 if branch is not None and branch[0] < costs[mask].get(index, math.inf):
                     costs[mask][index] = branch[0]
@@ -335,9 +372,15 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
                                  [prepared.wall_points[(name, node)] for name, node in selected.items()], policy):
         stats.rejected_physical_tree = True
         return None
+    stats.fittings = count_tree_fittings(
+        lines, [prepared.wall_points[(name, node)] for name, node in selected.items()],
+    )
+    prefix_charge = fitting_weight * count_tree_fittings(root_prefix).total if fitting_weight else 0.0
+    stats.search_cost = float(costs[full][0]) + prefix_charge
+    stats.primary_cost = stats.search_cost - fitting_weight * stats.fittings.total
     directed = tuple(sorted(arcs))
     tree = SteinerTreeResult(
         frozenset({root} | {node for edge in directed for node in edge}), directed, directed,
-        SteinerScore(len(directed), len(directed), 1.0, float(costs[full][0])),
+        SteinerScore(len(directed), len(directed), 1.0, stats.search_cost),
     )
     return tree, selected

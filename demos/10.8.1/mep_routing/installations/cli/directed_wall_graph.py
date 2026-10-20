@@ -232,8 +232,10 @@ def solve_directed_wall_tree(nodes, adjacency, root, rooms_by_name, connections,
 
 
 def solve_directed_wall_steiner(nodes, adjacency, root, rooms_by_name, connections, bend_penalty,
-                               *, length_policy=None, root_prefix=(), stats=None):
+                               *, length_policy=None, root_prefix=(), stats=None, fitting_weight=0.0):
     """Exact directed-Steiner subset DP on the turn-aware line graph."""
+    if fitting_weight and length_policy is None:
+        raise ValueError("fitting perturbation requires the hard-length solver")
     prepared = _prepare_wall_graph(nodes, adjacency, rooms_by_name, connections)
     if prepared is None:
         return None
@@ -242,7 +244,7 @@ def solve_directed_wall_steiner(nodes, adjacency, root, rooms_by_name, connectio
 
         solved = solve_length_steiner(
             prepared, root, tuple(item.route_name for item in connections), bend_penalty,
-            length_policy, root_prefix=root_prefix, stats=stats,
+            length_policy, root_prefix=root_prefix, stats=stats, fitting_weight=fitting_weight,
         )
         if solved is None:
             return None

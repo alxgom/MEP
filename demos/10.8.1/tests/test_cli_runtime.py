@@ -139,7 +139,7 @@ def test_cli_runtime_can_disable_return_ventilation():
     assert result.status.startswith("Cli supply solved")
 
 
-@pytest.mark.parametrize("backend_index", (3, 4, 5, 6))
+@pytest.mark.parametrize("backend_index", (3, 4, 5, 6, 7))
 def test_cli_directed_wall_candidates_choose_one_sized_supply_grille_per_room(backend_index):
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION,
@@ -158,14 +158,21 @@ def test_cli_directed_wall_candidates_choose_one_sized_supply_grille_per_room(ba
     assert all(item.grille_point == item.routing_point for item in result.grille_plan.supply)
     assert {item.width_mm for item in result.grille_plan.supply} == {800}
     assert all(item.sizing.airflow_m3h == 630.0 for item in result.grille_plan.supply)
-    if backend_index in (5, 6):
+    if backend_index in (5, 6, 7):
+        from mep_routing.installations.cli.fittings import count_tree_fittings
+
         assert result.supply_minimum_length_mm == 600
         assert result.supply_length_stats.state_count > 0
         assert not result.supply_length_stats.rejected_physical_tree
         assert "min 600 mm" in result.status
+        assert result.supply_length_stats.fittings == count_tree_fittings(
+            [segment.line for segment in result.supply_segments],
+            [item.grille_point for item in result.grille_plan.supply],
+        )
+        assert result.supply_length_stats.fitting_weight == (1e-6 if backend_index == 7 else 0.0)
 
 
-@pytest.mark.parametrize("backend_index", (5, 6))
+@pytest.mark.parametrize("backend_index", (5, 6, 7))
 def test_cli_hard_lengths_report_unsupported_without_sizing_or_wall_candidates(backend_index):
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
@@ -180,7 +187,7 @@ def test_cli_hard_lengths_report_unsupported_without_sizing_or_wall_candidates(b
     assert not result.routes and "no calculated duct width" in result.status
 
 
-@pytest.mark.parametrize("backend_index", (5, 6))
+@pytest.mark.parametrize("backend_index", (5, 6, 7))
 def test_cli_hard_lengths_keep_return_tree_unconstrained(backend_index):
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
@@ -209,7 +216,7 @@ def test_cli_length_backends_receive_identical_graph_weights_and_grille_candidat
         CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
         TerminalRuntimeConfig(100, 100, 300),
     )
-    for backend in (4, 5, 6):
+    for backend in (4, 5, 6, 7):
         result = runtime.solve(_prepared(), CLI_INSTALLATION.default_machine, (3000, 3500),
                                return_enabled=False, solver_backend_index=backend, start_mode_index=1)
         assert result.routes

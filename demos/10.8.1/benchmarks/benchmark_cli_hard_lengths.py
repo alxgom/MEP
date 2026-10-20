@@ -16,7 +16,7 @@ import sys
 from time import perf_counter
 
 
-def benchmark(cases=1, repeats=3):
+def benchmark(cases=1, repeats=3, backends=(4, 5, 6)):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     with redirect_stdout(io.StringIO()):
         import main as demo
@@ -37,7 +37,7 @@ def benchmark(cases=1, repeats=3):
         for dx, dy, rotation in ((0, 0, 0), (100, 0, 0), (-100, 0, 0),
                                  (0, 100, 0), (0, -100, 0), (0, 0, 90)):
             pose.set((x + dx, y + dy), angle + rotation)
-            for backend in (4, 5, 6):
+            for backend in backends:
                 state.router_backend_idx = backend
                 with redirect_stdout(io.StringIO()):
                     demo.routing_controller.solve_installations()
@@ -58,10 +58,17 @@ def benchmark(cases=1, repeats=3):
                         "subset_labels": stats.subset_labels if stats else None,
                         "branch_labels": stats.branch_labels if stats else None,
                         "rejected_tree": stats.rejected_physical_tree if stats else False,
+                        "primary_cost": stats.primary_cost if stats else None,
+                        "search_cost": stats.search_cost if stats else None,
+                        "fitting_weight": stats.fitting_weight if stats else None,
+                        "fittings": stats.fittings.total if stats and stats.fittings else None,
+                        "elbows": stats.fittings.elbows if stats and stats.fittings else None,
+                        "tees": stats.fittings.tees if stats and stats.fittings else None,
+                        "crosses": stats.fittings.crosses if stats and stats.fittings else None,
                     })
         state.auto_placement_mode_idx = 1
     summary = {}
-    for backend in (4, 5, 6):
+    for backend in backends:
         rows = [row for row in samples if row["backend"] == backend]
         times = sorted(row["scene_ms"] for row in rows)
         summary[demo.CLI_INSTALLATION.search_backend_labels[backend]] = {
@@ -84,10 +91,11 @@ def main():
     parser.add_argument("--cases", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--backends", type=int, nargs="+", default=[4, 5, 6], choices=range(8))
     args = parser.parse_args()
     if args.cases < 1 or args.repeats < 1:
         parser.error("cases and repeats must be positive")
-    result = benchmark(args.cases, args.repeats)
+    result = benchmark(args.cases, args.repeats, tuple(args.backends))
     if args.output:
         args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result["summary"], indent=2))

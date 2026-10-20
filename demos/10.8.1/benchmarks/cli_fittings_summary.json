@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-20",
+  "epsilon_mm_per_fitting": 1e-06,
+  "model": "Each elbow, tee or cross counts as one; straight connections and reductions are excluded.",
+  "graph": "Core Simple",
+  "machine": "PEAD M71JA",
+  "returns": false,
+  "cases": 7,
+  "poses_per_case": 6,
+  "repeats": 3,
+  "scene_summary": {
+    "Steiner: min bends + tees": {
+      "samples": 126,
+      "successful": 90,
+      "median_ms": 72.14724997174926,
+      "p95_ms": 199.13179997820407,
+      "max_ms": 221.40820004278794,
+      "over_200_ms": 5,
+      "max_states": 3144,
+      "rejected_trees": 27,
+      "max_subset_labels": 42246,
+      "max_branch_labels": 35123
+    },
+    "Steiner: min + fittings": {
+      "samples": 126,
+      "successful": 90,
+      "median_ms": 71.74114999361336,
+      "p95_ms": 200.37370000500232,
+      "max_ms": 214.82949994970113,
+      "over_200_ms": 8,
+      "max_states": 3144,
+      "rejected_trees": 27,
+      "max_subset_labels": 42246,
+      "max_branch_labels": 35123
+    }
+  },
+  "paired_poses": {
+    "total": 42,
+    "common_successes": 30,
+    "identical_states": true,
+    "fitting_improvements": 0,
+    "max_primary_delta": 9.313225746154785e-10
+  },
+  "frozen_search": {
+    "case": "0002_real_c90 / B_B_P01_V02",
+    "graph_nodes": 317,
+    "room_count": 4,
+    "samples_per_mode": 20,
+    "summary": {
+      "0.0": {
+        "median_ms": 108.75844996189699,
+        "p95_ms": 116.13939999369904,
+        "max_ms": 118.82039997726679,
+        "peak_python_bytes": 20976188,
+        "states": 3144,
+        "subset_labels": 42246,
+        "branch_labels": 35123,
+        "fittings": 5
+      },
+      "1e-06": {
+        "median_ms": 108.87914997874759,
+        "p95_ms": 114.6310999756679,
+        "max_ms": 114.94560004211962,
+        "peak_python_bytes": 20827884,
+        "states": 3144,
+        "subset_labels": 42246,
+        "branch_labels": 35123,
+        "fittings": 5
+      }
+    },
+    "notes": "Frozen prepared request, alternating mode order; memory measured separately from timings."
+  },
+  "notes": [
+    "Scene timings include graph preparation, wall candidates, search and sizing, but exclude dwelling preparation, automatic placement and rendering.",
+    "Frozen timings exclude graph and candidate preparation; peak Python allocations were measured separately with tracemalloc.",
+    "All accepted real-scene pairs had matching fitting counts; a controlled tie regression demonstrates a reduction from three to two fittings at unchanged primary cost.",
+    "Timing variation prevents a speedup claim; no fixed 200 ms guarantee.",
+    "Physical-union rejection does not certify infeasibility; the perturbation does not add alternative-tree retry."
+  ]
+}

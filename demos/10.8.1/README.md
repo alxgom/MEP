@@ -230,6 +230,40 @@ dwelling preparation, automatic placement, rendering and history. Checked-in
 repeat. Timings vary substantially with machine load; saturation does not impose
 an absolute memory cap, and terminal subsets still grow exponentially with room count.
 
+### Fitting perturbation
+
+`Steiner: min + fittings` uses the same hard minimum lengths at bends and tees,
+with the scalar search objective `existing cost + 1e-6 * physical fittings`.
+Compare it with `Steiner: min bends + tees` at the same pose. The sidebar shows
+the total and its elbow/tee/cross breakdown; each component counts as one.
+Reducers, straight couplings and machine/grille connections do not add fittings.
+A grille takeoff on a continuing trunk counts as a junction.
+
+The solver reuses its existing candidate-specific direction masks and retains
+one scalar per label. Elbow charges are prepared with transitions, zero-length
+wall aliases carry no physical charge, and a completed branch receives one
+tee/cross charge irrespective of its number of binary subset merges. Branch
+summaries exclude their shared origin, preventing elbow-plus-tee double counting.
+Final physical fitting counts are computed independently from the reconstructed
+centerlines, including machine and grille adapters. Diagnostics recover the
+primary search score by subtracting the counted perturbation, subject to floating
+point roundoff. The workbench KPI scoring formula retains its existing semantics.
+
+This is a near-tie preference, not strict lexicographic ordering: a sufficiently
+small primary-cost difference can be outweighed by fewer fittings. The weight is
+fixed in `mep_routing/installations/cli/fittings.py`. It is a lab preference,
+not a pressure-loss or fabrication-cost model. The existing physical-union
+rejection limitations also apply to this variant.
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_cli_hard_lengths.py --cases 7 --repeats 3 --backends 6 7 --output cli_fittings_results.json
+```
+
+The recorded comparison is in `benchmarks/cli_fittings_summary.json`. The real
+scenes had matching fitting counts for both modes; a controlled regression with
+equal primary cost demonstrates the intended two-elbows-plus-tee to one-elbow-plus-tee
+choice. No additional routing states are introduced.
+
 ## Room Starts
 
 The default start mode is `Room node set`. Instead of snapping each wet room to a single centroid terminal, each route starts from a virtual source connected to every valid graph node inside that room and inside the false-ceiling region. This keeps the current room-to-machine routing direction but removes unnecessary dependence on a centroid point.

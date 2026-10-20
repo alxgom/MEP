@@ -92,7 +92,7 @@ def test_hard_steiner_dropdown_selects_wall_candidates_and_preserves_mode():
     )
     facade = DemoUiFacade(app, SimpleNamespace(Rect=_Rect))
     control, options = solver_dropdown_bounds(1, len(CLI_INSTALLATION.search_backend_labels))
-    for backend in (5, 6):
+    for backend in (5, 6, 7):
         facade.handle_solver_dropdown_click((control[0] + 1, control[1] + 1))
         facade.handle_solver_dropdown_click((options[backend][0] + 1, options[backend][1] + 1))
         assert state.cli.router_backend_idx == backend
@@ -100,4 +100,4 @@ def test_hard_steiner_dropdown_selects_wall_candidates_and_preserves_mode():
     starts, options = solver_dropdown_bounds(4, len(CLI_INSTALLATION.start_mode_labels))
     facade.handle_solver_dropdown_click((starts[0] + 1, starts[1] + 1))
     facade.handle_solver_dropdown_click((options[1][0] + 1, options[1][1] + 1))
-    assert state.cli.router_backend_idx == 6
+    assert state.cli.router_backend_idx == 7

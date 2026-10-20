@@ -10,6 +10,7 @@ from mep_routing.installations.cli.length_steiner import (
     LengthSteinerStats, TreeLengthPolicy, segment_geometry,
     solve_length_steiner, validate_tree_lengths,
 )
+from mep_routing.installations.cli.fittings import FITTING_PERTURBATION_MM, FittingCounts, count_tree_fittings
 
 
 def prepared(points, edges, candidates, walls=None, weights=None):
@@ -133,8 +134,8 @@ def test_invalid_threshold_is_rejected(minimum):
         TreeLengthPolicy(minimum)
 
 
-@pytest.mark.parametrize("tees", (False, True))
-def test_small_graph_exhaustive_physical_tree_cost_oracle(tees):
+@pytest.mark.parametrize("tees,fitting_weight", ((False, 0.0), (True, 0.0), (True, 1e-6)))
+def test_small_graph_exhaustive_physical_tree_cost_oracle(tees, fitting_weight):
     points = ((0, 0), (60, 0), (160, 0), (0, 120), (60, 120), (160, 120))
     edges = ((0, 1), (1, 2), (3, 4), (4, 5), (0, 3), (1, 4), (2, 5))
     graph = prepared(points, edges, {"a": [2], "b": [5]})
@@ -170,11 +171,18 @@ def test_small_graph_exhaustive_physical_tree_cost_oracle(tees):
                     previous = directed_wall_graph._direction(points[parent[u]], points[u])
                     following = directed_wall_graph._direction(points[u], points[v])
                     value += bend if previous != following else 0
+            for node, neighbours in undirected.items():
+                if len(neighbours) < 2:
+                    continue
+                degree = len(neighbours) + (node in (2, 5))
+                vectors = [segment_geometry(points[node], points[other])[0] for other in neighbours]
+                is_fitting = degree > 2 or vectors[0] != tuple(-v for v in vectors[1])
+                value += fitting_weight * is_fitting
             best = min(best, value)
     stats = LengthSteinerStats()
-    solved = solve_length_steiner(graph, 0, ("a", "b"), bend, policy, stats=stats)
+    solved = solve_length_steiner(graph, 0, ("a", "b"), bend, policy, stats=stats, fitting_weight=fitting_weight)
     assert solved is not None
-    assert solved[0].score.total == best
+    assert solved[0].score.total == pytest.approx(best, rel=0, abs=1e-10)
     assert stats.state_count > 0 and stats.subset_labels > 0
 
 
@@ -192,3 +200,91 @@ def test_compatible_minimum_preserves_baseline_weighted_objective(monkeypatch, t
     assert hard is not None
     assert hard[0].score.total == baseline.tree.score.total == 6403
     assert hard[0].tree_edges == baseline.tree.tree_edges
+
+
+def fitting_choice_graph(extra=0.0):
+    return prepared(((0, 0), (400, -400), (200, -400), (200, 0),
+                      (200, 400), (400, 0), (600, -400)),
+                     ((0, 3), (3, 4), (3, 5), (3, 2), (5, 1), (1, 6), (1, 2)),
+                     {"a": [4], "b": [6]}, weights={(3, 2): 400 + extra})
+
+
+def test_fitting_perturbation_absorbs_an_elbow_into_a_tee_on_a_primary_cost_tie():
+    graph = fitting_choice_graph()
+    baseline, perturbed = LengthSteinerStats(), LengthSteinerStats()
+    ordinary = solve_length_steiner(graph, 0, ("a", "b"), 4000, TreeLengthPolicy(100, True), stats=baseline)
+    chosen = solve_length_steiner(graph, 0, ("a", "b"), 4000, TreeLengthPolicy(100, True),
+                                  stats=perturbed, fitting_weight=FITTING_PERTURBATION_MM)
+    assert ordinary is not None and chosen is not None
+    assert baseline.primary_cost == 13400
+    assert baseline.fittings == FittingCounts(elbows=2, tees=1)
+    assert perturbed.primary_cost == pytest.approx(13400, abs=1e-9)
+    assert perturbed.fittings == FittingCounts(elbows=1, tees=1)
+    assert chosen[0].score.total == pytest.approx(13400 + 2e-6, rel=0, abs=1e-9)
+    assert (3, 2) in chosen[0].tree_edges
+    assert baseline.state_count == perturbed.state_count
+
+
+@pytest.mark.parametrize("extra,expected_fittings", ((0.001, 3), (0.25e-6, 2)))
+def test_scalar_perturbation_changes_only_sufficiently_close_primary_costs(extra, expected_fittings):
+    graph, stats = fitting_choice_graph(extra), LengthSteinerStats()
+    chosen = solve_length_steiner(graph, 0, ("a", "b"), 4000, TreeLengthPolicy(100, True),
+                                  stats=stats, fitting_weight=FITTING_PERTURBATION_MM)
+    assert chosen is not None
+    assert stats.fittings.total == expected_fittings
+    primary = 13400 + (extra if expected_fittings == 2 else 0)
+    assert stats.primary_cost == pytest.approx(primary, rel=0, abs=2e-9)
+    assert stats.search_cost == pytest.approx(primary + expected_fittings * 1e-6, rel=0, abs=2e-9)
+
+
+@pytest.mark.parametrize("leaf_count", (2, 3))
+def test_binary_merges_charge_only_one_tee_or_cross(leaf_count):
+    graph = prepared(((0, 0), (200, 0), (400, 0), (200, 200), (200, -200)),
+                     ((0, 1), (1, 2), (1, 3), (1, 4)),
+                     {name: [index] for name, index in zip(("a", "b", "c")[:leaf_count], (2, 3, 4))})
+    stats = LengthSteinerStats()
+    chosen = solve_length_steiner(graph, 0, tuple(graph.candidates), 17, TreeLengthPolicy(100, True),
+                                  stats=stats, fitting_weight=1e-6)
+    assert chosen is not None
+    expected = 200 * (leaf_count + 1) + 17 * (leaf_count - 1)
+    assert chosen[0].score.total == pytest.approx(expected + 1e-6, rel=0, abs=1e-10)
+    assert stats.fittings == (FittingCounts(tees=1) if leaf_count == 2 else FittingCounts(crosses=1))
+
+
+def test_machine_prefix_and_diagonal_grille_bend_are_counted_physically():
+    graph = prepared(((0, 0), (0, 200), (0, 400)), ((0, 1), (1, 2)),
+                     {"a": [2]}, walls={("a", 2): (200, 600)})
+    stats, base = LengthSteinerStats(), LengthSteinerStats()
+    kwargs = dict(root_prefix=(((-200, 0), (0, 0)),))
+    assert solve_length_steiner(graph, 0, ("a",), 17, TreeLengthPolicy(100, True), stats=base, **kwargs)
+    assert solve_length_steiner(graph, 0, ("a",), 17, TreeLengthPolicy(100, True),
+                                stats=stats, fitting_weight=1e-6, **kwargs)
+    assert stats.fittings == FittingCounts(elbows=2)
+    assert stats.search_cost - base.search_cost == pytest.approx(2e-6, rel=0, abs=1e-10)
+
+
+def test_zero_wall_aliases_and_collinear_graph_splits_do_not_add_charges():
+    graph = prepared(((0, 0), (0, 0), (50, 0), (100, 0), (100, 0), (200, 0)),
+                     ((0, 1), (1, 2), (2, 3), (3, 4), (4, 5)), {"a": [5]})
+    stats, base = LengthSteinerStats(), LengthSteinerStats()
+    assert solve_length_steiner(graph, 0, ("a",), 17, TreeLengthPolicy(100, True), stats=base)
+    assert solve_length_steiner(graph, 0, ("a",), 17, TreeLengthPolicy(100, True), stats=stats, fitting_weight=1e-6)
+    assert stats.fittings.total == 0
+    assert stats.search_cost == base.search_cost
+
+
+@pytest.mark.parametrize("weight", (-1, math.inf, math.nan))
+def test_invalid_fitting_weight_is_rejected(weight):
+    graph = prepared(((0, 0), (200, 0)), ((0, 1),), {"a": [1]})
+    with pytest.raises(ValueError):
+        solve_length_steiner(graph, 0, ("a",), 4000, TreeLengthPolicy(100, True), fitting_weight=weight)
+
+
+def test_perturbation_requires_tee_length_policy():
+    graph = prepared(((0, 0), (200, 0)), ((0, 1),), {"a": [1]})
+    with pytest.raises(ValueError):
+        solve_length_steiner(graph, 0, ("a",), 4000, TreeLengthPolicy(100), fitting_weight=1e-6)
+    with pytest.raises(ValueError):
+        directed_wall_graph.solve_directed_wall_steiner(
+            graph.nodes, graph.adjacency, 0, {}, (), 4000, fitting_weight=1e-6,
+        )

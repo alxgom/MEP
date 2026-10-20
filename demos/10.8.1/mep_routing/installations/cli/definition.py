@@ -28,7 +28,12 @@ CLI_SEARCH_BACKEND_LABELS = (
     "Directed Steiner arborescence (exact)",
     "Steiner: min bends",
     "Steiner: min bends + tees",
+    "Steiner: min + fittings",
 )
+CLI_DIRECTED_BACKENDS = (3, 4, 5, 6, 7)
+CLI_LENGTH_BACKENDS = (5, 6, 7)
+CLI_TEE_LENGTH_BACKENDS = (6, 7)
+CLI_FITTING_BACKEND = 7
 CLI_HEURISTIC_MODE_LABELS = ("Shortest-path distance",)
 CLI_START_MODE_LABELS = ("Grille center", "Wall candidates")
 CLI_AUTO_PLACEMENT_LABELS = ("Manual", "Routing-Core Workflow")
@@ -49,6 +54,8 @@ class CliInstallationDefinition:
     start_mode_labels: tuple[str, ...] = CLI_START_MODE_LABELS
     auto_placement_labels: tuple[str, ...] = CLI_AUTO_PLACEMENT_LABELS
     interactive_runtime_available: bool = True
+    directed_backend_indices: tuple[int, ...] = CLI_DIRECTED_BACKENDS
+    length_backend_indices: tuple[int, ...] = CLI_LENGTH_BACKENDS
 
     @property
     def default_machine(self) -> CliMachine:
