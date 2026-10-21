@@ -56,7 +56,8 @@ def test_unknown_key_does_not_change_state():
 def test_cli_graph_hotkey_cycles_cli_state_without_changing_sal():
     app, _rebuilds = _app()
     app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
-    app.workbench_state.cli.graph_type_idx = 3
+    from mep_routing.installations.cli.definition import CLI_INSTALLATION
+    app.workbench_state.cli.graph_type_idx = len(CLI_INSTALLATION.graph_modes) - 1
     controller = WorkbenchCommandController(app, _pygame_keys())
 
     transition = controller.apply_routing_key_command(_pygame_keys().K_TAB)

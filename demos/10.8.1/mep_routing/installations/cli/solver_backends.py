@@ -9,6 +9,7 @@ from itertools import combinations
 from shapely.geometry import LineString
 
 from mep_routing.routing import SteinerScore, SteinerTreeResult, solve_steiner_tree
+from mep_routing.geometry.directions import same_direction
 
 
 ALL_HEURISTIC_DIRECTIONS = (
@@ -58,15 +59,15 @@ def _bend_path(nodes, adjacency, start, target, bend_penalty, crossing_penalty, 
         incoming = state[1]
         for edge in adjacency.get(node, ()):
             nxt, distance = int(edge[0]), float(edge[1])
-            direction = str(edge[2]) if len(edge) > 2 else _edge_direction(nodes, node, nxt)
-            turn = bend_penalty if incoming is not None and direction != incoming else 0.0
+            direction = edge[2] if len(edge) > 2 else _edge_direction(nodes, node, nxt)
+            turn = bend_penalty if incoming is not None and not same_direction(direction, incoming) else 0.0
             key = (min(node, nxt), max(node, nxt))
             candidate = cost + distance + turn + (crossing_penalty if key in crossed else 0.0)
             next_state = (nxt, direction)
             if candidate < best.get(next_state, math.inf):
                 best[next_state] = candidate
                 parent[next_state] = state
-                heapq.heappush(queue, (candidate, nxt, direction, next_state))
+                heapq.heappush(queue, (candidate, nxt, str(direction), next_state))
     if final is None:
         return None
     path = []
@@ -157,16 +158,19 @@ def solve_line_graph_mst(
 def solve_cli_tree(
     backend_index, nodes, adjacency, terminals, *, bend_penalty=0.0,
     crossing_multiplier=0.0, prior_segments=(),
+    euclidean=False,
 ):
     if backend_index == 0:
         return solve_steiner_tree(
             nodes, adjacency, terminals,
             heuristic_directions=ALL_HEURISTIC_DIRECTIONS,
+            euclidean=euclidean,
         )
     if backend_index == 1:
         return solve_steiner_tree(
             nodes, adjacency, terminals,
             heuristic_directions=NONNEGATIVE_HEURISTIC_DIRECTIONS,
+            euclidean=euclidean,
         )
     if backend_index == 2:
         return solve_line_graph_mst(

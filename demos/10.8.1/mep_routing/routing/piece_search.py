@@ -14,6 +14,7 @@ import math
 from .clearance import weighted_edge_cost
 from .metrics import segment_metric_dir
 from .segments import add_port_stub_segment
+from mep_routing.geometry.directions import travel_direction, same_direction
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ class PieceLengthPolicy:
         incoming, achieved, first = run
         if achieved == 0:
             return direction, min(length, self.cap_mm), first
-        if direction is not None and direction == incoming:
+        if direction is not None and same_direction(direction, incoming):
             return direction, min(achieved + length, self.cap_mm), first
         minimum = self.endpoint_min_mm if first else self.internal_min_mm
         if achieved + 1e-7 < minimum:
@@ -78,6 +79,8 @@ class PieceSearchGraph:
                 direction = ("E" if dx > 0 else "W") if abs(dy) < 1e-7 else (
                     ("N" if dy > 0 else "S") if abs(dx) < 1e-7 else None
                 )
+                if getattr(env, "euclidean", False):
+                    direction = travel_direction(start, end)
                 prepared.append((int(neighbour), float(distance), direction, math.hypot(dx, dy)))
             adjacency[int(node)] = tuple(prepared)
         return cls(points, adjacency)
@@ -93,9 +96,9 @@ class _Label:
     active: bool = True
 
 
-def _steps(segments, route_name, start_index=0):
+def _steps(segments, route_name, start_index=0, *, include_diagonal=False):
     return tuple(
-        (segment_metric_dir(route_name, start_index + index, start, end),
+        (segment_metric_dir(route_name, start_index + index, start, end, include_diagonal=include_diagonal),
          math.hypot(end[0] - start[0], end[1] - start[1]))
         for index, (start, end) in enumerate(segments)
     )
@@ -147,7 +150,9 @@ def run_piece_length_astar(
         key = node, direction
         if key not in heuristic_cache:
             point = points[node]
-            if heuristic_mode == 2:
+            if getattr(env, "euclidean", False):
+                value = min(math.hypot(x - point[0], y - point[1]) for x, y in target_points)
+            elif heuristic_mode == 2:
                 value = max(0.0, abs(point[0] - cx) + abs(point[1] - cy) - radius)
             else:
                 estimate_bends = heuristic_mode == 0 and (direction is None or isinstance(direction, str))
@@ -168,7 +173,7 @@ def run_piece_length_astar(
                 {target["pin"]: target["pin_point"]}, env.nodes, target,
             )
         by_node.setdefault(int(target["node_idx"]), []).append(
-            (target, _steps(segments, policy.route_name, start_index=1)),
+            (target, _steps(segments, policy.route_name, start_index=1, include_diagonal=getattr(env, "euclidean", False))),
         )
 
     labels, frontiers, queue = [], {}, []
@@ -205,7 +210,7 @@ def run_piece_length_astar(
     for node in _start_node_list(start_nodes):
         node = int(node)
         prefix = (source_segments or {}).get(node, ())
-        run = _append_steps(policy, (None, 0.0, True), _steps(prefix, policy.route_name))
+        run = _append_steps(policy, (None, 0.0, True), _steps(prefix, policy.route_name, include_diagonal=getattr(env, "euclidean", False)))
         if run is not None:
             push(node, -1, run, 0.0, None)
 
@@ -225,7 +230,7 @@ def run_piece_length_astar(
             if finished is None or not policy.finish(finished):
                 stats.rejected_goals += 1
                 continue
-            goal_cost = cost + (bend_cost if incoming is not None and incoming != target["in_dir"] else 0.0)
+            goal_cost = cost + (bend_cost if incoming is not None and not same_direction(incoming, target["in_dir"]) else 0.0)
             if goal_cost < best_cost:
                 best_cost, best_index, best_target = goal_cost, index, target
         for neighbour, distance, direction, physical_length in geometry.adjacency.get(node, ()):
@@ -239,7 +244,7 @@ def run_piece_length_astar(
                 stats.rejected_turns += 1
                 continue
             edge_cost = weighted_edge_cost(edge_weights, node, neighbour, distance)
-            turn_cost = bend_cost if incoming is not None and incoming != direction else 0.0
+            turn_cost = bend_cost if incoming is not None and direction is not None and not same_direction(incoming, direction) else 0.0
             push(neighbour, node, run, cost + edge_cost + turn_cost, index)
 
     if best_index is None:

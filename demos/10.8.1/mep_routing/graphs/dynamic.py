@@ -5,9 +5,10 @@ from shapely.geometry import LineString, Point
 from shapely.prepared import prep
 
 from .env import EnvView
+from mep_routing.geometry.directions import reverse_direction
 
 
-def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polygon, clearance_mm, protected_nodes=()):
+def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polygon, clearance_mm, protected_nodes=(), *, euclidean=False):
     """Filter a static graph against the current machine obstacle and return a graph view."""
     blocked_polygon = machine_polygon.buffer(clearance_mm, join_style=2)
     min_x, min_y, max_x, max_y = blocked_polygon.bounds
@@ -35,14 +36,13 @@ def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polyg
             continue
         line = LineString([(float(nodes[u, 0]), float(nodes[u, 1])), (float(nodes[v, 0]), float(nodes[v, 1]))])
         intersection = line.intersection(blocked_polygon)
-        if not intersection.is_empty and intersection.length > 1.0 and u not in protected_nodes and v not in protected_nodes:
+        if not intersection.is_empty and intersection.length > 1.0 and (euclidean or (u not in protected_nodes and v not in protected_nodes)):
             blocked_edges.add(int(edge_index))
 
-    reverse_direction = {"E": "W", "N": "S", "W": "E", "S": "N"}
     adjacency = {index: [] for index in range(len(nodes))}
     for edge_index, (u, v, length, direction) in enumerate(edge_list):
         if edge_index in blocked_edges or u in blocked_nodes or v in blocked_nodes:
             continue
         adjacency[u].append((v, length, direction))
-        adjacency[v].append((u, length, reverse_direction[direction]))
-    return EnvView(nodes, adjacency), len(blocked_nodes), len(blocked_edges)
+        adjacency[v].append((u, length, reverse_direction(direction)))
+    return EnvView(nodes, adjacency, euclidean=euclidean), len(blocked_nodes), len(blocked_edges)

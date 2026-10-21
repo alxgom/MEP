@@ -21,6 +21,7 @@ SAL_GRAPH_MODES = (
     "Hannan Grid (numpy)",
     "Epsilon Grid (core-like numpy)",
     "Routing-Core Port: Simple Grid",
+    "Medial Axis (sampled Voronoi)",
 )
 
 SAL_STRATEGY_LABELS = (

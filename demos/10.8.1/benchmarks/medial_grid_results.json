@@ -1,0 +1,1866 @@
+{
+  "boundary_sample_spacing_mm": 200,
+  "strategy": "First Fit",
+  "note": "Warm full Sal scene solves; fixed poses; timings are machine dependent. Failures are retained.",
+  "summary": {
+    "REGULAR": {
+      "samples": 36,
+      "successful": 36,
+      "median_ms": 57.035,
+      "p95_ms": 890.673,
+      "median_nodes": 634.0
+    },
+    "HANNAN": {
+      "samples": 36,
+      "successful": 36,
+      "median_ms": 84.65,
+      "p95_ms": 256.695,
+      "median_nodes": 656.0
+    },
+    "MEDIAL_AXIS": {
+      "samples": 36,
+      "successful": 36,
+      "median_ms": 28.954,
+      "p95_ms": 470.906,
+      "median_nodes": 98.0
+    }
+  },
+  "samples": [
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 38.661,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 38.5ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 35.547,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 35.4ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 35.136,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 35.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 36.695,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 36.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 68.53,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 68.4ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 68.571,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 68.4ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 71.752,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 71.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 71.311,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 71.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 24.007,
+      "nodes": 98,
+      "edges": 124,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 23.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 25.446,
+      "nodes": 98,
+      "edges": 124,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 25.3ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 25.234,
+      "nodes": 98,
+      "edges": 124,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 25.1ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 23.371,
+      "nodes": 98,
+      "edges": 124,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 23.3ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 48.464,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 48.4ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 47.965,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 47.8ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 50.302,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 50.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 46.19,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 5,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 46.1ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 67.776,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 67.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 66.7,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 66.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 69.363,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 69.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 72.758,
+      "nodes": 537,
+      "edges": 976,
+      "routes": 4,
+      "turns": 4,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 72.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 34.913,
+      "nodes": 96,
+      "edges": 122,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 2 perms, 1 crossings) in 34.8ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 34.779,
+      "nodes": 96,
+      "edges": 122,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 2 perms, 1 crossings) in 34.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 33.559,
+      "nodes": 96,
+      "edges": 122,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 2 perms, 1 crossings) in 33.4ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 32.963,
+      "nodes": 96,
+      "edges": 122,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 2 perms, 1 crossings) in 32.8ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 35.032,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 34.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 34.32,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 34.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 33.664,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 33.5ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 33.59,
+      "nodes": 498,
+      "edges": 907,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 33.5ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 71.018,
+      "nodes": 516,
+      "edges": 934,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 70.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 63.505,
+      "nodes": 516,
+      "edges": 934,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 63.4ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 68.844,
+      "nodes": 516,
+      "edges": 934,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 68.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 66.702,
+      "nodes": 516,
+      "edges": 934,
+      "routes": 4,
+      "turns": 2,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 66.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 21.104,
+      "nodes": 99,
+      "edges": 125,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 21.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 21.964,
+      "nodes": 99,
+      "edges": 125,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 21.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 21.863,
+      "nodes": 99,
+      "edges": 125,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 21.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 23.052,
+      "nodes": 99,
+      "edges": 125,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 22.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 56.97,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 56.8ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 57.428,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 57.3ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 53.402,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 53.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 55.409,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 55.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 88.866,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 88.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 86.754,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 86.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 81.707,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 81.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 81.718,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 81.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 29.799,
+      "nodes": 89,
+      "edges": 115,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 29.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 27.376,
+      "nodes": 89,
+      "edges": 115,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 27.1ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 28.099,
+      "nodes": 89,
+      "edges": 115,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 28.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 28.344,
+      "nodes": 89,
+      "edges": 115,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 28.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 59.363,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 59.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 59.118,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 58.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 55.169,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 55.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 53.82,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 53.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 84.968,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 84.8ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 84.278,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 84.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 83.018,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 82.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 82.829,
+      "nodes": 656,
+      "edges": 1217,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 82.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 28.73,
+      "nodes": 91,
+      "edges": 117,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 28.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 29.178,
+      "nodes": 91,
+      "edges": 117,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 29.1ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 27.259,
+      "nodes": 91,
+      "edges": 117,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 27.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 28.012,
+      "nodes": 91,
+      "edges": 117,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 27.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 58.866,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 8,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 58.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 57.101,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 8,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 57.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 58.036,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 8,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 57.9ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 53.733,
+      "nodes": 634,
+      "edges": 1181,
+      "routes": 4,
+      "turns": 8,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 53.6ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 96.507,
+      "nodes": 655,
+      "edges": 1216,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 96.3ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 87.855,
+      "nodes": 655,
+      "edges": 1216,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 87.7ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 84.332,
+      "nodes": 655,
+      "edges": 1216,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 84.2ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 85.475,
+      "nodes": 655,
+      "edges": 1216,
+      "routes": 4,
+      "turns": 7,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 85.3ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 26.514,
+      "nodes": 94,
+      "edges": 120,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 26.3ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 27.179,
+      "nodes": 94,
+      "edges": 120,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 27.1ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 27.109,
+      "nodes": 94,
+      "edges": 120,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 27.0ms"
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 26.887,
+      "nodes": 94,
+      "edges": 120,
+      "routes": 4,
+      "turns": 1,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 26.8ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 890.673,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 6 perms, 0 crossings) in 890.5ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 897.491,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 6 perms, 0 crossings) in 897.3ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 855.977,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 6 perms, 0 crossings) in 855.8ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 860.05,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 6 perms, 0 crossings) in 859.9ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 158.854,
+      "nodes": 933,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 158.7ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 152.146,
+      "nodes": 933,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 152.0ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 256.695,
+      "nodes": 933,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 4 perms, 0 crossings) in 256.5ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 251.786,
+      "nodes": 933,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 4 perms, 0 crossings) in 251.6ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 470.906,
+      "nodes": 239,
+      "edges": 266,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 7 crossings, 1 overlaps) in 470.7ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 476.244,
+      "nodes": 239,
+      "edges": 266,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 7 crossings, 1 overlaps) in 476.1ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 427.678,
+      "nodes": 239,
+      "edges": 266,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 8 crossings, 1 overlaps) in 427.5ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 431.865,
+      "nodes": 239,
+      "edges": 266,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 8 crossings, 1 overlaps) in 431.7ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 218.18,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 218.0ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 228.788,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 228.6ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 558.148,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 10,
+      "status": "Success: Routed all (tried 4 perms, 0 crossings) in 558.0ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 553.381,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 10,
+      "status": "Success: Routed all (tried 4 perms, 0 crossings) in 553.2ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 154.839,
+      "nodes": 934,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 154.7ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 150.219,
+      "nodes": 934,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 150.1ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 259.027,
+      "nodes": 934,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 4 perms, 0 crossings) in 258.9ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 253.549,
+      "nodes": 934,
+      "edges": 1715,
+      "routes": 5,
+      "turns": 9,
+      "status": "Success: Routed all (tried 4 perms, 0 crossings) in 253.4ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 390.506,
+      "nodes": 238,
+      "edges": 265,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 2 crossings, 1 overlaps) in 390.4ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 393.408,
+      "nodes": 238,
+      "edges": 265,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 2 crossings, 1 overlaps) in 393.3ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 422.817,
+      "nodes": 238,
+      "edges": 265,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 2 crossings, 1 overlaps) in 422.6ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 364.96,
+      "nodes": 238,
+      "edges": 265,
+      "routes": 5,
+      "turns": 2,
+      "status": "Success: Routed all (tried 6 perms, 2 crossings, 1 overlaps) in 364.7ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 470.431,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 3 perms, 0 crossings) in 470.3ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 0,
+      "scene_ms": 468.174,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 3 perms, 0 crossings) in 468.0ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 210.67,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 210.5ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "REGULAR",
+      "backend": 1,
+      "scene_ms": 212.919,
+      "nodes": 2409,
+      "edges": 4561,
+      "routes": 5,
+      "turns": 11,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 212.8ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 249.108,
+      "nodes": 970,
+      "edges": 1787,
+      "routes": 5,
+      "turns": 10,
+      "status": "Success: Routed all (tried 3 perms, 0 crossings) in 249.0ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 0,
+      "scene_ms": 241.037,
+      "nodes": 970,
+      "edges": 1787,
+      "routes": 5,
+      "turns": 10,
+      "status": "Success: Routed all (tried 3 perms, 0 crossings) in 240.9ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 167.135,
+      "nodes": 970,
+      "edges": 1787,
+      "routes": 5,
+      "turns": 10,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 167.0ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "HANNAN",
+      "backend": 1,
+      "scene_ms": 165.197,
+      "nodes": 970,
+      "edges": 1787,
+      "routes": 5,
+      "turns": 10,
+      "status": "Success: Routed all (tried 1 perms, 0 crossings) in 165.1ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 424.258,
+      "nodes": 240,
+      "edges": 267,
+      "routes": 5,
+      "turns": 4,
+      "status": "Success: Routed all (tried 6 perms, 4 crossings, 1 overlaps) in 424.1ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 0,
+      "scene_ms": 447.705,
+      "nodes": 240,
+      "edges": 267,
+      "routes": 5,
+      "turns": 4,
+      "status": "Success: Routed all (tried 6 perms, 4 crossings, 1 overlaps) in 447.5ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 396.81,
+      "nodes": 240,
+      "edges": 267,
+      "routes": 5,
+      "turns": 4,
+      "status": "Success: Routed all (tried 6 perms, 4 crossings, 1 overlaps) in 396.7ms"
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "grid": "MEDIAL_AXIS",
+      "backend": 1,
+      "scene_ms": 385.766,
+      "nodes": 240,
+      "edges": 267,
+      "routes": 5,
+      "turns": 4,
+      "status": "Success: Routed all (tried 6 perms, 4 crossings, 1 overlaps) in 385.6ms"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ CLI_GRAPH_LABELS = (
     "Hannan Grid (numpy)",
     "Epsilon Grid (core-like numpy)",
     "Routing-Core Port: Simple Grid",
+    "Medial Axis (sampled Voronoi)",
 )
 CLI_STRATEGY_LABELS = ("Multi-terminal Steiner tree",)
 CLI_SEARCH_BACKEND_LABELS = (

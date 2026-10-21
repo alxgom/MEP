@@ -8,13 +8,14 @@ from mep_routing.routing import count_segment_crossings, count_solution_turns, t
 class CliRouteAnalysis:
     """Score Cli geometry with the same bend/crossing costs exposed by its solver."""
 
-    def __init__(self, bend_penalty_mm, crossing_penalty_multiplier):
+    def __init__(self, bend_penalty_mm, crossing_penalty_multiplier, *, include_diagonal=False):
         self.bend_penalty_mm = float(bend_penalty_mm)
         self.crossing_penalty_multiplier = float(crossing_penalty_multiplier)
+        self.include_diagonal = include_diagonal
 
     def score(self, routes, crossings=None):
         crossings = count_segment_crossings(routes) if crossings is None else int(crossings)
-        turns = count_solution_turns(routes)
+        turns = count_solution_turns(routes, include_diagonal=self.include_diagonal)
         crossing_penalty = self.bend_penalty_mm * self.crossing_penalty_multiplier
         return (
             float(total_route_length(routes))

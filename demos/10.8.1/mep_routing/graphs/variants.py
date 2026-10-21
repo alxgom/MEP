@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any, Iterable, Mapping
 
@@ -12,6 +12,8 @@ from .axis_grid import build_axis_grid
 from .axes import merge_close_values
 from .epsilon import build_axes as build_epsilon_axes
 from .simple import SimpleGraphInputs, build_simple_grid
+from .medial import cached_medial_template, attach_medial_points
+from .runtime import Edge
 
 
 @dataclass(frozen=True)
@@ -19,13 +21,32 @@ class GraphVariantResult:
     """Uncommitted graph-builder output and useful diagnostics."""
 
     nodes: np.ndarray
-    edges: list[tuple[int, int, float, str]]
+    edges: list[Edge]
     axes_x: list[int]
     axes_y: list[int]
     required_points: list[tuple[float, float]]
     axes_ms: float
     nodes_ms: float
     edges_ms: float
+    diagnostics: dict = field(default_factory=dict)
+
+
+def build_medial_variant(*, allowed_region, wall_polys, wall_thickness_mm,
+                         required_points, sample_spacing_mm=200, machine_polygon=None):
+    started = perf_counter()
+    if machine_polygon is not None:
+        # Cutting a cached centreline alone can strand a port. Include the body
+        # as a polygon hole so this pose gets candidate detours around it.
+        allowed_region = allowed_region.difference(machine_polygon)
+    template = cached_medial_template(allowed_region.wkb, tuple(w.wkb for w in wall_polys),
+                                     wall_thickness_mm, sample_spacing_mm)
+    skeleton_ms = (perf_counter() - started) * 1000
+    nodes, edges = attach_medial_points(template, required_points, allowed_region, wall_polys,
+                                       wall_thickness_mm, machine_polygon=machine_polygon)
+    attach_ms = (perf_counter() - started) * 1000 - skeleton_ms
+    return GraphVariantResult(nodes, edges, [], [], list(required_points), skeleton_ms, attach_ms, 0.0,
+                              {"samples": template.sample_count, "skeleton_nodes": len(template.nodes),
+                               "sample_spacing_mm": sample_spacing_mm})
 
 
 def build_hannan_variant(

@@ -106,9 +106,11 @@ def _shortest_path(graph: Graph, positions: np.ndarray, start: int, end: int, sc
     if start == end:
         return 0.0, (start,)
 
-    sx, sy = scale
+    sx, sy = scale if scale is not None else (0, 0)
 
     def heuristic(node):
+        if scale is None:
+            return math.dist(positions[node][:2], positions[end][:2])
         return sx * abs(positions[node][0] - positions[end][0]) + sy * abs(positions[node][1] - positions[end][1])
 
     queue = [(float(heuristic(start)), 0.0, start)]
@@ -256,6 +258,7 @@ def solve_steiner_tree(
     *,
     min_edge_size: float = 0.0,
     heuristic_directions: Sequence[tuple[float, float]] = DEFAULT_HEURISTIC_DIRECTIONS,
+    euclidean: bool = False,
 ) -> SteinerTreeResult | None:
     """Approximate a minimum rectilinear tree connecting all terminal nodes.
 
@@ -278,7 +281,7 @@ def solve_steiner_tree(
     best = None
     best_key = None
     terminals_set = frozenset(terminals)
-    for order, scale in enumerate(directions):
+    for order, scale in enumerate((None,) if euclidean else directions):
         initial = _kou_tree(graph, terminals, positions, scale)
         if initial is None:
             continue

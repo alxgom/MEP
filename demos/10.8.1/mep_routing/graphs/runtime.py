@@ -15,11 +15,9 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from .env import EnvView
+from mep_routing.geometry.directions import Direction, reverse_direction, same_direction
 
-
-REVERSE_DIRECTION = {"E": "W", "N": "S", "W": "E", "S": "N"}
-
-Edge = tuple[int, int, float, str]
+Edge = tuple[int, int, float, Direction]
 
 
 @dataclass(frozen=True)
@@ -27,7 +25,7 @@ class RuntimeGraph:
     """The runtime representation shared by routing, drawing, and snapping."""
 
     nodes: np.ndarray
-    adjacency: dict[int, list[tuple[int, float, str]]]
+    adjacency: dict[int, list[tuple[int, float, Direction]]]
     edge_list: list[Edge]
     edge_coords: np.ndarray
     spatial_index: object
@@ -99,20 +97,20 @@ def restrict_pin_access_edges(
         target_pin = pin_indices.get(target)
         source_allowed = allowed_directions_by_pin.get(source_pin, set()) if source_pin else set()
         target_allowed = allowed_directions_by_pin.get(target_pin, set()) if target_pin else set()
-        if source_allowed and direction not in source_allowed:
+        if source_allowed and not any(same_direction(direction, allowed) for allowed in source_allowed):
             continue
-        if target_allowed and REVERSE_DIRECTION[direction] not in target_allowed:
+        if target_allowed and not any(same_direction(reverse_direction(direction), allowed) for allowed in target_allowed):
             continue
         filtered_edges.append((source, target, length, direction))
     return filtered_edges
 
 
-def build_adjacency(node_count: int, edge_list: Iterable[Edge]) -> dict[int, list[tuple[int, float, str]]]:
+def build_adjacency(node_count: int, edge_list: Iterable[Edge]) -> dict[int, list[tuple[int, float, Direction]]]:
     """Build the bidirectional directed adjacency used by routing searches."""
     adjacency = {index: [] for index in range(node_count)}
     for source, target, length, direction in edge_list:
         adjacency[source].append((target, length, direction))
-        adjacency[target].append((source, length, REVERSE_DIRECTION[direction]))
+        adjacency[target].append((source, length, reverse_direction(direction)))
     return adjacency
 
 
@@ -132,6 +130,7 @@ def create_runtime_graph(
     edge_list: Iterable[Edge],
     *,
     spatial_index_factory: Callable[[np.ndarray], object] = cKDTree,
+    euclidean: bool = False,
 ) -> RuntimeGraph:
     """Materialize graph runtime data after node/edge construction is complete."""
     runtime_nodes = np.asarray(nodes, dtype=np.float32)
@@ -143,5 +142,5 @@ def create_runtime_graph(
         edge_list=runtime_edges,
         edge_coords=edge_coordinates(runtime_nodes, runtime_edges),
         spatial_index=spatial_index_factory(runtime_nodes),
-        env=EnvView(runtime_nodes, adjacency),
+        env=EnvView(runtime_nodes, adjacency, euclidean=euclidean),
     )

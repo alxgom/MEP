@@ -10,6 +10,12 @@ DWELLING_EXPORT_ROOT = Path.home() / "Documents" / "Dwelling-export"
 
 SALUBRIDAD_PARAMETERS = (
     ConfigParameter(
+        key="DOMAIN.SOLVER.GRAPH.MEDIAL_BOUNDARY_SAMPLE_SPACING_MM",
+        default=200, reason="solver", unit="mm",
+        description="Maximum boundary sample spacing for the approximate medial-axis grid.",
+        legacy_names=("MEDIAL_BOUNDARY_SAMPLE_SPACING_MM",),
+    ),
+    ConfigParameter(
         key="SALUBRIDAD.SOLVER.GRAPH.REGULAR_GRID_SPACING_MM",
         default=200,
         reason="solver",

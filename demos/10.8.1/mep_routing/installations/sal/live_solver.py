@@ -135,4 +135,5 @@ class SalLiveRoutingSession:
             policy or self.policy,
             self.routing_region,
             shaft_extraction,
+            include_diagonal=getattr(getattr(self.workspace, "env", None), "euclidean", False),
         )

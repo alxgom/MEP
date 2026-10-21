@@ -25,6 +25,7 @@ class SalRouteAnalysis:
     policy: object
     routing_region: object = None
     shaft_extraction: object = None
+    include_diagonal: bool = False
 
     def route_diameter(self, route_name):
         return self.machine_spec.route_diameter_mm(route_name)
@@ -43,7 +44,7 @@ class SalRouteAnalysis:
         return count_segment_clearance_conflicts(routes, self.route_diameter, self.required_clearance)
 
     def count_short_pieces(self, routes):
-        return count_solution_short_pieces(routes, self.min_piece_length)
+        return count_solution_short_pieces(routes, self.min_piece_length, include_diagonal=self.include_diagonal)
 
     def score(self, routes, crossings=None):
         weights = RouteScoreWeights(
@@ -60,12 +61,16 @@ class SalRouteAnalysis:
             self.required_clearance,
             self.min_piece_length,
             crossings=crossings,
+            include_diagonal=self.include_diagonal,
         )
 
     def quality_warnings(self, routes):
         warnings = route_quality_warnings(
             routes, self.route_diameter, self.required_clearance, self.min_piece_length,
+            include_diagonal=self.include_diagonal,
         )
+        if self.include_diagonal:
+            warnings.append("Medial MVP: overlap/clearance metrics retain orthogonal assumptions")
         return append_allowed_region_warning(
             warnings, routes, self.routing_region, self.shaft_extraction,
         )

@@ -79,3 +79,10 @@ class GraphBuildSession:
                 f"[Routing-Core Simple Port] axes={len(variant.axes_x)}x{len(variant.axes_y)} "
                 f"nodes={len(variant.nodes)} edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms"
             )
+        elif mode is GraphMode.MEDIAL_AXIS:
+            self.report(
+                f"[Medial Axis] spacing={variant.diagnostics['sample_spacing_mm']:.0f}mm "
+                f"samples={variant.diagnostics['samples']} nodes={len(variant.nodes)} "
+                f"edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "
+                "(Euclidean heuristic; fixed bends; experimental diagonal metrics)"
+            )

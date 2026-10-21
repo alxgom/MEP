@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import numpy as np
+from mep_routing.geometry.directions import travel_direction, same_direction
 
 from shapely.geometry import LineString, Point
 
@@ -15,16 +17,25 @@ from mep_routing.routing.segments import (
 def count_segment_crossings(routes):
     crossing_points = set()
     all_segs = metric_route_segments(routes)
+    if not all_segs:
+        return 0
+    lines = [LineString(segment) for _name, segment in all_segs]
+    bounds = np.asarray([line.bounds for line in lines])
+    names = np.asarray([name for name, _segment in all_segs])
 
     for i in range(len(all_segs)):
         name1, seg1 = all_segs[i]
-        line1 = LineString(seg1)
-
-        for j in range(i + 1, len(all_segs)):
+        line1 = lines[i]
+        # Skeleton polylines have many short diagonal edges. Reject separated
+        # boxes numerically before invoking GEOS; preserve crossing semantics.
+        candidates = np.flatnonzero(
+            (np.arange(len(all_segs)) > i) & (names != name1)
+            & (bounds[:, 0] <= bounds[i, 2]) & (bounds[:, 2] >= bounds[i, 0])
+            & (bounds[:, 1] <= bounds[i, 3]) & (bounds[:, 3] >= bounds[i, 1])
+        )
+        for j in candidates:
             name2, seg2 = all_segs[j]
-            if name1 == name2:
-                continue
-            line2 = LineString(seg2)
+            line2 = lines[j]
             inter = line1.intersection(line2)
             if inter.is_empty or not isinstance(inter, Point):
                 continue
@@ -67,7 +78,9 @@ def count_segment_overlaps(routes):
     return overlaps
 
 
-def segment_metric_dir(route_name, idx, p1, p2, eps=1e-7):
+def segment_metric_dir(route_name, idx, p1, p2, eps=1e-7, *, include_diagonal=False):
+    if include_diagonal:
+        return travel_direction(p1, p2)
     dx = float(p2[0] - p1[0])
     dy = float(p2[1] - p1[1])
     length = math.hypot(dx, dy)
@@ -82,28 +95,28 @@ def segment_metric_dir(route_name, idx, p1, p2, eps=1e-7):
     return None
 
 
-def count_ordered_route_turns(route_name, segs):
+def count_ordered_route_turns(route_name, segs, *, include_diagonal=False):
     """Count graph/pin turns; ignore diagonal snap artifacts except the shaft connector."""
     prev_dir = None
     turns = 0
     for idx, (p1, p2) in enumerate(segs):
-        curr_dir = segment_metric_dir(route_name, idx, p1, p2)
+        curr_dir = segment_metric_dir(route_name, idx, p1, p2, include_diagonal=include_diagonal)
         if curr_dir is None:
             continue
 
-        if prev_dir is not None and curr_dir != prev_dir:
+        if prev_dir is not None and not same_direction(curr_dir, prev_dir):
             turns += 1
         prev_dir = curr_dir
     return turns
 
 
-def count_tree_route_turns(route_name, segs):
+def count_tree_route_turns(route_name, segs, *, include_diagonal=False):
     """Count directed branch turns in a rooted, flattened tree geometry."""
     adjacency = {}
     root = None
     for idx, (p1, p2) in enumerate(segs):
-        direction = segment_metric_dir(route_name, idx, p1, p2)
-        if direction is None or not isinstance(direction, str):
+        direction = segment_metric_dir(route_name, idx, p1, p2, include_diagonal=include_diagonal)
+        if direction is None or (not include_diagonal and not isinstance(direction, str)):
             continue
         left = (round(float(p1[0]), 6), round(float(p1[1]), 6))
         right = (round(float(p2[0]), 6), round(float(p2[1]), 6))
@@ -120,29 +133,29 @@ def count_tree_route_turns(route_name, segs):
     while pending:
         node, parent = pending.pop()
         incoming = None if parent is None else segment_metric_dir(
-            route_name, 0, parent, node,
+            route_name, 0, parent, node, include_diagonal=include_diagonal,
         )
         for child in adjacency.get(node, ()):
             if child in visited:
                 continue
             visited.add(child)
-            outgoing = segment_metric_dir(route_name, 0, node, child)
-            if incoming is not None and outgoing is not None and incoming != outgoing:
+            outgoing = segment_metric_dir(route_name, 0, node, child, include_diagonal=include_diagonal)
+            if incoming is not None and outgoing is not None and not same_direction(incoming, outgoing):
                 turns += 1
             pending.append((child, node))
     return turns
 
 
-def count_solution_turns(routes):
+def count_solution_turns(routes, *, include_diagonal=False):
     return sum(
-        count_tree_route_turns(name, segs)
+        count_tree_route_turns(name, segs, include_diagonal=include_diagonal)
         if name in ("Supply Air Tree", "Return Air Tree")
-        else count_ordered_route_turns(name, segs)
+        else count_ordered_route_turns(name, segs, include_diagonal=include_diagonal)
         for name, segs in routes
     )
 
 
-def merged_route_piece_lengths(route_name, segs):
+def merged_route_piece_lengths(route_name, segs, *, include_diagonal=False):
     if not segs:
         return []
     pieces = []
@@ -152,14 +165,14 @@ def merged_route_piece_lengths(route_name, segs):
         length = math.hypot(float(p2[0]) - float(p1[0]), float(p2[1]) - float(p1[1]))
         if length < 1.0:
             continue
-        seg_dir = segment_metric_dir(route_name, idx, p1, p2)
+        seg_dir = segment_metric_dir(route_name, idx, p1, p2, include_diagonal=include_diagonal)
         if seg_dir is None:
             if current_len > 0.0:
                 pieces.append(current_len)
             pieces.append(length)
             current_dir = None
             current_len = 0.0
-        elif seg_dir == current_dir:
+        elif same_direction(seg_dir, current_dir):
             current_len += length
         else:
             if current_len > 0.0:
@@ -171,8 +184,8 @@ def merged_route_piece_lengths(route_name, segs):
     return pieces
 
 
-def count_route_short_pieces(route_name, segs, min_piece_length):
-    pieces = merged_route_piece_lengths(route_name, segs)
+def count_route_short_pieces(route_name, segs, min_piece_length, *, include_diagonal=False):
+    pieces = merged_route_piece_lengths(route_name, segs, include_diagonal=include_diagonal)
     if not pieces:
         return 0
     count = 0
@@ -184,5 +197,5 @@ def count_route_short_pieces(route_name, segs, min_piece_length):
     return count
 
 
-def count_solution_short_pieces(routes, min_piece_length):
-    return sum(count_route_short_pieces(name, segs, min_piece_length) for name, segs in routes)
+def count_solution_short_pieces(routes, min_piece_length, *, include_diagonal=False):
+    return sum(count_route_short_pieces(name, segs, min_piece_length, include_diagonal=include_diagonal) for name, segs in routes)

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-
-
-REVERSE_DIRECTION = {"E": "W", "N": "S", "W": "E", "S": "N"}
+from mep_routing.geometry.directions import reverse_direction
 
 
 def adjacency_without_obstacle_bounds(runtime, obstacle_bounds, protected_nodes=()):
@@ -38,5 +36,5 @@ def adjacency_without_obstacle_bounds(runtime, obstacle_bounds, protected_nodes=
         if blocked_edge_mask[edge_index] or blocked_node_mask[u] or blocked_node_mask[v]:
             continue
         adjacency[u].append((v, length, direction))
-        adjacency[v].append((u, length, REVERSE_DIRECTION[direction]))
+        adjacency[v].append((u, length, reverse_direction(direction)))
     return adjacency, int(blocked_node_mask.sum()), int(blocked_edge_mask.sum())

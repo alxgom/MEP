@@ -314,6 +314,7 @@ def add_route_interaction_weights(
     edge_y1 = np.minimum(coords[:, 1], coords[:, 3])
     edge_y2 = np.maximum(coords[:, 1], coords[:, 3])
     edge_is_h = np.abs(coords[:, 1] - coords[:, 3]) < 1e-7
+    diagonal_edges = ~edge_is_h & (np.abs(coords[:, 0] - coords[:, 2]) >= 1e-7)
 
     blocked_edges = set()
     crossing_counts = {}
@@ -365,6 +366,12 @@ def add_route_interaction_weights(
                 (np.abs(edge_x1 - px1) < 1e-7) | (np.abs(edge_x2 - px1) < 1e-7)
             )
             cross_share = np.where(endpoint, 0.5, 1.0)
+
+        if prior_dir in ("H", "V") and np.any(diagonal_edges):
+            # The axis fast path remains unchanged for existing grids. Reuse
+            # the numeric general-segment routine for new diagonal candidates.
+            fields = _diagonal_interaction_fields(coords[diagonal_edges], prior_seg, required)
+            overlap_mask[diagonal_edges], cross_mask[diagonal_edges], clearance_mask[diagonal_edges], cross_share[diagonal_edges] = fields
 
         for edge_index in np.flatnonzero(overlap_mask):
             u, v, _, _ = edge_list[int(edge_index)]

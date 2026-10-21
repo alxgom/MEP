@@ -190,9 +190,11 @@ class DemoRoutingController:
             from mep_routing.installations.cli import CliRouteAnalysis
 
             state = self.app.workbench_state.cli
+            from mep_routing.graphs import GraphMode
             return CliRouteAnalysis(
                 state.bend_penalty_mm,
                 state.crossing_penalty_multiplier,
+                include_diagonal=self.app.CLI_INSTALLATION.graph_modes[state.graph_type_idx] is GraphMode.MEDIAL_AXIS,
             ).score(routes, crossings)
         return self.solution_score(routes, crossings)
 

@@ -43,15 +43,16 @@ def route_quality_counts(
     required_clearance,
     min_piece_length,
     crossings=None,
+    include_diagonal=False,
 ):
     if crossings is None:
         crossings = count_segment_crossings(routes)
     return {
         "crossings": crossings,
-        "turns": count_solution_turns(routes),
+        "turns": count_solution_turns(routes, include_diagonal=include_diagonal),
         "overlaps": count_segment_overlaps(routes),
         "clearance_conflicts": count_segment_clearance_conflicts(routes, route_diameter, required_clearance),
-        "short_pieces": count_solution_short_pieces(routes, min_piece_length),
+        "short_pieces": count_solution_short_pieces(routes, min_piece_length, include_diagonal=include_diagonal),
     }
 
 
@@ -62,6 +63,7 @@ def score_routes(
     required_clearance,
     min_piece_length,
     crossings=None,
+    include_diagonal=False,
 ):
     counts = route_quality_counts(
         routes,
@@ -69,6 +71,7 @@ def score_routes(
         required_clearance,
         min_piece_length,
         crossings=crossings,
+        include_diagonal=include_diagonal,
     )
     return (
         int(total_route_length(routes))
@@ -80,11 +83,11 @@ def score_routes(
     )
 
 
-def route_quality_warnings(routes, route_diameter, required_clearance, min_piece_length):
+def route_quality_warnings(routes, route_diameter, required_clearance, min_piece_length, *, include_diagonal=False):
     if not routes:
         return []
     warnings = []
-    counts = route_quality_counts(routes, route_diameter, required_clearance, min_piece_length)
+    counts = route_quality_counts(routes, route_diameter, required_clearance, min_piece_length, include_diagonal=include_diagonal)
     if counts["crossings"]:
         warnings.append(f'{counts["crossings"]} crossing(s)')
     if counts["overlaps"]:

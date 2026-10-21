@@ -285,17 +285,76 @@ Preferred terminals keep the same virtual-source abstraction. When a room has on
 
 ## Routing Grids
 
-Demo 10.8 supports three grid modes:
+Demo 10.8.1 exposes five grid modes for Sal and Cli:
 
 - Regular 200 mm Grid
 - Hannan Grid (numpy)
 - Epsilon Grid (core-like numpy)
+- Routing-Core Port: Simple Grid
+- Medial Axis (sampled Voronoi)
 
 The Hannan grid follows a simple axis construction inspired by `letsmep-routing-core`: it builds X/Y axes from relevant room, obstacle, machine, and terminal geometry, then constructs axis-aligned graph nodes and edges.
 
 This is comparable to the routing-core simple grid at the level of "axis lines from terminals, allowed boundaries, obstacles, and connector geometry", but it is not a byte-for-byte port. The demo keeps a precomputed static Hannan template and overlays dynamic machine axes for interactivity; routing-core rebuilds a simpler grid from supplied points, allowed-boundary offsets, and obstacle-buffer axes.
 
 The epsilon grid is an experimental routing-core-inspired alternative. It mirrors the core idea of adding axes at geometry/connector coordinates plus `+/- EPSILON`, but it deliberately keeps the demo's NumPy graph build and edge filtering instead of porting the core Shapely-heavy grid internals line-for-line. This keeps it interactive and makes the difference explicit.
+
+### Medial-axis grid MVP
+
+Choose `Medial Axis (sampled Voronoi)` in **Grid**, or cycle with `Tab`.
+It generates candidate nodes and edges independently of the routing strategy
+and graph/search representation. It approximates the free-space medial axis
+using SciPy Voronoi ridges of sampled outer/hole boundaries, discarding ridges
+between samples on the same boundary segment. This is not an exact segment-site
+Voronoi construction or a raster skeleton.
+
+`DOMAIN.SOLVER.GRAPH.MEDIAL_BOUNDARY_SAMPLE_SPACING_MM` defaults to 200 mm.
+Degree-two chains are simplified with a tolerance of 5% of that spacing
+(10 mm by default); junctions, endpoints and closed cycles remain. Every
+replacement chord is checked against the allowed geometry and current wall
+policy, and is an explicit straight edge with its own heading. Terminals,
+machine access points and shaft faces attach to up to three nearby visible
+skeleton projections (at most 24 segment candidates per endpoint). Missing
+machine access points are not silently snapped elsewhere.
+
+The machine body is a hole in this mode's free space, so changing its pose
+regenerates detours. Up to 16 geometry/pose/spacing templates are cached for
+repeated solves. Internal walls retain the existing short transverse-crossing
+policy. Boundaries/obstacles follow the current inset routing region.
+
+Sal's state-expanded, line-graph and minimum-piece backends accept arbitrary
+headings, with a **fixed penalty for each actual direction change**. The
+normalized-vector comparison uses routing-core's `flow_turn` tolerance (1e-4).
+Angle-weighted costs are deferred; routing-core's quadratic angle score is not
+enabled. This grid uses Euclidean target-distance heuristics, retaining `Zero`
+for diagnostic searches, and displays the effective override in the sidebar.
+The source grid is still selectable independently of strategy/backend.
+
+Cli's two Kou variants use Euclidean distance in this grid, and its line-graph
+metric MST accepts diagonal headings. Directed wall-candidate and hard Steiner
+backends explicitly report unsupported for this MVP. Coc's grid choices are
+unchanged. The existing `G` overlay draws the candidate skeleton and attachments.
+
+Crossing detection and numeric route-interaction fields include diagonal
+segments. Post-route overlap/clearance conflict counts still use the existing
+orthogonal logic; the Sal warnings flag this limitation. Minimum-piece modes
+can block on the skeleton's short segments. Success means a solver returned a
+route on this approximate graph, not that every construction constraint passed.
+
+Run a fixed-pose grid comparison with the demo interpreter:
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 2 --output benchmarks\medial_grid_results.json
+```
+
+The recorded run covers two real dwellings plus a seeded synthetic dwelling,
+three poses, and both standard A* representations (36 warm samples per grid).
+All three grids routed all sampled requests. Median scene times were
+57.0/84.7/29.0 ms for Regular/Hannan/Medial; p95 was 890.7/256.7/470.9 ms.
+Median node counts were 634/656/98. These are exploratory, machine-dependent
+results including graph refresh and routing, excluding rendering and initial
+dwelling preparation/automatic placement; they do not establish universal
+speed or route-quality superiority.
 
 ## Validation Warnings
 

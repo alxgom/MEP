@@ -6,6 +6,7 @@ from numbers import Integral
 from typing import Generic, TypeVar
 
 from .contracts import RoutingProblem, SolvedRoute, SolverFailure, SolverResult
+from mep_routing.geometry.directions import same_direction
 
 
 Target = TypeVar("Target")
@@ -207,7 +208,7 @@ def build_pin_min_cost_flow_network(
                 continue
             next_in, _ = state_nodes[(v, w)]
             edge_cost = edge_cost_fn(v, w, dist)
-            turn_penalty = bend_penalty if current_direction != next_direction else 0.0
+            turn_penalty = bend_penalty if not same_direction(current_direction, next_direction) else 0.0
             add_edge(graph, state_out, next_in, len(route_names), edge_cost + turn_penalty)
 
     pin_nodes = {}
@@ -228,7 +229,7 @@ def build_pin_min_cost_flow_network(
                     continue
                 _, state_out = state_nodes[(u, target_node)]
                 current_direction = direction_fn(u, target_node)
-                final_penalty = bend_penalty if current_direction != target["in_dir"] else 0.0
+                final_penalty = bend_penalty if not same_direction(current_direction, target["in_dir"]) else 0.0
                 add_edge(graph, state_out, spec_node, 1, final_penalty)
 
     return graph, source, sink, route_flow_nodes

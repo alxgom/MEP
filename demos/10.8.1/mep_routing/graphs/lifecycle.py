@@ -8,12 +8,15 @@ from time import perf_counter
 from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
+from shapely.geometry import Polygon
+
+from mep_routing.geometry.directions import travel_direction
 
 from .dynamic import filter_dynamic_machine_obstacle
 from .hannan import build_static_axes
 from .regular import build_regular_grid
 from .runtime import RuntimeGraph, append_shaft_runtime_node, create_runtime_graph, restrict_pin_access_edges
-from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant
+from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant, build_medial_variant
 
 
 class GraphMode(IntEnum):
@@ -21,6 +24,7 @@ class GraphMode(IntEnum):
     HANNAN = 1
     EPSILON = 2
     CORE_SIMPLE = 3
+    MEDIAL_AXIS = 4
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,7 @@ class GraphLifecycle:
     port_access_specs: Callable[[Mapping[str, Any], float], Sequence[Mapping[str, Any]]]
     simple_input_builder: Callable[..., Any] | None = None
     simple_axis_clearance_mm: float = 100.0
+    medial_sample_spacing_mm: float = 200.0
     _hannan_templates: dict[bool, Mapping[str, Any]] = field(default_factory=dict, init=False, repr=False)
 
     def node_region(self):
@@ -111,7 +116,7 @@ class GraphLifecycle:
         )
         return create_runtime_graph(nodes, edges)
 
-    def commit_runtime(self, nodes, edges, machine_pins, machine_angle: float) -> RuntimeGraph:
+    def commit_runtime(self, nodes, edges, machine_pins, machine_angle: float, *, euclidean=False) -> RuntimeGraph:
         """Attach shaft/pin constraints and materialize a routing runtime graph."""
         shaft_center = shaft_bounds = None
         if self.shaft_extraction is not None:
@@ -125,6 +130,8 @@ class GraphLifecycle:
             shaft_bounds=shaft_bounds,
             clearance_mm=self.wall_clearance_mm,
         )
+        if euclidean:
+            edges = [(u, v, length, travel_direction(nodes[u], nodes[v])) for u, v, length, _ in edges]
 
         pin_indices: dict[int, str] = {}
         if len(nodes):
@@ -139,6 +146,7 @@ class GraphLifecycle:
         return create_runtime_graph(
             nodes,
             restrict_pin_access_edges(edges, pin_indices, allowed_directions),
+            euclidean=euclidean,
         )
 
     def build_selected(
@@ -196,6 +204,21 @@ class GraphLifecycle:
                 epsilon_mm=self.epsilon_mm,
                 scaffold_spacing_mm=self.scaffold_spacing_mm,
             )
+        elif mode is GraphMode.MEDIAL_AXIS:
+            required = list(self.terminals.values()) + access_points
+            # Preserve the existing explicit shaft-face entry semantics.
+            if self.shaft_extraction is not None:
+                min_x, min_y, max_x, max_y = self.shaft_extraction.bounds
+                c = self.wall_clearance_mm
+                required.extend(((max_x + c, (min_y + max_y) / 2), (min_x - c, (min_y + max_y) / 2),
+                                 ((min_x + max_x) / 2, max_y + c), ((min_x + max_x) / 2, min_y - c)))
+            corners = [machine_pins.get(name) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
+            machine_polygon = Polygon(corners) if all(p is not None for p in corners) else None
+            variant = build_medial_variant(
+                allowed_region=self.node_region(), wall_polys=self.wall_polygons,
+                wall_thickness_mm=self.wall_thickness_mm, required_points=required,
+                sample_spacing_mm=self.medial_sample_spacing_mm, machine_polygon=machine_polygon,
+            )
         else:
             if self.simple_input_builder is None:
                 raise ValueError("core-simple graph mode has no installation input builder")
@@ -209,7 +232,8 @@ class GraphLifecycle:
                 epsilon_mm=self.epsilon_mm,
                 axis_clearance_mm=self.simple_axis_clearance_mm,
             ))
-        runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle)
+        runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle,
+                                      euclidean=mode is GraphMode.MEDIAL_AXIS)
         return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0, variant)
 
     def apply_dynamic_obstacle(
@@ -222,6 +246,8 @@ class GraphLifecycle:
         clearance_mm: float,
     ):
         """Filter a committed graph while preserving terminal and port-access nodes."""
+        if not len(runtime.nodes):
+            return DynamicGraphResult(runtime.env, 0, 0)
         protected_nodes = set()
         protected_points = list(self.terminals.values())
         protected_points.extend(spec["access_point"] for spec in self.port_access_specs(machine_pins, machine_angle))
@@ -237,5 +263,6 @@ class GraphLifecycle:
             machine_polygon,
             clearance_mm,
             protected_nodes,
+            euclidean=runtime.env.euclidean,
         )
         return DynamicGraphResult(env, blocked_nodes, blocked_edges)

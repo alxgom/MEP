@@ -6,6 +6,7 @@ from enum import IntEnum
 from numbers import Integral
 
 from .clearance import weighted_edge_cost
+from mep_routing.geometry.directions import same_direction, travel_direction
 
 
 class SearchBackend(IntEnum):
@@ -28,6 +29,8 @@ def coerce_search_backend(backend):
 
 
 def line_graph_dir_from_points(env, u, v):
+    if getattr(env, "euclidean", False):
+        return travel_direction(env.nodes[u], env.nodes[v])
     pu = env.nodes[u]
     pv = env.nodes[v]
     dx = float(pv[0] - pu[0])
@@ -63,6 +66,10 @@ def target_heuristic(
         return 0.0
 
     p = env.nodes[node_idx]
+    if getattr(env, "euclidean", False):
+        return min((math.hypot(float(env.nodes[int(t["node_idx"]), 0] - p[0]),
+                               float(env.nodes[int(t["node_idx"]), 1] - p[1]))
+                    for t in target_specs), default=0.0)
     if heuristic_mode == 2:
         cx, cy = float(machine_center[0]), float(machine_center[1])
         radius = 0.0
@@ -172,7 +179,7 @@ def run_super_sink_state_astar(
         for next_node, distance, edge_dir in search_adj.get(node_idx, []):
             next_node = int(next_node)
             edge_cost = weighted_edge_cost(edge_weights, node_idx, next_node, distance)
-            turn_penalty = bend_cost if incoming_dir is not None and edge_dir is not None and incoming_dir != edge_dir else 0.0
+            turn_penalty = bend_cost if incoming_dir is not None and edge_dir is not None and not same_direction(incoming_dir, edge_dir) else 0.0
             next_cost = current_cost + edge_cost + turn_penalty
             next_state = (next_node, edge_dir)
             if next_cost >= g_scores.get(next_state, float("inf")):
@@ -283,7 +290,7 @@ def run_super_sink_line_graph_search(
         previous_node, node_idx = state
         current_dir = state_dirs[state]
         for target in targets_by_node.get(node_idx, []):
-            final_penalty = bend_cost if current_dir != target["in_dir"] else 0.0
+            final_penalty = bend_cost if not same_direction(current_dir, target["in_dir"]) else 0.0
             final_cost = current_cost + final_penalty
             if final_cost < best_final_cost:
                 best_final_cost = final_cost
@@ -297,7 +304,7 @@ def run_super_sink_line_graph_search(
             if next_node == previous_node:
                 continue
             edge_cost = weighted_edge_cost(edge_weights, node_idx, next_node, distance)
-            turn_penalty = bend_cost if current_dir != next_dir else 0.0
+            turn_penalty = bend_cost if not same_direction(current_dir, next_dir) else 0.0
             next_state = (node_idx, next_node)
             next_cost = current_cost + edge_cost + turn_penalty
             if next_cost >= g_scores.get(next_state, float("inf")):

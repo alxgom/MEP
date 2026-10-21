@@ -117,6 +117,11 @@ class CliInteractiveRuntime:
         )
         if not return_enabled:
             grilles = CliGrillePlan(tuple(grilles.supply))
+        if GraphMode(graph_mode) is GraphMode.MEDIAL_AXIS and solver_backend_index in CLI_DIRECTED_BACKENDS:
+            return self._finish(
+                (), "Unsupported: Medial MVP supports Kou and line-graph metric MST; directed wall solvers remain orthogonal",
+                started, 0, grilles, pins, context_obstacles=context_obstacles,
+            )
         if not grilles.supply:
             return self._finish(
                 (), "Blocked: no Cli supply grilles", started, 0, grilles, pins,
@@ -285,6 +290,9 @@ class CliInteractiveRuntime:
         weighted_adjacency = apply_cli_edge_weights(runtime.adjacency, clearance_weights)
         dwelling.workspace.overlay.values = dict(clearance_weights)
         root_node = int(runtime.spatial_index.query(access["access_point"])[1])
+        if runtime.env.euclidean and math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-3:
+            self._length_failure = "Blocked: machine access outside Medial grid"
+            return None
         graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
         selected_connections = tuple(connections)
         length_policy, length_stats = None, None
@@ -333,6 +341,7 @@ class CliInteractiveRuntime:
                 bend_penalty=bend_penalty_mm,
                 crossing_multiplier=crossing_penalty_multiplier,
                 prior_segments=prior_segments,
+                euclidean=runtime.env.euclidean,
             )
         if tree is None:
             return None
