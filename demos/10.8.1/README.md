@@ -285,7 +285,7 @@ Preferred terminals keep the same virtual-source abstraction. When a room has on
 
 ## Routing Grids
 
-Demo 10.8.1 exposes six grid modes for Sal and Cli:
+Demo 10.8.1 exposes seven grid modes for Sal and Cli:
 
 - Regular 200 mm Grid
 - Hannan Grid (numpy)
@@ -293,6 +293,7 @@ Demo 10.8.1 exposes six grid modes for Sal and Cli:
 - Routing-Core Port: Simple Grid
 - Medial Axis (sampled Voronoi)
 - Cell Skeleton (orthogonal)
+- Hanan + Voronoi (local links)
 
 The Hannan grid follows a simple axis construction inspired by `letsmep-routing-core`: it builds X/Y axes from relevant room, obstacle, machine, and terminal geometry, then constructs axis-aligned graph nodes and edges.
 
@@ -405,7 +406,51 @@ dwelling's shaft remained disconnected in 12 requests. Other grids routed
 count was 157; timings include those blocked requests and are not evidence of
 a speed advantage. Cell centres and one portal midpoint restrict routing
 choices and can create additional turns, overlap and clearance warnings.
-No Hanan/Voronoi hybrid was added in this step.
+
+### Hanan + Voronoi with local links
+
+Choose **Grid > Hanan + Voronoi (local links)** to retain the Hanan grid and
+Voronoi diagonals in one connected candidate grid. The standalone Hannan,
+Voronoi and cell-skeleton modes remain available. Grid construction remains
+independent of routing strategy and graph/search representation.
+
+The Hanan axes remain unchanged. Each Voronoi node may connect in up to four
+cardinal directions to the nearest legal projection onto a Hanan edge, within
+one Hanan scaffold spacing (600 mm by default). These are short local segments;
+they do not extend an axis across the dwelling. The builder splits the target
+edge at the attachment point. Natural intersections between the two grids,
+and between their new links, are also split into shared junctions. Collinear
+overlaps are split and deduplicated. Nodes retain the common float32 millimetre
+representation so diagonal intersections can be shared without integer snapping.
+
+Local links obey the allowed-region and short wall-crossing checks. No distant
+fallback is added when a local connection is blocked or out of range. The
+machine body is cut from both inputs. The sampled Voronoi geometry uses its
+existing bounded cache; Hanan construction and the local union are rebuilt
+with the current required points. Console diagnostics show skeleton-node,
+local-link and total topology counts. Press `G` to inspect the merged grid.
+
+Both normal A* representations retain fixed bend costs and use Euclidean target
+distance (or the diagnostic Zero heuristic), as in the standalone Voronoi mode.
+Cli's Kou variants and line-graph metric MST support the hybrid. Its directed
+wall-candidate/hard Steiner backends explicitly report unsupported for grids
+with diagonals. Existing diagonal overlap/clearance metric limitations apply.
+Sampling and bounded attachment can still disconnect useful routing choices.
+
+Run a fixed-pose comparison with:
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 1 --include-hybrid --output benchmarks\hannan_medial_grid_results.json
+```
+
+The recorded run has 18 warm requests per grid over two real dwellings, seeded
+synthetic, three poses and both standard A* representations. All requests
+returned routes, retaining physical warnings. The hybrid median/p95 times were
+177.4/956.0 ms, with median 1,064 nodes; Hannan was 85.7/257.2 ms with 656 nodes.
+These machine-dependent observations include graph refresh and routing, not
+rendering or initial preparation. With only 18 samples the reported p95 is
+the slowest sample; no uniform interaction latency or route-quality benefit
+is established.
 
 ## Validation Warnings
 

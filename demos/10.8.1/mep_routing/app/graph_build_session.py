@@ -61,7 +61,15 @@ class GraphBuildSession:
         variant = result.variant
         if variant is None or not len(variant.nodes):
             return
-        if mode is GraphMode.HANNAN:
+        if mode is GraphMode.HANNAN_MEDIAL:
+            info = variant.diagnostics
+            self.report(
+                f"[Hanan + Voronoi] skeleton nodes={info['skeleton_nodes']} "
+                f"local links={info['links']} axes={len(variant.axes_x)}x{len(variant.axes_y)} "
+                f"nodes={len(variant.nodes)} edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "
+                "(shared junctions; Euclidean heuristic; fixed bends)"
+            )
+        elif mode is GraphMode.HANNAN:
             self.report(
                 f"[Hannan Simple] axes={len(variant.axes_x)}x{len(variant.axes_y)} "
                 f"nodes={len(variant.nodes)} edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "

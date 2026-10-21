@@ -23,6 +23,7 @@ SAL_GRAPH_MODES = (
     "Routing-Core Port: Simple Grid",
     "Medial Axis (sampled Voronoi)",
     "Cell Skeleton (orthogonal)",
+    "Hanan + Voronoi (local links)",
 )
 
 SAL_STRATEGY_LABELS = (

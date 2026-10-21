@@ -70,11 +70,11 @@ class DemoUiFacade:
             )
             state = a
         opened = a.workbench_state.solver_dropdown_open_for
-        medial = labels[3][int(getattr(state, "graph_type_idx"))].startswith("Medial Axis")
+        medial = labels[3][int(getattr(state, "graph_type_idx"))].startswith(("Medial Axis", "Hanan + Voronoi"))
         return tuple(
             SolverDropdown(
                 key, label,
-                tuple(DropdownOption(str(i), "Euclidean (Medial)" if medial and key == "heuristic" and value != "Zero" else value)
+                tuple(DropdownOption(str(i), "Euclidean (Voronoi)" if medial and key == "heuristic" and value != "Zero" else value)
                       for i, value in enumerate(values)),
                 str(getattr(state, attribute)),
                 opened == (active, key),

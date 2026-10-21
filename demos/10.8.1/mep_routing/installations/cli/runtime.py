@@ -117,9 +117,9 @@ class CliInteractiveRuntime:
         )
         if not return_enabled:
             grilles = CliGrillePlan(tuple(grilles.supply))
-        if GraphMode(graph_mode) is GraphMode.MEDIAL_AXIS and solver_backend_index in CLI_DIRECTED_BACKENDS:
+        if GraphMode(graph_mode) in (GraphMode.MEDIAL_AXIS, GraphMode.HANNAN_MEDIAL) and solver_backend_index in CLI_DIRECTED_BACKENDS:
             return self._finish(
-                (), "Unsupported: Medial MVP supports Kou and line-graph metric MST; directed wall solvers remain orthogonal",
+                (), "Unsupported: Voronoi grids support Kou and line-graph metric MST; directed wall solvers remain orthogonal",
                 started, 0, grilles, pins, context_obstacles=context_obstacles,
             )
         if not grilles.supply:

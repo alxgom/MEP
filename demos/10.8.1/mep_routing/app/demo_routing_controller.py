@@ -194,7 +194,8 @@ class DemoRoutingController:
             return CliRouteAnalysis(
                 state.bend_penalty_mm,
                 state.crossing_penalty_multiplier,
-                include_diagonal=self.app.CLI_INSTALLATION.graph_modes[state.graph_type_idx] is GraphMode.MEDIAL_AXIS,
+                include_diagonal=self.app.CLI_INSTALLATION.graph_modes[state.graph_type_idx] in (
+                    GraphMode.MEDIAL_AXIS, GraphMode.HANNAN_MEDIAL),
             ).score(routes, crossings)
         return self.solution_score(routes, crossings)
 

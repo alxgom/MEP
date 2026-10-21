@@ -17,7 +17,7 @@ from .hannan import build_static_axes
 from .regular import build_regular_grid
 from .runtime import RuntimeGraph, append_shaft_runtime_node, create_runtime_graph, restrict_pin_access_edges
 from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant, build_medial_variant
-from .variants import build_cell_variant
+from .variants import build_cell_variant, build_hannan_medial_variant
 
 
 class GraphMode(IntEnum):
@@ -27,6 +27,7 @@ class GraphMode(IntEnum):
     CORE_SIMPLE = 3
     MEDIAL_AXIS = 4
     CELL_SKELETON = 5
+    HANNAN_MEDIAL = 6
 
 
 @dataclass(frozen=True)
@@ -181,8 +182,16 @@ class GraphLifecycle:
             return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0)
 
         access_points = [spec["access_point"] for spec in self.port_access_specs(machine_pins, machine_angle)]
-        if mode is GraphMode.HANNAN:
-            variant = build_hannan_variant(
+        if mode in (GraphMode.HANNAN, GraphMode.HANNAN_MEDIAL):
+            options = {}
+            builder = build_hannan_variant
+            if mode is GraphMode.HANNAN_MEDIAL:
+                corners = [machine_pins.get(name) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
+                options = {"machine_polygon": Polygon(corners) if all(p is not None for p in corners) else None,
+                           "sample_spacing_mm": self.medial_sample_spacing_mm,
+                           "max_link_distance_mm": self.scaffold_spacing_mm}
+                builder = build_hannan_medial_variant
+            variant = builder(
                 template=self.hannan_template(shift_walls=shift_hannan_walls),
                 allowed_region=self.routing_region,
                 node_region=self.node_region(),
@@ -191,6 +200,7 @@ class GraphLifecycle:
                 terminals=self.terminals,
                 shaft_extraction=self.shaft_extraction,
                 machine_access_points=access_points,
+                **options,
             )
         elif mode is GraphMode.EPSILON:
             variant = build_epsilon_variant(
@@ -241,8 +251,9 @@ class GraphLifecycle:
                 axis_clearance_mm=self.simple_axis_clearance_mm,
             ))
         runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle,
-                                      euclidean=mode is GraphMode.MEDIAL_AXIS,
-                                      exact_access=mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON),
+                                      euclidean=mode in (GraphMode.MEDIAL_AXIS, GraphMode.HANNAN_MEDIAL),
+                                      exact_access=mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON,
+                                                           GraphMode.HANNAN_MEDIAL),
                                       cells=variant.diagnostics.get("cells", ()))
         return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0, variant)
 

@@ -159,8 +159,9 @@ class DemoWorkbenchApplication:
     def count_solution_turns(self, routes):
         from mep_routing.graphs import GraphMode
         active = self.installation_header_state.active
-        medial = (active == "sal" and self.graph_type_idx == GraphMode.MEDIAL_AXIS) or (
-            active == "cli" and self.CLI_INSTALLATION.graph_modes[self.workbench_state.cli.graph_type_idx] == GraphMode.MEDIAL_AXIS)
+        diagonal_modes = (GraphMode.MEDIAL_AXIS, GraphMode.HANNAN_MEDIAL)
+        medial = (active == "sal" and self.graph_type_idx in diagonal_modes) or (
+            active == "cli" and self.CLI_INSTALLATION.graph_modes[self.workbench_state.cli.graph_type_idx] in diagonal_modes)
         return self._count_solution_turns(routes, include_diagonal=medial)
 
     def find_room_route_at_point(self, world_point, route_names):

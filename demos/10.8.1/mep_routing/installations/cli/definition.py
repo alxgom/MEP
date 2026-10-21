@@ -20,6 +20,7 @@ CLI_GRAPH_LABELS = (
     "Routing-Core Port: Simple Grid",
     "Medial Axis (sampled Voronoi)",
     "Cell Skeleton (orthogonal)",
+    "Hanan + Voronoi (local links)",
 )
 CLI_STRATEGY_LABELS = ("Multi-terminal Steiner tree",)
 CLI_SEARCH_BACKEND_LABELS = (

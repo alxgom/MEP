@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from time import perf_counter
 from typing import Any, Iterable, Mapping
 
@@ -15,6 +15,7 @@ from .simple import SimpleGraphInputs, build_simple_grid
 from .medial import cached_medial_template, attach_medial_points
 from .runtime import Edge
 from .cells import cached_cell_template, build_cell_skeleton
+from .hybrid import join_hanan_voronoi
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,34 @@ def build_hannan_variant(
         required_points,
     )
     return GraphVariantResult(nodes, edges, axes_x, axes_y, required_points, axes_ms, nodes_ms, edges_ms)
+
+
+def build_hannan_medial_variant(*, template, allowed_region, node_region, wall_polys, wall_thickness_mm,
+                                terminals, shaft_extraction, machine_access_points=(),
+                                sample_spacing_mm=200, machine_polygon=None, max_link_distance_mm=600):
+    """Preserve both grids and connect them through local edge projections."""
+    started = perf_counter()
+    if machine_polygon is not None:
+        allowed_region = allowed_region.difference(machine_polygon)
+        node_region = node_region.difference(machine_polygon)
+    medial = cached_medial_template(node_region.wkb, tuple(w.wkb for w in wall_polys),
+                                    wall_thickness_mm, sample_spacing_mm)
+    skeleton_ms = (perf_counter() - started) * 1000
+    result = build_hannan_variant(
+        template=template, allowed_region=allowed_region, node_region=node_region,
+        wall_polys=wall_polys, wall_thickness_mm=wall_thickness_mm,
+        terminals=terminals, shaft_extraction=shaft_extraction, machine_access_points=machine_access_points,
+    )
+    join_started = perf_counter()
+    nodes, edges, diagnostics = join_hanan_voronoi(
+        result.nodes, result.edges, medial.nodes, medial.edges, allowed_region,
+        wall_polys, wall_thickness_mm, max_link_distance_mm=max_link_distance_mm,
+    )
+    return replace(result, nodes=nodes, edges=edges, axes_ms=result.axes_ms + skeleton_ms,
+                   edges_ms=result.edges_ms + (perf_counter() - join_started) * 1000,
+                   diagnostics={**diagnostics, "skeleton_nodes": len(medial.nodes),
+                                "samples": medial.sample_count, "sample_spacing_mm": sample_spacing_mm,
+                                "max_link_distance_mm": max_link_distance_mm})
 
 
 def build_epsilon_variant(
