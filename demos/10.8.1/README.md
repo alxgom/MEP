@@ -285,7 +285,7 @@ Preferred terminals keep the same virtual-source abstraction. When a room has on
 
 ## Routing Grids
 
-Demo 10.8.1 exposes seven grid modes for Sal and Cli:
+Demo 10.8.1 exposes eight grid modes for Sal and Cli:
 
 - Regular 200 mm Grid
 - Hannan Grid (numpy)
@@ -294,6 +294,7 @@ Demo 10.8.1 exposes seven grid modes for Sal and Cli:
 - Medial Axis (sampled Voronoi)
 - Cell Skeleton (orthogonal)
 - Hanan + Voronoi (local links)
+- Hanan + Cell Skeleton
 
 The Hannan grid follows a simple axis construction inspired by `letsmep-routing-core`: it builds X/Y axes from relevant room, obstacle, machine, and terminal geometry, then constructs axis-aligned graph nodes and edges.
 
@@ -437,6 +438,46 @@ comparison remains in `benchmarks/cell_grid_results.json`, and the earlier
 sampled-wall-run comparison in `benchmarks/cell_wall_grid_results.json`.
 Neither describes the current wall-axis construction. Hard-length searches
 can still block.
+
+### Hanan + Cell Skeleton
+
+Choose **Grid > Hanan + Cell Skeleton** to merge the full Hanan grid with the
+current cell skeleton, including its Hanan wall-shifted axes. Both inputs remain
+available as separate grid options. The merged mode retains their legal edge
+geometry: crossings and attachments become shared nodes, and overlapping spans
+are split and deduplicated. Cell nodes can also connect to nearby Hanan edges
+through cardinal links within one scaffold spacing (600 mm default). Cell
+coordinates do not add full-dwelling Hanan axes; even isolated cell centres
+remain visible if no legal connection exists.
+
+The cell layer keeps the confirmed **0.04 m²** minimum area and boundary
+resolution. Machine geometry is excluded from both inputs; runtime port and
+shaft constraints are applied once to the merged result. The grid remains
+orthogonal, using normal Manhattan/bend heuristics and fixed bend costs in
+both A* representations. Cli's directed and hard bends/tees/fittings backends
+can use it. Subdividing a straight physical edge does not add a physical bend.
+Press `G` to see the merged candidates and the cell outlines.
+
+A bounded 16-entry cache reuses immutable unions for identical input nodes,
+edges, allowed geometry, walls, wall policy and connection radius. Changing a
+machine pose or terminal geometry changes those keys. Consumers receive their
+own edge list. Initial and changed-pose preparation still performs the union;
+warm timings do not describe every drag update.
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 1 --include-cells --include-hanan-cells --output benchmarks\hannan_cell_grid_results.json
+```
+
+The recorded run has 18 warm requests per grid: two real dwellings, seeded
+synthetic, three poses and both standard A* representations. The merged mode
+routed 18/18, including the six synthetic requests blocked on standalone Cell;
+Hanan also routed 18/18. Warnings remain visible. Merged median/p95 scene times
+were 114.2/531.8 ms, with median 935 nodes; Hanan was 85.5/264.0 ms with 656
+nodes, and Cell 36.9/47.1 ms with 155 nodes including its failures. At 18 samples
+p95 is the slowest request. Preparation of the displayed pose was about 238 ms
+initially and 42 ms on reuse; its warm scene solve was about 111 ms. These
+machine-dependent observations do not establish route-quality superiority or
+uniform interaction latency. The denser graph remains an explicit experiment.
 
 ### Hanan + Voronoi with local links
 

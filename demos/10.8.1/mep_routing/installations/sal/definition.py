@@ -24,6 +24,7 @@ SAL_GRAPH_MODES = (
     "Medial Axis (sampled Voronoi)",
     "Cell Skeleton (orthogonal)",
     "Hanan + Voronoi (local links)",
+    "Hanan + Cell Skeleton",
 )
 
 SAL_STRATEGY_LABELS = (

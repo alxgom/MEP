@@ -17,7 +17,7 @@ from .hannan import build_static_axes
 from .regular import build_regular_grid
 from .runtime import RuntimeGraph, append_shaft_runtime_node, create_runtime_graph, restrict_pin_access_edges
 from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant, build_medial_variant
-from .variants import build_cell_variant, build_hannan_medial_variant
+from .variants import build_cell_variant, build_hannan_medial_variant, build_hannan_cell_variant
 
 
 class GraphMode(IntEnum):
@@ -28,6 +28,7 @@ class GraphMode(IntEnum):
     MEDIAL_AXIS = 4
     CELL_SKELETON = 5
     HANNAN_MEDIAL = 6
+    HANNAN_CELL = 7
 
 
 @dataclass(frozen=True)
@@ -219,7 +220,7 @@ class GraphLifecycle:
                 epsilon_mm=self.epsilon_mm,
                 scaffold_spacing_mm=self.scaffold_spacing_mm,
             )
-        elif mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON):
+        elif mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON, GraphMode.HANNAN_CELL):
             required = list(self.terminals.values()) + access_points
             # Preserve the existing explicit shaft-face entry semantics.
             if self.shaft_extraction is not None:
@@ -236,8 +237,14 @@ class GraphLifecycle:
                 "walls": self.walls, "wall_offset_mm": self.wall_clearance_mm,
                 "max_link_distance_mm": self.scaffold_spacing_mm,
             }
+            if mode is GraphMode.HANNAN_CELL:
+                builder = build_hannan_cell_variant
+                options.update(template=self.hannan_template(shift_walls=shift_hannan_walls),
+                               node_region=self.node_region(), terminals=self.terminals,
+                               shaft_extraction=self.shaft_extraction, machine_access_points=access_points)
             variant = builder(
-                allowed_region=self.node_region(), wall_polys=self.wall_polygons,
+                allowed_region=self.routing_region if mode is GraphMode.HANNAN_CELL else self.node_region(),
+                wall_polys=self.wall_polygons,
                 wall_thickness_mm=self.wall_thickness_mm, required_points=required,
                 machine_polygon=machine_polygon, **options,
             )
@@ -257,7 +264,7 @@ class GraphLifecycle:
         runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle,
                                       euclidean=mode in (GraphMode.MEDIAL_AXIS, GraphMode.HANNAN_MEDIAL),
                                       exact_access=mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON,
-                                                           GraphMode.HANNAN_MEDIAL),
+                                                           GraphMode.HANNAN_MEDIAL, GraphMode.HANNAN_CELL),
                                       cells=variant.diagnostics.get("cells", ()))
         return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0, variant)
 

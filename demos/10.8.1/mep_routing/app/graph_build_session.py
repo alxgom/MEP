@@ -61,7 +61,15 @@ class GraphBuildSession:
         variant = result.variant
         if variant is None or not len(variant.nodes):
             return
-        if mode is GraphMode.HANNAN_MEDIAL:
+        if mode is GraphMode.HANNAN_CELL:
+            info = variant.diagnostics
+            self.report(
+                f"[Hanan + Cell Skeleton] Hanan={info['hannan_nodes']} nodes/{info['hannan_edges']} edges "
+                f"cell={info['cell_nodes']} nodes/{info['cell_edges']} edges "
+                f"local links={info['hybrid_links']} merged={len(variant.nodes)} nodes/{len(variant.edges)} edges "
+                f"in {result.elapsed_ms:.1f}ms (orthogonal; shared junctions; cell floor={info['min_cell_area_mm2']:.0f}mm2)"
+            )
+        elif mode is GraphMode.HANNAN_MEDIAL:
             info = variant.diagnostics
             self.report(
                 f"[Hanan + Voronoi] skeleton nodes={info['skeleton_nodes']} "

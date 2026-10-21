@@ -21,6 +21,7 @@ CLI_GRAPH_LABELS = (
     "Medial Axis (sampled Voronoi)",
     "Cell Skeleton (orthogonal)",
     "Hanan + Voronoi (local links)",
+    "Hanan + Cell Skeleton",
 )
 CLI_STRATEGY_LABELS = ("Multi-terminal Steiner tree",)
 CLI_SEARCH_BACKEND_LABELS = (

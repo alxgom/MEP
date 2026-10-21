@@ -1,9 +1,10 @@
 """Join candidate grids with bounded cardinal links and shared junctions."""
 
 import math
+from functools import lru_cache
 
 import numpy as np
-from shapely import STRtree, linestrings
+from shapely import STRtree, linestrings, from_wkb
 from shapely.geometry import LineString
 
 from mep_routing.geometry.directions import travel_direction
@@ -129,3 +130,25 @@ def join_grids_locally(base_nodes, base_edges, added_nodes, added_edges, allowed
 
 # Retain the original public name for the Hanan/Voronoi experiment.
 join_hanan_voronoi = join_grids_locally
+
+
+@lru_cache(maxsize=16)
+def _cached_join(base_bytes, base_edges, added_bytes, added_edges, region_wkb, walls_wkb, thickness, radius):
+    nodes, edges, info = join_grids_locally(
+        np.frombuffer(base_bytes, dtype=np.float32).reshape((-1, 2)), base_edges,
+        np.frombuffer(added_bytes, dtype=np.float32).reshape((-1, 2)), added_edges,
+        from_wkb(region_wkb), tuple(from_wkb(w) for w in walls_wkb), thickness, max_link_distance_mm=radius,
+    )
+    nodes.setflags(write=False)
+    return nodes, tuple(edges), info["links"], info["linked_nodes"]
+
+
+def cached_join_grids_locally(base_nodes, base_edges, added_nodes, added_edges, allowed_region,
+                              wall_polys=(), wall_thickness_mm=150, *, max_link_distance_mm=600):
+    """Reuse immutable unions; every geometry/topology input is part of the key."""
+    nodes, edges, links, linked_nodes = _cached_join(
+        np.asarray(base_nodes, dtype=np.float32).tobytes(), tuple(base_edges),
+        np.asarray(added_nodes, dtype=np.float32).tobytes(), tuple(added_edges),
+        allowed_region.wkb, tuple(w.wkb for w in wall_polys), wall_thickness_mm, max_link_distance_mm,
+    )
+    return nodes, list(edges), {"links": links, "linked_nodes": linked_nodes}

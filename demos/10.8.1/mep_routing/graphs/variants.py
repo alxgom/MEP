@@ -16,7 +16,7 @@ from .simple import SimpleGraphInputs, build_simple_grid
 from .medial import cached_medial_template, attach_medial_points
 from .runtime import Edge
 from .cells import cached_cell_template, build_cell_skeleton
-from .hybrid import join_hanan_voronoi, join_grids_locally
+from .hybrid import join_hanan_voronoi, join_grids_locally, cached_join_grids_locally
 from .hannan import build_wall_shift_axes
 
 
@@ -187,6 +187,44 @@ def build_hannan_medial_variant(*, template, allowed_region, node_region, wall_p
                    diagnostics={**diagnostics, "skeleton_nodes": len(medial.nodes),
                                 "samples": medial.sample_count, "sample_spacing_mm": sample_spacing_mm,
                                 "max_link_distance_mm": max_link_distance_mm})
+
+
+def build_hannan_cell_variant(*, template, allowed_region, node_region, wall_polys, wall_thickness_mm,
+                              terminals, shaft_extraction, required_points, machine_access_points=(),
+                              machine_polygon=None, boundary_resolution_mm=200, min_cell_area_mm2=40000,
+                              walls=(), wall_offset_mm=100, max_link_distance_mm=600):
+    """Retain both grids' physical edges with shared junctions and local links."""
+    if machine_polygon is not None:
+        allowed_region = allowed_region.difference(machine_polygon)
+        node_region = node_region.difference(machine_polygon)
+    hannan = build_hannan_variant(
+        template=template, allowed_region=allowed_region, node_region=node_region,
+        wall_polys=wall_polys, wall_thickness_mm=wall_thickness_mm, terminals=terminals,
+        shaft_extraction=shaft_extraction, machine_access_points=machine_access_points,
+    )
+    cells = build_cell_variant(
+        allowed_region=node_region, wall_polys=wall_polys, wall_thickness_mm=wall_thickness_mm,
+        required_points=required_points, boundary_resolution_mm=boundary_resolution_mm,
+        min_cell_area_mm2=min_cell_area_mm2, walls=walls, wall_offset_mm=wall_offset_mm,
+        max_link_distance_mm=max_link_distance_mm,
+    )
+    started = perf_counter()
+    nodes, edges, info = cached_join_grids_locally(
+        hannan.nodes, hannan.edges, cells.nodes, cells.edges, allowed_region,
+        wall_polys, wall_thickness_mm, max_link_distance_mm=max_link_distance_mm,
+    )
+    # Keep even isolated cell centres visible when no legal local link exists.
+    present = set(map(tuple, nodes))
+    missing = [p for p in cells.nodes if tuple(p) not in present]
+    if missing:
+        nodes = np.vstack((nodes, np.asarray(missing, dtype=np.float32)))
+    return replace(
+        hannan, nodes=nodes, edges=edges, required_points=cells.required_points,
+        axes_ms=hannan.axes_ms + cells.axes_ms, nodes_ms=hannan.nodes_ms + cells.nodes_ms,
+        edges_ms=hannan.edges_ms + cells.edges_ms + (perf_counter() - started) * 1000,
+        diagnostics={**cells.diagnostics, "hannan_nodes": len(hannan.nodes), "hannan_edges": len(hannan.edges),
+                     "cell_nodes": len(cells.nodes), "cell_edges": len(cells.edges), "hybrid_links": info["links"]},
+    )
 
 
 def build_epsilon_variant(

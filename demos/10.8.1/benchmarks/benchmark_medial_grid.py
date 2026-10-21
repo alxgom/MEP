@@ -14,7 +14,7 @@ from time import perf_counter
 import numpy as np
 
 
-def benchmark(cases=2, repeats=2, *, include_cells=False, include_hybrid=False):
+def benchmark(cases=2, repeats=2, *, include_cells=False, include_hybrid=False, include_hanan_cells=False):
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -26,6 +26,8 @@ def benchmark(cases=2, repeats=2, *, include_cells=False, include_hybrid=False):
         modes += (GraphMode.CELL_SKELETON,)
     if include_hybrid:
         modes += (GraphMode.HANNAN_MEDIAL,)
+    if include_hanan_cells:
+        modes += (GraphMode.HANNAN_CELL,)
     rows = []
     sources = [(0, index) for index in range(min(cases, len(app.REAL_DWELLING_SCENARIOS)))] + [(1, 0)]
     for source, case in sources:
@@ -87,10 +89,12 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path)
     parser.add_argument("--include-cells", action="store_true", help="Also compare the Figure-5-style orthogonal cell skeleton")
     parser.add_argument("--include-hybrid", action="store_true", help="Also compare Hanan plus Voronoi with local links")
+    parser.add_argument("--include-hanan-cells", action="store_true", help="Also compare the merged Hanan and cell grid")
     args = parser.parse_args()
     if args.cases < 1 or args.repeats < 1:
         parser.error("cases and repeats must be positive")
-    result = benchmark(args.cases, args.repeats, include_cells=args.include_cells, include_hybrid=args.include_hybrid)
+    result = benchmark(args.cases, args.repeats, include_cells=args.include_cells, include_hybrid=args.include_hybrid,
+                       include_hanan_cells=args.include_hanan_cells)
     if args.output:
         args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result["summary"], indent=2))
