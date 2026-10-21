@@ -388,18 +388,24 @@ Sloping/curved boundaries additionally stop at
 The console reports excluded partition area, small-cell removals and endpoint
 attachment counts. These limits can remove narrow passages from the cell layer.
 
-The cell skeleton is enriched with local wall-offset grids. Wall segments are
-sampled on both sides using the existing wall-clearance offset (100 mm default)
-and regular-grid spacing (200 mm default). Only portions inside the allowed
-geometry are used. Diagonal walls try short horizontal/vertical L steps rather
-than diagonal edges; each step passes the current geometry/wall checks. Wall
-nodes receive up to four local cardinal connections to nearby cell-skeleton
-edges within one scaffold spacing (600 mm default). Target edges and all
-crossings are split into shared nodes. No wall axis extends across the dwelling.
+The cell skeleton is enriched with the existing **Hanan wall-shifted axes**.
+For each wall segment, its midpoint is offset to both normal sides by the
+wall-clearance distance (100 mm default). The two points contribute rounded
+integer X/Y coordinates, using the same shared generator as Hanan. Coordinates
+merge under the existing 120 mm axis rule; their Cartesian intersections and
+horizontal/vertical edges pass the cell mode's geometry/wall checks. Diagonal
+walls contribute orthogonal axes. This wall layer uses only wall-shifted axes;
+the other Hanan terminal/cover/scaffold axis sources remain part of Hanan mode.
+
+Wall-grid nodes receive up to four local cardinal connections to nearby
+cell-skeleton edges within one scaffold spacing (600 mm default). Target edges
+and all crossings are split into shared nodes. The wall-side sampled runs from
+the earlier experiment have been replaced by this Hanan axis construction.
 
 A required point in an excluded boundary fragment may attach to a nearby cell
 within one boundary resolution if a legal L shape exists. Still-isolated
-required points can attach locally to the combined wall/cell grid. Invalid or
+cell centres and required points can attach locally to the combined wall/cell
+grid. Invalid or
 disconnected points receive no distant fallback. The wall layer can provide
 legal candidate edges in areas excluded from the rectangular partition.
 
@@ -408,25 +414,29 @@ strategy, backend and heuristic controls remain independent; this orthogonal
 grid keeps the normal Manhattan/bend heuristics and fixed bend penalties.
 Cli's directed wall backends can use this grid, although sparse candidate
 locations may block hard-length modes. Geometry/pose/area-floor cell templates
-have a 16-entry cache; wall samples and their local links use the live geometry.
+have a 16-entry cache; the wall-axis layer and local links use the live geometry.
 Exact access-point checks apply without enabling the Voronoi grid's
 Euclidean heuristic override. Coc's choices are unchanged.
 
 Compare all four experimental/baseline grids with:
 
 ```powershell
-..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 1 --include-cells --output benchmarks\cell_wall_grid_results.json
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 1 --include-cells --output benchmarks\cell_hanan_axes_results.json
 ```
 
 The recorded comparison has 18 warm requests per grid over two real dwellings,
-seeded synthetic, three poses and both standard A* representations. All grids
-returned routes for all sampled requests, with physical warnings retained.
-The enriched cell-grid median/p95 scene times were 75.3/903.4 ms, with median
-199 nodes. At 18 samples the p95 is the slowest request. These machine-dependent
+seeded synthetic, three poses and both standard A* representations. The cell
+grid routed all 12 real-dwelling requests; six synthetic shaft requests remained
+blocked. Other grids routed all 18 requests. Physical warnings and failures
+are retained. Cell-grid median/p95 scene times were 36.4/45.5 ms, with median
+155 nodes. These timings include blocked requests and do not show a speed
+advantage. At 18 samples the p95 is the slowest request. These machine-dependent
 timings include graph refresh and routing, exclude preparation/rendering and
 do not establish route-quality or latency superiority. The earlier cell-only
-comparison remains in `benchmarks/cell_grid_results.json`; its synthetic shaft
-failures predate the wall-grid enrichment. Hard-length searches can still block.
+comparison remains in `benchmarks/cell_grid_results.json`, and the earlier
+sampled-wall-run comparison in `benchmarks/cell_wall_grid_results.json`.
+Neither describes the current wall-axis construction. Hard-length searches
+can still block.
 
 ### Hanan + Voronoi with local links
 

@@ -17,7 +17,7 @@ from .medial import cached_medial_template, attach_medial_points
 from .runtime import Edge
 from .cells import cached_cell_template, build_cell_skeleton
 from .hybrid import join_hanan_voronoi, join_grids_locally
-from .wall_grid import build_shifted_wall_grid
+from .hannan import build_wall_shift_axes
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class GraphVariantResult:
 
 def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, required_points,
                        boundary_resolution_mm=200, machine_polygon=None, min_cell_area_mm2=40000,
-                       walls=(), wall_offset_mm=100, wall_sample_spacing_mm=200, max_link_distance_mm=600):
+                       walls=(), wall_offset_mm=100, max_link_distance_mm=600):
     started = perf_counter()
     required_points = list(required_points)
     if machine_polygon is not None:
@@ -47,9 +47,11 @@ def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, require
     decomposition_ms = (perf_counter() - started) * 1000
     nodes, edges, attached = build_cell_skeleton(template, required_points, allowed_region, wall_polys,
                                                 wall_thickness_mm, boundary_resolution_mm=boundary_resolution_mm)
-    wall_nodes, wall_edges = build_shifted_wall_grid(
-        walls, allowed_region, wall_polys, wall_thickness_mm,
-        offset_mm=wall_offset_mm, sample_spacing_mm=wall_sample_spacing_mm,
+    wall_xs, wall_ys = build_wall_shift_axes(walls, wall_offset_mm)
+    wall_axes_x = merge_close_values(wall_xs, threshold=120, priority_values=wall_xs)
+    wall_axes_y = merge_close_values(wall_ys, threshold=120, priority_values=wall_ys)
+    wall_nodes, wall_edges, _wall_timings = build_axis_grid(
+        wall_axes_x, wall_axes_y, allowed_region, allowed_region, wall_polys, wall_thickness_mm,
     )
     link_info = {"links": 0, "linked_nodes": 0}
     endpoint_links = 0
@@ -59,8 +61,11 @@ def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, require
             max_link_distance_mm=max_link_distance_mm,
         )
         connected = {tuple(nodes[i]) for u, v, *_ in edges for i in (u, v)}
-        isolated = [p for p in required_points if tuple(np.asarray(p, dtype=np.float32)) not in connected
-                    and allowed_region.covers(Point(p))]
+        # Join in both directions: an isolated cell centre/required point may
+        # project onto a wall-grid edge even when no wall vertex aligns with it.
+        candidates = set(map(tuple, nodes)) | set(map(tuple, required_points))
+        isolated = sorted(p for p in candidates if tuple(np.asarray(p, dtype=np.float32)) not in connected
+                          and allowed_region.covers(Point(p)))
         if isolated:
             nodes, edges, endpoint_info = join_grids_locally(
                 nodes, edges, np.asarray(isolated), (), allowed_region, wall_polys, wall_thickness_mm,
@@ -69,7 +74,7 @@ def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, require
             endpoint_links = endpoint_info["links"]
         connected = {tuple(nodes[i]) for u, v, *_ in edges for i in (u, v)}
         attached = sum(tuple(np.asarray(p, dtype=np.float32)) in connected for p in set(map(tuple, required_points)))
-    return GraphVariantResult(nodes, edges, [], [], list(required_points), decomposition_ms,
+    return GraphVariantResult(nodes, edges, wall_axes_x, wall_axes_y, list(required_points), decomposition_ms,
                               (perf_counter() - started) * 1000 - decomposition_ms, 0.0,
                               {"cells": template.cells, "portals": len(template.portals), "attached": attached,
                                "excluded_area_mm2": template.excluded_area_mm2,
@@ -78,7 +83,7 @@ def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, require
                                "wall_nodes": len(wall_nodes), "wall_edges": len(wall_edges),
                                "wall_links": link_info["links"],
                                "endpoint_links": endpoint_links,
-                               "wall_offset_mm": wall_offset_mm, "wall_sample_spacing_mm": wall_sample_spacing_mm,
+                               "wall_offset_mm": wall_offset_mm,
                                "boundary_resolution_mm": boundary_resolution_mm})
 
 

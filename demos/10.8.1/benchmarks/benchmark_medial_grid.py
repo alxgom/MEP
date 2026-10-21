@@ -74,7 +74,7 @@ def benchmark(cases=2, repeats=2, *, include_cells=False, include_hybrid=False):
             "cell_boundary_resolution_mm": app.demo_config.cell_boundary_resolution_mm,
             "cell_min_area_mm2": app.demo_config.cell_min_area_mm2,
             "wall_grid_offset_mm": app.demo_config.routing_wall_clearance_mm,
-            "wall_grid_sample_spacing_mm": app.demo_config.grid_spacing_mm,
+            "cell_wall_grid": "hanan_shifted_axes",
             "strategy": app.demo_config.routing_strategies[app.routing_strategy_idx],
             "note": "Warm full Sal scene solves; fixed poses; timings are machine dependent. Failures are retained.",
             "summary": summary, "samples": rows}

@@ -234,7 +234,7 @@ class GraphLifecycle:
                 "boundary_resolution_mm": self.cell_boundary_resolution_mm,
                 "min_cell_area_mm2": self.cell_min_area_mm2,
                 "walls": self.walls, "wall_offset_mm": self.wall_clearance_mm,
-                "wall_sample_spacing_mm": self.grid_spacing_mm, "max_link_distance_mm": self.scaffold_spacing_mm,
+                "max_link_distance_mm": self.scaffold_spacing_mm,
             }
             variant = builder(
                 allowed_region=self.node_region(), wall_polys=self.wall_polygons,

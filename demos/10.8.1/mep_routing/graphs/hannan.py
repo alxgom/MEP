@@ -69,19 +69,11 @@ def build_static_axes(
         add_bounds_axes(xs, ys, wall, clearance=25)
 
     if shift_walls:
-        for wall in walls:
-            coords = list(wall.coords)
-            for index in range(len(coords) - 1):
-                x1, y1 = float(coords[index][0]), float(coords[index][1])
-                x2, y2 = float(coords[index + 1][0]), float(coords[index + 1][1])
-                length = math.hypot(x2 - x1, y2 - y1)
-                if length < 1.0:
-                    continue
-                normal_x, normal_y = -(y2 - y1) / length, (x2 - x1) / length
-                mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
-                for point in ((mid_x + normal_x * wall_clearance_mm, mid_y + normal_y * wall_clearance_mm), (mid_x - normal_x * wall_clearance_mm, mid_y - normal_y * wall_clearance_mm)):
-                    add_point_axes(xs, ys, point)
-                    add_point_axes(priority_x, priority_y, point)
+        wall_xs, wall_ys = build_wall_shift_axes(walls, wall_clearance_mm)
+        xs.update(wall_xs)
+        ys.update(wall_ys)
+        priority_x.update(wall_xs)
+        priority_y.update(wall_ys)
 
     return {
         "xs": xs,
@@ -91,3 +83,22 @@ def build_static_axes(
         "priority_x": priority_x,
         "priority_y": priority_y,
     }
+
+
+def build_wall_shift_axes(walls, wall_clearance_mm):
+    """Hanan X/Y axes from each segment's two normal-offset midpoints."""
+    xs, ys = set(), set()
+    for wall in walls:
+        coords = list(wall.coords)
+        for index in range(len(coords) - 1):
+            x1, y1 = float(coords[index][0]), float(coords[index][1])
+            x2, y2 = float(coords[index + 1][0]), float(coords[index + 1][1])
+            length = math.hypot(x2 - x1, y2 - y1)
+            if length < 1.0:
+                continue
+            normal_x, normal_y = -(y2 - y1) / length, (x2 - x1) / length
+            mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+            for point in ((mid_x + normal_x * wall_clearance_mm, mid_y + normal_y * wall_clearance_mm),
+                          (mid_x - normal_x * wall_clearance_mm, mid_y - normal_y * wall_clearance_mm)):
+                add_point_axes(xs, ys, point)
+    return xs, ys

@@ -100,6 +100,7 @@ class GraphBuildSession:
                 f"[Cell Skeleton] cells={len(info['cells'])} portals={info['portals']} "
                 f"nodes={len(variant.nodes)} edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "
                 f"(attached={info['attached']}/{len(variant.required_points)}, "
+                f"wall axes={len(variant.axes_x)}x{len(variant.axes_y)}, "
                 f"wall nodes={info['wall_nodes']}, wall links={info['wall_links']}, "
                 f"area floor={info['min_cell_area_mm2']:.0f}mm2, small cells removed={info['discarded_small_cells']}, "
                 f"excluded boundary area={info['excluded_area_mm2']:.0f}mm2)"
