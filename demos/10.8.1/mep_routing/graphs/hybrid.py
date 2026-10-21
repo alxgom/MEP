@@ -24,6 +24,50 @@ def _intersection_points(geometry):
             yield from _intersection_points(part)
 
 
+def _orthogonal_intersections(coordinates, base_count):
+    """Exact numeric intersections for nonzero horizontal/vertical segments.
+
+    Visit pairs and overlap endpoints in the same order as the GEOS path so
+    node indices, edge ordering and solver tie-breaking remain unchanged.
+    """
+    lower, upper = coordinates.min(axis=1), coordinates.max(axis=1)
+    horizontal = coordinates[:, 0, 1] == coordinates[:, 1, 1]
+    indices = np.arange(len(coordinates))
+    for first in range(base_count, len(coordinates)):
+        candidates = np.flatnonzero(
+            ((indices < base_count) | (indices > first))
+            & (lower[:, 0] <= upper[first, 0]) & (upper[:, 0] >= lower[first, 0])
+            & (lower[:, 1] <= upper[first, 1]) & (upper[:, 1] >= lower[first, 1])
+        )
+        for second in candidates:
+            if horizontal[first] != horizontal[second]:
+                x = coordinates[second if horizontal[first] else first, 0, 0]
+                y = coordinates[first if horizontal[first] else second, 0, 1]
+                points = ((x, y),)
+            else:
+                axis = 0 if horizontal[first] else 1
+                lo = max(lower[first, axis], lower[second, axis])
+                hi = min(upper[first, axis], upper[second, axis])
+                if coordinates[first, 0, axis] > coordinates[first, 1, axis]:
+                    lo, hi = hi, lo
+                fixed = coordinates[first, 0, 1 - axis]
+                start, end = ((lo, fixed), (hi, fixed)) if axis == 0 else ((fixed, lo), (fixed, hi))
+                points = (start,) if lo == hi else (start, end)
+            yield first, int(second), points
+
+
+def _geometry_intersections(coordinates, base_count):
+    """Retain GEOS intersection semantics for diagonals and degenerate inputs."""
+    segments = linestrings(coordinates)
+    base_tree, added_tree = STRtree(segments[:base_count]), STRtree(segments[base_count:])
+    for first in range(base_count, len(coordinates)):
+        others = list(map(int, base_tree.query(segments[first], predicate="intersects")))
+        others.extend(base_count + int(i) for i in added_tree.query(segments[first], predicate="intersects")
+                      if base_count + int(i) > first)
+        for second in sorted(others):
+            yield first, second, _intersection_points(segments[first].intersection(segments[second]))
+
+
 def join_grids_locally(base_nodes, base_edges, added_nodes, added_edges, allowed_region,
                        wall_polys=(), wall_thickness_mm=150, *, max_link_distance_mm=600):
     """Keep both grids, attaching each added node in up to four directions.
@@ -104,18 +148,16 @@ def join_grids_locally(base_nodes, base_edges, added_nodes, added_edges, allowed
     # base topology already has explicit crossings; it need not be rebuilt.
     if not pairs:
         return np.asarray(points, dtype=np.float32).reshape((-1, 2)), [], {"links": links, "linked_nodes": linked_nodes}
-    segments = linestrings(np.asarray([[points[u], points[v]] for u, v in pairs]))
+    coordinates = np.asarray([[points[u], points[v]] for u, v in pairs])
     splits = [{u, v} for u, v in pairs]
-    base_tree, added_tree = STRtree(segments[:base_count]), STRtree(segments[base_count:])
-    for first in range(base_count, len(pairs)):
-        others = list(map(int, base_tree.query(segments[first], predicate="intersects")))
-        others.extend(base_count + int(i) for i in added_tree.query(segments[first], predicate="intersects")
-                      if base_count + int(i) > first)
-        for second in sorted(others):
-            for point in _intersection_points(segments[first].intersection(segments[second])):
-                junction = index(point)
-                splits[first].add(junction)
-                splits[second].add(junction)
+    delta = coordinates[:, 1] - coordinates[:, 0]
+    orthogonal = np.all(((delta[:, 0] == 0) | (delta[:, 1] == 0)) & np.any(delta != 0, axis=1))
+    intersections = _orthogonal_intersections if orthogonal else _geometry_intersections
+    for first, second, junctions in intersections(coordinates, base_count):
+        for point in junctions:
+            junction = index(point)
+            splits[first].add(junction)
+            splits[second].add(junction)
     result_pairs = set()
     for (u, v), junctions in zip(pairs, splits):
         start, end = np.asarray(points[u]), np.asarray(points[v])

@@ -474,10 +474,42 @@ routed 18/18, including the six synthetic requests blocked on standalone Cell;
 Hanan also routed 18/18. Warnings remain visible. Merged median/p95 scene times
 were 114.2/531.8 ms, with median 935 nodes; Hanan was 85.5/264.0 ms with 656
 nodes, and Cell 36.9/47.1 ms with 155 nodes including its failures. At 18 samples
-p95 is the slowest request. Preparation of the displayed pose was about 238 ms
-initially and 42 ms on reuse; its warm scene solve was about 111 ms. These
+p95 is the slowest request. Before the intersection optimization below,
+preparation of the displayed pose was about 238 ms initially and 42 ms on reuse;
+its warm scene solve was about 111 ms. These
 machine-dependent observations do not establish route-quality superiority or
 uniform interaction latency. The denser graph remains an explicit experiment.
+
+Orthogonal grid unions now use numeric intersections, retaining Shapely/GEOS
+for diagonals, near-cardinal slants and degenerate segments. Pair and junction
+ordering is preserved, including reversed overlaps, so the optimization does
+not change graph nodes, edge records or solver tie-breaking. Numeric bounding
+box checks use linear temporary arrays but still scan segment pairs; very large
+grids can need further indexing or incremental construction.
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_grid_build.py --cases 2 --repeats 3 --output benchmarks\grid_build_results.json
+```
+
+This separate construction benchmark compares the retained GEOS routine with
+the numeric path in alternating order. Two real dwellings and seeded synthetic,
+three poses and three repetitions give 27 samples per implementation per grid.
+Cold measurements clear cell-template and union caches; warm measurements
+immediately rebuild the same pose. Both include runtime assembly and exclude
+routing, rendering, dwelling preparation and static Hanan-axis preparation.
+Every output is checked for identical node arrays, edge records and cell overlays.
+
+| Hanan + Cell construction | GEOS | Numeric |
+| --- | ---: | ---: |
+| Cold median | 229.3 ms | 108.8 ms |
+| Cold p95 | 370.5 ms | 179.4 ms |
+| Cold maximum | 370.9 ms | 185.5 ms |
+| Warm median | 41.9 ms | 37.7 ms |
+
+Standalone Cell's cold median changed from 19.2 to 14.1 ms. Unchanged Hanan
+controls measured 29.6 and 28.8 ms, illustrating run variation. The merged cold
+build is roughly twice as fast in these samples, but construction plus routing
+can still delay a drag update. This is not a fixed latency guarantee.
 
 ### Hanan + Voronoi with local links
 

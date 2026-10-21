@@ -1,0 +1,2659 @@
+{
+  "note": "Grid lifecycle builds including runtime assembly; excludes routing, rendering, dwelling preparation and static Hanan axes. Cold clears cell-template and union caches; warm immediately repeats the same pose. Alternating implementation order. Every output matches exact nodes, edge records and cell overlays. Machine-dependent timings.",
+  "summary": {
+    "HANNAN": {
+      "geos": {
+        "samples": 27,
+        "cold_median_ms": 29.564,
+        "cold_p95_ms": 49.009,
+        "cold_max_ms": 55.182,
+        "warm_median_ms": 28.66,
+        "warm_p95_ms": 48.769,
+        "warm_max_ms": 51.632
+      },
+      "numeric": {
+        "samples": 27,
+        "cold_median_ms": 28.828,
+        "cold_p95_ms": 49.898,
+        "cold_max_ms": 53.95,
+        "warm_median_ms": 28.905,
+        "warm_p95_ms": 47.744,
+        "warm_max_ms": 48.433
+      }
+    },
+    "CELL_SKELETON": {
+      "geos": {
+        "samples": 27,
+        "cold_median_ms": 19.182,
+        "cold_p95_ms": 34.248,
+        "cold_max_ms": 34.299,
+        "warm_median_ms": 15.302,
+        "warm_p95_ms": 28.625,
+        "warm_max_ms": 29.179
+      },
+      "numeric": {
+        "samples": 27,
+        "cold_median_ms": 14.094,
+        "cold_p95_ms": 26.673,
+        "cold_max_ms": 26.779,
+        "warm_median_ms": 10.859,
+        "warm_p95_ms": 19.669,
+        "warm_max_ms": 20.244
+      }
+    },
+    "HANNAN_CELL": {
+      "geos": {
+        "samples": 27,
+        "cold_median_ms": 229.295,
+        "cold_p95_ms": 370.474,
+        "cold_max_ms": 370.926,
+        "warm_median_ms": 41.882,
+        "warm_p95_ms": 75.63,
+        "warm_max_ms": 80.512
+      },
+      "numeric": {
+        "samples": 27,
+        "cold_median_ms": 108.825,
+        "cold_p95_ms": 179.438,
+        "cold_max_ms": 185.462,
+        "warm_median_ms": 37.653,
+        "warm_p95_ms": 69.505,
+        "warm_max_ms": 78.071
+      }
+    }
+  },
+  "samples": [
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 24.888,
+      "warm_ms": 26.487,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 19.182,
+      "warm_ms": 16.155,
+      "nodes": 156,
+      "edges": 201
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 242.553,
+      "warm_ms": 40.968,
+      "nodes": 935,
+      "edges": 1696
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 25.224,
+      "warm_ms": 24.884,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 14.094,
+      "warm_ms": 11.678,
+      "nodes": 156,
+      "edges": 201
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 108.825,
+      "warm_ms": 37.342,
+      "nodes": 935,
+      "edges": 1696
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 27.965,
+      "warm_ms": 27.076,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 14.339,
+      "warm_ms": 10.933,
+      "nodes": 156,
+      "edges": 201
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 110.044,
+      "warm_ms": 44.176,
+      "nodes": 935,
+      "edges": 1696
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 26.2,
+      "warm_ms": 24.859,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 20.526,
+      "warm_ms": 15.163,
+      "nodes": 156,
+      "edges": 201
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 237.004,
+      "warm_ms": 41.756,
+      "nodes": 935,
+      "edges": 1696
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 27.068,
+      "warm_ms": 25.986,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 19.256,
+      "warm_ms": 15.129,
+      "nodes": 156,
+      "edges": 201
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 234.073,
+      "warm_ms": 41.747,
+      "nodes": 935,
+      "edges": 1696
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 24.196,
+      "warm_ms": 26.437,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 13.759,
+      "warm_ms": 10.608,
+      "nodes": 156,
+      "edges": 201
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 108.367,
+      "warm_ms": 37.548,
+      "nodes": 935,
+      "edges": 1696
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 27.095,
+      "warm_ms": 25.008,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 19.382,
+      "warm_ms": 15.793,
+      "nodes": 155,
+      "edges": 199
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 229.295,
+      "warm_ms": 41.558,
+      "nodes": 936,
+      "edges": 1698
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 25.52,
+      "warm_ms": 26.526,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 14.928,
+      "warm_ms": 10.859,
+      "nodes": 155,
+      "edges": 199
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 114.996,
+      "warm_ms": 37.025,
+      "nodes": 936,
+      "edges": 1698
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 26.017,
+      "warm_ms": 25.62,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 13.982,
+      "warm_ms": 10.461,
+      "nodes": 155,
+      "edges": 199
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 112.881,
+      "warm_ms": 39.232,
+      "nodes": 936,
+      "edges": 1698
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 27.091,
+      "warm_ms": 25.689,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 19.317,
+      "warm_ms": 16.761,
+      "nodes": 155,
+      "edges": 199
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 240.896,
+      "warm_ms": 42.013,
+      "nodes": 936,
+      "edges": 1698
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 25.825,
+      "warm_ms": 25.923,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 18.735,
+      "warm_ms": 15.302,
+      "nodes": 155,
+      "edges": 199
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 227.848,
+      "warm_ms": 41.332,
+      "nodes": 936,
+      "edges": 1698
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 25.368,
+      "warm_ms": 26.868,
+      "nodes": 537,
+      "edges": 976
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 15.682,
+      "warm_ms": 10.67,
+      "nodes": 155,
+      "edges": 199
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 119.384,
+      "warm_ms": 37.653,
+      "nodes": 936,
+      "edges": 1698
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 25.201,
+      "warm_ms": 24.194,
+      "nodes": 516,
+      "edges": 934
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 19.008,
+      "warm_ms": 14.503,
+      "nodes": 149,
+      "edges": 183
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 215.43,
+      "warm_ms": 41.449,
+      "nodes": 932,
+      "edges": 1688
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 25.342,
+      "warm_ms": 23.934,
+      "nodes": 516,
+      "edges": 934
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 13.58,
+      "warm_ms": 10.52,
+      "nodes": 149,
+      "edges": 183
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 104.806,
+      "warm_ms": 37.192,
+      "nodes": 932,
+      "edges": 1688
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 24.563,
+      "warm_ms": 24.837,
+      "nodes": 516,
+      "edges": 934
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 14.329,
+      "warm_ms": 11.234,
+      "nodes": 149,
+      "edges": 183
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 104.145,
+      "warm_ms": 36.942,
+      "nodes": 932,
+      "edges": 1688
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 24.751,
+      "warm_ms": 25.342,
+      "nodes": 516,
+      "edges": 934
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 18.563,
+      "warm_ms": 15.859,
+      "nodes": 149,
+      "edges": 183
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 225.221,
+      "warm_ms": 40.988,
+      "nodes": 932,
+      "edges": 1688
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 25.125,
+      "warm_ms": 25.387,
+      "nodes": 516,
+      "edges": 934
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 18.447,
+      "warm_ms": 14.272,
+      "nodes": 149,
+      "edges": 183
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 221.939,
+      "warm_ms": 40.168,
+      "nodes": 932,
+      "edges": 1688
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 26.419,
+      "warm_ms": 25.843,
+      "nodes": 516,
+      "edges": 934
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 13.73,
+      "warm_ms": 11.025,
+      "nodes": 149,
+      "edges": 183
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 104.023,
+      "warm_ms": 37.525,
+      "nodes": 932,
+      "edges": 1688
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 29.095,
+      "warm_ms": 28.816,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 9.39,
+      "warm_ms": 6.757,
+      "nodes": 100,
+      "edges": 136
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 182.368,
+      "warm_ms": 44.625,
+      "nodes": 887,
+      "edges": 1648
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 28.081,
+      "warm_ms": 28.65,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.562,
+      "warm_ms": 5.947,
+      "nodes": 100,
+      "edges": 136
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 88.608,
+      "warm_ms": 35.718,
+      "nodes": 887,
+      "edges": 1648
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 27.725,
+      "warm_ms": 28.52,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.887,
+      "warm_ms": 5.683,
+      "nodes": 100,
+      "edges": 136
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 89.266,
+      "warm_ms": 35.237,
+      "nodes": 887,
+      "edges": 1648
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 29.148,
+      "warm_ms": 28.311,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 9.85,
+      "warm_ms": 6.429,
+      "nodes": 100,
+      "edges": 136
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 177.414,
+      "warm_ms": 35.791,
+      "nodes": 887,
+      "edges": 1648
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 29.616,
+      "warm_ms": 28.655,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 9.488,
+      "warm_ms": 6.33,
+      "nodes": 100,
+      "edges": 136
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 180.685,
+      "warm_ms": 42.684,
+      "nodes": 887,
+      "edges": 1648
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 28.933,
+      "warm_ms": 28.742,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.806,
+      "warm_ms": 5.614,
+      "nodes": 100,
+      "edges": 136
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 88.277,
+      "warm_ms": 37.709,
+      "nodes": 887,
+      "edges": 1648
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 28.976,
+      "warm_ms": 28.52,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.875,
+      "warm_ms": 6.308,
+      "nodes": 101,
+      "edges": 138
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 188.252,
+      "warm_ms": 36.077,
+      "nodes": 885,
+      "edges": 1644
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 28.828,
+      "warm_ms": 29.988,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.966,
+      "warm_ms": 5.716,
+      "nodes": 101,
+      "edges": 138
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 90.713,
+      "warm_ms": 36.808,
+      "nodes": 885,
+      "edges": 1644
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 29.211,
+      "warm_ms": 28.955,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.628,
+      "warm_ms": 5.681,
+      "nodes": 101,
+      "edges": 138
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 89.518,
+      "warm_ms": 43.227,
+      "nodes": 885,
+      "edges": 1644
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 28.855,
+      "warm_ms": 29.549,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 9.299,
+      "warm_ms": 6.284,
+      "nodes": 101,
+      "edges": 138
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 185.909,
+      "warm_ms": 37.112,
+      "nodes": 885,
+      "edges": 1644
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 30.272,
+      "warm_ms": 28.66,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 9.166,
+      "warm_ms": 6.28,
+      "nodes": 101,
+      "edges": 138
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 185.665,
+      "warm_ms": 36.071,
+      "nodes": 885,
+      "edges": 1644
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 28.732,
+      "warm_ms": 29.759,
+      "nodes": 656,
+      "edges": 1217
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.744,
+      "warm_ms": 5.568,
+      "nodes": 101,
+      "edges": 138
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 89.629,
+      "warm_ms": 36.469,
+      "nodes": 885,
+      "edges": 1644
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 29.564,
+      "warm_ms": 29.532,
+      "nodes": 655,
+      "edges": 1216
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.817,
+      "warm_ms": 6.038,
+      "nodes": 87,
+      "edges": 106
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 152.32,
+      "warm_ms": 43.606,
+      "nodes": 883,
+      "edges": 1635
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 29.589,
+      "warm_ms": 29.098,
+      "nodes": 655,
+      "edges": 1216
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 7.988,
+      "warm_ms": 5.192,
+      "nodes": 87,
+      "edges": 106
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 81.793,
+      "warm_ms": 34.532,
+      "nodes": 883,
+      "edges": 1635
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 29.071,
+      "warm_ms": 28.341,
+      "nodes": 655,
+      "edges": 1216
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 7.618,
+      "warm_ms": 5.379,
+      "nodes": 87,
+      "edges": 106
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 80.47,
+      "warm_ms": 37.459,
+      "nodes": 883,
+      "edges": 1635
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 29.793,
+      "warm_ms": 28.281,
+      "nodes": 655,
+      "edges": 1216
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 8.747,
+      "warm_ms": 6.205,
+      "nodes": 87,
+      "edges": 106
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 162.988,
+      "warm_ms": 38.643,
+      "nodes": 883,
+      "edges": 1635
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 29.656,
+      "warm_ms": 29.283,
+      "nodes": 655,
+      "edges": 1216
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 9.128,
+      "warm_ms": 6.357,
+      "nodes": 87,
+      "edges": 106
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 156.293,
+      "warm_ms": 41.882,
+      "nodes": 883,
+      "edges": 1635
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 28.792,
+      "warm_ms": 28.905,
+      "nodes": 655,
+      "edges": 1216
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 7.675,
+      "warm_ms": 5.338,
+      "nodes": 87,
+      "edges": 106
+    },
+    {
+      "source": "real",
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 80.802,
+      "warm_ms": 34.024,
+      "nodes": 883,
+      "edges": 1635
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 47.24,
+      "warm_ms": 47.255,
+      "nodes": 933,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 32.002,
+      "warm_ms": 27.353,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 342.662,
+      "warm_ms": 80.512,
+      "nodes": 1405,
+      "edges": 2562
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 46.44,
+      "warm_ms": 45.239,
+      "nodes": 933,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 24.965,
+      "warm_ms": 19.084,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 176.954,
+      "warm_ms": 68.683,
+      "nodes": 1405,
+      "edges": 2562
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 48.895,
+      "warm_ms": 47.744,
+      "nodes": 933,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 26.673,
+      "warm_ms": 19.669,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 176.804,
+      "warm_ms": 78.071,
+      "nodes": 1405,
+      "edges": 2562
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 49.009,
+      "warm_ms": 48.012,
+      "nodes": 933,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 31.547,
+      "warm_ms": 27.483,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 339.314,
+      "warm_ms": 73.246,
+      "nodes": 1405,
+      "edges": 2562
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 45.44,
+      "warm_ms": 48.612,
+      "nodes": 933,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 34.248,
+      "warm_ms": 27.66,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 347.117,
+      "warm_ms": 73.144,
+      "nodes": 1405,
+      "edges": 2562
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 45.325,
+      "warm_ms": 45.69,
+      "nodes": 933,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 24.069,
+      "warm_ms": 18.274,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 166.375,
+      "warm_ms": 64.072,
+      "nodes": 1405,
+      "edges": 2562
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 45.414,
+      "warm_ms": 45.484,
+      "nodes": 934,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 31.873,
+      "warm_ms": 27.615,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 351.216,
+      "warm_ms": 73.247,
+      "nodes": 1404,
+      "edges": 2559
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 47.366,
+      "warm_ms": 46.056,
+      "nodes": 934,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 26.779,
+      "warm_ms": 20.244,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 170.459,
+      "warm_ms": 65.552,
+      "nodes": 1404,
+      "edges": 2559
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 45.02,
+      "warm_ms": 45.18,
+      "nodes": 934,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 23.046,
+      "warm_ms": 19.135,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 179.084,
+      "warm_ms": 69.505,
+      "nodes": 1404,
+      "edges": 2559
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 46.43,
+      "warm_ms": 45.568,
+      "nodes": 934,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 34.299,
+      "warm_ms": 27.569,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 343.403,
+      "warm_ms": 72.539,
+      "nodes": 1404,
+      "edges": 2559
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 45.276,
+      "warm_ms": 51.632,
+      "nodes": 934,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 31.414,
+      "warm_ms": 27.025,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 344.811,
+      "warm_ms": 73.245,
+      "nodes": 1404,
+      "edges": 2559
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 45.22,
+      "warm_ms": 45.735,
+      "nodes": 934,
+      "edges": 1715
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 23.555,
+      "warm_ms": 18.183,
+      "nodes": 204,
+      "edges": 256
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 168.439,
+      "warm_ms": 66.546,
+      "nodes": 1404,
+      "edges": 2559
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 55.182,
+      "warm_ms": 46.708,
+      "nodes": 970,
+      "edges": 1787
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 32.036,
+      "warm_ms": 27.887,
+      "nodes": 210,
+      "edges": 272
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 0,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 364.694,
+      "warm_ms": 75.313,
+      "nodes": 1434,
+      "edges": 2622
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 49.898,
+      "warm_ms": 48.433,
+      "nodes": 970,
+      "edges": 1787
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 26.053,
+      "warm_ms": 19.542,
+      "nodes": 210,
+      "edges": 272
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 0,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 185.462,
+      "warm_ms": 68.353,
+      "nodes": 1434,
+      "edges": 2622
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 47.11,
+      "warm_ms": 46.842,
+      "nodes": 970,
+      "edges": 1787
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 23.907,
+      "warm_ms": 18.99,
+      "nodes": 210,
+      "edges": 272
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 1,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 176.36,
+      "warm_ms": 66.976,
+      "nodes": 1434,
+      "edges": 2622
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 46.932,
+      "warm_ms": 48.769,
+      "nodes": 970,
+      "edges": 1787
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 33.969,
+      "warm_ms": 29.179,
+      "nodes": 210,
+      "edges": 272
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 1,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 370.474,
+      "warm_ms": 74.016,
+      "nodes": 1434,
+      "edges": 2622
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN",
+      "cold_ms": 46.955,
+      "warm_ms": 46.545,
+      "nodes": 970,
+      "edges": 1787
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 32.306,
+      "warm_ms": 28.625,
+      "nodes": 210,
+      "edges": 272
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 2,
+      "path": "geos",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 370.926,
+      "warm_ms": 75.63,
+      "nodes": 1434,
+      "edges": 2622
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN",
+      "cold_ms": 53.95,
+      "warm_ms": 46.267,
+      "nodes": 970,
+      "edges": 1787
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "CELL_SKELETON",
+      "cold_ms": 24.245,
+      "warm_ms": 19.005,
+      "nodes": 210,
+      "edges": 272
+    },
+    {
+      "source": "synthetic",
+      "case": "synthetic",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "repeat": 2,
+      "path": "numeric",
+      "grid": "HANNAN_CELL",
+      "cold_ms": 179.438,
+      "warm_ms": 67.804,
+      "nodes": 1434,
+      "edges": 2622
+    }
+  ]
+}
