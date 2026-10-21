@@ -135,7 +135,7 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
             not active,
         ))
 
-    grid_edges, grid_nodes = [], []
+    grid_edges, grid_nodes, grid_cells = [], [], []
     if state.show_grid_graph and state.graph_env is not None:
         env = state.graph_env
         grid_edges = [
@@ -143,6 +143,8 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
             for u in env.adj for v, _distance, _direction in env.adj[u] if u < v
         ]
         grid_nodes = [to_screen(*point[:2]) for point in env.nodes]
+        grid_cells = [[to_screen(a, b), to_screen(c, b), to_screen(c, d), to_screen(a, d)]
+                      for a, b, c, d in getattr(env, "cells", ())]
 
     terminal_markers = []
     route_strokes = []
@@ -240,6 +242,7 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         state.selected_route_name, state.terminal_area_start, state.terminal_area_end,
         tuple(machines),
         guides,
+        grid_cells,
     )
 
 

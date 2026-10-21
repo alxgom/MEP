@@ -14,13 +14,16 @@ from time import perf_counter
 import numpy as np
 
 
-def benchmark(cases=2, repeats=2):
+def benchmark(cases=2, repeats=2, *, include_cells=False):
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     with redirect_stdout(io.StringIO()):
         import main as app
     from mep_routing.graphs import GraphMode
+    modes = (GraphMode.REGULAR, GraphMode.HANNAN, GraphMode.MEDIAL_AXIS)
+    if include_cells:
+        modes += (GraphMode.CELL_SKELETON,)
     rows = []
     sources = [(0, index) for index in range(min(cases, len(app.REAL_DWELLING_SCENARIOS)))] + [(1, 0)]
     for source, case in sources:
@@ -34,7 +37,7 @@ def benchmark(cases=2, repeats=2):
         x, y, angle = pose.as_tuple()
         for dx, dy, rotation in ((0, 0, 0), (100, 0, 0), (0, 0, 90)):
             pose.set((x + dx, y + dy), angle + rotation)
-            for mode in (GraphMode.REGULAR, GraphMode.HANNAN, GraphMode.MEDIAL_AXIS):
+            for mode in modes:
                 app.graph_type_idx = int(mode)
                 with redirect_stdout(io.StringIO()):
                     app.routing_controller.build_grid(machine_pins=app.routing_controller.machine_pins(*pose.as_tuple()))
@@ -56,7 +59,7 @@ def benchmark(cases=2, repeats=2):
                             "turns": app.application.count_solution_turns(routes or ()), "status": status,
                         })
     summary = {}
-    for mode in (GraphMode.REGULAR, GraphMode.HANNAN, GraphMode.MEDIAL_AXIS):
+    for mode in modes:
         selected = [row for row in rows if row["grid"] == mode.name]
         times = sorted(row["scene_ms"] for row in selected)
         summary[mode.name] = {
@@ -66,6 +69,7 @@ def benchmark(cases=2, repeats=2):
             "median_nodes": statistics.median(row["nodes"] for row in selected),
         }
     return {"boundary_sample_spacing_mm": app.demo_config.medial_sample_spacing_mm,
+            "cell_boundary_resolution_mm": app.demo_config.cell_boundary_resolution_mm,
             "strategy": app.demo_config.routing_strategies[app.routing_strategy_idx],
             "note": "Warm full Sal scene solves; fixed poses; timings are machine dependent. Failures are retained.",
             "summary": summary, "samples": rows}
@@ -76,10 +80,11 @@ if __name__ == "__main__":
     parser.add_argument("--cases", type=int, default=2)
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--include-cells", action="store_true", help="Also compare the Figure-5-style orthogonal cell skeleton")
     args = parser.parse_args()
     if args.cases < 1 or args.repeats < 1:
         parser.error("cases and repeats must be positive")
-    result = benchmark(args.cases, args.repeats)
+    result = benchmark(args.cases, args.repeats, include_cells=args.include_cells)
     if args.output:
         args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result["summary"], indent=2))

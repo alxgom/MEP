@@ -54,8 +54,8 @@ class MachineRoutingSession:
         targets = {}
         for spec in port_access_specs(self.spec, pins, self.angle):
             distance, index = self.workspace.spatial_index.query(spec["access_point"])
-            if getattr(getattr(self.workspace, "env", None), "euclidean", False) and distance > 1e-3:
-                continue  # Medial MVP requires exact access points; no hidden snap.
+            if getattr(getattr(self.workspace, "env", None), "exact_access", False) and distance > 1e-3:
+                continue  # Skeleton grids require exact access points; no hidden snap.
             target = spec.copy()
             target["node_idx"] = int(index)
             targets.setdefault(spec["pin"], []).append(target)

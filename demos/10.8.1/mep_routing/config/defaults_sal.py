@@ -10,6 +10,12 @@ DWELLING_EXPORT_ROOT = Path.home() / "Documents" / "Dwelling-export"
 
 SALUBRIDAD_PARAMETERS = (
     ConfigParameter(
+        key="DOMAIN.SOLVER.GRAPH.CELL_BOUNDARY_RESOLUTION_MM",
+        default=200, reason="solver", unit="mm",
+        description="Minimum refinement size of mixed boundary cells in the orthogonal cell skeleton.",
+        legacy_names=("CELL_BOUNDARY_RESOLUTION_MM",),
+    ),
+    ConfigParameter(
         key="DOMAIN.SOLVER.GRAPH.MEDIAL_BOUNDARY_SAMPLE_SPACING_MM",
         default=200, reason="solver", unit="mm",
         description="Maximum boundary sample spacing for the approximate medial-axis grid.",

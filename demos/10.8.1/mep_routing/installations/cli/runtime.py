@@ -290,8 +290,8 @@ class CliInteractiveRuntime:
         weighted_adjacency = apply_cli_edge_weights(runtime.adjacency, clearance_weights)
         dwelling.workspace.overlay.values = dict(clearance_weights)
         root_node = int(runtime.spatial_index.query(access["access_point"])[1])
-        if runtime.env.euclidean and math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-3:
-            self._length_failure = "Blocked: machine access outside Medial grid"
+        if runtime.env.exact_access and math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-3:
+            self._length_failure = "Blocked: machine access outside skeleton grid"
             return None
         graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
         selected_connections = tuple(connections)

@@ -19,6 +19,7 @@ CLI_GRAPH_LABELS = (
     "Epsilon Grid (core-like numpy)",
     "Routing-Core Port: Simple Grid",
     "Medial Axis (sampled Voronoi)",
+    "Cell Skeleton (orthogonal)",
 )
 CLI_STRATEGY_LABELS = ("Multi-terminal Steiner tree",)
 CLI_SEARCH_BACKEND_LABELS = (

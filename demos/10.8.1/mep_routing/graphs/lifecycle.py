@@ -17,6 +17,7 @@ from .hannan import build_static_axes
 from .regular import build_regular_grid
 from .runtime import RuntimeGraph, append_shaft_runtime_node, create_runtime_graph, restrict_pin_access_edges
 from .variants import GraphVariantResult, build_epsilon_variant, build_hannan_variant, build_simple_variant, build_medial_variant
+from .variants import build_cell_variant
 
 
 class GraphMode(IntEnum):
@@ -25,6 +26,7 @@ class GraphMode(IntEnum):
     EPSILON = 2
     CORE_SIMPLE = 3
     MEDIAL_AXIS = 4
+    CELL_SKELETON = 5
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,7 @@ class GraphLifecycle:
     simple_input_builder: Callable[..., Any] | None = None
     simple_axis_clearance_mm: float = 100.0
     medial_sample_spacing_mm: float = 200.0
+    cell_boundary_resolution_mm: float = 200.0
     _hannan_templates: dict[bool, Mapping[str, Any]] = field(default_factory=dict, init=False, repr=False)
 
     def node_region(self):
@@ -116,7 +119,7 @@ class GraphLifecycle:
         )
         return create_runtime_graph(nodes, edges)
 
-    def commit_runtime(self, nodes, edges, machine_pins, machine_angle: float, *, euclidean=False) -> RuntimeGraph:
+    def commit_runtime(self, nodes, edges, machine_pins, machine_angle: float, *, euclidean=False, exact_access=False, cells=()) -> RuntimeGraph:
         """Attach shaft/pin constraints and materialize a routing runtime graph."""
         shaft_center = shaft_bounds = None
         if self.shaft_extraction is not None:
@@ -147,6 +150,7 @@ class GraphLifecycle:
             nodes,
             restrict_pin_access_edges(edges, pin_indices, allowed_directions),
             euclidean=euclidean,
+            exact_access=exact_access, cells=cells,
         )
 
     def build_selected(
@@ -204,7 +208,7 @@ class GraphLifecycle:
                 epsilon_mm=self.epsilon_mm,
                 scaffold_spacing_mm=self.scaffold_spacing_mm,
             )
-        elif mode is GraphMode.MEDIAL_AXIS:
+        elif mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON):
             required = list(self.terminals.values()) + access_points
             # Preserve the existing explicit shaft-face entry semantics.
             if self.shaft_extraction is not None:
@@ -214,10 +218,14 @@ class GraphLifecycle:
                                  ((min_x + max_x) / 2, max_y + c), ((min_x + max_x) / 2, min_y - c)))
             corners = [machine_pins.get(name) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
             machine_polygon = Polygon(corners) if all(p is not None for p in corners) else None
-            variant = build_medial_variant(
+            builder = build_medial_variant if mode is GraphMode.MEDIAL_AXIS else build_cell_variant
+            options = {"sample_spacing_mm": self.medial_sample_spacing_mm} if mode is GraphMode.MEDIAL_AXIS else {
+                "boundary_resolution_mm": self.cell_boundary_resolution_mm,
+            }
+            variant = builder(
                 allowed_region=self.node_region(), wall_polys=self.wall_polygons,
                 wall_thickness_mm=self.wall_thickness_mm, required_points=required,
-                sample_spacing_mm=self.medial_sample_spacing_mm, machine_polygon=machine_polygon,
+                machine_polygon=machine_polygon, **options,
             )
         else:
             if self.simple_input_builder is None:
@@ -233,7 +241,9 @@ class GraphLifecycle:
                 axis_clearance_mm=self.simple_axis_clearance_mm,
             ))
         runtime = self.commit_runtime(variant.nodes, variant.edges, machine_pins, machine_angle,
-                                      euclidean=mode is GraphMode.MEDIAL_AXIS)
+                                      euclidean=mode is GraphMode.MEDIAL_AXIS,
+                                      exact_access=mode in (GraphMode.MEDIAL_AXIS, GraphMode.CELL_SKELETON),
+                                      cells=variant.diagnostics.get("cells", ()))
         return GraphBuildResult(runtime, int(mode), (perf_counter() - started) * 1000.0, variant)
 
     def apply_dynamic_obstacle(
@@ -264,5 +274,6 @@ class GraphLifecycle:
             clearance_mm,
             protected_nodes,
             euclidean=runtime.env.euclidean,
+            exact_access=runtime.env.exact_access, cells=runtime.env.cells,
         )
         return DynamicGraphResult(env, blocked_nodes, blocked_edges)

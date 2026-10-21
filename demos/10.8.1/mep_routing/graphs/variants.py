@@ -14,6 +14,7 @@ from .epsilon import build_axes as build_epsilon_axes
 from .simple import SimpleGraphInputs, build_simple_grid
 from .medial import cached_medial_template, attach_medial_points
 from .runtime import Edge
+from .cells import cached_cell_template, build_cell_skeleton
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,22 @@ class GraphVariantResult:
     nodes_ms: float
     edges_ms: float
     diagnostics: dict = field(default_factory=dict)
+
+
+def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, required_points,
+                       boundary_resolution_mm=200, machine_polygon=None):
+    started = perf_counter()
+    if machine_polygon is not None:
+        allowed_region = allowed_region.difference(machine_polygon)
+    template = cached_cell_template(allowed_region.wkb, tuple(w.wkb for w in wall_polys), boundary_resolution_mm)
+    decomposition_ms = (perf_counter() - started) * 1000
+    nodes, edges, attached = build_cell_skeleton(template, required_points, allowed_region, wall_polys,
+                                                wall_thickness_mm, boundary_resolution_mm=boundary_resolution_mm)
+    return GraphVariantResult(nodes, edges, [], [], list(required_points), decomposition_ms,
+                              (perf_counter() - started) * 1000 - decomposition_ms, 0.0,
+                              {"cells": template.cells, "portals": len(template.portals), "attached": attached,
+                               "excluded_area_mm2": template.excluded_area_mm2,
+                               "boundary_resolution_mm": boundary_resolution_mm})
 
 
 def build_medial_variant(*, allowed_region, wall_polys, wall_thickness_mm,

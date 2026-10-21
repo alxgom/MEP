@@ -285,13 +285,14 @@ Preferred terminals keep the same virtual-source abstraction. When a room has on
 
 ## Routing Grids
 
-Demo 10.8.1 exposes five grid modes for Sal and Cli:
+Demo 10.8.1 exposes six grid modes for Sal and Cli:
 
 - Regular 200 mm Grid
 - Hannan Grid (numpy)
 - Epsilon Grid (core-like numpy)
 - Routing-Core Port: Simple Grid
 - Medial Axis (sampled Voronoi)
+- Cell Skeleton (orthogonal)
 
 The Hannan grid follows a simple axis construction inspired by `letsmep-routing-core`: it builds X/Y axes from relevant room, obstacle, machine, and terminal geometry, then constructs axis-aligned graph nodes and edges.
 
@@ -355,6 +356,56 @@ Median node counts were 634/656/98. These are exploratory, machine-dependent
 results including graph refresh and routing, excluding rendering and initial
 dwelling preparation/automatic placement; they do not establish universal
 speed or route-quality superiority.
+
+### Cell-based orthogonal skeleton
+
+Choose **Grid > Cell Skeleton (orthogonal)** for the experiment based on the
+cell-to-skeleton construction in Figure 5(d) of the
+[Blokland et al. survey](https://doi.org/10.1007/s43069-023-00208-5).
+This is a demo adaptation of that principle; the figure does not prescribe
+the particular decomposition and connection rules implemented here.
+The separate sampled-Voronoi option remains available.
+
+The builder partitions the inset free space using boundary coordinates, merges
+adjacent rectangles, and retains internal-wall bounding bands as partition
+features. Cells contain centre nodes; neighboring cells connect through the
+midpoint of their shared boundary interval. Required elbow nodes make every
+candidate edge horizontal or vertical. Corner-only cell contact does not create
+a connection. The final assembly splits all segment crossings and shared spans
+into explicit graph nodes/edges. Terminal, machine-access and shaft-face points
+receive validated local L-shaped attachments, and the machine body is a hole.
+Wall crossings retain the current short transverse-crossing filter.
+
+Rectilinear input has an exact rectangular partition. Sloping/curved boundaries
+use conservative local subdivision; unresolved mixed boundary boxes are excluded
+at `DOMAIN.SOLVER.GRAPH.CELL_BOUNDARY_RESOLUTION_MM` (default 200 mm).
+The console reports excluded free-space area and endpoint attachment counts.
+This can remove narrow passages. A required point in an excluded boundary
+fragment may attach to a nearby cell within one resolution if a legal L shape
+exists; disconnected/invalid points receive no invented connection.
+
+Press `G` to see pale cell outlines plus the centre/portal skeleton. Routing
+strategy, backend and heuristic controls remain independent; this orthogonal
+grid keeps the normal Manhattan/bend heuristics and fixed bend penalties.
+Cli's directed wall backends can use this grid, although sparse candidate
+locations may block hard-length modes. Geometry/pose templates have a 16-entry
+cache. Exact access-point checks apply without enabling the Voronoi grid's
+Euclidean heuristic override. Coc's choices are unchanged.
+
+Compare all four experimental/baseline grids with:
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 2 --include-cells --output benchmarks\cell_grid_results.json
+```
+
+The recorded comparison retains failures: the cell grid routed 24 of 36
+requests (both real dwellings at all sampled poses), and the seeded synthetic
+dwelling's shaft remained disconnected in 12 requests. Other grids routed
+36/36. Cell-grid median/p95 scene times were 72.8/85.0 ms and the median node
+count was 157; timings include those blocked requests and are not evidence of
+a speed advantage. Cell centres and one portal midpoint restrict routing
+choices and can create additional turns, overlap and clearance warnings.
+No Hanan/Voronoi hybrid was added in this step.
 
 ## Validation Warnings
 

@@ -11,3 +11,5 @@ class EnvView:
     nodes: Any
     adj: dict[int, list[tuple[int, float, Any]]]
     euclidean: bool = False
+    exact_access: bool = False
+    cells: tuple = ()

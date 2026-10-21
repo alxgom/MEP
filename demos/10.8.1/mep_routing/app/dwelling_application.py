@@ -19,6 +19,7 @@ class CommonGraphConfig:
     wall_clearance_mm: float
     epsilon_mm: float
     medial_sample_spacing_mm: float = 200.0
+    cell_boundary_resolution_mm: float = 200.0
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,7 @@ def create_active_dwelling(prepared, graph: CommonGraphConfig, profile: Installa
         simple_input_builder=profile.simple_input_builder,
         simple_axis_clearance_mm=profile.simple_axis_clearance_mm,
         medial_sample_spacing_mm=graph.medial_sample_spacing_mm,
+        cell_boundary_resolution_mm=graph.cell_boundary_resolution_mm,
     )
     return ActiveDwellingSession.create(
         prepared, lifecycle,

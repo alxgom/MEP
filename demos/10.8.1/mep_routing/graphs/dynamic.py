@@ -8,7 +8,7 @@ from .env import EnvView
 from mep_routing.geometry.directions import reverse_direction
 
 
-def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polygon, clearance_mm, protected_nodes=(), *, euclidean=False):
+def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polygon, clearance_mm, protected_nodes=(), *, euclidean=False, exact_access=False, cells=()):
     """Filter a static graph against the current machine obstacle and return a graph view."""
     blocked_polygon = machine_polygon.buffer(clearance_mm, join_style=2)
     min_x, min_y, max_x, max_y = blocked_polygon.bounds
@@ -36,7 +36,7 @@ def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polyg
             continue
         line = LineString([(float(nodes[u, 0]), float(nodes[u, 1])), (float(nodes[v, 0]), float(nodes[v, 1]))])
         intersection = line.intersection(blocked_polygon)
-        if not intersection.is_empty and intersection.length > 1.0 and (euclidean or (u not in protected_nodes and v not in protected_nodes)):
+        if not intersection.is_empty and intersection.length > 1.0 and (euclidean or exact_access or (u not in protected_nodes and v not in protected_nodes)):
             blocked_edges.add(int(edge_index))
 
     adjacency = {index: [] for index in range(len(nodes))}
@@ -45,4 +45,4 @@ def filter_dynamic_machine_obstacle(nodes, edge_list, edge_coords, machine_polyg
             continue
         adjacency[u].append((v, length, direction))
         adjacency[v].append((u, length, reverse_direction(direction)))
-    return EnvView(nodes, adjacency, euclidean=euclidean), len(blocked_nodes), len(blocked_edges)
+    return EnvView(nodes, adjacency, euclidean=euclidean, exact_access=exact_access or euclidean, cells=cells), len(blocked_nodes), len(blocked_edges)

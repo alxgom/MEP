@@ -131,6 +131,8 @@ def create_runtime_graph(
     *,
     spatial_index_factory: Callable[[np.ndarray], object] = cKDTree,
     euclidean: bool = False,
+    exact_access: bool = False,
+    cells: tuple = (),
 ) -> RuntimeGraph:
     """Materialize graph runtime data after node/edge construction is complete."""
     runtime_nodes = np.asarray(nodes, dtype=np.float32)
@@ -142,5 +144,5 @@ def create_runtime_graph(
         edge_list=runtime_edges,
         edge_coords=edge_coordinates(runtime_nodes, runtime_edges),
         spatial_index=spatial_index_factory(runtime_nodes),
-        env=EnvView(runtime_nodes, adjacency, euclidean=euclidean),
+        env=EnvView(runtime_nodes, adjacency, euclidean=euclidean, exact_access=exact_access or euclidean, cells=cells),
     )

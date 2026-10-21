@@ -86,3 +86,11 @@ class GraphBuildSession:
                 f"edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "
                 "(Euclidean heuristic; fixed bends; experimental diagonal metrics)"
             )
+        elif mode is GraphMode.CELL_SKELETON:
+            info = variant.diagnostics
+            self.report(
+                f"[Cell Skeleton] cells={len(info['cells'])} portals={info['portals']} "
+                f"nodes={len(variant.nodes)} edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "
+                f"(attached={info['attached']}/{len(variant.required_points)}, "
+                f"excluded boundary area={info['excluded_area_mm2']:.0f}mm2)"
+            )

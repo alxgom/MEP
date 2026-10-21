@@ -55,6 +55,7 @@ class DemoConfig:
     real_dwelling_db: Path
     preferred_shaft_installation: str
     medial_sample_spacing_mm: int = 200
+    cell_boundary_resolution_mm: int = 200
 
     @property
     def common_graph(self) -> CommonGraphConfig:
@@ -65,6 +66,7 @@ class DemoConfig:
             self.routing_wall_clearance_mm,
             self.core_epsilon_grid_mm,
             self.medial_sample_spacing_mm,
+            self.cell_boundary_resolution_mm,
         )
 
     @property
@@ -86,6 +88,7 @@ def build_demo_config(sal_installation, catalog=SALUBRIDAD_DEFAULTS) -> DemoConf
         hannan_scaffold_spacing_mm=default("HANNAN_SCAFFOLD_SPACING"),
         core_epsilon_grid_mm=default("CORE_EPSILON_GRID_MM"),
         medial_sample_spacing_mm=default("MEDIAL_BOUNDARY_SAMPLE_SPACING_MM"),
+        cell_boundary_resolution_mm=default("CELL_BOUNDARY_RESOLUTION_MM"),
         machine_clearance_mm=0,
         duct_buffer_ratio=default("DUCT_BUFFER_RATIO"),
         routing_wall_clearance_mm=default("ROUTING_WALL_CLEARANCE_MM"),

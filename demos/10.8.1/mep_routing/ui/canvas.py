@@ -101,6 +101,7 @@ class CanvasScene:
     terminal_area_end: WorldPoint | None
     machines: Sequence[MachineRender]
     guide_lines: Sequence[GuideLine]
+    grid_cells: Sequence[Sequence[ScreenPoint]] = ()
 
     @property
     def machine(self) -> MachineRender:
@@ -167,6 +168,8 @@ def draw_canvas_scene(
             hooks.draw_polygon_hatch(shaft.source_geometry)
             pygame.draw.polygon(screen, scene.room_wall_color, shaft.points, 1)
 
+    for corners in scene.grid_cells:
+        pygame.draw.polygon(screen, (150, 177, 190), corners, 1)
     for start, end in scene.grid_edges:
         pygame.draw.line(screen, scene.grid_edge_color, start, end, 1)
     for point in scene.grid_nodes:
