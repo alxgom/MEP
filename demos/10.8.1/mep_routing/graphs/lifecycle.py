@@ -72,6 +72,7 @@ class GraphLifecycle:
     simple_axis_clearance_mm: float = 100.0
     medial_sample_spacing_mm: float = 200.0
     cell_boundary_resolution_mm: float = 200.0
+    cell_min_area_mm2: float = 40000.0
     _hannan_templates: dict[bool, Mapping[str, Any]] = field(default_factory=dict, init=False, repr=False)
 
     def node_region(self):
@@ -231,6 +232,9 @@ class GraphLifecycle:
             builder = build_medial_variant if mode is GraphMode.MEDIAL_AXIS else build_cell_variant
             options = {"sample_spacing_mm": self.medial_sample_spacing_mm} if mode is GraphMode.MEDIAL_AXIS else {
                 "boundary_resolution_mm": self.cell_boundary_resolution_mm,
+                "min_cell_area_mm2": self.cell_min_area_mm2,
+                "walls": self.walls, "wall_offset_mm": self.wall_clearance_mm,
+                "wall_sample_spacing_mm": self.grid_spacing_mm, "max_link_distance_mm": self.scaffold_spacing_mm,
             }
             variant = builder(
                 allowed_region=self.node_region(), wall_polys=self.wall_polygons,

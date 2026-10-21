@@ -72,6 +72,9 @@ def benchmark(cases=2, repeats=2, *, include_cells=False, include_hybrid=False):
         }
     return {"boundary_sample_spacing_mm": app.demo_config.medial_sample_spacing_mm,
             "cell_boundary_resolution_mm": app.demo_config.cell_boundary_resolution_mm,
+            "cell_min_area_mm2": app.demo_config.cell_min_area_mm2,
+            "wall_grid_offset_mm": app.demo_config.routing_wall_clearance_mm,
+            "wall_grid_sample_spacing_mm": app.demo_config.grid_spacing_mm,
             "strategy": app.demo_config.routing_strategies[app.routing_strategy_idx],
             "note": "Warm full Sal scene solves; fixed poses; timings are machine dependent. Failures are retained.",
             "summary": summary, "samples": rows}

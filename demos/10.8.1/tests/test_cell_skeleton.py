@@ -54,8 +54,8 @@ def test_rectilinear_decomposition_covers_free_space_without_overlapping_cells()
 
 def test_sloping_boundary_is_conservative_and_refinement_reduces_excluded_area():
     region = Polygon([(0, 0), (5000, 0), (4000, 4000), (0, 4000)])
-    coarse = build_cell_template(region, boundary_resolution_mm=400)
-    fine = build_cell_template(region, boundary_resolution_mm=100)
+    coarse = build_cell_template(region, boundary_resolution_mm=400, min_cell_area_mm2=0)
+    fine = build_cell_template(region, boundary_resolution_mm=100, min_cell_area_mm2=0)
     assert 0 < fine.excluded_area_mm2 < coarse.excluded_area_mm2
     assert all(box(*bounds).covered_by(region) for bounds in fine.cells)
     assert region.area - sum(box(*b).area for b in fine.cells) == pytest.approx(fine.excluded_area_mm2)
@@ -136,3 +136,27 @@ def test_empty_domain_and_resolution_validation():
     assert not build_cell_template(Polygon()).cells
     with pytest.raises(ValueError):
         build_cell_template(box(0, 0, 1000, 1000), boundary_resolution_mm=0)
+
+
+def test_area_floor_limits_diagonal_refinement_and_is_part_of_the_cache_key():
+    region = Polygon([(0, 0), (3000, 0), (1650, 3000), (0, 3000)])
+    original = build_cell_template(region, boundary_resolution_mm=20, min_cell_area_mm2=0)
+    limited = build_cell_template(region, boundary_resolution_mm=20, min_cell_area_mm2=40000)
+    assert len(limited.cells) < len(original.cells)
+    assert limited.excluded_area_mm2 > original.excluded_area_mm2
+    assert all(box(*bounds).area >= 40000 for bounds in limited.cells)
+    assert all(box(*bounds).covered_by(region) for bounds in limited.cells)
+    assert cached_cell_template(region.wkb, (), 20, 0) is not cached_cell_template(region.wkb, (), 20, 40000)
+
+
+def test_area_floor_applies_to_initial_wall_bands_after_legal_merges():
+    region = box(0, 0, 2000, 1000)
+    wall = box(950, 0, 960, 1000)
+    original = build_cell_template(region, [wall], min_cell_area_mm2=0)
+    limited = build_cell_template(region, [wall], min_cell_area_mm2=40000)
+    assert len(original.cells) == 3 and len(limited.cells) == 2
+    assert limited.discarded_small_cells == 1
+    assert limited.excluded_area_mm2 == pytest.approx(10000)
+    assert all(box(*bounds).area >= 40000 for bounds in limited.cells)
+    with pytest.raises(ValueError):
+        build_cell_template(region, min_cell_area_mm2=-1)

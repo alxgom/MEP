@@ -10,6 +10,12 @@ DWELLING_EXPORT_ROOT = Path.home() / "Documents" / "Dwelling-export"
 
 SALUBRIDAD_PARAMETERS = (
     ConfigParameter(
+        key="DOMAIN.SOLVER.GRAPH.CELL_MIN_AREA_MM2",
+        default=40000, reason="solver", unit="mm2",
+        description="Minimum retained cell area; mixed cells stop before a split would create smaller children. Zero disables the area floor.",
+        legacy_names=("CELL_MIN_AREA_MM2",),
+    ),
+    ConfigParameter(
         key="DOMAIN.SOLVER.GRAPH.CELL_BOUNDARY_RESOLUTION_MM",
         default=200, reason="solver", unit="mm",
         description="Minimum refinement size of mixed boundary cells in the orthogonal cell skeleton.",

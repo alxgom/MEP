@@ -377,35 +377,56 @@ into explicit graph nodes/edges. Terminal, machine-access and shaft-face points
 receive validated local L-shaped attachments, and the machine body is a hole.
 Wall crossings retain the current short transverse-crossing filter.
 
-Rectilinear input has an exact rectangular partition. Sloping/curved boundaries
-use conservative local subdivision; unresolved mixed boundary boxes are excluded
-at `DOMAIN.SOLVER.GRAPH.CELL_BOUNDARY_RESOLUTION_MM` (default 200 mm).
-The console reports excluded free-space area and endpoint attachment counts.
-This can remove narrow passages. A required point in an excluded boundary
-fragment may attach to a nearby cell within one resolution if a legal L shape
-exists; disconnected/invalid points receive no invented connection.
+`DOMAIN.SOLVER.GRAPH.CELL_MIN_AREA_MM2` defaults to **40,000 mm² (0.04 m²)**.
+Mixed boundary cells stop before subdivision would create children below this
+area. Fully covered initial rectangles can still merge; any remaining cell
+below the area floor is excluded after merging. This also limits tiny cells
+created by closely spaced wall-bound coordinates before recursion. Zero disables
+the area floor, allowing exact rectangular coverage for rectilinear input.
+Sloping/curved boundaries additionally stop at
+`DOMAIN.SOLVER.GRAPH.CELL_BOUNDARY_RESOLUTION_MM` (default 200 mm).
+The console reports excluded partition area, small-cell removals and endpoint
+attachment counts. These limits can remove narrow passages from the cell layer.
+
+The cell skeleton is enriched with local wall-offset grids. Wall segments are
+sampled on both sides using the existing wall-clearance offset (100 mm default)
+and regular-grid spacing (200 mm default). Only portions inside the allowed
+geometry are used. Diagonal walls try short horizontal/vertical L steps rather
+than diagonal edges; each step passes the current geometry/wall checks. Wall
+nodes receive up to four local cardinal connections to nearby cell-skeleton
+edges within one scaffold spacing (600 mm default). Target edges and all
+crossings are split into shared nodes. No wall axis extends across the dwelling.
+
+A required point in an excluded boundary fragment may attach to a nearby cell
+within one boundary resolution if a legal L shape exists. Still-isolated
+required points can attach locally to the combined wall/cell grid. Invalid or
+disconnected points receive no distant fallback. The wall layer can provide
+legal candidate edges in areas excluded from the rectangular partition.
 
 Press `G` to see pale cell outlines plus the centre/portal skeleton. Routing
 strategy, backend and heuristic controls remain independent; this orthogonal
 grid keeps the normal Manhattan/bend heuristics and fixed bend penalties.
 Cli's directed wall backends can use this grid, although sparse candidate
-locations may block hard-length modes. Geometry/pose templates have a 16-entry
-cache. Exact access-point checks apply without enabling the Voronoi grid's
+locations may block hard-length modes. Geometry/pose/area-floor cell templates
+have a 16-entry cache; wall samples and their local links use the live geometry.
+Exact access-point checks apply without enabling the Voronoi grid's
 Euclidean heuristic override. Coc's choices are unchanged.
 
 Compare all four experimental/baseline grids with:
 
 ```powershell
-..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 2 --include-cells --output benchmarks\cell_grid_results.json
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 1 --include-cells --output benchmarks\cell_wall_grid_results.json
 ```
 
-The recorded comparison retains failures: the cell grid routed 24 of 36
-requests (both real dwellings at all sampled poses), and the seeded synthetic
-dwelling's shaft remained disconnected in 12 requests. Other grids routed
-36/36. Cell-grid median/p95 scene times were 72.8/85.0 ms and the median node
-count was 157; timings include those blocked requests and are not evidence of
-a speed advantage. Cell centres and one portal midpoint restrict routing
-choices and can create additional turns, overlap and clearance warnings.
+The recorded comparison has 18 warm requests per grid over two real dwellings,
+seeded synthetic, three poses and both standard A* representations. All grids
+returned routes for all sampled requests, with physical warnings retained.
+The enriched cell-grid median/p95 scene times were 75.3/903.4 ms, with median
+199 nodes. At 18 samples the p95 is the slowest request. These machine-dependent
+timings include graph refresh and routing, exclude preparation/rendering and
+do not establish route-quality or latency superiority. The earlier cell-only
+comparison remains in `benchmarks/cell_grid_results.json`; its synthetic shaft
+failures predate the wall-grid enrichment. Hard-length searches can still block.
 
 ### Hanan + Voronoi with local links
 

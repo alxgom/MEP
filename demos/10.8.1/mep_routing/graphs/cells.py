@@ -1,8 +1,8 @@
 """Figure-5-style rectangular cells and an orthogonal centre/portal grid.
 
-Cells partition the inset free space exactly for rectilinear polygons. Mixed
-boundary boxes are subdivided conservatively for sloping/curved boundaries;
-unresolved boundary fragments are excluded at the configured resolution.
+Rectilinear polygons partition exactly when the minimum-area floor is disabled.
+Mixed boundary boxes are subdivided conservatively for sloping/curved boundaries;
+unresolved fragments and cells below the configured area floor are excluded.
 This builder selects candidate geometry only, never a route.
 """
 
@@ -13,10 +13,10 @@ import math
 
 import numpy as np
 import shapely
-from shapely.geometry import LineString, Point
+from shapely.geometry import Point
 
 from mep_routing.geometry.polygons import iter_polygons
-from .axis_grid import _edge_allowed
+from .orthogonal import OrthogonalGrid
 
 
 @dataclass(frozen=True)
@@ -24,6 +24,7 @@ class CellTemplate:
     cells: tuple
     portals: tuple
     excluded_area_mm2: float
+    discarded_small_cells: int = 0
 
 
 def _merge_rectangles(rectangles, wall_bounds):
@@ -82,9 +83,11 @@ def _portals(cells):
     return tuple(result)
 
 
-def build_cell_template(allowed_region, wall_polys=(), *, boundary_resolution_mm=200):
+def build_cell_template(allowed_region, wall_polys=(), *, boundary_resolution_mm=200, min_cell_area_mm2=40000):
     if not math.isfinite(boundary_resolution_mm) or boundary_resolution_mm <= 0:
         raise ValueError("cell boundary resolution must be finite and positive")
+    if not math.isfinite(min_cell_area_mm2) or min_cell_area_mm2 < 0:
+        raise ValueError("minimum cell area must be finite and nonnegative")
     if allowed_region is None or allowed_region.is_empty:
         return CellTemplate((), (), 0.0)
     xs, ys = set(), set()
@@ -112,75 +115,35 @@ def build_cell_template(allowed_region, wall_polys=(), *, boundary_resolution_mm
         partial = candidates[~covered & shapely.intersects(shapes, allowed_region)]
         following = []
         for a, b, c, d in partial:
-            if max(c - a, d - b) <= boundary_resolution_mm:
+            if max(c - a, d - b) <= boundary_resolution_mm or (c - a) * (d - b) < 2 * min_cell_area_mm2:
                 continue
             if c - a >= d - b:
                 mid = round((a + c) / 2, 6)
+                if not a < mid < c:
+                    continue
                 following.extend(((a, b, mid, d), (mid, b, c, d)))
             else:
                 mid = round((b + d) / 2, 6)
+                if not b < mid < d:
+                    continue
                 following.extend(((a, b, c, mid), (a, mid, c, d)))
         candidates = np.asarray(following).reshape((-1, 4))
-    cells = _merge_rectangles(rectangles, wall_bounds)
+    merged = _merge_rectangles(rectangles, wall_bounds)
+    cells = tuple(bounds for bounds in merged
+                  if (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) >= min_cell_area_mm2)
     area = sum((c - a) * (d - b) for a, b, c, d in cells)
-    return CellTemplate(cells, _portals(cells), max(0.0, float(allowed_region.area) - area))
+    return CellTemplate(cells, _portals(cells), max(0.0, float(allowed_region.area) - area), len(merged) - len(cells))
 
 
 @lru_cache(maxsize=16)
-def cached_cell_template(region_wkb, walls_wkb, boundary_resolution_mm):
+def cached_cell_template(region_wkb, walls_wkb, boundary_resolution_mm, min_cell_area_mm2=40000):
     return build_cell_template(shapely.from_wkb(region_wkb), tuple(shapely.from_wkb(w) for w in walls_wkb),
-                               boundary_resolution_mm=boundary_resolution_mm)
-
-
-class _OrthogonalGrid:
-    """Validate candidate paths, then split all crossings and overlapping spans."""
-
-    def __init__(self, allowed, walls, wall_thickness):
-        self.allowed, self.walls, self.thickness = allowed, walls, wall_thickness
-        self.wall_bounds = [w.bounds for w in walls]
-        self.points, self.segments = set(), set()
-
-    def add_path(self, path):
-        segments = [(tuple(a), tuple(b)) for a, b in zip(path, path[1:]) if a != b]
-        if not all(_edge_allowed(LineString((a, b)), self.allowed, self.walls, self.wall_bounds, self.thickness)
-                   for a, b in segments):
-            return False
-        self.points.update(map(tuple, path))
-        self.segments.update(tuple(sorted((a, b))) for a, b in segments)
-        return True
-
-    def finish(self):
-        horizontal, vertical = defaultdict(list), defaultdict(list)
-        for (x0, y0), (x1, y1) in self.segments:
-            if abs(y1 - y0) < 1e-5:
-                horizontal[y0].append((min(x0, x1), max(x0, x1)))
-            else:
-                vertical[x0].append((min(y0, y1), max(y0, y1)))
-        for y, intervals in horizontal.items():
-            for x, spans in vertical.items():
-                if any(lo <= x <= hi for lo, hi in intervals) and any(lo <= y <= hi for lo, hi in spans):
-                    self.points.add((x, y))
-        points = sorted(self.points)
-        indices = {p: i for i, p in enumerate(points)}
-        by_x, by_y = defaultdict(set), defaultdict(set)
-        for x, y in points:
-            by_x[x].add(y)
-            by_y[y].add(x)
-        edges = []
-        for is_vertical, lines, points_by_line in ((False, horizontal, by_y), (True, vertical, by_x)):
-            for fixed, intervals in sorted(lines.items()):
-                values = sorted(points_by_line[fixed])
-                for a, b in zip(values, values[1:]):
-                    if b - a < 1e-5 or not any(lo <= (a + b) / 2 <= hi for lo, hi in intervals):
-                        continue
-                    start, end = ((fixed, a), (fixed, b)) if is_vertical else ((a, fixed), (b, fixed))
-                    edges.append((indices[start], indices[end], b - a, "N" if is_vertical else "E"))
-        return np.asarray(points, dtype=np.float32).reshape((-1, 2)), edges
+                               boundary_resolution_mm=boundary_resolution_mm, min_cell_area_mm2=min_cell_area_mm2)
 
 
 def build_cell_skeleton(template, required_points, allowed_region, wall_polys=(), wall_thickness_mm=150,
                         *, boundary_resolution_mm=200):
-    graph = _OrthogonalGrid(allowed_region, wall_polys, wall_thickness_mm)
+    graph = OrthogonalGrid(allowed_region, wall_polys, wall_thickness_mm)
     bounds = np.asarray(template.cells).reshape((-1, 4))
     centres = ((bounds[:, :2] + bounds[:, 2:]) / 2).tolist()
     for point in centres:

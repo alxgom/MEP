@@ -1,4 +1,4 @@
-"""Join Hanan and Voronoi grids with bounded local links and shared junctions."""
+"""Join candidate grids with bounded cardinal links and shared junctions."""
 
 import math
 
@@ -23,11 +23,11 @@ def _intersection_points(geometry):
             yield from _intersection_points(part)
 
 
-def join_hanan_voronoi(base_nodes, base_edges, medial_nodes, medial_edges, allowed_region,
+def join_grids_locally(base_nodes, base_edges, added_nodes, added_edges, allowed_region,
                        wall_polys=(), wall_thickness_mm=150, *, max_link_distance_mm=600):
-    """Keep both grids, attaching each Voronoi node in up to four directions.
+    """Keep both grids, attaching each added node in up to four directions.
 
-    The first legal Hanan-edge projection in each cardinal direction is used
+    The first legal base-edge projection in each cardinal direction is used
     within the radius. Existing crossings also become shared nodes. No axis is
     extended beyond the local connector. Both input grids remain unchanged.
     """
@@ -55,18 +55,31 @@ def join_hanan_voronoi(base_nodes, base_edges, medial_nodes, medial_edges, allow
         pairs.append((index(a), index(b)))
         return True
 
-    for u, v, *_ in medial_edges:
-        add_segment(medial_nodes[u], medial_nodes[v])
+    for u, v, *_ in added_edges:
+        add_segment(added_nodes[u], added_nodes[v])
 
-    # Numeric projections to the original Hanan edges avoid global axis growth.
+    # Numeric projections to the original base edges avoid global axis growth.
     starts = np.asarray([base_nodes[u] for u, v, *_ in base_edges]).reshape((-1, 2))
     ends = np.asarray([base_nodes[v] for u, v, *_ in base_edges]).reshape((-1, 2))
     vertical = np.abs(starts[:, 0] - ends[:, 0]) < 1e-4
     horizontal = np.abs(starts[:, 1] - ends[:, 1]) < 1e-4
     lower, upper = np.minimum(starts, ends), np.maximum(starts, ends)
+    incident = {i for u, v, *_ in base_edges for i in (u, v)}
+    isolated = [base_nodes[i] for i in range(len(base_nodes)) if i not in incident]
     links, linked_nodes = 0, 0
-    for point in medial_nodes:
+    for point in added_nodes:
         candidates = {direction: [] for direction in ("E", "W", "N", "S")}
+        # A cell may have a centre node before it has any portal edge. It can
+        # still receive a local cardinal link; do not fabricate a diagonal.
+        for target in isolated:
+            dx, dy = float(target[0] - point[0]), float(target[1] - point[1])
+            distance = math.hypot(dx, dy)
+            if not 1e-4 < distance <= max_link_distance_mm:
+                continue
+            if abs(dy) < 1e-4:
+                candidates["E" if dx > 0 else "W"].append((distance, tuple(map(float, target))))
+            elif abs(dx) < 1e-4:
+                candidates["N" if dy > 0 else "S"].append((distance, tuple(map(float, target))))
         for edge_index in np.flatnonzero(vertical & (lower[:, 1] <= point[1]) & (point[1] <= upper[:, 1])):
             target = (float(starts[edge_index, 0]), float(point[1]))
             distance = abs(target[0] - point[0])
@@ -87,7 +100,7 @@ def join_hanan_voronoi(base_nodes, base_edges, medial_nodes, medial_edges, allow
         linked_nodes += attached
 
     # Query only added segments against the base and each other. The original
-    # Hanan topology already has explicit crossings; it need not be rebuilt.
+    # base topology already has explicit crossings; it need not be rebuilt.
     if not pairs:
         return np.asarray(points, dtype=np.float32).reshape((-1, 2)), [], {"links": links, "linked_nodes": linked_nodes}
     segments = linestrings(np.asarray([[points[u], points[v]] for u, v in pairs]))
@@ -112,3 +125,7 @@ def join_hanan_voronoi(base_nodes, base_edges, medial_nodes, medial_edges, allow
     edges = [(u, v, math.dist(nodes[u], nodes[v]), travel_direction(nodes[u], nodes[v]))
              for u, v in sorted(result_pairs) if math.dist(nodes[u], nodes[v]) > 1e-4]
     return nodes, edges, {"links": links, "linked_nodes": linked_nodes}
+
+
+# Retain the original public name for the Hanan/Voronoi experiment.
+join_hanan_voronoi = join_grids_locally
