@@ -105,7 +105,7 @@ def test_all_crossings_and_t_junctions_are_explicit_nodes_without_overlapping_ed
 
 def test_machine_body_is_a_hole_and_cached_cells_do_not_change_with_attachments():
     region, body = box(0, 0, 6000, 5000), box(2500, 3000, 3500, 4000)
-    template = cached_cell_template(region.difference(body).wkb, (), 200)
+    template = cached_cell_template(region.wkb, (), 200)
     before = template.cells
     result = build_cell_variant(allowed_region=region, wall_polys=(), wall_thickness_mm=150,
                                 required_points=[(3000, 4500), (3000, 1000)], machine_polygon=body)
@@ -113,7 +113,7 @@ def test_machine_body_is_a_hole_and_cached_cells_do_not_change_with_attachments(
     a, b = [int(runtime.spatial_index.query(p)[1]) for p in [(3000, 4500), (3000, 1000)]]
     assert b in reachable(runtime.adjacency, a)
     assert template.cells == before
-    assert template is cached_cell_template(region.difference(body).wkb, (), 200)
+    assert template is cached_cell_template(region.wkb, (), 200)
     assert all(LineString((result.nodes[u], result.nodes[v])).intersection(body).length < 1e-5
                for u, v, _length, _direction in result.edges)
 

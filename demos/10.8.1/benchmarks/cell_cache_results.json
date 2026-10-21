@@ -1,0 +1,3314 @@
+{
+  "reference_ref": "914d637",
+  "note": "Moving-pose grid lifecycle builds, runtime included, routing/rendering/dwelling preparation excluded. Prime an initial pose then retain caches across three different poses. Alternating implementation order; caches reset between grids/paths/repeats. Local partition geometry intentionally differs from global machine-hole decomposition; Hanan is an unchanged control. For Hanan/merged, partition_ms includes Hanan axis preparation. Machine-dependent timings.",
+  "summary": {
+    "HANNAN": {
+      "reference": {
+        "samples": 27,
+        "median_ms": 30.226,
+        "p95_ms": 49.134,
+        "max_ms": 51.496,
+        "median_partition_ms": 0.085,
+        "template_hits": 0,
+        "template_misses": 0,
+        "median_nodes": 656
+      },
+      "local_cache": {
+        "samples": 27,
+        "median_ms": 29.852,
+        "p95_ms": 48.257,
+        "max_ms": 48.805,
+        "median_partition_ms": 0.086,
+        "template_hits": 0,
+        "template_misses": 0,
+        "median_nodes": 656
+      }
+    },
+    "CELL_SKELETON": {
+      "reference": {
+        "samples": 27,
+        "median_ms": 14.14,
+        "p95_ms": 24.468,
+        "max_ms": 25.192,
+        "median_partition_ms": 3.461,
+        "template_hits": 0,
+        "template_misses": 27,
+        "median_nodes": 155
+      },
+      "local_cache": {
+        "samples": 27,
+        "median_ms": 11.685,
+        "p95_ms": 20.51,
+        "max_ms": 20.731,
+        "median_partition_ms": 0.979,
+        "template_hits": 27,
+        "template_misses": 0,
+        "median_nodes": 155
+      }
+    },
+    "HANNAN_CELL": {
+      "reference": {
+        "samples": 27,
+        "median_ms": 107.901,
+        "p95_ms": 179.859,
+        "max_ms": 192.078,
+        "median_partition_ms": 3.695,
+        "template_hits": 0,
+        "template_misses": 27,
+        "median_nodes": 936
+      },
+      "local_cache": {
+        "samples": 27,
+        "median_ms": 104.922,
+        "p95_ms": 176.02,
+        "max_ms": 179.393,
+        "median_partition_ms": 1.138,
+        "template_hits": 27,
+        "template_misses": 0,
+        "median_nodes": 938
+      }
+    }
+  },
+  "samples": [
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 24.176,
+      "partition_ms": 0.081,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 25.672,
+      "partition_ms": 0.077,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 23.723,
+      "partition_ms": 0.076,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 516
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 14.739,
+      "partition_ms": 3.461,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 13.632,
+      "partition_ms": 3.29,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 12.804,
+      "partition_ms": 3.249,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 149
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 107.187,
+      "partition_ms": 3.472,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 936
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 108.023,
+      "partition_ms": 3.544,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 937
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 102.239,
+      "partition_ms": 3.527,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 932
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 25.168,
+      "partition_ms": 0.079,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 25.332,
+      "partition_ms": 0.083,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 24.324,
+      "partition_ms": 0.077,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 516
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 12.383,
+      "partition_ms": 0.979,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 12.181,
+      "partition_ms": 1.024,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 11.863,
+      "partition_ms": 0.966,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 149
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 105.396,
+      "partition_ms": 1.06,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 938
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 104.009,
+      "partition_ms": 1.21,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 939
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 98.855,
+      "partition_ms": 1.093,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 931
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 25.464,
+      "partition_ms": 0.075,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 25.732,
+      "partition_ms": 0.074,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 25.199,
+      "partition_ms": 0.079,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 516
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 11.811,
+      "partition_ms": 0.989,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 11.685,
+      "partition_ms": 0.935,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 11.265,
+      "partition_ms": 0.971,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 149
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 108.157,
+      "partition_ms": 1.203,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 938
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 107.69,
+      "partition_ms": 1.128,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 939
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 99.904,
+      "partition_ms": 1.12,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 931
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 26.756,
+      "partition_ms": 0.077,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 26.065,
+      "partition_ms": 0.097,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 24.849,
+      "partition_ms": 0.077,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 516
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 14.647,
+      "partition_ms": 3.582,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 15.028,
+      "partition_ms": 3.516,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 13.678,
+      "partition_ms": 3.624,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 149
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 107.56,
+      "partition_ms": 3.656,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 936
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 107.901,
+      "partition_ms": 3.742,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 937
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 103.484,
+      "partition_ms": 4.148,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 932
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 25.842,
+      "partition_ms": 0.079,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 27.024,
+      "partition_ms": 0.071,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 23.229,
+      "partition_ms": 0.075,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 516
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 14.745,
+      "partition_ms": 3.876,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 14.14,
+      "partition_ms": 3.286,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 13.56,
+      "partition_ms": 3.28,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 149
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 108.34,
+      "partition_ms": 3.695,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 936
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 107.937,
+      "partition_ms": 3.933,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 937
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 114.836,
+      "partition_ms": 4.416,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 23,
+      "nodes": 932
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 27.928,
+      "partition_ms": 0.078,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 26.263,
+      "partition_ms": 0.083,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 537
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 25.095,
+      "partition_ms": 0.086,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 516
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 11.583,
+      "partition_ms": 1.043,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 11.637,
+      "partition_ms": 1.058,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 155
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 10.748,
+      "partition_ms": 0.907,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 149
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3106,
+        5801,
+        90
+      ],
+      "build_ms": 104.922,
+      "partition_ms": 1.138,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 938
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3206,
+        5801,
+        90
+      ],
+      "build_ms": 109.66,
+      "partition_ms": 1.127,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 939
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P01_V01",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        3006,
+        5801,
+        180
+      ],
+      "build_ms": 103.223,
+      "partition_ms": 1.055,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 20,
+      "rebuilt_cells": 1,
+      "cells": 23,
+      "nodes": 931
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 29.665,
+      "partition_ms": 0.089,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 656
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 30.306,
+      "partition_ms": 0.103,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 680
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 29.372,
+      "partition_ms": 0.081,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 655
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 9.408,
+      "partition_ms": 3.007,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 8.358,
+      "partition_ms": 2.69,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 8.433,
+      "partition_ms": 2.905,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 87
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 99.03,
+      "partition_ms": 2.862,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 885
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 92.645,
+      "partition_ms": 2.762,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 916
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 81.715,
+      "partition_ms": 2.919,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 883
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 30.112,
+      "partition_ms": 0.082,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 656
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 29.891,
+      "partition_ms": 0.086,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 680
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 30.071,
+      "partition_ms": 0.092,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 655
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 6.875,
+      "partition_ms": 0.76,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 6.323,
+      "partition_ms": 0.799,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 6.053,
+      "partition_ms": 0.891,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 87
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 88.887,
+      "partition_ms": 0.988,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 885
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 90.311,
+      "partition_ms": 1.043,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 916
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 80.6,
+      "partition_ms": 0.968,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 883
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 29.329,
+      "partition_ms": 0.102,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 656
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 29.898,
+      "partition_ms": 0.09,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 680
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 29.8,
+      "partition_ms": 0.081,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 655
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 7.172,
+      "partition_ms": 0.812,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 6.442,
+      "partition_ms": 0.921,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 5.632,
+      "partition_ms": 0.768,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 87
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 96.899,
+      "partition_ms": 1.076,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 885
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 92.956,
+      "partition_ms": 1.153,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 916
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 82.71,
+      "partition_ms": 0.95,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 883
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 29.502,
+      "partition_ms": 0.286,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 656
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 30.686,
+      "partition_ms": 0.084,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 680
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 33.222,
+      "partition_ms": 0.084,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 655
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 8.913,
+      "partition_ms": 2.567,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 8.006,
+      "partition_ms": 2.585,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 8.226,
+      "partition_ms": 2.502,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 87
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 90.123,
+      "partition_ms": 2.641,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 885
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 92.343,
+      "partition_ms": 2.612,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 916
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 87.299,
+      "partition_ms": 2.942,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 883
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 30.061,
+      "partition_ms": 0.08,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 656
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 32.791,
+      "partition_ms": 0.082,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 680
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 30.226,
+      "partition_ms": 0.09,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 655
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 8.754,
+      "partition_ms": 2.479,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 8.721,
+      "partition_ms": 2.781,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 8.394,
+      "partition_ms": 2.489,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 87
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 89.886,
+      "partition_ms": 2.679,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 885
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 99.526,
+      "partition_ms": 2.706,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 916
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 82.25,
+      "partition_ms": 3.121,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 14,
+      "nodes": 883
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 28.734,
+      "partition_ms": 0.082,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 656
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 29.852,
+      "partition_ms": 0.08,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 680
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 28.67,
+      "partition_ms": 0.085,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 655
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 6.539,
+      "partition_ms": 0.754,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 7.699,
+      "partition_ms": 0.788,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 101
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 5.733,
+      "partition_ms": 0.894,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 87
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8915,
+        7767,
+        90
+      ],
+      "build_ms": 85.916,
+      "partition_ms": 0.931,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 885
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        9015,
+        7767,
+        90
+      ],
+      "build_ms": 88.182,
+      "partition_ms": 1.227,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 916
+    },
+    {
+      "case": "0001_real_2b2 / 01_01_P04_V06",
+      "source": "real",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8815,
+        7767,
+        180
+      ],
+      "build_ms": 80.727,
+      "partition_ms": 1.057,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 11,
+      "rebuilt_cells": 1,
+      "cells": 14,
+      "nodes": 883
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 44.394,
+      "partition_ms": 0.094,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 934
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 47.07,
+      "partition_ms": 0.097,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 954
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 47.299,
+      "partition_ms": 0.085,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 970
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 24.468,
+      "partition_ms": 4.804,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 23.867,
+      "partition_ms": 5.007,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 23.884,
+      "partition_ms": 4.513,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 210
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 175.754,
+      "partition_ms": 5.387,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1404
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 167.455,
+      "partition_ms": 4.543,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1422
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 192.078,
+      "partition_ms": 5.159,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1434
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 46.041,
+      "partition_ms": 0.095,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 934
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 48.805,
+      "partition_ms": 0.088,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 954
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 48.257,
+      "partition_ms": 0.1,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 970
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 20.111,
+      "partition_ms": 1.272,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 19.285,
+      "partition_ms": 1.189,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 20.731,
+      "partition_ms": 1.312,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 210
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 172.274,
+      "partition_ms": 1.409,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1404
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 164.758,
+      "partition_ms": 1.407,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1422
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 0,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 171.567,
+      "partition_ms": 1.474,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1434
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 46.381,
+      "partition_ms": 0.1,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 934
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 47.191,
+      "partition_ms": 0.086,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 954
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 47.726,
+      "partition_ms": 0.098,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 970
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 19.653,
+      "partition_ms": 1.171,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 19.565,
+      "partition_ms": 1.217,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 19.473,
+      "partition_ms": 1.179,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 210
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 166.099,
+      "partition_ms": 1.369,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1404
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 165.872,
+      "partition_ms": 1.321,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1422
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 179.393,
+      "partition_ms": 1.49,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1434
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 47.612,
+      "partition_ms": 0.088,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 934
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 51.496,
+      "partition_ms": 0.103,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 954
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 49.134,
+      "partition_ms": 0.097,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 970
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 24.193,
+      "partition_ms": 5.016,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 24.27,
+      "partition_ms": 5.573,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 25.192,
+      "partition_ms": 4.896,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 210
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 168.29,
+      "partition_ms": 4.74,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1404
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 172.942,
+      "partition_ms": 4.911,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1422
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 1,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 173.47,
+      "partition_ms": 4.531,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1434
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 45.851,
+      "partition_ms": 0.096,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 934
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 45.211,
+      "partition_ms": 0.091,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 954
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 47.096,
+      "partition_ms": 0.085,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 970
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 23.435,
+      "partition_ms": 5.007,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 21.973,
+      "partition_ms": 4.399,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 24.438,
+      "partition_ms": 4.503,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 210
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 168.523,
+      "partition_ms": 4.563,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1404
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 179.859,
+      "partition_ms": 5.121,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1422
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "reference",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 174.942,
+      "partition_ms": 4.592,
+      "template_hits": 0,
+      "template_misses": 1,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 40,
+      "nodes": 1434
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 45.544,
+      "partition_ms": 0.092,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 934
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 46.334,
+      "partition_ms": 0.086,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 954
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 47.518,
+      "partition_ms": 0.086,
+      "template_hits": 0,
+      "template_misses": 0,
+      "base_cells": null,
+      "rebuilt_cells": null,
+      "cells": 0,
+      "nodes": 970
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 20.51,
+      "partition_ms": 1.229,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 18.844,
+      "partition_ms": 1.192,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 204
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "CELL_SKELETON",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 19.984,
+      "partition_ms": 1.2,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 210
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7960,
+        8250,
+        0
+      ],
+      "build_ms": 176.02,
+      "partition_ms": 1.592,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1404
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        8060,
+        8250,
+        0
+      ],
+      "build_ms": 165.803,
+      "partition_ms": 1.402,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1422
+    },
+    {
+      "case": "synthetic",
+      "source": "synthetic",
+      "repeat": 2,
+      "path": "local_cache",
+      "grid": "HANNAN_CELL",
+      "pose": [
+        7860,
+        8250,
+        90
+      ],
+      "build_ms": 169.913,
+      "partition_ms": 1.413,
+      "template_hits": 1,
+      "template_misses": 0,
+      "base_cells": 37,
+      "rebuilt_cells": 1,
+      "cells": 40,
+      "nodes": 1434
+    }
+  ]
+}

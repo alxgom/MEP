@@ -21,7 +21,7 @@ def benchmark(cases=2, repeats=3):
     with redirect_stdout(io.StringIO()):
         import main as app
     from mep_routing.graphs import GraphMode, hybrid
-    from mep_routing.graphs.cells import cached_cell_template
+    from mep_routing.graphs.cells import cached_cell_template, cached_machine_cell_template
 
     numeric = hybrid._orthogonal_intersections
     modes = (GraphMode.HANNAN, GraphMode.CELL_SKELETON, GraphMode.HANNAN_CELL)
@@ -49,6 +49,7 @@ def benchmark(cases=2, repeats=3):
                         hybrid._orthogonal_intersections = numeric if path == "numeric" else hybrid._geometry_intersections
                         for mode in modes:
                             cached_cell_template.cache_clear()
+                            cached_machine_cell_template.cache_clear()
                             hybrid._cached_join.cache_clear()
                             times = []
                             for _ in range(2):
@@ -69,6 +70,7 @@ def benchmark(cases=2, repeats=3):
     finally:
         hybrid._orthogonal_intersections = numeric
         cached_cell_template.cache_clear()
+        cached_machine_cell_template.cache_clear()
         hybrid._cached_join.cache_clear()
     summary = {}
     for mode in modes:
@@ -83,7 +85,7 @@ def benchmark(cases=2, repeats=3):
                     f"{phase}_p95_ms": times[min(len(times) - 1, int(0.95 * len(times)))],
                     f"{phase}_max_ms": times[-1],
                 })
-    return {"note": "Grid lifecycle builds including runtime assembly; excludes routing, rendering, dwelling preparation and static Hanan axes. Cold clears cell-template and union caches; warm immediately repeats the same pose. Alternating implementation order. Every output matches exact nodes, edge records and cell overlays. Machine-dependent timings.",
+    return {"note": "Grid lifecycle builds including runtime assembly; excludes routing, rendering, dwelling preparation and static Hanan axes. Cold clears dwelling-cell, machine-cell and union caches; warm immediately repeats the same pose. Alternating implementation order. Every output matches exact nodes, edge records and cell overlays. Machine-dependent timings.",
             "summary": summary, "samples": rows}
 
 

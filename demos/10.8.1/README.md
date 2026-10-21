@@ -414,8 +414,17 @@ Press `G` to see pale cell outlines plus the centre/portal skeleton. Routing
 strategy, backend and heuristic controls remain independent; this orthogonal
 grid keeps the normal Manhattan/bend heuristics and fixed bend penalties.
 Cli's directed wall backends can use this grid, although sparse candidate
-locations may block hard-length modes. Geometry/pose/area-floor cell templates
-have a 16-entry cache; the wall-axis layer and local links use the live geometry.
+locations may block hard-length modes. Fixed dwelling partitions have a 16-entry
+cache keyed by the inset boundary, walls, boundary resolution and area floor.
+Machine positions and required attachment points do not change that key.
+A separate 16-entry pose cache replaces only cells with positive-area overlap
+with the machine body. Untouched cell rectangles stay unchanged; replacement
+cells obey the same area floor and boundary resolution, and shared portals are
+matched again across their boundaries. Revisiting a recent pose reuses its patch;
+dragging through many poses does not evict the fixed dwelling partition.
+The wall-axis layer, required-point attachments and local links still use live
+geometry. Local partitioning can change candidate edges and routes compared
+with decomposing the whole dwelling around each machine position.
 Exact access-point checks apply without enabling the Voronoi grid's
 Euclidean heuristic override. Coc's choices are unchanged.
 
@@ -425,7 +434,8 @@ Compare all four experimental/baseline grids with:
 ..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_medial_grid.py --cases 2 --repeats 1 --include-cells --output benchmarks\cell_hanan_axes_results.json
 ```
 
-The recorded comparison has 18 warm requests per grid over two real dwellings,
+Before the local machine-cell update, the recorded comparison had 18 warm
+requests per grid over two real dwellings,
 seeded synthetic, three poses and both standard A* representations. The cell
 grid routed all 12 real-dwelling requests; six synthetic shaft requests remained
 blocked. Other grids routed all 18 requests. Physical warnings and failures
@@ -438,6 +448,40 @@ comparison remains in `benchmarks/cell_grid_results.json`, and the earlier
 sampled-wall-run comparison in `benchmarks/cell_wall_grid_results.json`.
 Neither describes the current wall-axis construction. Hard-length searches
 can still block.
+
+The moving-pose cache comparison is reproducible against the earlier local
+commit (Git history required):
+
+```powershell
+..\10.7\.venv\Scripts\python.exe benchmarks\benchmark_cell_cache.py --reference-ref 914d637 --output benchmarks\cell_cache_results.json
+```
+
+Two real dwellings plus seeded synthetic, three different poses and three
+repetitions give 27 samples per implementation per grid. Each sequence primes
+one initial pose, then retains caches while moving/rotating the machine.
+Implementation order alternates. Measured builds include runtime assembly and
+exclude routing, rendering and dwelling preparation. All 27 new cell requests
+hit the dwelling cache; the reference rebuilt its pose-dependent partition 27
+times. The first real pose rebuilds one of 20 base cells.
+
+| Moving-pose work, median | Whole-dwelling partition | Cached base + local patch |
+| --- | ---: | ---: |
+| Cell partition | 3.46 ms | 0.98 ms |
+| Complete Cell grid | 14.14 ms | 11.69 ms |
+| Complete Hanan + Cell grid | 107.90 ms | 104.92 ms |
+
+The unchanged Hanan control measured 30.23/29.85 ms. This cache removes repeated
+dwelling decomposition, but the merged-grid union still dominates construction.
+This comparison includes an intentional local-partition geometry change; it
+does not establish identical routes or a fixed interaction-time bound.
+
+`benchmarks/cell_cached_scene_results.json` separately records 18 warm scene
+requests per grid at the usual two real dwellings/seeded synthetic/three poses
+and both standard A* representations. Cell routed 12/18 (all real cases); the
+six synthetic shaft requests remained blocked. Hanan + Cell routed 18/18.
+Cell median/p95 times were 30.8/38.8 ms and merged 107.7/524.0 ms, with median
+155/937 nodes. At 18 samples p95 is the slowest request. Warnings and failures
+remain visible; routing cost and sparse-grid limitations are unchanged in scope.
 
 ### Hanan + Cell Skeleton
 
@@ -494,8 +538,8 @@ grids can need further indexing or incremental construction.
 This separate construction benchmark compares the retained GEOS routine with
 the numeric path in alternating order. Two real dwellings and seeded synthetic,
 three poses and three repetitions give 27 samples per implementation per grid.
-Cold measurements clear cell-template and union caches; warm measurements
-immediately rebuild the same pose. Both include runtime assembly and exclude
+Cold measurements clear dwelling-cell, machine-cell and union caches; warm
+measurements immediately rebuild the same pose. Both include runtime assembly and exclude
 routing, rendering, dwelling preparation and static Hanan-axis preparation.
 Every output is checked for identical node arrays, edge records and cell overlays.
 
@@ -509,7 +553,9 @@ Every output is checked for identical node arrays, edge records and cell overlay
 Standalone Cell's cold median changed from 19.2 to 14.1 ms. Unchanged Hanan
 controls measured 29.6 and 28.8 ms, illustrating run variation. The merged cold
 build is roughly twice as fast in these samples, but construction plus routing
-can still delay a drag update. This is not a fixed latency guarantee.
+can still delay a drag update. This is not a fixed latency guarantee. Those
+recorded intersection-comparison timings predate the local machine-cell update
+described above and remain available as historical results.
 
 ### Hanan + Voronoi with local links
 

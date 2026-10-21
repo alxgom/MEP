@@ -66,6 +66,7 @@ class GraphBuildSession:
             self.report(
                 f"[Hanan + Cell Skeleton] Hanan={info['hannan_nodes']} nodes/{info['hannan_edges']} edges "
                 f"cell={info['cell_nodes']} nodes/{info['cell_edges']} edges "
+                f"rebuilt cells={info['rebuilt_cells']}/{info['base_cells']} "
                 f"local links={info['hybrid_links']} merged={len(variant.nodes)} nodes/{len(variant.edges)} edges "
                 f"in {result.elapsed_ms:.1f}ms (orthogonal; shared junctions; cell floor={info['min_cell_area_mm2']:.0f}mm2)"
             )
@@ -106,6 +107,7 @@ class GraphBuildSession:
             info = variant.diagnostics
             self.report(
                 f"[Cell Skeleton] cells={len(info['cells'])} portals={info['portals']} "
+                f"rebuilt cells={info['rebuilt_cells']}/{info['base_cells']} "
                 f"nodes={len(variant.nodes)} edges={len(variant.edges)} in {result.elapsed_ms:.1f}ms "
                 f"(attached={info['attached']}/{len(variant.required_points)}, "
                 f"wall axes={len(variant.axes_x)}x{len(variant.axes_y)}, "

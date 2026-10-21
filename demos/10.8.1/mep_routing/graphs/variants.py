@@ -15,7 +15,7 @@ from .epsilon import build_axes as build_epsilon_axes
 from .simple import SimpleGraphInputs, build_simple_grid
 from .medial import cached_medial_template, attach_medial_points
 from .runtime import Edge
-from .cells import cached_cell_template, build_cell_skeleton
+from .cells import cached_cell_template, cached_machine_cell_template, build_cell_skeleton
 from .hybrid import join_hanan_voronoi, join_grids_locally, cached_join_grids_locally
 from .hannan import build_wall_shift_axes
 
@@ -40,10 +40,14 @@ def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, require
                        walls=(), wall_offset_mm=100, max_link_distance_mm=600):
     started = perf_counter()
     required_points = list(required_points)
+    walls_wkb = tuple(w.wkb for w in wall_polys)
+    base = cached_cell_template(allowed_region.wkb, walls_wkb, boundary_resolution_mm, min_cell_area_mm2)
+    template, rebuilt_cells = base, 0
     if machine_polygon is not None:
         allowed_region = allowed_region.difference(machine_polygon)
-    template = cached_cell_template(allowed_region.wkb, tuple(w.wkb for w in wall_polys),
-                                    boundary_resolution_mm, min_cell_area_mm2)
+        template, rebuilt_cells = cached_machine_cell_template(
+            base, machine_polygon.wkb, walls_wkb, boundary_resolution_mm, min_cell_area_mm2, allowed_region.area,
+        )
     decomposition_ms = (perf_counter() - started) * 1000
     nodes, edges, attached = build_cell_skeleton(template, required_points, allowed_region, wall_polys,
                                                 wall_thickness_mm, boundary_resolution_mm=boundary_resolution_mm)
@@ -77,6 +81,7 @@ def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, require
     return GraphVariantResult(nodes, edges, wall_axes_x, wall_axes_y, list(required_points), decomposition_ms,
                               (perf_counter() - started) * 1000 - decomposition_ms, 0.0,
                               {"cells": template.cells, "portals": len(template.portals), "attached": attached,
+                               "base_cells": len(base.cells), "rebuilt_cells": rebuilt_cells,
                                "excluded_area_mm2": template.excluded_area_mm2,
                                "discarded_small_cells": template.discarded_small_cells,
                                "min_cell_area_mm2": min_cell_area_mm2,
@@ -194,6 +199,7 @@ def build_hannan_cell_variant(*, template, allowed_region, node_region, wall_pol
                               machine_polygon=None, boundary_resolution_mm=200, min_cell_area_mm2=40000,
                               walls=(), wall_offset_mm=100, max_link_distance_mm=600):
     """Retain both grids' physical edges with shared junctions and local links."""
+    cell_region = node_region
     if machine_polygon is not None:
         allowed_region = allowed_region.difference(machine_polygon)
         node_region = node_region.difference(machine_polygon)
@@ -203,7 +209,8 @@ def build_hannan_cell_variant(*, template, allowed_region, node_region, wall_pol
         shaft_extraction=shaft_extraction, machine_access_points=machine_access_points,
     )
     cells = build_cell_variant(
-        allowed_region=node_region, wall_polys=wall_polys, wall_thickness_mm=wall_thickness_mm,
+        allowed_region=cell_region, machine_polygon=machine_polygon,
+        wall_polys=wall_polys, wall_thickness_mm=wall_thickness_mm,
         required_points=required_points, boundary_resolution_mm=boundary_resolution_mm,
         min_cell_area_mm2=min_cell_area_mm2, walls=walls, wall_offset_mm=wall_offset_mm,
         max_link_distance_mm=max_link_distance_mm,

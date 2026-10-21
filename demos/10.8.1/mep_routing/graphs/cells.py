@@ -137,8 +137,44 @@ def build_cell_template(allowed_region, wall_polys=(), *, boundary_resolution_mm
 
 @lru_cache(maxsize=16)
 def cached_cell_template(region_wkb, walls_wkb, boundary_resolution_mm, min_cell_area_mm2=40000):
+    """Cache the fixed dwelling partition independently of ports/machine poses."""
     return build_cell_template(shapely.from_wkb(region_wkb), tuple(shapely.from_wkb(w) for w in walls_wkb),
                                boundary_resolution_mm=boundary_resolution_mm, min_cell_area_mm2=min_cell_area_mm2)
+
+
+@lru_cache(maxsize=16)
+def cached_machine_cell_template(base, machine_wkb, walls_wkb, boundary_resolution_mm,
+                                 min_cell_area_mm2, allowed_area_mm2):
+    """Replace only base cells with positive-area machine overlap.
+
+    Keep this pose cache separate so dragging cannot evict the dwelling cache.
+    Reconnect the resulting partition through freshly matched shared portals;
+    do not merge replacement rectangles across untouched cell boundaries.
+    """
+    machine = shapely.from_wkb(machine_wkb)
+    if machine.is_empty:
+        return base, 0
+    walls = tuple(shapely.from_wkb(w) for w in walls_wkb)
+    mx0, my0, mx1, my1 = machine.bounds
+    cells, rebuilt, discarded = [], 0, base.discarded_small_cells
+    for bounds in base.cells:
+        x0, y0, x1, y1 = bounds
+        if x1 <= mx0 or mx1 <= x0 or y1 <= my0 or my1 <= y0:
+            cells.append(bounds)
+            continue
+        cell = shapely.box(*bounds)
+        if cell.intersection(machine).area == 0:
+            cells.append(bounds)
+            continue
+        local = build_cell_template(cell.difference(machine), walls,
+                                    boundary_resolution_mm=boundary_resolution_mm,
+                                    min_cell_area_mm2=min_cell_area_mm2)
+        cells.extend(local.cells)
+        discarded += local.discarded_small_cells
+        rebuilt += 1
+    cells = tuple(sorted(cells))
+    retained_area = sum((c - a) * (d - b) for a, b, c, d in cells)
+    return CellTemplate(cells, _portals(cells), max(0.0, allowed_area_mm2 - retained_area), discarded), rebuilt
 
 
 def build_cell_skeleton(template, required_points, allowed_region, wall_polys=(), wall_thickness_mm=150,
