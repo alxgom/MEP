@@ -662,10 +662,11 @@ The placement heatmap is independent from the active placement mode. `[V]` displ
 With **Cli** active, `[V]` instead toggles the **body + supply** overlay.
 The footprint combines the selected machine body with a 500 mm rectangle
 from its supply outlet to the routing access point, using the catalog outlet
-width. Green tiles show a clear fit inside one room. Yellow tiles also fit
-within the allowed region, but the combined footprint touches a wall or does
-not fit wholly inside one room. Columns, shafts and space outside the allowed
-region still block placement. Red tiles mark positions the conservative 50 mm
+width. Both parts must fit within the allowed region and clear columns and
+shafts. For those valid placements, green means the **body** fits within one
+room without touching a wall. Yellow means the body touches a wall or does
+not fit wholly within one room. The extension can cross a traversable wall
+without changing green to yellow. Red tiles mark positions the conservative 50 mm
 raster does not clear. `[R]` rotates the body and extension together, including
 opposite outlet directions. With the overlay on, the dashed outline follows
 the combined footprint before rounding to raster tiles, and the machine fill

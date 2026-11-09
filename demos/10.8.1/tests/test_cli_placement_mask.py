@@ -48,15 +48,17 @@ def test_valid_tiles_fit_exact_allowed_region_and_clear_tiles_avoid_walls():
     assert not mask.valid[4, 3] and not mask.valid[7, 15]
     for j, i in np.argwhere(mask.valid):
         x, y = (i + 0.5) * mask.step_mm, (j + 0.5) * mask.step_mm
-        # Test the full region of possible centers colored green, not just its midpoint.
+        # Test both swept rectangles over the entire center tile.
         half_tile = mask.step_mm / 2
-        for left, bottom, right, top in ((-100, -50, 100, 50), (-50, 50, 50, 550)):
-            swept = box(x + left - half_tile, y + bottom - half_tile,
-                        x + right + half_tile, y + top + half_tile)
+        body = box(x - 100 - half_tile, y - 50 - half_tile,
+                   x + 100 + half_tile, y + 50 + half_tile)
+        extension = box(x - 50 - half_tile, y + 50 - half_tile,
+                        x + 50 + half_tile, y + 550 + half_tile)
+        for swept in (body, extension):
             assert room.covers(swept)
             assert all(swept.disjoint(obstacle) for obstacle in (*columns, *shafts))
-            if mask.clear_room[j, i]:
-                assert all(swept.disjoint(wall) for wall in walls)
+        if mask.clear_room[j, i]:
+            assert all(body.disjoint(wall) for wall in walls)
 
 
 def test_allowed_space_outside_a_room_is_valid_but_an_excluded_wall_is_not():
@@ -97,7 +99,7 @@ def test_supply_extension_blocks_poses_at_the_boundary_in_its_own_direction():
     assert south.valid[24, 8] and not north.valid[24, 8]
 
 
-def test_extension_uses_the_outlet_width_and_classifies_its_wall_contact():
+def test_extension_controls_fit_but_only_the_body_controls_room_color():
     room = box(0, 0, 1200, 1400)
     cache = CliPlacementMasks()
     # At center (425, 175) the narrow extension reaches the middle obstacle,
@@ -107,6 +109,9 @@ def test_extension_uses_the_outlet_width_and_classifies_its_wall_contact():
     source = dwelling((room,), columns=(beside,))
     assert cache.get(source, machine(), 0).clear_room[3, 8]
     assert not cache.get(source, machine(outlet_width=200), 0).valid[3, 8]
-    assert not cache.get(dwelling((room,), shafts=(ahead,)), machine(), 0).valid[3, 8]
-    mask = cache.get(dwelling((room,), walls=(ahead,)), machine(), 0)
-    assert mask.valid[3, 8] and not mask.clear_room[3, 8]
+    blocked = cache.get(dwelling((room,), shafts=(ahead,)), machine(), 0)
+    assert not blocked.valid[3, 8] and not blocked.clear_room[3, 8]
+    # The body is clear in the lower room; the extension crosses into the upper one.
+    rooms = (box(0, 0, 1200, 450), box(0, 450, 1200, 1400))
+    mask = cache.get(dwelling(rooms, walls=(ahead,)), machine(), 0)
+    assert mask.valid[3, 8] and mask.clear_room[3, 8]

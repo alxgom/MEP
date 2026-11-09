@@ -18,7 +18,7 @@ class CliPlacementMask:
     step_mm: int
     visible: np.ndarray  # indexed [y, x], with Y increasing upwards
     valid: np.ndarray
-    clear_room: np.ndarray  # valid and inside one room without wall contact
+    clear_room: np.ndarray  # valid and body inside one room without wall contact
 
 
 def _footprint_windows(machine, quarter_turn):
@@ -94,7 +94,7 @@ class CliPlacementMasks:
             k, l = math.ceil((c - origin_x) / step), math.ceil((d - origin_y) / step)
             window = np.s_[j:l, i:k]
             shapely.prepare(area)
-            # A green footprint must fit in one room, even across a wall-free opening.
+            # Only the body must fit in one room for the placement to be green.
             rooms.append((window, wall_clear[window] & shapely.covers(area, tiles[window])))
         visible.setflags(write=False)
         self._rooms, self._visible, self._free = rooms, visible, free
@@ -111,11 +111,12 @@ class CliPlacementMasks:
             return None
         key = (machine, quarter_turn % 4)
         if key not in self._masks:
-            windows = _footprint_windows(*key)
-            valid = _erode(self._free, windows)
+            body, extension = _footprint_windows(*key)
+            valid = _erode(self._free, (body, extension))
             clear_room = np.zeros_like(valid)
             for window, free in self._rooms:
-                clear_room[window] |= _erode(free, windows)
+                clear_room[window] |= _erode(free, (body,))
+            clear_room &= valid
             valid.setflags(write=False)
             clear_room.setflags(write=False)
             self._masks[key] = CliPlacementMask(self._origin, PLACEMENT_MASK_STEP_MM, self._visible, valid, clear_room)

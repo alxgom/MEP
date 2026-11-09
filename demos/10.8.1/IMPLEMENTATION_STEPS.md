@@ -997,6 +997,8 @@ Before each commit:
 
 - When CLI's placement heatmap is visible, draw a dashed perimeter around the body and supply extension and make the active machine fill translucent. The perimeter and raster use the same footprint geometry before tile rounding. Verified the outline, heatmap visibility through the fill, rotation, and restoration of the opaque fill with the overlay off in Pygame. Six changed Python files compiled; 609 tests passed.
 
+- Separated CLI placement feasibility from room coloring. The combined body and supply extension still determine validity, but only the body determines whether a valid tile is green (clear in one room) or yellow. Regression tests cover a green body with an extension crossing a traversable wall into another room, and a blocked extension preventing green. Three changed Python files compiled; 609 tests passed. On the first real dwelling at 90°, the valid count stayed at 1,203 and the green count rose from 421 to 592; verified the new legend in Pygame.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
