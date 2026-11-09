@@ -9,6 +9,9 @@ from shapely.geometry import Polygon
 from mep_routing.domain.machines import DIR_REV, dir_from_axis, local_axis_to_world
 
 
+CLI_SUPPLY_ACCESS_LENGTH_MM = 500
+
+
 def _rotate(center, point, angle_degrees):
     radians = math.radians(angle_degrees)
     x, y = point
@@ -62,5 +65,5 @@ def cli_air_access_specs(machine, pins, angle_degrees, connector_keys=("air_out"
     return tuple(cli_air_access_spec(machine, pins, angle_degrees, key) for key in connector_keys)
 
 
-def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=500):
+def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=CLI_SUPPLY_ACCESS_LENGTH_MM):
     return (cli_air_access_spec(machine, pins, angle_degrees, "air_out", stub_length_mm),)

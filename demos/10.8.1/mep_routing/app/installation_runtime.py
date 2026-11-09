@@ -83,7 +83,7 @@ class CliInstallationRuntime:
         self._placement_masks = CliPlacementMasks()
 
     def placement_mask(self, dwelling, angle_degrees):
-        return self._placement_masks.get(dwelling, self._machine().body_size_mm, angle_degrees)
+        return self._placement_masks.get(dwelling, self._machine(), angle_degrees)
 
     def _machine(self):
         key = self.app.installation_ui_session.selected_keys[self.key]

@@ -1,10 +1,12 @@
-"""Conservative raster screening for CLI machine body placement."""
+"""Conservative raster screening for CLI body and supply extension placement."""
 
 from dataclasses import dataclass
 import math
 
 import numpy as np
 import shapely
+
+from .geometry import cli_machine_footprint, cli_machine_pins, cli_supply_access_specs
 
 
 PLACEMENT_MASK_STEP_MM = 50
@@ -19,18 +21,45 @@ class CliPlacementMask:
     clear_room: np.ndarray  # valid and inside one room without wall contact
 
 
-def _erode(free, radius_x, radius_y):
-    height, width = 2 * radius_y + 1, 2 * radius_x + 1
-    valid = np.zeros_like(free)
-    if height <= free.shape[0] and width <= free.shape[1]:
-        counts = np.pad((~free).cumsum(0, dtype=np.int32).cumsum(1, dtype=np.int32), ((1, 0), (1, 0)))
-        blocked = counts[height:, width:] - counts[:-height, width:] - counts[height:, :-width] + counts[:-height, :-width]
-        valid[radius_y:radius_y + blocked.shape[0], radius_x:radius_x + blocked.shape[1]] = blocked == 0
+def _footprint_windows(machine, quarter_turn):
+    angle = quarter_turn * 90
+    pins = cli_machine_pins(machine, (0, 0), angle)
+    access, = cli_supply_access_specs(machine, pins, angle)
+    x, y = access["pin_point"]
+    tx, ty = access["access_point"]
+    half_width = machine.connector("air_out").rectangular_size_mm[0] / 2
+    # Use the catalog outlet width along the extension; trunk sizing comes later.
+    extension = ((x - half_width, min(y, ty), x + half_width, max(y, ty)) if x == tx
+                 else (min(x, tx), y - half_width, max(x, tx), y + half_width))
+    step = PLACEMENT_MASK_STEP_MM
+    # Signed inclusive tile offsets cover the footprint translated anywhere in its center tile.
+    return tuple(
+        (math.floor(left / step), math.floor(bottom / step),
+         math.ceil(right / step), math.ceil(top / step))
+        for left, bottom, right, top in (cli_machine_footprint(pins).bounds, extension)
+    )
+
+
+def _erode(free, windows):
+    """Require every rectangle of the footprint to fit for the whole center tile."""
+    ny, nx = free.shape
+    counts = np.pad((~free).cumsum(0, dtype=np.int32).cumsum(1, dtype=np.int32), ((1, 0), (1, 0)))
+    valid = np.ones_like(free)
+    for left, bottom, right, top in windows:
+        x0, x1 = max(0, -left), min(nx, nx - right)
+        y0, y1 = max(0, -bottom), min(ny, ny - top)
+        if x0 >= x1 or y0 >= y1:
+            return np.zeros_like(free)
+        a, b = slice(y0 + bottom, y1 + bottom), slice(y0 + top + 1, y1 + top + 1)
+        c, d = slice(x0 + left, x1 + left), slice(x0 + right + 1, x1 + right + 1)
+        valid[y0:y1, x0:x1] &= (counts[b, d] - counts[a, d] - counts[b, c] + counts[a, c]) == 0
+        valid[:y0] = valid[y1:] = False
+        valid[:, :x0] = valid[:, x1:] = False
     return valid
 
 
 class CliPlacementMasks:
-    """Rasterize the allowed region and clear rooms; cache by oriented body size."""
+    """Rasterize the allowed region and clear rooms; cache by machine and rotation."""
 
     def __init__(self):
         self._dwelling = None
@@ -77,7 +106,7 @@ class CliPlacementMasks:
         self._rooms, self._visible, self._free = rooms, visible, free
         self._origin = origin_x, origin_y
 
-    def get(self, dwelling, body_size_mm, angle_degrees):
+    def get(self, dwelling, machine, angle_degrees):
         quarter_turn = round(angle_degrees / 90)
         if not math.isclose(angle_degrees, quarter_turn * 90, abs_tol=1e-7):
             return None
@@ -86,16 +115,14 @@ class CliPlacementMasks:
             self._dwelling = dwelling
         if self._visible is None:
             return None
-        width, depth = body_size_mm[:2]
-        size = (depth, width) if quarter_turn % 2 else (width, depth)
-        if size not in self._masks:
-            step = PLACEMENT_MASK_STEP_MM
-            rx, ry = (math.ceil(value / (2 * step)) for value in size)
-            valid = _erode(self._free, rx, ry)
+        key = (machine, quarter_turn % 4)
+        if key not in self._masks:
+            windows = _footprint_windows(*key)
+            valid = _erode(self._free, windows)
             clear_room = np.zeros_like(valid)
             for window, free in self._rooms:
-                clear_room[window] |= _erode(free, rx, ry)
+                clear_room[window] |= _erode(free, windows)
             valid.setflags(write=False)
             clear_room.setflags(write=False)
-            self._masks[size] = CliPlacementMask(self._origin, step, self._visible, valid, clear_room)
-        return self._masks[size]
+            self._masks[key] = CliPlacementMask(self._origin, PLACEMENT_MASK_STEP_MM, self._visible, valid, clear_room)
+        return self._masks[key]

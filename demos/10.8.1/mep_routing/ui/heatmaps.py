@@ -57,7 +57,7 @@ def draw_placement_mask_legend(screen, mask, viewport, font, angle):
 
     x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=340)
     pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 46), border_radius=4)
-    title = font.render(f"CLI body fit · {angle:g}° · {mask.step_mm} mm", True, (240, 240, 240))
+    title = font.render(f"CLI body + supply extension · {angle:g}° · {mask.step_mm} mm raster", True, (240, 240, 240))
     screen.blit(title, (x + 8, y + 4))
     items = ((8, _PLACEMENT_VALID, "Clear room"),
              (98, _PLACEMENT_WALL, "Wall / room edge"),

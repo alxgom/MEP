@@ -659,17 +659,17 @@ The Routing-Core Workflow mode mirrors the core placement phase at demo scale: i
 
 The placement heatmap is independent from the active placement mode. `[V]` displays the placement score field for Manual, Topological Fields, and Routing-Core Workflow modes.
 
-With **Cli** active, `[V]` instead toggles the **body fit** overlay for the
-selected machine and current rotation. Green tiles show a clear fit inside
-one room. Yellow tiles also fit within the allowed region, but the footprint
-touches a wall or does not fit wholly inside one room. Columns, shafts and
-space outside the allowed region still block placement. Red tiles mark
-positions the 50 mm raster does not clear. The check is conservative near
-boundaries, so some red positions may fit under exact geometry.
-`[R]` changes the orientation. The overlay checks only
-the body against static plan geometry; outlet and inlet extensions, vertical
-clearance and other installations are outside this check. It does not affect
-automatic placement or routing.
+With **Cli** active, `[V]` instead toggles the **body + supply** overlay.
+The footprint combines the selected machine body with a 500 mm rectangle
+from its supply outlet to the routing access point, using the catalog outlet
+width. Green tiles show a clear fit inside one room. Yellow tiles also fit
+within the allowed region, but the combined footprint touches a wall or does
+not fit wholly inside one room. Columns, shafts and space outside the allowed
+region still block placement. Red tiles mark positions the conservative 50 mm
+raster does not clear. `[R]` rotates the body and extension together, including
+opposite outlet directions. This check uses static plan geometry; return
+extensions, vertical clearance and other installations are outside its scope.
+It does not affect automatic placement or routing.
 
 Before routing, CLI checks the exact machine footprint against the allowed
 region. If any part of the body lies outside, the workbench shows

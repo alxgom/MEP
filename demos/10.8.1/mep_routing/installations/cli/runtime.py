@@ -11,7 +11,9 @@ from shapely.geometry import Polygon
 from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
-from .geometry import cli_air_access_spec, cli_machine_footprint, cli_machine_pins
+from .geometry import (
+    CLI_SUPPLY_ACCESS_LENGTH_MM, cli_air_access_spec, cli_machine_footprint, cli_machine_pins,
+)
 from .definition import (
     CLI_DIRECTED_BACKENDS, CLI_FITTING_BACKEND, CLI_LENGTH_BACKENDS, CLI_TEE_LENGTH_BACKENDS,
 )
@@ -257,7 +259,7 @@ class CliInteractiveRuntime:
                     item.route_name: policy.size(item.room_area_m2, total_area)
                     for item in connections
                 }
-        access_length_mm = 500 if role == "supply" else 20
+        access_length_mm = CLI_SUPPLY_ACCESS_LENGTH_MM if role == "supply" else 20
         access = cli_air_access_spec(
             machine, pins, angle, connector_key, access_length_mm,
         )

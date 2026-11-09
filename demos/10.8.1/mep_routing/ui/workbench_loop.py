@@ -221,12 +221,12 @@ def _render(app, screen, clock, fonts, state):
         solver_dropdowns=solver_dropdowns,
         solver_detail=solver_detail,
         placement_heatmap_label=(
-            ("Body fit [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Body fit")
+            ("Body + supply [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Placement")
             if active == "cli" else "Not available" if active == "coc" else None
         ),
         placement_weights_label=("Grille-distance ranking" if active == "cli" else "Not applicable" if active == "coc" else None),
         placement_rotation_label=("Machine-aligned" if active == "cli" else "Exported geometry" if active == "coc" else None),
-        placement_shortcuts_label=("[A] Auto | [P] Mode | [V] Body fit" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
+        placement_shortcuts_label=("[A] Auto | [P] Mode | [V] Placement" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
     ))
     draw_sidebar(
         screen, canvas_left=viewport.canvas_left, window_height=viewport.window_height,
