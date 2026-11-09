@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol, runtime_checkable
 
 from mep_routing.installations.cli import cli_machine_pins
+from mep_routing.installations.cli.placement_mask import CliPlacementMasks
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,10 @@ class CliInstallationRuntime:
 
     def __init__(self, app):
         self.app = app
+        self._placement_masks = CliPlacementMasks()
+
+    def placement_mask(self, dwelling, angle_degrees):
+        return self._placement_masks.get(dwelling, self._machine().body_size_mm, angle_degrees)
 
     def _machine(self):
         key = self.app.installation_ui_session.selected_keys[self.key]

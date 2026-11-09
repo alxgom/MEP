@@ -13,6 +13,7 @@ from .frame import (
 )
 from .installation_header import draw_installation_header
 from .installation_projection import project_workbench
+from .heatmaps import draw_placement_mask, draw_placement_mask_legend
 from .pygame_events import WorkbenchEventAdapter
 from .sidebar import SidebarColors, SidebarFonts, draw_sidebar
 
@@ -61,8 +62,29 @@ def _render(app, screen, clock, fonts, state):
         else ({"air_out"} if selected == "Supply Air Tree" else set())
     )
     context = projection.context_layers
-    if app.show_heatmap and active_view.can("placement_overlay"):
+    sal_heatmap = app.show_heatmap and active_view.can("placement_overlay")
+    cli_heatmap = active == "cli" and workbench.cli.show_placement_mask
+    viewport = app.canvas_ui.viewport
+    placement_mask = None
+    if cli_heatmap and active_view.can("machine_selection") and dwelling_state.active is not None:
+        runtime = app.routing_controller.installations.get("cli")
+        placement_mask = runtime.placement_mask(dwelling_state.active.prepared, pose[2])
+    if sal_heatmap:
         app.routing_controller.ensure_placement_scores()
+
+    def placement_overlay():
+        if placement_mask is not None:
+            draw_placement_mask(screen, placement_mask, viewport)
+        elif sal_heatmap and app.ap_scores:
+            app.ui_facade.draw_distance_heatmap(screen, app.ap_scores)
+
+    def placement_legend():
+        if app.edge_weight_heatmap_enabled:
+            return
+        if placement_mask is not None:
+            draw_placement_mask_legend(screen, placement_mask, viewport, fonts.small, pose[2])
+        elif sal_heatmap and app.ap_scores:
+            app.ui_facade.draw_colorbar(screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores))
 
     def edge_overlay():
         if app.edge_weight_heatmap_enabled:
@@ -101,10 +123,8 @@ def _render(app, screen, clock, fonts, state):
     ))
     hooks = CanvasRenderHooks(
         draw_covers=lambda: app.canvas_ui.draw_geometry(screen, app.covers, app.theme.cover_overlay),
-        draw_distance_heatmap=lambda: app.ui_facade.draw_distance_heatmap(screen, app.ap_scores) if app.show_heatmap and app.ap_scores else None,
-        draw_distance_colorbar=lambda: app.ui_facade.draw_colorbar(
-            screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores),
-        ) if app.show_heatmap and app.ap_scores and not app.edge_weight_heatmap_enabled else None,
+        draw_distance_heatmap=placement_overlay,
+        draw_distance_colorbar=placement_legend,
         draw_edge_weight_heatmap=edge_overlay,
         draw_edge_weight_colorbar=lambda: app.ui_facade.draw_edge_weight_colorbar(screen, workspace),
         draw_route_polygons=lambda: app.canvas_ui.draw_geometry(
@@ -200,12 +220,14 @@ def _render(app, screen, clock, fonts, state):
         ),
         solver_dropdowns=solver_dropdowns,
         solver_detail=solver_detail,
-        placement_heatmap_label=("Not available" if active in ("cli", "coc") else None),
+        placement_heatmap_label=(
+            ("Body fit [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Body fit")
+            if active == "cli" else "Not available" if active == "coc" else None
+        ),
         placement_weights_label=("Grille-distance ranking" if active == "cli" else "Not applicable" if active == "coc" else None),
         placement_rotation_label=("Machine-aligned" if active == "cli" else "Exported geometry" if active == "coc" else None),
-        placement_shortcuts_label=("[A] Auto | [P] Mode" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
+        placement_shortcuts_label=("[A] Auto | [P] Mode | [V] Body fit" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
     ))
-    viewport = app.canvas_ui.viewport
     draw_sidebar(
         screen, canvas_left=viewport.canvas_left, window_height=viewport.window_height,
         fonts=SidebarFonts(title=fonts.title, bold=fonts.bold, small=fonts.small),

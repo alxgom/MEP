@@ -508,7 +508,8 @@ class WorkbenchEventAdapter:
             self._change_dwelling(f"Frame:{a.routing_frame_idx}", (230, 126, 34))
         elif key == pygame.K_v:
             if a.installation_header_state.active == "cli":
-                a.observation.set_transient_message("Cli placement heatmap is not implemented")
+                cli = a.workbench_state.cli
+                cli.show_placement_mask = not cli.show_placement_mask
             else:
                 a.show_heatmap = not a.show_heatmap
                 if a.show_heatmap: a.routing_controller.ensure_placement_scores()

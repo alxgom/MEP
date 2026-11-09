@@ -80,6 +80,7 @@ class CliWorkbenchState:
     crossing_penalty_multiplier: float = 5.0
     minimum_segment_length_factor: float = 1.0
     duct_geometry_mode_idx: int = 0
+    show_placement_mask: bool = False
 
 
 @dataclass

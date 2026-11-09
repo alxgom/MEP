@@ -1,8 +1,65 @@
-"""Pygame adapters for distance and edge-weight heatmap rendering."""
+"""Pygame adapters for placement, distance and edge-weight overlays."""
 
 from __future__ import annotations
 
 import math
+from functools import lru_cache
+
+import numpy as np
+
+
+_PLACEMENT_VALID = (22, 172, 114)
+_PLACEMENT_INVALID = (207, 72, 66)
+
+
+@lru_cache(maxsize=8)
+def _placement_surface(mask):
+    import pygame
+
+    height, width = mask.valid.shape
+    rgba = np.zeros((height, width, 4), dtype=np.uint8)
+    rgba[mask.visible] = (*_PLACEMENT_INVALID, 105)
+    rgba[mask.valid] = (*_PLACEMENT_VALID, 155)
+    return pygame.image.frombytes(rgba[::-1].tobytes(), (width, height), "RGBA")
+
+
+def draw_placement_mask(screen, mask, viewport):
+    """Draw nearest-neighbor mask tiles, scaling only the visible portion."""
+    import pygame
+
+    surface = _placement_surface(mask)
+    nx, ny = surface.get_size()
+    x, y = mask.origin_mm
+    left, top = viewport.to_screen(x, y + ny * mask.step_mm)
+    right, bottom = viewport.to_screen(x + nx * mask.step_mm, y)
+    target = pygame.Rect(left, top, right - left, bottom - top)
+    previous_clip = screen.get_clip()
+    clip = previous_clip.clip(viewport.canvas_rect)
+    visible = target.clip(clip)
+    if not visible.width or not visible.height:
+        return
+    a = (visible.left - left) * nx // target.width
+    b = (visible.top - top) * ny // target.height
+    c = math.ceil((visible.right - left) * nx / target.width)
+    d = math.ceil((visible.bottom - top) * ny / target.height)
+    x0, x1 = (left + round(i * target.width / nx) for i in (a, c))
+    y0, y1 = (top + round(j * target.height / ny) for j in (b, d))
+    cropped = surface.subsurface((a, b, c - a, d - b))
+    screen.set_clip(clip)
+    screen.blit(pygame.transform.scale(cropped, (x1 - x0, y1 - y0)), (x0, y0))
+    screen.set_clip(previous_clip)
+
+
+def draw_placement_mask_legend(screen, mask, viewport, font, angle):
+    import pygame
+
+    x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=218)
+    pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 46), border_radius=4)
+    title = font.render(f"CLI body fit · {angle:g}° · {mask.step_mm} mm", True, (240, 240, 240))
+    screen.blit(title, (x + 8, y + 4))
+    for offset, color, label in ((8, _PLACEMENT_VALID, "Valid"), (82, _PLACEMENT_INVALID, "Not cleared")):
+        pygame.draw.rect(screen, color, (x + offset, y + 26, 10, 10))
+        screen.blit(font.render(label, True, (240, 240, 240)), (x + offset + 15, y + 22))
 
 
 def horizontal_colorbar_bounds(canvas_bounds, width=240):
