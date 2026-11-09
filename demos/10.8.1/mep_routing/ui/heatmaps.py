@@ -52,19 +52,24 @@ def draw_placement_mask(screen, mask, viewport):
     screen.set_clip(previous_clip)
 
 
-def draw_placement_cells(screen, cells, mask, viewport):
-    """Draw static cell bounds and center candidates above the raster."""
+def draw_placement_cell_grid(screen, grid, mask, viewport):
+    """Draw the fixed Cell Skeleton, with placement candidates at cell centers."""
     import pygame
 
     previous_clip = screen.get_clip()
     screen.set_clip(previous_clip.clip(viewport.canvas_rect))
     centers = []
-    for left, bottom, right, top in cells:
+    for left, bottom, right, top in grid.diagnostics["cells"]:
         x0, y0 = viewport.to_screen(left, top)
         x1, y1 = viewport.to_screen(right, bottom)
-        pygame.draw.rect(screen, (72, 85, 104), (x0, y0, x1 - x0, y1 - y0), 1)
+        pygame.draw.rect(screen, (153, 159, 174), (x0, y0, x1 - x0, y1 - y0), 1)
         center = ((left + right) / 2, (bottom + top) / 2)
         centers.append((viewport.to_screen(*center), mask.center_status(center)))
+    points = [viewport.to_screen(*point) for point in grid.nodes]
+    for u, v, *_ in grid.edges:
+        pygame.draw.line(screen, (58, 75, 96), points[u], points[v])
+    for point in points:
+        pygame.draw.circle(screen, (58, 75, 96), point, 2)
     for point, status in centers:
         if status == "blocked":
             pygame.draw.circle(screen, (81, 91, 107), point, 3)
@@ -92,7 +97,7 @@ def draw_placement_mask_legend(screen, mask, viewport, font, angle, cells_visibl
         pygame.draw.rect(screen, color, (x + offset, y + 26, 10, 10))
         screen.blit(font.render(label, True, (240, 240, 240)), (x + offset + 15, y + 22))
     if cells_visible:
-        label = font.render("Cell centers: ring = candidate · [Shift+G] Cells", True, (240, 240, 240))
+        label = font.render("Cell Skeleton · ring = candidate center · [Shift+G]", True, (240, 240, 240))
         screen.blit(label, (x + 8, y + 42))
 
 

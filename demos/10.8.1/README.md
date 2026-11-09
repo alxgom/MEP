@@ -675,7 +675,9 @@ This check uses static plan geometry; return
 extensions, vertical clearance and other installations are outside its scope.
 It does not affect automatic placement or routing.
 
-The heatmap also shows the dwelling's fixed **Cell Skeleton** partition.
+The heatmap also shows the dwelling's fixed **Cell Skeleton** grid, including
+the center and portal connections and the wall-shifted Hanan edges.
+This preview omits machine and terminal attachments so it stays fixed.
 A green or yellow ring marks a cell center that passes the placement mask for
 the current rotation; gray dots mark the other centers. Drag the machine so
 its body center sits on a ring to try that position. The cell overlay stays

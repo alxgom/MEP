@@ -85,6 +85,25 @@ class GraphLifecycle:
         inset = self.routing_region.buffer(-self.wall_clearance_mm, join_style=2)
         return self.routing_region if inset.is_empty else inset
 
+    def _cell_options(self):
+        return {
+            "boundary_resolution_mm": self.cell_boundary_resolution_mm,
+            "min_cell_area_mm2": self.cell_min_area_mm2,
+            "walls": self.walls,
+            "wall_offset_mm": self.wall_clearance_mm,
+            "max_link_distance_mm": self.scaffold_spacing_mm,
+        }
+
+    def build_static_cell_grid(self):
+        """Build the Cell Skeleton without a live machine or endpoint attachments."""
+        region = self.node_region()
+        if region is None:
+            return None
+        return build_cell_variant(
+            allowed_region=region, wall_polys=self.wall_polygons,
+            wall_thickness_mm=self.wall_thickness_mm, required_points=(), **self._cell_options(),
+        )
+
     def clear_hannan_templates(self) -> None:
         """Discard static Hannan axes after a dwelling geometry change."""
         self._hannan_templates.clear()
@@ -231,12 +250,8 @@ class GraphLifecycle:
             corners = [machine_pins.get(name) for name in ("c_tl", "c_tr", "c_br", "c_bl")]
             machine_polygon = Polygon(corners) if all(p is not None for p in corners) else None
             builder = build_medial_variant if mode is GraphMode.MEDIAL_AXIS else build_cell_variant
-            options = {"sample_spacing_mm": self.medial_sample_spacing_mm} if mode is GraphMode.MEDIAL_AXIS else {
-                "boundary_resolution_mm": self.cell_boundary_resolution_mm,
-                "min_cell_area_mm2": self.cell_min_area_mm2,
-                "walls": self.walls, "wall_offset_mm": self.wall_clearance_mm,
-                "max_link_distance_mm": self.scaffold_spacing_mm,
-            }
+            options = ({"sample_spacing_mm": self.medial_sample_spacing_mm}
+                       if mode is GraphMode.MEDIAL_AXIS else self._cell_options())
             if mode is GraphMode.HANNAN_CELL:
                 builder = build_hannan_cell_variant
                 options.update(template=self.hannan_template(shift_walls=shift_hannan_walls),
