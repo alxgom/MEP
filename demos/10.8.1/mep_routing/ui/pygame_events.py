@@ -495,7 +495,16 @@ class WorkbenchEventAdapter:
             pygame.K_a, pygame.K_p, pygame.K_u, pygame.K_w,
         }:
             a.observation.set_transient_message("This control is not available for the active installation")
-        elif key == pygame.K_g: a.show_grid_graph = not a.show_grid_graph
+        elif key == pygame.K_g:
+            if (
+                a.installation_header_state.active == "cli"
+                and a.workbench_state.cli.show_placement_mask
+                and pygame.key.get_mods() & pygame.KMOD_SHIFT
+            ):
+                cli = a.workbench_state.cli
+                cli.show_placement_cells = not cli.show_placement_cells
+            else:
+                a.show_grid_graph = not a.show_grid_graph
         elif key == pygame.K_d:
             a.dwelling_source_idx = (
                 a.dwelling_source_idx + 1

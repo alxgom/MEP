@@ -675,6 +675,13 @@ This check uses static plan geometry; return
 extensions, vertical clearance and other installations are outside its scope.
 It does not affect automatic placement or routing.
 
+The heatmap also shows the dwelling's fixed **Cell Skeleton** partition.
+A green or yellow ring marks a cell center that passes the placement mask for
+the current rotation; gray dots mark the other centers. Drag the machine so
+its body center sits on a ring to try that position. The cell overlay stays
+fixed while you move or rotate the machine. Use `[Shift+G]` to toggle these
+cells, and `[G]` to toggle the separate routing grid.
+
 Before routing, CLI checks the exact machine footprint against the allowed
 region. If any part of the body lies outside, the workbench shows
 `Blocked: machine body outside allowed area`, even when the outlet is inside.

@@ -999,6 +999,9 @@ Before each commit:
 
 - Separated CLI placement feasibility from room coloring. The combined body and supply extension still determine validity, but only the body determines whether a valid tile is green (clear in one room) or yellow. Regression tests cover a green body with an extension crossing a traversable wall into another room, and a blocked extension preventing green. Three changed Python files compiled; 609 tests passed. On the first real dwelling at 90°, the valid count stayed at 1,203 and the green count rose from 421 to 592; verified the new legend in Pygame.
 
+- Added a fixed Cell Skeleton partition over the CLI placement heatmap, independently of the selected routing grid. The overlay reuses the dwelling cell template before cutting the live machine. It marks cell centers green or yellow when they pass the current rotation's footprint mask and gray otherwise. The machine and its footprint outline still draw above the grid. `[Shift+G]` toggles the placement cells while the heatmap is on; `[G]` retains the routing-grid toggle. Candidate markers do not move or snap the machine.
+- Validation: six changed Python files compiled and 609 tests passed. Pygame smoke checks verified the layered view, independent toggles without a routing solve, and stable partition across rotation. On the first real dwelling the 20 cells offered 6, 6, 5, and 4 footprint candidates at 0°, 90°, 180°, and 270°. At 90°, four of the six candidates also routed with the hard-length fittings backend on Core Simple.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

@@ -52,11 +52,37 @@ def draw_placement_mask(screen, mask, viewport):
     screen.set_clip(previous_clip)
 
 
-def draw_placement_mask_legend(screen, mask, viewport, font, angle):
+def draw_placement_cells(screen, cells, mask, viewport):
+    """Draw static cell bounds and center candidates above the raster."""
+    import pygame
+
+    previous_clip = screen.get_clip()
+    screen.set_clip(previous_clip.clip(viewport.canvas_rect))
+    centers = []
+    for left, bottom, right, top in cells:
+        x0, y0 = viewport.to_screen(left, top)
+        x1, y1 = viewport.to_screen(right, bottom)
+        pygame.draw.rect(screen, (72, 85, 104), (x0, y0, x1 - x0, y1 - y0), 1)
+        center = ((left + right) / 2, (bottom + top) / 2)
+        centers.append((viewport.to_screen(*center), mask.center_status(center)))
+    for point, status in centers:
+        if status == "blocked":
+            pygame.draw.circle(screen, (81, 91, 107), point, 3)
+        else:
+            color = _PLACEMENT_VALID if status == "clear" else _PLACEMENT_WALL
+            pygame.draw.circle(screen, (37, 46, 60), point, 7)
+            pygame.draw.circle(screen, (248, 249, 252), point, 6)
+            pygame.draw.circle(screen, color, point, 4)
+    screen.set_clip(previous_clip)
+
+
+def draw_placement_mask_legend(screen, mask, viewport, font, angle, cells_visible=False):
     import pygame
 
     x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=340)
-    pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 46), border_radius=4)
+    if cells_visible:
+        y -= 19
+    pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 65 if cells_visible else 46), border_radius=4)
     title = font.render(f"CLI body + supply extension · {angle:g}° · {mask.step_mm} mm raster", True, (240, 240, 240))
     screen.blit(title, (x + 8, y + 4))
     items = ((8, _PLACEMENT_VALID, "Body clear"),
@@ -65,6 +91,9 @@ def draw_placement_mask_legend(screen, mask, viewport, font, angle):
     for offset, color, label in items:
         pygame.draw.rect(screen, color, (x + offset, y + 26, 10, 10))
         screen.blit(font.render(label, True, (240, 240, 240)), (x + offset + 15, y + 22))
+    if cells_visible:
+        label = font.render("Cell centers: ring = candidate · [Shift+G] Cells", True, (240, 240, 240))
+        screen.blit(label, (x + 8, y + 42))
 
 
 def horizontal_colorbar_bounds(canvas_bounds, width=240):

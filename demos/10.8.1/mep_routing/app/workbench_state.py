@@ -81,6 +81,7 @@ class CliWorkbenchState:
     minimum_segment_length_factor: float = 1.0
     duct_geometry_mode_idx: int = 0
     show_placement_mask: bool = False
+    show_placement_cells: bool = True
 
 
 @dataclass

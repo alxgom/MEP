@@ -20,6 +20,15 @@ class CliPlacementMask:
     valid: np.ndarray
     clear_room: np.ndarray  # valid and body inside one room without wall contact
 
+    def center_status(self, point):
+        """Classify a candidate center using the same tile as the heatmap."""
+        x, y = (math.floor((value - origin) / self.step_mm)
+                for value, origin in zip(point, self.origin_mm))
+        ny, nx = self.valid.shape
+        if not (0 <= x < nx and 0 <= y < ny and self.valid[y, x]):
+            return "blocked"
+        return "clear" if self.clear_room[y, x] else "allowed"
+
 
 def _footprint_windows(machine, quarter_turn):
     angle = quarter_turn * 90

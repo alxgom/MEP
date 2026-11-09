@@ -13,7 +13,7 @@ from .frame import (
 )
 from .installation_header import draw_installation_header
 from .installation_projection import project_workbench
-from .heatmaps import draw_placement_mask, draw_placement_mask_legend
+from .heatmaps import draw_placement_cells, draw_placement_mask, draw_placement_mask_legend
 from .pygame_events import WorkbenchEventAdapter
 from .sidebar import SidebarColors, SidebarFonts, draw_sidebar
 
@@ -67,17 +67,22 @@ def _render(app, screen, clock, fonts, state):
     viewport = app.canvas_ui.viewport
     placement_mask = None
     placement_outlines = ()
+    placement_cells = ()
     if cli_heatmap and active_view.can("machine_selection") and dwelling_state.active is not None:
         runtime = app.routing_controller.installations.get("cli")
         placement_mask = runtime.placement_mask(dwelling_state.active.prepared, pose[2])
         if placement_mask is not None:
             placement_outlines = runtime.placement_outlines(pins, pose[2])
+            if workbench.cli.show_placement_cells:
+                placement_cells = runtime.placement_cells(dwelling_state.active)
     if sal_heatmap:
         app.routing_controller.ensure_placement_scores()
 
     def placement_overlay():
         if placement_mask is not None:
             draw_placement_mask(screen, placement_mask, viewport)
+            if placement_cells:
+                draw_placement_cells(screen, placement_cells, placement_mask, viewport)
         elif sal_heatmap and app.ap_scores:
             app.ui_facade.draw_distance_heatmap(screen, app.ap_scores)
 
@@ -85,7 +90,7 @@ def _render(app, screen, clock, fonts, state):
         if app.edge_weight_heatmap_enabled:
             return
         if placement_mask is not None:
-            draw_placement_mask_legend(screen, placement_mask, viewport, fonts.small, pose[2])
+            draw_placement_mask_legend(screen, placement_mask, viewport, fonts.small, pose[2], bool(placement_cells))
         elif sal_heatmap and app.ap_scores:
             app.ui_facade.draw_colorbar(screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores))
 

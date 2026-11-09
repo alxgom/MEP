@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Mapping, Protocol, runtime_checkable
 
 from mep_routing.geometry import iter_polygons
+from mep_routing.graphs.cells import cached_cell_template
 from mep_routing.installations.cli import cli_machine_pins
 from mep_routing.installations.cli.geometry import cli_placement_footprint_parts
 from mep_routing.installations.cli.placement_mask import CliPlacementMasks
@@ -83,9 +84,23 @@ class CliInstallationRuntime:
     def __init__(self, app):
         self.app = app
         self._placement_masks = CliPlacementMasks()
+        self._cell_dwelling = None
+        self._placement_cells = ()
 
     def placement_mask(self, dwelling, angle_degrees):
         return self._placement_masks.get(dwelling, self._machine(), angle_degrees)
+
+    def placement_cells(self, dwelling):
+        """Reuse the fixed cell partition, before subtracting the live machine."""
+        if dwelling is not self._cell_dwelling:
+            graph = dwelling.workspace.lifecycle
+            region = graph.node_region()
+            self._placement_cells = () if region is None else cached_cell_template(
+                region.wkb, tuple(wall.wkb for wall in graph.wall_polygons),
+                graph.cell_boundary_resolution_mm, graph.cell_min_area_mm2,
+            ).cells
+            self._cell_dwelling = dwelling
+        return self._placement_cells
 
     def placement_outlines(self, pins, angle_degrees):
         body, extension = cli_placement_footprint_parts(self._machine(), pins, angle_degrees)
