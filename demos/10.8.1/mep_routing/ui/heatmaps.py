@@ -9,6 +9,7 @@ import numpy as np
 
 
 _PLACEMENT_VALID = (22, 172, 114)
+_PLACEMENT_WALL = (236, 184, 43)
 _PLACEMENT_INVALID = (207, 72, 66)
 
 
@@ -19,7 +20,8 @@ def _placement_surface(mask):
     height, width = mask.valid.shape
     rgba = np.zeros((height, width, 4), dtype=np.uint8)
     rgba[mask.visible] = (*_PLACEMENT_INVALID, 105)
-    rgba[mask.valid] = (*_PLACEMENT_VALID, 155)
+    rgba[mask.valid] = (*_PLACEMENT_WALL, 155)
+    rgba[mask.clear_room] = (*_PLACEMENT_VALID, 155)
     return pygame.image.frombytes(rgba[::-1].tobytes(), (width, height), "RGBA")
 
 
@@ -53,11 +55,14 @@ def draw_placement_mask(screen, mask, viewport):
 def draw_placement_mask_legend(screen, mask, viewport, font, angle):
     import pygame
 
-    x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=218)
+    x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=340)
     pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 46), border_radius=4)
     title = font.render(f"CLI body fit · {angle:g}° · {mask.step_mm} mm", True, (240, 240, 240))
     screen.blit(title, (x + 8, y + 4))
-    for offset, color, label in ((8, _PLACEMENT_VALID, "Valid"), (82, _PLACEMENT_INVALID, "Not cleared")):
+    items = ((8, _PLACEMENT_VALID, "Clear room"),
+             (98, _PLACEMENT_WALL, "Wall / room edge"),
+             (235, _PLACEMENT_INVALID, "Not cleared"))
+    for offset, color, label in items:
         pygame.draw.rect(screen, color, (x + offset, y + 26, 10, 10))
         screen.blit(font.render(label, True, (240, 240, 240)), (x + offset + 15, y + 22))
 

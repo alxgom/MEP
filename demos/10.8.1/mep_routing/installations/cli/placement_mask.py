@@ -16,6 +16,7 @@ class CliPlacementMask:
     step_mm: int
     visible: np.ndarray  # indexed [y, x], with Y increasing upwards
     valid: np.ndarray
+    clear_room: np.ndarray  # valid and inside one room without wall contact
 
 
 def _erode(free, radius_x, radius_y):
@@ -29,16 +30,17 @@ def _erode(free, radius_x, radius_y):
 
 
 class CliPlacementMasks:
-    """Rasterize each room once per dwelling; cache masks by oriented body size."""
+    """Rasterize the allowed region and clear rooms; cache by oriented body size."""
 
     def __init__(self):
         self._dwelling = None
         self._rooms = ()
         self._visible = None
+        self._free = None
         self._masks = {}
 
     def _rasterize(self, dwelling):
-        self._rooms, self._visible = (), None
+        self._rooms, self._visible, self._free = (), None, None
         self._masks.clear()
         step = PLACEMENT_MASK_STEP_MM
         region = dwelling.routing_region_base
@@ -47,9 +49,18 @@ class CliPlacementMasks:
         x0, y0, x1, y1 = region.bounds
         origin_x, origin_y = math.floor(x0 / step) * step, math.floor(y0 / step) * step
         nx, ny = math.ceil((x1 - origin_x) / step), math.ceil((y1 - origin_y) / step)
-        visible = np.zeros((ny, nx), dtype=bool)
-        obstacles = shapely.union_all([*dwelling.wall_polygons, *dwelling.columns, *dwelling.shafts])
+        x = origin_x + np.arange(nx)[None, :] * step
+        y = origin_y + np.arange(ny)[:, None] * step
+        tiles = shapely.box(x, y, x + step, y + step)
+        obstacles = shapely.union_all([*dwelling.columns, *dwelling.shafts])
+        walls = shapely.union_all(dwelling.wall_polygons)
+        shapely.prepare(region)
         shapely.prepare(obstacles)
+        shapely.prepare(walls)
+        visible = shapely.contains_xy(region, x + step / 2, y + step / 2)
+        free = shapely.covers(region, tiles) & ~shapely.intersects(obstacles, tiles)
+        # Interior walls classify a placement; the allowed region controls feasibility.
+        wall_clear = free & ~shapely.intersects(walls, tiles)
         rooms = []
         for room in dwelling.rooms:
             area = region.intersection(room.polygon)
@@ -58,17 +69,12 @@ class CliPlacementMasks:
             a, b, c, d = area.bounds
             i, j = math.floor((a - origin_x) / step), math.floor((b - origin_y) / step)
             k, l = math.ceil((c - origin_x) / step), math.ceil((d - origin_y) / step)
-            x = origin_x + np.arange(i, k)[None, :] * step
-            y = origin_y + np.arange(j, l)[:, None] * step
-            tiles = shapely.box(x, y, x + step, y + step)
-            shapely.prepare(area)
-            free = shapely.covers(area, tiles) & ~shapely.intersects(obstacles, tiles)
             window = np.s_[j:l, i:k]
-            visible[window] |= shapely.contains_xy(area, x + step / 2, y + step / 2)
-            # Keep rooms separate so a footprint cannot straddle a room boundary.
-            rooms.append((window, free))
+            shapely.prepare(area)
+            # A green footprint must fit in one room, even across a wall-free opening.
+            rooms.append((window, wall_clear[window] & shapely.covers(area, tiles[window])))
         visible.setflags(write=False)
-        self._rooms, self._visible = rooms, visible
+        self._rooms, self._visible, self._free = rooms, visible, free
         self._origin = origin_x, origin_y
 
     def get(self, dwelling, body_size_mm, angle_degrees):
@@ -85,9 +91,11 @@ class CliPlacementMasks:
         if size not in self._masks:
             step = PLACEMENT_MASK_STEP_MM
             rx, ry = (math.ceil(value / (2 * step)) for value in size)
-            valid = np.zeros_like(self._visible)
+            valid = _erode(self._free, rx, ry)
+            clear_room = np.zeros_like(valid)
             for window, free in self._rooms:
-                valid[window] |= _erode(free, rx, ry)
+                clear_room[window] |= _erode(free, rx, ry)
             valid.setflags(write=False)
-            self._masks[size] = CliPlacementMask(self._origin, step, self._visible, valid)
+            clear_room.setflags(write=False)
+            self._masks[size] = CliPlacementMask(self._origin, step, self._visible, valid, clear_room)
         return self._masks[size]
