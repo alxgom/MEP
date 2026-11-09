@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
-from shapely.geometry import Point, Polygon
-
-from .geometry import cli_machine_pins
+from .geometry import cli_machine_footprint, cli_machine_pins
 
 
 @dataclass(frozen=True)
@@ -40,7 +38,7 @@ class CliPlacementRuntime:
         for angle in (0, 90):
             for center in dict.fromkeys(candidates):
                 pins = cli_machine_pins(machine, center, angle)
-                footprint = Polygon([pins[name] for name in ("c_tl", "c_tr", "c_br", "c_bl")])
+                footprint = cli_machine_footprint(pins)
                 if not region.covers(footprint) or any(footprint.intersects(obstacle) for obstacle in obstacles):
                     continue
                 feasible += 1

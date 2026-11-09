@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+from shapely.geometry import Polygon
+
 from mep_routing.domain.machines import DIR_REV, dir_from_axis, local_axis_to_world
 
 
@@ -31,6 +33,11 @@ def cli_machine_pins(machine, center, angle_degrees):
     }
     pins.update({name: _rotate(center, point, angle_degrees) for name, point in corners.items()})
     return pins
+
+
+def cli_machine_footprint(pins):
+    """Return the full machine body polygon in the routing frame."""
+    return Polygon([pins[name] for name in ("c_tl", "c_tr", "c_br", "c_bl")])
 
 
 def cli_air_access_spec(machine, pins, angle_degrees, connector_key, stub_length_mm=20):

@@ -11,7 +11,7 @@ from shapely.geometry import Polygon
 from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
-from .geometry import cli_air_access_spec, cli_machine_pins
+from .geometry import cli_air_access_spec, cli_machine_footprint, cli_machine_pins
 from .definition import (
     CLI_DIRECTED_BACKENDS, CLI_FITTING_BACKEND, CLI_LENGTH_BACKENDS, CLI_TEE_LENGTH_BACKENDS,
 )
@@ -109,9 +109,15 @@ class CliInteractiveRuntime:
         self._length_stats = None
         self._length_minimum = None
         pins = cli_machine_pins(machine, center, angle_degrees)
+        region = prepared_dwelling.routing_region_base
+        if region is None or not region.covers(cli_machine_footprint(pins)):
+            return self._finish(
+                (), "Blocked: machine body outside allowed area", started, 0,
+                CliGrillePlan(()), pins, context_obstacles=context_obstacles,
+            )
         grille_sizes = self._size_supply_grilles(prepared_dwelling.rooms, machine)
         grilles = prepare_cli_grilles(
-            prepared_dwelling.rooms, prepared_dwelling.routing_region_base,
+            prepared_dwelling.rooms, region,
             machine=machine, machine_pins=pins, angle_degrees=angle_degrees,
             supply_width_by_room_id=grille_sizes,
         )

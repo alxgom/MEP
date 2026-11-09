@@ -671,6 +671,12 @@ the body against static plan geometry; outlet and inlet extensions, vertical
 clearance and other installations are outside this check. It does not affect
 automatic placement or routing.
 
+Before routing, CLI checks the exact machine footprint against the allowed
+region. If any part of the body lies outside, the workbench shows
+`Blocked: machine body outside allowed area`, even when the outlet is inside.
+This check allows boundary contact and does not treat interior walls as holes
+unless the allowed geometry excludes them.
+
 
 ## Route Interaction Model
 

@@ -72,6 +72,42 @@ def test_cli_runtime_builds_core_simple_supply_tree():
     assert all(segment.width_mm > 0 and segment.height_mm > 0 for segment in result.supply_segments)
 
 
+@pytest.mark.parametrize("backend_index", (0, 7))
+def test_cli_rejects_body_outside_allowed_area_even_when_supply_access_is_inside(backend_index):
+    from mep_routing.installations.cli.geometry import cli_supply_access_specs
+
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    prepared = _prepared()
+    machine = CLI_INSTALLATION.default_machine
+    options = dict(return_enabled=False, solver_backend_index=backend_index, start_mode_index=1)
+    # At y=350 the body touches the boundary; moving one mm out leaves the outlet well inside.
+    assert runtime.solve(prepared, machine, (3000, 350), **options).routes
+    result = runtime.solve(prepared, machine, (3000, 349), **options)
+    access, = cli_supply_access_specs(machine, result.machine_pins, 0)
+    assert prepared.routing_region_base.contains(Point(access["access_point"]))
+    assert result.status == "Blocked: machine body outside allowed area"
+    assert not result.routes and not result.supply_segments and result.workspace is None
+    assert result.total_nodes == 0 and runtime.last_result is result
+    assert runtime.solve(prepared, machine, (3000, 350), **options).routes
+
+
+def test_cli_rejects_an_excluded_area_under_the_body_even_if_all_corners_fit():
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    prepared = _prepared()
+    region = prepared.routing_region_base.difference(box(2950, 3450, 3050, 3550))
+    result = runtime.solve(replace(prepared, routing_region_base=region),
+                           CLI_INSTALLATION.default_machine, (3000, 3500),
+                           solver_backend_index=7, start_mode_index=1)
+    assert all(region.covers(Point(result.machine_pins[key])) for key in ("c_tl", "c_tr", "c_br", "c_bl"))
+    assert not result.routes and result.status == "Blocked: machine body outside allowed area"
+
+
 def test_cli_runtime_sizes_only_supply_tree_from_downstream_room_area():
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION,
