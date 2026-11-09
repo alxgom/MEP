@@ -68,6 +68,7 @@ class MachineRender:
     outline: Sequence[ScreenPoint]
     fill_color: Color
     pins: Sequence[MachinePinMarker]
+    placement_outlines: Sequence[Sequence[ScreenPoint]] = ()
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,7 @@ def draw_canvas_scene(
 ) -> None:
     """Draw the central plan in the legacy layer order."""
     import pygame
+    from .drawing import draw_dashed_polyline
 
     screen.fill(scene.background_color)
 
@@ -222,12 +224,25 @@ def draw_canvas_scene(
     hooks.draw_terminal_area_drag(scene.terminal_area_start, scene.terminal_area_end)
 
     for index, machine in enumerate(scene.machines):
-        pygame.draw.polygon(screen, machine.fill_color, machine.outline)
-        active = index == len(scene.machines) - 1
-        border = (91, 149, 245) if active else (150, 156, 164)
-        if active:
-            pygame.draw.polygon(screen, (232, 242, 255), machine.outline, 5)
-        pygame.draw.polygon(screen, border, machine.outline, 3 if active else 1)
+        if machine.placement_outlines:
+            xs, ys = zip(*machine.outline)
+            bounds = pygame.Rect(min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1)
+            bounds = bounds.clip(screen.get_clip())
+            if bounds.width and bounds.height:
+                fill = pygame.Surface(bounds.size, pygame.SRCALPHA)
+                pygame.draw.polygon(fill, (*machine.fill_color, 92),
+                                    [(x - bounds.x, y - bounds.y) for x, y in machine.outline])
+                screen.blit(fill, bounds.topleft)
+            for ring in machine.placement_outlines:
+                draw_dashed_polyline(screen, ring, (33, 45, 62), width=4)
+                draw_dashed_polyline(screen, ring, (239, 247, 255), width=2)
+        else:
+            pygame.draw.polygon(screen, machine.fill_color, machine.outline)
+            active = index == len(scene.machines) - 1
+            border = (91, 149, 245) if active else (150, 156, 164)
+            if active:
+                pygame.draw.polygon(screen, (232, 242, 255), machine.outline, 5)
+            pygame.draw.polygon(screen, border, machine.outline, 3 if active else 1)
         for pin in machine.pins:
             pygame.draw.circle(screen, pin.color, pin.point, pin.radius)
             pygame.draw.circle(screen, pin.ring_color, pin.point, pin.radius, 1)

@@ -667,7 +667,10 @@ within the allowed region, but the combined footprint touches a wall or does
 not fit wholly inside one room. Columns, shafts and space outside the allowed
 region still block placement. Red tiles mark positions the conservative 50 mm
 raster does not clear. `[R]` rotates the body and extension together, including
-opposite outlet directions. This check uses static plan geometry; return
+opposite outlet directions. With the overlay on, the dashed outline follows
+the combined footprint before rounding to raster tiles, and the machine fill
+is translucent so the heatmap remains visible beneath it.
+This check uses static plan geometry; return
 extensions, vertical clearance and other installations are outside its scope.
 It does not affect automatic placement or routing.
 

@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Protocol, runtime_checkable
 
+from mep_routing.geometry import iter_polygons
 from mep_routing.installations.cli import cli_machine_pins
+from mep_routing.installations.cli.geometry import cli_placement_footprint_parts
 from mep_routing.installations.cli.placement_mask import CliPlacementMasks
 
 
@@ -84,6 +86,10 @@ class CliInstallationRuntime:
 
     def placement_mask(self, dwelling, angle_degrees):
         return self._placement_masks.get(dwelling, self._machine(), angle_degrees)
+
+    def placement_outlines(self, pins, angle_degrees):
+        body, extension = cli_placement_footprint_parts(self._machine(), pins, angle_degrees)
+        return tuple(tuple(part.exterior.coords) for part in iter_polygons(body.union(extension)))
 
     def _machine(self):
         key = self.app.installation_ui_session.selected_keys[self.key]

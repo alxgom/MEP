@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 
 from mep_routing.domain.machines import DIR_REV, dir_from_axis, local_axis_to_world
 
@@ -67,3 +67,14 @@ def cli_air_access_specs(machine, pins, angle_degrees, connector_keys=("air_out"
 
 def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=CLI_SUPPLY_ACCESS_LENGTH_MM):
     return (cli_air_access_spec(machine, pins, angle_degrees, "air_out", stub_length_mm),)
+
+
+def cli_placement_footprint_parts(machine, pins, angle_degrees):
+    """Return the body and outlet-width rectangle used for cardinal placement screening."""
+    access, = cli_supply_access_specs(machine, pins, angle_degrees)
+    x, y = access["pin_point"]
+    tx, ty = access["access_point"]
+    half_width = machine.connector("air_out").rectangular_size_mm[0] / 2
+    extension = (box(x - half_width, min(y, ty), x + half_width, max(y, ty)) if x == tx
+                 else box(min(x, tx), y - half_width, max(x, tx), y + half_width))
+    return cli_machine_footprint(pins), extension

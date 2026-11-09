@@ -66,9 +66,12 @@ def _render(app, screen, clock, fonts, state):
     cli_heatmap = active == "cli" and workbench.cli.show_placement_mask
     viewport = app.canvas_ui.viewport
     placement_mask = None
+    placement_outlines = ()
     if cli_heatmap and active_view.can("machine_selection") and dwelling_state.active is not None:
         runtime = app.routing_controller.installations.get("cli")
         placement_mask = runtime.placement_mask(dwelling_state.active.prepared, pose[2])
+        if placement_mask is not None:
+            placement_outlines = runtime.placement_outlines(pins, pose[2])
     if sal_heatmap:
         app.routing_controller.ensure_placement_scores()
 
@@ -120,6 +123,7 @@ def _render(app, screen, clock, fonts, state):
         room_wall_width=app.theme.wall_draw_width,
         terminal_area_start=state.terminal_area_start_mm,
         terminal_area_end=state.terminal_area_end_mm if state.terminal_area_dragging else None,
+        placement_outlines=placement_outlines,
     ))
     hooks = CanvasRenderHooks(
         draw_covers=lambda: app.canvas_ui.draw_geometry(screen, app.covers, app.theme.cover_overlay),

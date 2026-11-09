@@ -6,7 +6,7 @@ import math
 import numpy as np
 import shapely
 
-from .geometry import cli_machine_footprint, cli_machine_pins, cli_supply_access_specs
+from .geometry import cli_machine_pins, cli_placement_footprint_parts
 
 
 PLACEMENT_MASK_STEP_MM = 50
@@ -24,19 +24,13 @@ class CliPlacementMask:
 def _footprint_windows(machine, quarter_turn):
     angle = quarter_turn * 90
     pins = cli_machine_pins(machine, (0, 0), angle)
-    access, = cli_supply_access_specs(machine, pins, angle)
-    x, y = access["pin_point"]
-    tx, ty = access["access_point"]
-    half_width = machine.connector("air_out").rectangular_size_mm[0] / 2
-    # Use the catalog outlet width along the extension; trunk sizing comes later.
-    extension = ((x - half_width, min(y, ty), x + half_width, max(y, ty)) if x == tx
-                 else (min(x, tx), y - half_width, max(x, tx), y + half_width))
     step = PLACEMENT_MASK_STEP_MM
+    bounds = (part.bounds for part in cli_placement_footprint_parts(machine, pins, angle))
     # Signed inclusive tile offsets cover the footprint translated anywhere in its center tile.
     return tuple(
         (math.floor(left / step), math.floor(bottom / step),
          math.ceil(right / step), math.ceil(top / step))
-        for left, bottom, right, top in (cli_machine_footprint(pins).bounds, extension)
+        for left, bottom, right, top in bounds
     )
 
 
