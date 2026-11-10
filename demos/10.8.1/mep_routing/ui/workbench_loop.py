@@ -259,7 +259,7 @@ def _render(app, screen, clock, fonts, state):
         placement_rotation_label=("Current rotation" if virtual_placement else
                                   "Machine-aligned" if active == "cli" else
                                   "Exported geometry" if active == "coc" else None),
-        placement_shortcuts_label=("[A] Auto | [P] Mode | [V] Placement" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
+        placement_shortcuts_label=("[A] Place | [P] Mode | [V] Placement" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
     ))
     draw_sidebar(
         screen, canvas_left=viewport.canvas_left, window_height=viewport.window_height,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 HELP_TEXT = {
-    "auto": ("[A] Auto-placement on/off", "[P] Cycle placement mode", "[U] Rotation mode", "[V] Placement heatmap", "[H] Heatmap scale", "[B] Heatmap palette", "[W] Placement weights"),
+    "auto": ("[A] Automatic placement", "[P] Cycle placement mode", "[U] Rotation mode", "[V] Placement heatmap", "[H] Heatmap scale", "[B] Heatmap palette", "[W] Placement weights"),
     "solver": ("[C] Routing strategy", "[L] Router backend", "Hard minima: no flow solvers", "Sal minimum: diameter factor", "Cli minimum: trunk-width factor", "Cli minimum reset: 1.00x", "[Y] A* heuristic", "[Tab] Grid type", "[G] Grid mesh", "[T] Start mode", "Terminal: click nearest node", "Term. area: drag rectangle", "Ctrl removes preferences", "Reset prefs clears all", "Sliders: piece/bend/cross", "[M] Edge weights", "[N] Small/big weight view", "[X] Real pipe width"),
     "machine": ("Drag machine with mouse", "Wheel: rotate machine", "[U] Torque/field rotation", "Shift+wheel: zoom", "Shift+drag or middle drag: pan", "[D] Dwelling source", "[O] Routing frame"),
     "kpi": ("Plots compare current values", "against best observed minimum.", "Solver time excludes rendering."),

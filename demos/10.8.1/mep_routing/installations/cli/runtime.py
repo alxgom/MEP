@@ -102,7 +102,8 @@ class CliInteractiveRuntime:
         width = policy.size(1, 1).width_mm if policy is not None else None
         return cli_supply_exit_dimensions(machine, width, minimum_length_factor)
 
-    def place_machine(self, prepared_dwelling, machine, *, context_obstacles=(), minimum_segment_length_factor=1.0):
+    def place_machine(self, prepared_dwelling, machine, *, context_obstacles=(),
+                      minimum_segment_length_factor=1.0, angle_degrees=None):
         grille_sizes = self._size_supply_grilles(prepared_dwelling.rooms, machine)
         grilles = prepare_cli_grilles(
             prepared_dwelling.rooms, prepared_dwelling.routing_region_base, machine=machine,
@@ -111,6 +112,7 @@ class CliInteractiveRuntime:
         self.last_placement = self.placement.place(
             prepared_dwelling, machine, grilles, context_obstacles=context_obstacles,
             exit_dimensions=self.supply_exit_dimensions(machine, minimum_segment_length_factor),
+            angle_degrees=angle_degrees,
         )
         return self.last_placement
 

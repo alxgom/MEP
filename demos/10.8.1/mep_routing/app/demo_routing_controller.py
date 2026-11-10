@@ -245,8 +245,8 @@ class DemoRoutingController:
                 return
             machine_key = a.installation_ui_session.selected_keys["cli"]
             machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
+            pose = a.workbench_state.installation("cli").pose
             if state.auto_placement_mode_idx == a.CLI_INSTALLATION.virtual_placement_mode_index:
-                pose = a.workbench_state.installation("cli").pose
                 header = a.installation_header_state
                 runs = a.workbench_state.runs
                 context = installation_context_obstacles(
@@ -261,7 +261,7 @@ class DemoRoutingController:
                     minimum_segment_length_factor=state.minimum_segment_length_factor,
                     bend_penalty_mm=state.bend_penalty_mm,
                 )
-                message = (f"{outcome.status} · {outcome.ranked}/{outcome.feasible} ranked "
+                message = (f"{outcome.status} at {pose.angle_degrees:g}° · {outcome.ranked}/{outcome.feasible} ranked "
                            f"· {outcome.verified} checked · {outcome.elapsed_ms:.0f} ms")
                 a.observation.set_transient_message(message)
                 if outcome.placement is not None:
@@ -272,10 +272,12 @@ class DemoRoutingController:
                 return outcome
             placement = a.cli_runtime.place_machine(
                 dwelling.prepared, machine, minimum_segment_length_factor=state.minimum_segment_length_factor,
+                angle_degrees=pose.angle_degrees,
             )
-            a.workbench_state.installation("cli").pose.set(
-                placement.center, placement.angle_degrees,
-            )
+            if placement.feasible_candidates:
+                pose.set(placement.center)
+            else:
+                a.observation.set_transient_message(f"No valid CLI machine position at {pose.angle_degrees:g}°")
             return
         a.placement_session.weight_mode = a.weight_mode_idx
         outcome, elapsed_ms = a.placement_session.auto_place(a.auto_placement_mode_idx)

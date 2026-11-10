@@ -493,8 +493,12 @@ class WorkbenchEventAdapter:
         elif (caps := active_capabilities(a)).machine_edit and not caps.solver_controls and key == pygame.K_r:
             self._rotate_machine(90)
         elif transition := a.commands.apply_routing_key_command(key):
-            s.needs_auto_placement |= transition.needs_auto_placement
-            self._solve()
+            if a.installation_header_state.active == "cli" and key == pygame.K_p:
+                s.needs_auto_placement = False
+            else:
+                s.needs_auto_placement |= transition.needs_auto_placement
+            if transition.solve:
+                self._solve()
             if transition.record_history and self._successful():
                 a.observation.record_history(
                     s.routes, a.count_segment_crossings(s.routes), s.elapsed_ms,

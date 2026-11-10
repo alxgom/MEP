@@ -25,7 +25,8 @@ class CliPlacementRuntime:
     def __init__(self, spacing_mm=400):
         self.spacing_mm = int(spacing_mm)
 
-    def place(self, prepared, machine, grille_plan, *, context_obstacles=(), exit_dimensions=None):
+    def place(self, prepared, machine, grille_plan, *, context_obstacles=(), exit_dimensions=None,
+              angle_degrees=None):
         region = prepared.routing_region_base
         context_obstacles = tuple(context_obstacles)
         obstacles = tuple(prepared.columns) + tuple(prepared.shafts) + tuple(context_obstacles)
@@ -40,7 +41,8 @@ class CliPlacementRuntime:
         targets = tuple(grille_plan.connections)
         best = None
         feasible = 0
-        for angle in (0, 90):
+        angles = (0, 90) if angle_degrees is None else (angle_degrees,)
+        for angle in angles:
             for center in dict.fromkeys(candidates):
                 pins = cli_machine_pins(machine, center, angle)
                 footprint = cli_machine_footprint(pins)
@@ -65,5 +67,5 @@ class CliPlacementRuntime:
                     best = (key, center, angle, score)
         if best is None:
             center = (round(float(representative.x)), round(float(representative.y)))
-            return CliPlacementResult(center, 0, math.inf, 0)
+            return CliPlacementResult(center, angles[0], math.inf, 0)
         return CliPlacementResult(best[1], best[2], best[3], feasible)

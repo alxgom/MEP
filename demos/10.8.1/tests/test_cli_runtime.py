@@ -498,6 +498,16 @@ def test_cli_placement_uses_selected_machine_footprint():
     assert prepared.routing_region_base.covers(Point(small.center))
 
 
+def test_cli_core_workflow_places_at_the_requested_rotation():
+    prepared = _prepared()
+    plan = prepare_cli_grilles(prepared.rooms, prepared.routing_region_base)
+    placement = CliPlacementRuntime().place(
+        prepared, CLI_INSTALLATION.default_machine, plan, angle_degrees=270,
+    )
+    assert placement.feasible_candidates > 0
+    assert placement.angle_degrees == 270
+
+
 def test_cli_virtual_placement_publishes_a_verified_hybrid_grid_pose():
     prepared = _prepared()
     machine = CLI_INSTALLATION.default_machine

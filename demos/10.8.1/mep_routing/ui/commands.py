@@ -165,19 +165,15 @@ class WorkbenchCommandController:
         a, p = self.app, self.pygame
         state = a.workbench_state.cli
         definition = a.CLI_INSTALLATION
-        if event_key in (p.K_a, p.K_p):
-            if event_key == p.K_a:
-                state.auto_placement_mode_idx = (
-                    0 if state.auto_placement_mode_idx else 1
-                )
-            else:
-                state.auto_placement_mode_idx = (
-                    state.auto_placement_mode_idx + 1
-                ) % len(definition.auto_placement_labels)
-            return RoutingKeyTransition(
-                {}, record_history=False,
-                needs_auto_placement=state.auto_placement_mode_idx > 0,
-            )
+        if event_key == p.K_p:
+            state.auto_placement_mode_idx = (
+                state.auto_placement_mode_idx + 1
+            ) % len(definition.auto_placement_labels)
+            return RoutingKeyTransition({}, solve=False, record_history=False)
+        if event_key == p.K_a:
+            if state.auto_placement_mode_idx == 0:
+                state.auto_placement_mode_idx = definition.virtual_placement_mode_index
+            return RoutingKeyTransition({}, solve=False, record_history=False, needs_auto_placement=True)
         controls = {
             p.K_c: ("routing_strategy_idx", len(definition.strategy_labels), "Strategy"),
             p.K_l: ("router_backend_idx", len(definition.search_backend_labels), "Router"),
