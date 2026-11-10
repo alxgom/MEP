@@ -88,6 +88,7 @@ class CanvasFrameState:
     terminal_area_start: tuple[float, float] | None
     terminal_area_end: tuple[float, float] | None
     placement_outlines: Sequence[Sequence[tuple[float, float]]] = ()
+    placement_center: tuple[float, float] | None = None
 
 
 def active_selected_route(selected_route_name, routes):
@@ -235,6 +236,7 @@ def build_canvas_scene(state: CanvasFrameState) -> CanvasScene:
         machines.append(MachineRender(
             outline, (230, 126, 34) if state.auto_placement_mode > 0 else (127, 140, 141), pin_markers,
             placement_outlines=tuple(tuple(to_screen(*p) for p in ring) for ring in state.placement_outlines),
+            placement_center=to_screen(*state.placement_center) if state.placement_center is not None else None,
         ))
     return CanvasScene(
         palette.background, canvas_rooms, palette.wall, state.room_wall_width,

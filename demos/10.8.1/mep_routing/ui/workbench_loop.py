@@ -134,6 +134,7 @@ def _render(app, screen, clock, fonts, state):
         terminal_area_start=state.terminal_area_start_mm,
         terminal_area_end=state.terminal_area_end_mm if state.terminal_area_dragging else None,
         placement_outlines=placement_outlines,
+        placement_center=pose[:2] if placement_mask is not None else None,
     ))
     hooks = CanvasRenderHooks(
         draw_covers=lambda: app.canvas_ui.draw_geometry(screen, app.covers, app.theme.cover_overlay),

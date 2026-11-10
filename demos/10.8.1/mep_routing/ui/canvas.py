@@ -69,6 +69,7 @@ class MachineRender:
     fill_color: Color
     pins: Sequence[MachinePinMarker]
     placement_outlines: Sequence[Sequence[ScreenPoint]] = ()
+    placement_center: ScreenPoint | None = None
 
 
 @dataclass(frozen=True)
@@ -246,6 +247,13 @@ def draw_canvas_scene(
         for pin in machine.pins:
             pygame.draw.circle(screen, pin.color, pin.point, pin.radius)
             pygame.draw.circle(screen, pin.ring_color, pin.point, pin.radius, 1)
+        if machine.placement_center is not None:
+            x, y = machine.placement_center
+            strokes = (((x - 5, y - 5), (x + 5, y + 5)),
+                       ((x - 5, y + 5), (x + 5, y - 5)))
+            for color, width in (((247, 250, 255), 5), ((26, 34, 49), 2)):
+                for start, end in strokes:
+                    pygame.draw.line(screen, color, start, end, width)
 
     for guide in scene.guide_lines:
         pygame.draw.line(screen, guide.color, guide.start, guide.end, guide.width)

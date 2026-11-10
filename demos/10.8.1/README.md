@@ -683,7 +683,7 @@ Use `[Ctrl+G]` to compare with the original partition. This preview omits machin
 and terminal attachments, and changing it does not change the routing grid.
 A green or yellow ring marks a cell center that passes the placement mask for
 the current rotation; gray dots mark the other centers. Drag the machine so
-its body center sits on a ring to try that position. The cell overlay stays
+the X marking its body center sits on a ring to try that position. The cell overlay stays
 fixed while you move or rotate the machine. Use `[Shift+G]` to toggle these
 cells, and `[G]` to toggle the separate routing grid.
 
