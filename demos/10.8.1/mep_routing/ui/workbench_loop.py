@@ -260,7 +260,14 @@ def _render(app, screen, clock, fonts, state):
                                   "Machine-aligned" if active == "cli" else
                                   "Exported geometry" if active == "coc" else None),
         placement_shortcuts_label=("[A] Place | [P] Mode | [V] Placement" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
+        yellow_placement_penalty=(
+            (cli_state.yellow_placement_penalty_mm, app.CLI_INSTALLATION.yellow_placement_penalty_max_mm)
+            if virtual_placement else None
+        ),
     ))
+    if not virtual_placement:
+        app.canvas_ui.controls.yellow_placement_penalty = pygame.Rect(0, 0, 0, 0)
+        app.canvas_ui.controls.yellow_placement_penalty_reset = pygame.Rect(0, 0, 0, 0)
     draw_sidebar(
         screen, canvas_left=viewport.canvas_left, window_height=viewport.window_height,
         fonts=SidebarFonts(title=fonts.title, bold=fonts.bold, small=fonts.small),

@@ -330,6 +330,7 @@ class SidebarFrameState:
     placement_weights_label: str | None = None
     placement_rotation_label: str | None = None
     placement_shortcuts_label: str | None = None
+    yellow_placement_penalty: tuple[int, int] | None = None
     solver_detail: str | None = None
 
 
@@ -362,6 +363,7 @@ def build_sidebar_view(state: SidebarFrameState) -> SidebarView:
             state.auto_placement_mode, heatmap, weights, rotation_mode,
             state.placement_shortcuts_label
             or "[A] Auto | [P] Mode | [V] Heatmap | [?] More",
+            state.yellow_placement_penalty,
         ),
         SolverCard(
             state.strategy, state.router, state.heuristic, state.graph_type, state.room_start_mode,

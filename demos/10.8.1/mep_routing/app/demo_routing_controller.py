@@ -260,6 +260,7 @@ class DemoRoutingController:
                     dwelling.prepared, machine, pose.angle_degrees, mask, context_obstacles=context,
                     minimum_segment_length_factor=state.minimum_segment_length_factor,
                     bend_penalty_mm=state.bend_penalty_mm,
+                    yellow_placement_penalty_mm=state.yellow_placement_penalty_mm,
                 )
                 message = (f"{outcome.status} at {pose.angle_degrees:g}° · {outcome.ranked}/{outcome.feasible} ranked "
                            f"· {outcome.verified} checked · {outcome.elapsed_ms:.0f} ms")

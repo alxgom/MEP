@@ -165,6 +165,7 @@ class InteractiveObservationController:
                     "bend_penalty_mm": float(cli.bend_penalty_mm),
                     "crossing_penalty_multiplier": float(cli.crossing_penalty_multiplier),
                     "minimum_segment_length_factor": float(cli.minimum_segment_length_factor),
+                    "yellow_placement_penalty_mm": int(cli.yellow_placement_penalty_mm),
                     "duct_geometry_mode_idx": int(cli.duct_geometry_mode_idx),
                 },
             },
@@ -247,6 +248,7 @@ class InteractiveObservationController:
             cli = a.workbench_state.cli
             # Older logs used only the calculated trunk width.
             cli.minimum_segment_length_factor = cli_saved.get("minimum_segment_length_factor", 1.0)
+            cli.yellow_placement_penalty_mm = cli_saved.get("yellow_placement_penalty_mm", 0)
             for name in (
                 "return_ventilation_enabled", "graph_type_idx", "routing_strategy_idx",
                 "router_backend_idx", "heuristic_mode_idx", "room_start_mode_idx",

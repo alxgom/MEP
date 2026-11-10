@@ -58,6 +58,14 @@ class WorkbenchCommandController:
         if self.app.installation_header_state.active == "cli":
             self.app.workbench_state.cli.minimum_segment_length_factor = 1.0
 
+    def set_yellow_placement_penalty_from_slider_x(self, x):
+        a = self.app
+        state = a.workbench_state.cli
+        state.yellow_placement_penalty_mm = round(a.canvas_ui.slider_value(
+            "yellow_placement_penalty", x, 0, a.CLI_INSTALLATION.yellow_placement_penalty_max_mm,
+            state.yellow_placement_penalty_mm,
+        ))
+
     def set_bend_weight_from_slider_x(self, x):
         a = self.app
         if a.installation_header_state.active == "cli":

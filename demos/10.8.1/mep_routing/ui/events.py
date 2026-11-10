@@ -316,6 +316,8 @@ class PanelHit:
     canvas_tool: str | None = None
     solution_log_action: int | str | None = None
     terminal_tool_action: str | None = None
+    yellow_placement_penalty_slider: bool = False
+    yellow_placement_penalty_reset: bool = False
 
 
 @dataclass(frozen=True)
@@ -362,6 +364,13 @@ def begin_panel_interaction(
         )
     if hit.crossing_reset:
         return PanelInteractionTransition(state, (PanelCommand("reset_slider", "crossing"),))
+    if hit.yellow_placement_penalty_slider:
+        name = "yellow_placement_penalty"
+        return PanelInteractionTransition(
+            replace(state, active_slider=name), (PanelCommand("set_slider", (name, screen_x)),),
+        )
+    if hit.yellow_placement_penalty_reset:
+        return PanelInteractionTransition(state, (PanelCommand("reset_slider", "yellow_placement_penalty"),))
     if hit.canvas_tool is not None:
         return PanelInteractionTransition(state, (PanelCommand("canvas_tool", hit.canvas_tool),))
     if hit.solution_log_action is not None:

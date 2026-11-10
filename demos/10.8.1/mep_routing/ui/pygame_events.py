@@ -253,9 +253,12 @@ class WorkbenchEventAdapter:
             bend_reset=controls.bend_reset.collidepoint(pos),
             crossing_slider=controls.crossing.collidepoint(pos),
             crossing_reset=controls.crossing_reset.collidepoint(pos),
+            yellow_placement_penalty_slider=controls.yellow_placement_penalty.collidepoint(pos),
+            yellow_placement_penalty_reset=controls.yellow_placement_penalty_reset.collidepoint(pos),
         )
         occupied = any((panel_hit.help_card, panel_hit.min_piece_slider, panel_hit.min_piece_reset, panel_hit.bend_slider,
-                        panel_hit.bend_reset, panel_hit.crossing_slider, panel_hit.crossing_reset))
+                        panel_hit.bend_reset, panel_hit.crossing_slider, panel_hit.crossing_reset,
+                        panel_hit.yellow_placement_penalty_slider, panel_hit.yellow_placement_penalty_reset))
         if not occupied:
             panel_hit = replace(panel_hit, canvas_tool=a.commands.handle_canvas_tool_button_click(pos))
             occupied = panel_hit.canvas_tool is not None
@@ -312,11 +315,18 @@ class WorkbenchEventAdapter:
                 a.observation.set_transient_message("Routing weights are not available here")
                 return
             name, x = command.value
+            if name == "yellow_placement_penalty":
+                a.commands.set_yellow_placement_penalty_from_slider_x(x)
+                return
             label, color = self._set_slider(name, x)
             self._solve(); self._record(label, color)
         elif command.name == "reset_slider":
             if not active_capabilities(a).routing_weights:
                 a.observation.set_transient_message("Routing weights are not available here")
+                return
+            if command.value == "yellow_placement_penalty":
+                a.workbench_state.cli.yellow_placement_penalty_mm = 0
+                s.needs_auto_placement = True
                 return
             if command.value == "min_piece":
                 a.commands.reset_minimum_segment_length(); marker = ("Min:1x", (241, 196, 15))
@@ -416,6 +426,9 @@ class WorkbenchEventAdapter:
             s.installation_drag_enabled, s.installation_drag_position = False, None
             self._update_header_cursor(event.pos)
             return
+        if event.button == 1 and s.panel_interaction.active_slider == "yellow_placement_penalty":
+            a.commands.set_yellow_placement_penalty_from_slider_x(event.pos[0])
+            s.needs_auto_placement = True
         s.panel_interaction = end_panel_interaction(s.panel_interaction).state
         transition = end_canvas_gesture(self._gesture(), button="left" if event.button == 1 else "middle")
         s.canvas_gesture = transition.state
@@ -443,6 +456,9 @@ class WorkbenchEventAdapter:
         s.panel_interaction = panel.state
         if panel.commands:
             name, x = panel.commands[0].value
+            if name == "yellow_placement_penalty":
+                a.commands.set_yellow_placement_penalty_from_slider_x(x)
+                return
             self._set_slider(name, x); self._solve(); self._record(); return
         transition = move_canvas_gesture(
             self._gesture(), world_point=a.to_mm(*event.pos), screen_point=event.pos,

@@ -52,6 +52,7 @@ class AutoPlacementCard:
     placement_weights: str
     rotation_mode: str
     shortcuts: str = "[A] Auto | [P] Mode | [V] Heatmap | [?] More"
+    yellow_placement_penalty: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -225,7 +226,9 @@ def draw_sidebar(
         label = fonts.small.render("ON" if view.machine.return_ventilation_enabled else "OFF", True, colors.text)
         screen.blit(label, (toggle.centerx - label.get_width() // 2, toggle.centery - label.get_height() // 2))
 
-    solver_card = pygame.Rect(15, 280, card_width, 270)
+    yellow_penalty = view.auto_placement.yellow_placement_penalty
+    slider_row_height = 34 if yellow_penalty is not None else 0
+    solver_card = pygame.Rect(15, 280, card_width, 270 + slider_row_height)
     pygame.draw.rect(screen, colors.card, solver_card, border_radius=6)
     screen.blit(fonts.bold.render("ROUTING PATH SOLVER", True, colors.text), (text_x, 290))
     draw_help_button("solver", solver_card, fonts.small)
@@ -253,7 +256,14 @@ def draw_sidebar(
         (230, 126, 34), "crossing", "x", False,
     )
 
-    status_y = 560
+    if yellow_penalty is not None:
+        value, maximum = yellow_penalty
+        draw_weight_slider(
+            screen, fonts.small, text_x, 550, canvas_left - 70, "Yellow placement penalty",
+            value, 0, maximum, colors.warning, "yellow_placement_penalty", " mm", True,
+        )
+
+    status_y = 560 + slider_row_height
     status_card = pygame.Rect(15, status_y, card_width, 170)
     pygame.draw.rect(screen, colors.status_surface, status_card, border_radius=4)
     pygame.draw.rect(screen, (55, 61, 72), status_card, 1, border_radius=4)

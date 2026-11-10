@@ -133,6 +133,8 @@ class CanvasControlRects:
     crossing: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))
     bend_reset: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))
     crossing_reset: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 1, 1))
+    yellow_placement_penalty: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
+    yellow_placement_penalty_reset: pygame.Rect = field(default_factory=lambda: pygame.Rect(0, 0, 0, 0))
     terminal_tools: dict = field(default_factory=dict)
 
 

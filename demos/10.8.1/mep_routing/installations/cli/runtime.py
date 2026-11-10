@@ -118,7 +118,7 @@ class CliInteractiveRuntime:
 
     def place_machine_steiner(self, dwelling, machine, angle, mask, *,
                               minimum_segment_length_factor=1.0, bend_penalty_mm=4000.0,
-                              context_obstacles=()):
+                              context_obstacles=(), yellow_placement_penalty_mm=0):
         started = perf_counter()
         ranked, feasible, verified = (), 0, 0
 
@@ -142,6 +142,7 @@ class CliInteractiveRuntime:
         ranked, feasible = self.virtual_placement.rank(
             dwelling, machine, angle, mask, grilles, dimensions,
             dimensions[1] * minimum_segment_length_factor, bend_penalty_mm, context_obstacles,
+            yellow_placement_penalty_mm=yellow_placement_penalty_mm,
         )
         if not ranked:
             return outcome("No outlet can serve all supply grilles on the shared graph")

@@ -526,3 +526,29 @@ def test_cli_virtual_placement_publishes_a_verified_hybrid_grid_pose():
         solver_backend_index=7, start_mode_index=1,
     )
     assert routed.routes and len(routed.grille_plan.supply) == 2
+
+
+def test_cli_virtual_placement_charges_yellow_outlets_once():
+    prepared = _prepared()
+    machine = CLI_INSTALLATION.default_machine
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    dimensions = runtime.supply_exit_dimensions(machine, 1)
+    mask = CliPlacementMasks().get(prepared, machine, 90, dimensions)
+    grilles = prepare_cli_grilles(
+        prepared.rooms, prepared.routing_region_base,
+        supply_width_by_room_id=runtime._size_supply_grilles(prepared.rooms, machine),
+    )
+    args = (prepared, machine, 90, mask, grilles, dimensions, dimensions[1], 4000, ())
+    baseline, count = runtime.virtual_placement.rank(*args)
+    penalized, penalized_count = runtime.virtual_placement.rank(*args, yellow_placement_penalty_mm=500)
+    original = dict(baseline)
+    assert count == penalized_count
+    assert original.keys() == dict(penalized).keys()
+    assert {mask.center_status(center) for center in original} == {"clear", "allowed"}
+    for center, score in penalized:
+        expected = 500 if mask.center_status(center) == "allowed" else 0
+        assert score == pytest.approx(original[center] + expected)
+    assert [score for _, score in penalized] == sorted(score for _, score in penalized)

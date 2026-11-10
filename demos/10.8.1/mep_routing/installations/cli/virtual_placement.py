@@ -73,11 +73,11 @@ class CliVirtualPlacementSearch:
         return self._screened
 
     def rank(self, dwelling, machine, angle, mask, grilles, exit_dimensions, minimum_length_mm,
-             bend_penalty_mm, context_obstacles):
+             bend_penalty_mm, context_obstacles, *, yellow_placement_penalty_mm=0):
         length, width = exit_dimensions
         obstacles = (*dwelling.columns, *dwelling.shafts, *context_obstacles)
         candidates = []
-        for center, _status in self.screened_centers(dwelling, mask):
+        for center, status in self.screened_centers(dwelling, mask):
             pins = cli_machine_pins(machine, center, angle)
             body = cli_machine_footprint(pins)
             if not dwelling.routing_region_base.covers(body) or any(body.intersects(o) for o in obstacles):
@@ -87,7 +87,8 @@ class CliVirtualPlacementSearch:
             clear = cli_clear_supply_turns(dwelling, extension, turns, context_obstacles)
             if clear:
                 blocked = {access["in_dir"], *(turns.keys() - clear.keys())}
-                candidates.append((center, access, blocked))
+                penalty = yellow_placement_penalty_mm if status == "allowed" else 0
+                candidates.append((center, access, blocked, penalty))
         if not candidates:
             return (), 0
 
@@ -99,7 +100,7 @@ class CliVirtualPlacementSearch:
         inputs = build_cli_simple_graph_inputs(
             routing_region=dwelling.routing_region_base,
             terminals=terminals, columns=dwelling.columns, shafts=dwelling.shafts,
-            machine_pins={}, access_points=(access["access_point"] for _, access, _ in candidates),
+            machine_pins={}, access_points=(access["access_point"] for _, access, _, _ in candidates),
             epsilon_mm=self.graph_config.epsilon_mm, axis_clearance_mm=100,
             context_obstacles=context_obstacles,
         )
@@ -117,8 +118,8 @@ class CliVirtualPlacementSearch:
             terminals_at.setdefault(node, []).append((name, wall))
         terminal_nodes = {name: list(nodes) for name, nodes in prepared.candidates.items()}
         wall_points = dict(prepared.wall_points)
-        roots, root_centers, extra_points = [], {}, []
-        for center, access, blocked in candidates:
+        roots, placements, extra_points = [], {}, []
+        for center, access, blocked, penalty in candidates:
             point = access["access_point"]
             node = node_at[point]
             edges = [edge for edge in adjacency[node] if edge[2] not in blocked]
@@ -135,7 +136,7 @@ class CliVirtualPlacementSearch:
                 terminal_nodes[name].append(root)
                 wall_points[(name, root)] = wall
             roots.append((root, ((access["pin_point"], point),)))
-            root_centers[root] = center
+            placements[root] = center, penalty
         if not roots:
             return (), len(candidates)
         prepared = replace(prepared, nodes=np.vstack((grid.nodes, extra_points)),
@@ -145,4 +146,10 @@ class CliVirtualPlacementSearch:
             TreeLengthPolicy(minimum_length_mm, split_at_tees=True),
             fitting_weight=FITTING_PERTURBATION_MM,
         )
-        return tuple((root_centers[root], score) for root, score in scores), len(candidates)
+        # Charge the virtual source's choice once, after scoring the complete tree.
+        ranked = []
+        for root, score in scores:
+            center, penalty = placements[root]
+            ranked.append((center, score + penalty, penalty))
+        ranked.sort(key=lambda item: (item[1], item[2]))
+        return tuple((center, score) for center, score, _ in ranked), len(candidates)

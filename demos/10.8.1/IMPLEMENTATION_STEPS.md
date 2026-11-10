@@ -1023,6 +1023,8 @@ Before each commit:
 
 - Separated CLI placement controls. `P` selects the mode, `A` runs it at the displayed angle, and `R` reruns Virtual source at the next angle. Pressing `A` from Manual selects Virtual source. The legacy workflow also honors the current angle on an explicit run. Headless Pygame confirmed different verified Virtual source positions at 90° and 180°, and a legacy placement at 270°. All 620 tests passed.
 
+- Added a 0–500 mm yellow-placement penalty slider to CLI Virtual source, defaulting to 0. The candidate's virtual-source edge carries the penalty once when its raster tile is yellow. The slider reruns placement on release at the current rotation, and the reset button restores 0. Solution logs retain the value. Headless Pygame verified the 500 mm endpoint, single rerun on release, and reset. The ranking regression checks that only yellow candidates pay the selected amount.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
