@@ -1,6 +1,8 @@
 """Conservative raster screening for CLI body and supply extension placement."""
 
 from dataclasses import dataclass
+from functools import lru_cache
+from itertools import product
 import math
 
 import numpy as np
@@ -28,6 +30,19 @@ class CliPlacementMask:
         if not (0 <= x < nx and 0 <= y < ny and self.valid[y, x]):
             return "blocked"
         return "clear" if self.clear_room[y, x] else "allowed"
+
+
+@lru_cache(maxsize=16)
+def cell_center_product_candidates(mask, cells):
+    """Screen the Cartesian product of the unique cell-center coordinates."""
+    xs = sorted({(left + right) / 2 for left, _bottom, right, _top in cells})
+    ys = sorted({(bottom + top) / 2 for _left, bottom, _right, top in cells})
+    candidates = []
+    for point in product(xs, ys):
+        status = mask.center_status(point)
+        if status != "blocked":
+            candidates.append((point, status))
+    return tuple(candidates)
 
 
 def _footprint_windows(machine, quarter_turn):

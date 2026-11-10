@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 import pygame
 
+from mep_routing.installations.cli.placement_mask import cell_center_product_candidates
+
 from .canvas import CanvasFonts, CanvasRenderHooks, draw_canvas_scene
 from .frame import (
     CanvasFrameCallbacks, CanvasFramePalette, CanvasFrameState, SidebarFrameState,
@@ -68,6 +70,7 @@ def _render(app, screen, clock, fonts, state):
     placement_mask = None
     placement_outlines = ()
     placement_cell_grid = None
+    placement_candidates = ()
     placement_cell_label = None
     if cli_heatmap and active_view.can("machine_selection") and dwelling_state.active is not None:
         runtime = app.routing_controller.installations.get("cli")
@@ -78,7 +81,11 @@ def _render(app, screen, clock, fonts, state):
                 room_aware = workbench.cli.room_aware_placement_cells
                 placement_cell_grid = runtime.placement_cell_grid(dwelling_state.active, room_aware=room_aware)
                 if placement_cell_grid is not None:
-                    placement_cell_label = "Room-aware" if room_aware else "Original cells"
+                    placement_candidates = cell_center_product_candidates(
+                        placement_mask, placement_cell_grid.diagnostics["cells"],
+                    )
+                    mode = "Room-aware" if room_aware else "Original cells"
+                    placement_cell_label = f"{mode} · {len(placement_candidates)} candidates"
     if sal_heatmap:
         app.routing_controller.ensure_placement_scores()
 
@@ -86,7 +93,7 @@ def _render(app, screen, clock, fonts, state):
         if placement_mask is not None:
             draw_placement_mask(screen, placement_mask, viewport)
             if placement_cell_grid is not None:
-                draw_placement_cell_grid(screen, placement_cell_grid, placement_mask, viewport)
+                draw_placement_cell_grid(screen, placement_cell_grid, placement_candidates, viewport)
         elif sal_heatmap and app.ap_scores:
             app.ui_facade.draw_distance_heatmap(screen, app.ap_scores)
 

@@ -2,10 +2,13 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
+import numpy as np
 from shapely.geometry import Polygon, box
 
 from mep_routing.installations.cli.catalog import CLI_PEAD_MACHINES, CliConnector
-from mep_routing.installations.cli.placement_mask import CliPlacementMasks
+from mep_routing.installations.cli.placement_mask import (
+    CliPlacementMask, CliPlacementMasks, cell_center_product_candidates,
+)
 
 
 def machine(width=200, depth=100, outlet_width=100):
@@ -115,3 +118,16 @@ def test_extension_controls_fit_but_only_the_body_controls_room_color():
     rooms = (box(0, 0, 1200, 450), box(0, 450, 1200, 1400))
     mask = cache.get(dwelling(rooms, walls=(ahead,)), machine(), 0)
     assert mask.valid[3, 8] and mask.clear_room[3, 8]
+
+
+def test_cell_center_product_adds_only_valid_coordinate_pairs():
+    cells = ((0, 0, 50, 50), (50, 50, 100, 100), (0, 100, 50, 150))
+    valid = np.array([[True, True], [False, False], [False, True]])
+    clear = np.array([[True, False], [False, False], [False, True]])
+    mask = CliPlacementMask((0, 0), 50, np.ones_like(valid), valid, clear)
+
+    assert cell_center_product_candidates(mask, cells) == (
+        ((25, 25), "clear"),
+        ((75, 25), "allowed"),
+        ((75, 125), "clear"),
+    )

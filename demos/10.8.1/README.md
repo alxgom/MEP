@@ -681,9 +681,11 @@ the allowed area, then partitions the remaining space separately. Room
 boundaries guide the cells without blocking allowed connections between them.
 Use `[Ctrl+G]` to compare with the original partition. This preview omits machine
 and terminal attachments, and changing it does not change the routing grid.
-A green or yellow ring marks a cell center that passes the placement mask for
-the current rotation; gray dots mark the other centers. Drag the machine so
-the X marking its body center sits on a ring to try that position. The cell overlay stays
+A green or yellow ring marks a candidate that passes the placement mask for
+the current rotation. Candidates combine every distinct cell-center X with
+every distinct cell-center Y. The skeleton edges stay as drawn; the new
+intersections are placement points. Drag the machine so the X marking its
+body center sits on a ring to try that position. The cell overlay stays
 fixed while you move or rotate the machine. Use `[Shift+G]` to toggle these
 cells, and `[G]` to toggle the separate routing grid.
 
