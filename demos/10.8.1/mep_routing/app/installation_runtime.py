@@ -7,7 +7,9 @@ from typing import Mapping, Protocol, runtime_checkable
 
 from mep_routing.geometry import iter_polygons
 from mep_routing.installations.cli import cli_machine_pins
-from mep_routing.installations.cli.geometry import cli_placement_footprint_parts
+from mep_routing.installations.cli.geometry import (
+    cli_clear_supply_turns, cli_machine_footprint, cli_supply_access_specs, cli_supply_exit_footprints,
+)
 from mep_routing.installations.cli.placement_mask import CliPlacementMasks
 
 
@@ -87,7 +89,13 @@ class CliInstallationRuntime:
         self._placement_cell_grids = {}
 
     def placement_mask(self, dwelling, angle_degrees):
-        return self._placement_masks.get(dwelling, self._machine(), angle_degrees)
+        machine = self._machine()
+        return self._placement_masks.get(dwelling, machine, angle_degrees, self._exit_dimensions(machine))
+
+    def _exit_dimensions(self, machine):
+        return self.app.cli_runtime.supply_exit_dimensions(
+            machine, self.app.workbench_state.cli.minimum_segment_length_factor,
+        )
 
     def placement_cell_grid(self, dwelling, *, room_aware):
         """Cache both placement overlays independently of the machine pose."""
@@ -101,9 +109,16 @@ class CliInstallationRuntime:
             )
         return self._placement_cell_grids[room_aware]
 
-    def placement_outlines(self, pins, angle_degrees):
-        body, extension = cli_placement_footprint_parts(self._machine(), pins, angle_degrees)
-        return tuple(tuple(part.exterior.coords) for part in iter_polygons(body.union(extension)))
+    def placement_outlines(self, dwelling, pins, angle_degrees):
+        machine = self._machine()
+        length, width = self._exit_dimensions(machine)
+        access, = cli_supply_access_specs(machine, pins, angle_degrees, length)
+        extension, turns = cli_supply_exit_footprints(machine, angle_degrees, access, width)
+        usable_turns = cli_clear_supply_turns(dwelling, extension, turns)
+        footprint = cli_machine_footprint(pins).union(extension)
+        for turn in usable_turns.values():
+            footprint = footprint.union(turn)
+        return tuple(tuple(part.exterior.coords) for part in iter_polygons(footprint))
 
     def _machine(self):
         key = self.app.installation_ui_session.selected_keys[self.key]

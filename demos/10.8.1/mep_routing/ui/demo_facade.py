@@ -149,6 +149,7 @@ class DemoUiFacade:
                 if active == "cli" and transition.changed and dwelling is not None:
                     placement = a.cli_runtime.place_machine(
                         dwelling.prepared, a.CLI_INSTALLATION.machine_catalog.value(selected),
+                        minimum_segment_length_factor=a.workbench_state.cli.minimum_segment_length_factor,
                     )
                     a.workbench_state.installation("cli").pose.set(
                         placement.center, placement.angle_degrees,

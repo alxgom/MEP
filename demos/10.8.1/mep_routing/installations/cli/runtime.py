@@ -12,7 +12,8 @@ from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
 
 from .geometry import (
-    CLI_SUPPLY_ACCESS_LENGTH_MM, cli_air_access_spec, cli_machine_footprint, cli_machine_pins,
+    cli_air_access_spec, cli_clear_supply_turns, cli_machine_footprint, cli_machine_pins,
+    cli_supply_exit_dimensions, cli_supply_exit_footprints,
 )
 from .definition import (
     CLI_DIRECTED_BACKENDS, CLI_FITTING_BACKEND, CLI_LENGTH_BACKENDS, CLI_TEE_LENGTH_BACKENDS,
@@ -87,7 +88,19 @@ class CliInteractiveRuntime:
         self.last_placement = None
         self.last_result = CliRoutingResult((), "Cli has not run", 0.0, 0, {}, {})
 
-    def place_machine(self, prepared_dwelling, machine, *, context_obstacles=()):
+    def _supply_sizing_policy(self, machine):
+        if machine.airflow_m3h and machine.pressure_loss_mmca:
+            return self.sizing_policy_factory(CliSizingContext(
+                machine.airflow_m3h, machine.pressure_loss_mmca,
+            ))
+        return None
+
+    def supply_exit_dimensions(self, machine, minimum_length_factor):
+        policy = self._supply_sizing_policy(machine)
+        width = policy.size(1, 1).width_mm if policy is not None else None
+        return cli_supply_exit_dimensions(machine, width, minimum_length_factor)
+
+    def place_machine(self, prepared_dwelling, machine, *, context_obstacles=(), minimum_segment_length_factor=1.0):
         grille_sizes = self._size_supply_grilles(prepared_dwelling.rooms, machine)
         grilles = prepare_cli_grilles(
             prepared_dwelling.rooms, prepared_dwelling.routing_region_base, machine=machine,
@@ -95,6 +108,7 @@ class CliInteractiveRuntime:
         )
         self.last_placement = self.placement.place(
             prepared_dwelling, machine, grilles, context_obstacles=context_obstacles,
+            exit_dimensions=self.supply_exit_dimensions(machine, minimum_segment_length_factor),
         )
         return self.last_placement
 
@@ -248,21 +262,28 @@ class CliInteractiveRuntime:
         connector_key = "air_out" if role == "supply" else "air_in"
         policy, machine_sizing, grille_sizes = None, None, {}
         area_by_route = {item.route_name: item.room_area_m2 for item in connections}
-        if role == "supply" and machine.airflow_m3h and machine.pressure_loss_mmca:
-            policy = self.sizing_policy_factory(CliSizingContext(
-                machine.airflow_m3h, machine.pressure_loss_mmca,
-            ))
+        if role == "supply":
+            policy = self._supply_sizing_policy(machine)
             total_area = float(sum(area_by_route.values()))
-            if total_area > 0:
+            if policy is not None and total_area > 0:
                 machine_sizing = policy.size(total_area, total_area)
                 grille_sizes = {
                     item.route_name: policy.size(item.room_area_m2, total_area)
                     for item in connections
                 }
-        access_length_mm = CLI_SUPPLY_ACCESS_LENGTH_MM if role == "supply" else 20
+        access_length_mm, turn_width = 20, None
+        if role == "supply":
+            width = machine_sizing.width_mm if machine_sizing is not None else None
+            access_length_mm, turn_width = cli_supply_exit_dimensions(machine, width, minimum_segment_length_factor)
         access = cli_air_access_spec(
             machine, pins, angle, connector_key, access_length_mm,
         )
+        if role == "supply":
+            extension, turns = cli_supply_exit_footprints(machine, angle, access, turn_width)
+            clear_turns = cli_clear_supply_turns(prepared, extension, turns, context_obstacles)
+            if not clear_turns:
+                self._length_failure = "Blocked: no room for a 90° supply exit"
+                return None
         terminals = {item.route_name: item.routing_point for item in connections}
         role_prepared = replace(prepared, terminals=terminals, wet_room_names=[])
 
@@ -271,13 +292,19 @@ class CliInteractiveRuntime:
                 **kwargs, context_obstacles=context_obstacles,
             )
 
+        def access_specs(current_pins, current_angle):
+            spec = cli_air_access_spec(machine, current_pins, current_angle, connector_key, access_length_mm)
+            if role != "supply" or GraphMode(graph_mode) is not GraphMode.CELL_SKELETON:
+                return (spec,)
+            x, y = spec["access_point"]
+            offsets = {"N": (0, turn_width), "S": (0, -turn_width),
+                       "E": (turn_width, 0), "W": (-turn_width, 0)}
+            # Attach the usable turn endpoints to the same sparse grid as the outlet.
+            return (spec, *(dict(spec, access_point=(x + dx, y + dy))
+                            for direction, (dx, dy) in offsets.items() if direction in clear_turns))
+
         profile = InstallationGraphProfile(
-            port_access_specs=lambda current_pins, current_angle: (
-                cli_air_access_spec(
-                    machine, current_pins, current_angle, connector_key,
-                    access_length_mm,
-                ),
-            ),
+            port_access_specs=access_specs,
             simple_input_builder=simple_inputs,
         )
         dwelling = create_active_dwelling(
@@ -301,6 +328,15 @@ class CliInteractiveRuntime:
         if runtime.env.exact_access and math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-3:
             self._length_failure = "Blocked: machine access outside skeleton grid"
             return None
+        if role == "supply" and math.dist(runtime.nodes[root_node, :2], access["access_point"]) <= 1e-7:
+            blocked = {access["in_dir"], *(turns.keys() - clear_turns.keys())}
+            root_edges = weighted_adjacency.get(root_node, ())
+            weighted_adjacency[root_node] = [edge for edge in root_edges if edge[2] not in blocked]
+            for neighbor, _, direction in root_edges:
+                if direction in blocked:
+                    weighted_adjacency[neighbor] = [
+                        edge for edge in weighted_adjacency[neighbor] if edge[0] != root_node
+                    ]
         graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
         selected_connections = tuple(connections)
         length_policy, length_stats = None, None

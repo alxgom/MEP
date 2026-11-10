@@ -1,4 +1,4 @@
-"""Conservative raster screening for CLI body and supply extension placement."""
+"""Conservative raster screening for the CLI body, supply extension, and first turn."""
 
 from dataclasses import dataclass
 from functools import lru_cache
@@ -8,7 +8,10 @@ import math
 import numpy as np
 import shapely
 
-from .geometry import cli_machine_pins, cli_placement_footprint_parts
+from .geometry import (
+    cli_machine_footprint, cli_machine_pins, cli_supply_access_specs,
+    cli_supply_exit_dimensions, cli_supply_exit_footprints,
+)
 
 
 PLACEMENT_MASK_STEP_MM = 50
@@ -45,11 +48,13 @@ def cell_center_product_candidates(mask, cells):
     return tuple(candidates)
 
 
-def _footprint_windows(machine, quarter_turn):
+def _footprint_windows(machine, quarter_turn, length, turn_width):
     angle = quarter_turn * 90
     pins = cli_machine_pins(machine, (0, 0), angle)
+    access, = cli_supply_access_specs(machine, pins, angle, length)
+    extension, turns = cli_supply_exit_footprints(machine, angle, access, turn_width)
     step = PLACEMENT_MASK_STEP_MM
-    bounds = (part.bounds for part in cli_placement_footprint_parts(machine, pins, angle))
+    bounds = (part.bounds for part in (cli_machine_footprint(pins), extension, *turns.values()))
     # Signed inclusive tile offsets cover the footprint translated anywhere in its center tile.
     return tuple(
         (math.floor(left / step), math.floor(bottom / step),
@@ -124,7 +129,7 @@ class CliPlacementMasks:
         self._rooms, self._visible, self._free = rooms, visible, free
         self._origin = origin_x, origin_y
 
-    def get(self, dwelling, machine, angle_degrees):
+    def get(self, dwelling, machine, angle_degrees, exit_dimensions=None):
         quarter_turn = round(angle_degrees / 90)
         if not math.isclose(angle_degrees, quarter_turn * 90, abs_tol=1e-7):
             return None
@@ -133,15 +138,20 @@ class CliPlacementMasks:
             self._dwelling = dwelling
         if self._visible is None:
             return None
+        length, turn_width = exit_dimensions or cli_supply_exit_dimensions(machine, None, 1.0)
         key = (machine, quarter_turn % 4)
-        if key not in self._masks:
-            body, extension = _footprint_windows(*key)
+        dimensions = (length, turn_width)
+        cached_dimensions, mask = self._masks.get(key, (None, None))
+        if cached_dimensions != dimensions:
+            body, extension, left, right = _footprint_windows(*key, *dimensions)
             valid = _erode(self._free, (body, extension))
+            valid &= _erode(self._free, (left,)) | _erode(self._free, (right,))
             clear_room = np.zeros_like(valid)
             for window, free in self._rooms:
                 clear_room[window] |= _erode(free, (body,))
             clear_room &= valid
             valid.setflags(write=False)
             clear_room.setflags(write=False)
-            self._masks[key] = CliPlacementMask(self._origin, PLACEMENT_MASK_STEP_MM, self._visible, valid, clear_room)
-        return self._masks[key]
+            mask = CliPlacementMask(self._origin, PLACEMENT_MASK_STEP_MM, self._visible, valid, clear_room)
+            self._masks[key] = dimensions, mask
+        return mask

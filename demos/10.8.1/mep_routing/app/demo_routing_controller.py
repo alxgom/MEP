@@ -242,7 +242,9 @@ class DemoRoutingController:
                 return
             machine_key = a.installation_ui_session.selected_keys["cli"]
             machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
-            placement = a.cli_runtime.place_machine(dwelling.prepared, machine)
+            placement = a.cli_runtime.place_machine(
+                dwelling.prepared, machine, minimum_segment_length_factor=state.minimum_segment_length_factor,
+            )
             a.workbench_state.installation("cli").pose.set(
                 placement.center, placement.angle_degrees,
             )

@@ -120,6 +120,22 @@ def test_extension_controls_fit_but_only_the_body_controls_room_color():
     assert mask.valid[3, 8] and mask.clear_room[3, 8]
 
 
+def test_placement_requires_one_clear_turn_at_the_current_extension_length():
+    room = box(0, 0, 1200, 1400)
+    left = box(300, 810, 345, 890)
+    right = box(505, 810, 550, 890)
+    cache = CliPlacementMasks()
+    unit = machine(outlet_width=80)
+    center = (425, 175)
+    source = dwelling((room,), columns=(left, right))
+    short = cache.get(source, unit, 0, (500, 100))
+    assert short.center_status(center) == "clear"
+    long = cache.get(source, unit, 0, (600, 100))
+    assert long.center_status(center) == "blocked"
+    one_exit = cache.get(dwelling((room,), columns=(left,)), unit, 0, (600, 100))
+    assert one_exit.center_status(center) == "clear"
+
+
 def test_cell_center_product_adds_only_valid_coordinate_pairs():
     cells = ((0, 0, 50, 50), (50, 50, 100, 100), (0, 100, 50, 150))
     valid = np.array([[True, True], [False, False], [False, True]])

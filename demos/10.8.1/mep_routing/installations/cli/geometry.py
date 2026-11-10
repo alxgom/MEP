@@ -69,12 +69,43 @@ def cli_supply_access_specs(machine, pins, angle_degrees, stub_length_mm=CLI_SUP
     return (cli_air_access_spec(machine, pins, angle_degrees, "air_out", stub_length_mm),)
 
 
-def cli_placement_footprint_parts(machine, pins, angle_degrees):
-    """Return the body and outlet-width rectangle used for cardinal placement screening."""
-    access, = cli_supply_access_specs(machine, pins, angle_degrees)
+def cli_supply_exit_dimensions(machine, trunk_width_mm, minimum_length_factor):
+    outlet = machine.connector("air_out")
+    turn_width = trunk_width_mm or outlet.rectangular_size_mm[0]
+    nx, ny = outlet.normal_xy
+    width, depth, _ = machine.body_size_mm
+    x, y, _ = outlet.offset_mm
+    inset = (abs(nx) * width + abs(ny) * depth) / 2 - nx * x - ny * y
+    length = math.ceil(max(CLI_SUPPLY_ACCESS_LENGTH_MM, turn_width / 2 + inset,
+                           turn_width * minimum_length_factor))
+    return length, turn_width
+
+
+def cli_supply_exit_footprints(machine, angle_degrees, access, turn_width):
+    """Return the centered straight footprint and a mitered-turn envelope on each side."""
     x, y = access["pin_point"]
     tx, ty = access["access_point"]
-    half_width = machine.connector("air_out").rectangular_size_mm[0] / 2
+    half_width = max(machine.connector("air_out").rectangular_size_mm[0], turn_width) / 2
     extension = (box(x - half_width, min(y, ty), x + half_width, max(y, ty)) if x == tx
                  else box(min(x, tx), y - half_width, max(x, tx), y + half_width))
-    return cli_machine_footprint(pins), extension
+    nx, ny = local_axis_to_world(machine.connector("air_out").normal_xy, angle_degrees)
+    half_turn = turn_width / 2
+    turns = {}
+    for sx, sy in ((-ny, nx), (ny, -nx)):
+        # Reserve one duct width along the exit and the full width across it.
+        a = (tx - sx * half_turn - nx * half_turn, ty - sy * half_turn - ny * half_turn)
+        b = (tx + sx * turn_width + nx * half_turn, ty + sy * turn_width + ny * half_turn)
+        turns[dir_from_axis((sx, sy))] = box(min(a[0], b[0]), min(a[1], b[1]),
+                                              max(a[0], b[0]), max(a[1], b[1]))
+    return extension, turns
+
+
+def cli_clear_supply_turns(dwelling, extension, turns, context_obstacles=()):
+    """Check the straight footprint and return the locally usable 90-degree exits."""
+    region = dwelling.routing_region_base
+    obstacles = (*dwelling.columns, *dwelling.shafts, *context_obstacles)
+
+    def fits(footprint):
+        return region.covers(footprint) and all(footprint.disjoint(item) for item in obstacles)
+
+    return {direction: turn for direction, turn in turns.items() if fits(turn)} if fits(extension) else {}

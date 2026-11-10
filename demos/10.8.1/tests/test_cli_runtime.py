@@ -94,6 +94,18 @@ def test_cli_rejects_body_outside_allowed_area_even_when_supply_access_is_inside
     assert runtime.solve(prepared, machine, (3000, 350), **options).routes
 
 
+def test_cli_rejects_a_straight_supply_extension_with_both_turns_blocked():
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    machine = CLI_INSTALLATION.default_machine
+    prepared = replace(_prepared(), columns=[box(2410, 4330, 2460, 4490), box(3540, 4330, 3590, 4490)])
+    result = runtime.solve(prepared, machine, (3000, 3500), return_enabled=False)
+    assert result.status == "Blocked: no room for a 90° supply exit"
+    assert not result.routes
+
+
 def test_cli_rejects_an_excluded_area_under_the_body_even_if_all_corners_fit():
     runtime = CliInteractiveRuntime(
         CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
@@ -147,7 +159,7 @@ def test_cli_supply_materializes_core_sized_endpoint_branches_and_short_stubs():
 
     assert math.dist(machine_stub.start, machine_stub.end) == pytest.approx(200)
     assert machine_stub.height_mm == 150
-    assert math.dist(machine_branch.start, machine_branch.end) == pytest.approx(300)
+    assert math.dist(machine_branch.start, machine_branch.end) == pytest.approx(400)
     assert machine_branch.sizing.airflow_m3h == 1260.0
     assert len(grille_stubs) == len(grille_branches) == 2
     assert all(math.dist(item.start, item.end) == pytest.approx(100) for item in grille_stubs)

@@ -1012,6 +1012,9 @@ Before each commit:
 - Expanded CLI placement candidates to the Cartesian product of the cell-center X and Y coordinates. Both preview variants use unique axes and retain only intersections that pass the current rotation's footprint mask. Results are cached by mask and cells. Skeleton edges and routing stay unchanged; the overlay shows compact candidate rings and a count in the legend.
 - Validation: four changed Python files compiled and 612 tests passed. The product test covers recombined coordinates, duplicate axes, and rejection by the mask. Pygame verified the denser preview, rotation and the comparison toggle. At 90°, the first real dwelling had 92 valid product candidates (66 green, 26 yellow) instead of 9 original cell centers; the second had 40 instead of 3. These counts measure footprint feasibility, not routing success.
 
+- Moved the CLI supply root far enough along the centered outlet to meet the straight-run minimum and clear the machine body at a turn. The placement raster, automatic placement screen, and solver require the extension and at least one duct-width mitered turn envelope to fit. The outline shows the usable turn envelopes. Green still classifies the body alone after the exit passes. Cell Skeleton receives the usable turn endpoints as local attachment points.
+- Validation: 614 tests passed, including rejection of a straight extension whose two turns are blocked, acceptance with one open side, and raster invalidation when the extension length changes. Headless Pygame rendered the real-dwelling CLI overlay and produced 635 valid raster tiles at 0° and 929 at 90°. The turn envelope is a demo geometry rule.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

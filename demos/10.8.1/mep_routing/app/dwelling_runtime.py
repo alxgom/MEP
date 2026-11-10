@@ -122,7 +122,9 @@ class DwellingRuntime:
         cli_machine = a.CLI_INSTALLATION.machine_catalog.value(
             a.installation_ui_session.selected_keys["cli"],
         )
-        cli_placement = a.cli_runtime.place_machine(prepared, cli_machine)
+        cli_placement = a.cli_runtime.place_machine(
+            prepared, cli_machine, minimum_segment_length_factor=a.workbench_state.cli.minimum_segment_length_factor,
+        )
         cli_pose.set(cli_placement.center, cli_placement.angle_degrees)
         coc_payload = (prepared.installation_inputs or {}).get("coc") or {}
         coc_source = (coc_payload.get("appliance") or {}).get("exhaust_xy")

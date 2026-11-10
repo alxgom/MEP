@@ -76,7 +76,7 @@ def _render(app, screen, clock, fonts, state):
         runtime = app.routing_controller.installations.get("cli")
         placement_mask = runtime.placement_mask(dwelling_state.active.prepared, pose[2])
         if placement_mask is not None:
-            placement_outlines = runtime.placement_outlines(pins, pose[2])
+            placement_outlines = runtime.placement_outlines(dwelling_state.active.prepared, pins, pose[2])
             if workbench.cli.show_placement_cells:
                 room_aware = workbench.cli.room_aware_placement_cells
                 placement_cell_grid = runtime.placement_cell_grid(dwelling_state.active, room_aware=room_aware)
@@ -243,7 +243,7 @@ def _render(app, screen, clock, fonts, state):
         solver_dropdowns=solver_dropdowns,
         solver_detail=solver_detail,
         placement_heatmap_label=(
-            ("Body + supply [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Placement")
+            ("Body + supply turn [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Placement")
             if active == "cli" else "Not available" if active == "coc" else None
         ),
         placement_weights_label=("Grille-distance ranking" if active == "cli" else "Not applicable" if active == "coc" else None),
