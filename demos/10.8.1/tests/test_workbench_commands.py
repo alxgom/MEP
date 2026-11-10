@@ -87,6 +87,9 @@ def test_cli_auto_placement_hotkeys_update_only_cli_mode():
     app.installation_header_state = SimpleNamespace(active="cli", enabled={"cli"})
     controller = WorkbenchCommandController(app, _pygame_keys())
 
+    virtual = controller.apply_routing_key_command(_pygame_keys().K_p)
+    assert virtual.needs_auto_placement is True
+    assert app.workbench_state.cli.auto_placement_mode_idx == 2
     manual = controller.apply_routing_key_command(_pygame_keys().K_p)
     automatic = controller.apply_routing_key_command(_pygame_keys().K_a)
 

@@ -109,6 +109,16 @@ class WorkbenchEventAdapter:
         self._solve()
         self._record("Auto", (230, 126, 34))
 
+    def _rotate_machine(self, delta):
+        a = self.app
+        angle = a.rotate_active_machine(delta)
+        if (a.installation_header_state.active == "cli"
+                and a.workbench_state.cli.auto_placement_mode_idx == a.CLI_INSTALLATION.virtual_placement_mode_index):
+            self.state.needs_auto_placement = True
+            return
+        self._solve()
+        self._record(f"Rot:{angle}", (46, 204, 113))
+
     def process(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -154,9 +164,7 @@ class WorkbenchEventAdapter:
             self.state.last_wheel_rotate_ms = now
             self.app.auto_placement_mode_idx = 0
             delta = 90 if event.button == 4 else -90
-            angle = self.app.rotate_active_machine(delta)
-            self._solve()
-            self._record(f"Rot:{angle}", (46, 204, 113))
+            self._rotate_machine(delta)
 
     def _left_down(self, pos):
         a, s = self.app, self.state
@@ -457,7 +465,10 @@ class WorkbenchEventAdapter:
         a, s = self.app, self.state
         a.dwelling_runtime.generate(); a.solution_log_session.clear()
         if clear_history: a.observation.clear_history_buffers()
-        s.needs_auto_placement = a.auto_placement_mode_idx > 0
+        s.needs_auto_placement = (
+            a.workbench_state.cli.auto_placement_mode_idx > 0
+            if a.installation_header_state.active == "cli" else a.auto_placement_mode_idx > 0
+        )
         self._solve(); self._record(marker, color)
 
     def _key_down(self, key):
@@ -480,8 +491,7 @@ class WorkbenchEventAdapter:
                 a.real_scenario_idx = (a.real_scenario_idx + 1) % len(a.REAL_DWELLING_SCENARIOS)
             self._change_dwelling(clear_history=True)
         elif (caps := active_capabilities(a)).machine_edit and not caps.solver_controls and key == pygame.K_r:
-            angle = a.rotate_active_machine(90)
-            self._solve(); self._record(f"Rot:{angle}", (46, 204, 113))
+            self._rotate_machine(90)
         elif transition := a.commands.apply_routing_key_command(key):
             s.needs_auto_placement |= transition.needs_auto_placement
             self._solve()

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from shapely.ops import unary_union
 
+from mep_routing.app.installation_context import installation_context_obstacles
 from mep_routing.app.installation_execution import InstallationCoordinator
 from mep_routing.app.installation_runtime import (
     CliInstallationRuntime, CocInstallationRuntime, InstallationRegistry,
@@ -242,6 +245,31 @@ class DemoRoutingController:
                 return
             machine_key = a.installation_ui_session.selected_keys["cli"]
             machine = a.CLI_INSTALLATION.machine_catalog.value(machine_key)
+            if state.auto_placement_mode_idx == a.CLI_INSTALLATION.virtual_placement_mode_index:
+                pose = a.workbench_state.installation("cli").pose
+                header = a.installation_header_state
+                runs = a.workbench_state.runs
+                context = installation_context_obstacles(
+                    SimpleNamespace(routes=runs[key].routes, machine_pins=self.installations.get(key).machine_pins(
+                        a.workbench_state.installation(key),
+                    ))
+                    for key in header.order[:header.order.index("cli")] if key in header.enabled and key in runs
+                )
+                mask = self.installations.get("cli").placement_mask(dwelling.prepared, pose.angle_degrees)
+                outcome = a.cli_runtime.place_machine_steiner(
+                    dwelling.prepared, machine, pose.angle_degrees, mask, context_obstacles=context,
+                    minimum_segment_length_factor=state.minimum_segment_length_factor,
+                    bend_penalty_mm=state.bend_penalty_mm,
+                )
+                message = (f"{outcome.status} · {outcome.ranked}/{outcome.feasible} ranked "
+                           f"· {outcome.verified} checked · {outcome.elapsed_ms:.0f} ms")
+                a.observation.set_transient_message(message)
+                if outcome.placement is not None:
+                    pose.set(outcome.placement.center, outcome.placement.angle_degrees)
+                    state.graph_type_idx = a.CLI_INSTALLATION.graph_modes.index(a.cli_runtime.virtual_placement.graph_mode)
+                    state.router_backend_idx = a.cli_runtime.virtual_placement.backend_index
+                    state.room_start_mode_idx = 1
+                return outcome
             placement = a.cli_runtime.place_machine(
                 dwelling.prepared, machine, minimum_segment_length_factor=state.minimum_segment_length_factor,
             )

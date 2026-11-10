@@ -101,8 +101,23 @@ def validate_tree_lengths(lines, root_point, terminal_points, policy):
     return reached == terminals and set(children) <= visited and set(parents) <= visited
 
 
+def rank_length_steiner_roots(prepared, roots, names, bend_penalty, policy, *, fitting_weight=0.0):
+    """Score private outlet nodes against the full terminal set in one shared search."""
+    return _search_length_steiner(
+        prepared, roots, names, bend_penalty, policy, fitting_weight=fitting_weight, rank_only=True,
+    )
+
+
 def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
                          root_prefix=(), stats=None, fitting_weight=0.0):
+    return _search_length_steiner(
+        prepared, ((root, root_prefix),), names, bend_penalty, policy,
+        stats=stats, fitting_weight=fitting_weight,
+    )
+
+
+def _search_length_steiner(prepared, roots, names, bend_penalty, policy, *,
+                           stats=None, fitting_weight=0.0, rank_only=False):
     """Use the baseline's weighted arcs and terminal costs, adding feasibility.
 
     Tee resets are available exclusively to subset merges, never ordinary
@@ -116,15 +131,8 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
         raise ValueError("fitting perturbation requires lengths at bends and tees")
     stats.fitting_weight = fitting_weight
     positions, graph = prepared.nodes, prepared.adjacency
-    root = int(root)
-    initial_run = (None, 0.0)
-    for start, end in root_prefix:
-        initial_run = policy.advance(initial_run, *segment_geometry(start, end))
-        if initial_run is None:
-            return None
-    initial = (root, None, *initial_run)
-    states, indices = [initial], {initial: 0}
-    reverse, forward, reset_indices = [[]], [[]], {}
+    states, indices = [], {}
+    reverse, forward, reset_indices = [], [], {}
     geometry = {
         (int(u), int(edge[0])): segment_geometry(positions[int(u)], positions[int(edge[0])])
         for u, edges in graph.items() for edge in edges
@@ -146,13 +154,26 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
             forward.append([])
         return index
 
+    starts = {}
+    for root, prefix in roots:
+        run = (None, 0.0)
+        for start, end in prefix:
+            run = policy.advance(run, *segment_geometry(start, end))
+            if run is None:
+                break
+        if run is not None:
+            index = intern((int(root), None, *run))
+            starts[index] = (int(root), prefix)
+    if not starts or not names:
+        return () if rank_only else None
+
     # Enumerate reachable histories, including the starting states of branches.
     # Adding a reset here enumerates states only; it adds no traversable arc.
     current = 0
     while current < len(states):
         node, incoming, direction, length = states[current]
         if policy.split_at_tees and (policy.complete((direction, length)) or
-                                    (current == 0 and direction is None)):
+                                    (current in starts and direction is None)):
             reset_indices[current] = intern((node, incoming, None, 0.0))
         for edge in graph.get(node, ()):
             nxt, cost_direction = int(edge[0]), str(edge[2])
@@ -206,8 +227,6 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
         departures[start], local_endings[start] = outgoing, endings
 
     full = (1 << len(names)) - 1
-    if not full:
-        return None
     costs, choices = [dict() for _ in range(full + 1)], [dict() for _ in range(full + 1)]
     terminal_seeds = [dict() for _ in range(full + 1)]
     branch_costs = [dict() for _ in range(full + 1)]
@@ -337,10 +356,14 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
                     branch_costs[mask][start] = groups
     stats.subset_labels = sum(map(len, costs))
     stats.branch_labels = sum(len(groups) for subsets in branch_costs for groups in subsets.values())
-    if 0 not in costs[full]:
+    if rank_only:
+        ranked = ((root, costs[full][index]) for index, (root, _) in starts.items() if index in costs[full])
+        return tuple(sorted(ranked, key=lambda item: (item[1], item[0])))
+    initial, (root, root_prefix) = next(iter(starts.items()))
+    if initial not in costs[full]:
         return None
     arcs, selected = set(), {}
-    pending = [(full, 0)]
+    pending = [(full, initial)]
 
     def expand_branch(mask, departure):
         if departure[0] == "split":
@@ -376,7 +399,7 @@ def solve_length_steiner(prepared, root, names, bend_penalty, policy, *,
         lines, [prepared.wall_points[(name, node)] for name, node in selected.items()],
     )
     prefix_charge = fitting_weight * count_tree_fittings(root_prefix).total if fitting_weight else 0.0
-    stats.search_cost = float(costs[full][0]) + prefix_charge
+    stats.search_cost = float(costs[full][initial]) + prefix_charge
     stats.primary_cost = stats.search_cost - fitting_weight * stats.fittings.total
     directed = tuple(sorted(arcs))
     tree = SteinerTreeResult(

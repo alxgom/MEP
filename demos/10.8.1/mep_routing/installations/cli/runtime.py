@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 import math
 from time import perf_counter
 
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, Polygon
 
 from mep_routing.app import InstallationGraphProfile, create_active_dwelling
 from mep_routing.graphs import GraphMode
@@ -36,6 +36,7 @@ from .sizing import (
     size_tree_edges,
 )
 from .terminals import is_cli_supply_room
+from .virtual_placement import CliVirtualPlacementResult, CliVirtualPlacementSearch
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ class CliInteractiveRuntime:
         self.graph_config = graph_config
         self.terminal_config = terminal_config
         self.placement = placement or CliPlacementRuntime()
+        self.virtual_placement = CliVirtualPlacementSearch(graph_config, terminal_config)
         self.sizing_policy_factory = sizing_policy_factory
         self.grille_sizing_policy_factory = grille_sizing_policy_factory
         self._core_polygon_result = None
@@ -111,6 +113,62 @@ class CliInteractiveRuntime:
             exit_dimensions=self.supply_exit_dimensions(machine, minimum_segment_length_factor),
         )
         return self.last_placement
+
+    def place_machine_steiner(self, dwelling, machine, angle, mask, *,
+                              minimum_segment_length_factor=1.0, bend_penalty_mm=4000.0,
+                              context_obstacles=()):
+        started = perf_counter()
+        ranked, feasible, verified = (), 0, 0
+
+        def outcome(status, placement=None):
+            return CliVirtualPlacementResult(
+                placement, status, feasible, len(ranked), verified, (perf_counter() - started) * 1000,
+            )
+
+        if mask is None:
+            return outcome("Virtual source needs a cardinal machine rotation")
+        if self._supply_sizing_policy(machine) is None:
+            return outcome("Virtual source needs a calculated supply duct width")
+        context_obstacles = tuple(context_obstacles)
+        sizes = self._size_supply_grilles(dwelling.rooms, machine)
+        grilles = prepare_cli_grilles(dwelling.rooms, dwelling.routing_region_base, supply_width_by_room_id=sizes)
+        if grilles.missing_rooms:
+            return outcome(f"No valid CLI grille pair for {', '.join(grilles.missing_rooms)}")
+        if not grilles.supply:
+            return outcome("No CLI supply grilles")
+        dimensions = self.supply_exit_dimensions(machine, minimum_segment_length_factor)
+        ranked, feasible = self.virtual_placement.rank(
+            dwelling, machine, angle, mask, grilles, dimensions,
+            dimensions[1] * minimum_segment_length_factor, bend_penalty_mm, context_obstacles,
+        )
+        if not ranked:
+            return outcome("No outlet can serve all supply grilles on the shared graph")
+
+        verifier = CliInteractiveRuntime(
+            self.definition, self.graph_config, self.terminal_config,
+            sizing_policy_factory=self.sizing_policy_factory,
+            grille_sizing_policy_factory=self.grille_sizing_policy_factory,
+        )
+        # Bound the number of pose-specific graph rebuilds per interactive run.
+        for center, score in ranked[:5]:
+            verified += 1
+            result = verifier.solve(
+                dwelling, machine, center, angle, context_obstacles=context_obstacles,
+                return_enabled=False, graph_mode=self.virtual_placement.graph_mode,
+                solver_backend_index=self.virtual_placement.backend_index, start_mode_index=1,
+                minimum_segment_length_factor=minimum_segment_length_factor, bend_penalty_mm=bend_penalty_mm,
+            )
+            body = cli_machine_footprint(result.machine_pins)
+            obstacles = (body, *dwelling.columns, *dwelling.shafts, *context_obstacles)
+            if result.supply_segments and not result.status.startswith("Cli context relaxed") and all(
+                LineString(segment.line).disjoint(obstacle)
+                for segment in result.supply_segments
+                if segment.kind not in ("machine_stub", "machine_branch")
+                for obstacle in obstacles
+            ):
+                self.last_placement = CliPlacementResult(center, angle, score, feasible)
+                return outcome("Virtual source selected a verified pose", self.last_placement)
+        return outcome(f"No verified pose among the first {verified} ranked outlets")
 
     def solve(
         self, prepared_dwelling, machine, center, angle_degrees=0, *,

@@ -16,6 +16,7 @@ from mep_routing.installations.cli import (
     prepare_cli_supply_terminals,
 )
 from mep_routing.graphs import GraphMode
+from mep_routing.installations.cli.placement_mask import CliPlacementMasks
 
 
 def _room(name, bounds, *, covered=True):
@@ -495,3 +496,23 @@ def test_cli_placement_uses_selected_machine_footprint():
     large = placement.place(prepared, CLI_INSTALLATION.machine_catalog.value("pead-m140ja"), plan)
     assert small.feasible_candidates >= large.feasible_candidates > 0
     assert prepared.routing_region_base.covers(Point(small.center))
+
+
+def test_cli_virtual_placement_publishes_a_verified_hybrid_grid_pose():
+    prepared = _prepared()
+    machine = CLI_INSTALLATION.default_machine
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    mask = CliPlacementMasks().get(prepared, machine, 90, runtime.supply_exit_dimensions(machine, 1))
+    outcome = runtime.place_machine_steiner(prepared, machine, 90, mask)
+    assert outcome.placement == runtime.last_placement
+    assert outcome.placement is not None and outcome.placement.angle_degrees == 90
+    assert outcome.placement.center in dict(runtime.virtual_placement.screened_centers(prepared, mask))
+    assert 1 <= outcome.verified <= 5 and outcome.ranked > 1
+    routed = runtime.solve(
+        prepared, machine, outcome.placement.center, 90, return_enabled=False,
+        solver_backend_index=7, start_mode_index=1,
+    )
+    assert routed.routes and len(routed.grille_plan.supply) == 2

@@ -40,7 +40,7 @@ CLI_TEE_LENGTH_BACKENDS = (6, 7)
 CLI_FITTING_BACKEND = 7
 CLI_HEURISTIC_MODE_LABELS = ("Shortest-path distance",)
 CLI_START_MODE_LABELS = ("Grille center", "Wall candidates")
-CLI_AUTO_PLACEMENT_LABELS = ("Manual", "Routing-Core Workflow")
+CLI_AUTO_PLACEMENT_LABELS = ("Manual", "Routing-Core Workflow", "Virtual source (Hanan + Cell)")
 
 
 @dataclass(frozen=True)
@@ -57,6 +57,7 @@ class CliInstallationDefinition:
     heuristic_mode_labels: tuple[str, ...] = CLI_HEURISTIC_MODE_LABELS
     start_mode_labels: tuple[str, ...] = CLI_START_MODE_LABELS
     auto_placement_labels: tuple[str, ...] = CLI_AUTO_PLACEMENT_LABELS
+    virtual_placement_mode_index: int = 2
     interactive_runtime_available: bool = True
     directed_backend_indices: tuple[int, ...] = CLI_DIRECTED_BACKENDS
     length_backend_indices: tuple[int, ...] = CLI_LENGTH_BACKENDS

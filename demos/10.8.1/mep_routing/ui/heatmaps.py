@@ -53,7 +53,7 @@ def draw_placement_mask(screen, mask, viewport):
 
 
 def draw_placement_cell_grid(screen, grid, candidates, viewport):
-    """Draw the fixed Cell Skeleton and independently screened placement points."""
+    """Draw the static placement grid and screened placement points."""
     import pygame
 
     previous_clip = screen.get_clip()
@@ -76,7 +76,7 @@ def draw_placement_cell_grid(screen, grid, candidates, viewport):
     screen.set_clip(previous_clip)
 
 
-def draw_placement_mask_legend(screen, mask, viewport, font, angle, cell_label=None):
+def draw_placement_mask_legend(screen, mask, viewport, font, angle, cell_label=None, *, compare_cells=True):
     import pygame
 
     x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=340)
@@ -92,7 +92,8 @@ def draw_placement_mask_legend(screen, mask, viewport, font, angle, cell_label=N
         pygame.draw.rect(screen, color, (x + offset, y + 26, 10, 10))
         screen.blit(font.render(label, True, (240, 240, 240)), (x + offset + 15, y + 22))
     if cell_label:
-        label = font.render(f"{cell_label} · Ctrl+G compare · Shift+G hide", True, (240, 240, 240))
+        controls = "Ctrl+G compare · Shift+G hide" if compare_cells else "Shift+G hide"
+        label = font.render(f"{cell_label} · {controls}", True, (240, 240, 240))
         screen.blit(label, (x + 8, y + 42))
 
 

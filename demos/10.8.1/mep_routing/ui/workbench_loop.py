@@ -66,6 +66,8 @@ def _render(app, screen, clock, fonts, state):
     context = projection.context_layers
     sal_heatmap = app.show_heatmap and active_view.can("placement_overlay")
     cli_heatmap = active == "cli" and workbench.cli.show_placement_mask
+    virtual_placement = (active == "cli"
+                         and workbench.cli.auto_placement_mode_idx == app.CLI_INSTALLATION.virtual_placement_mode_index)
     viewport = app.canvas_ui.viewport
     placement_mask = None
     placement_outlines = ()
@@ -77,7 +79,12 @@ def _render(app, screen, clock, fonts, state):
         placement_mask = runtime.placement_mask(dwelling_state.active.prepared, pose[2])
         if placement_mask is not None:
             placement_outlines = runtime.placement_outlines(dwelling_state.active.prepared, pins, pose[2])
-            if workbench.cli.show_placement_cells:
+            if workbench.cli.show_placement_cells and virtual_placement:
+                search = app.cli_runtime.virtual_placement
+                placement_cell_grid = search.candidate_grid(dwelling_state.active.prepared)
+                placement_candidates = search.screened_centers(dwelling_state.active.prepared, placement_mask)
+                placement_cell_label = f"Hanan + Cell · {len(placement_candidates)} candidates"
+            elif workbench.cli.show_placement_cells:
                 room_aware = workbench.cli.room_aware_placement_cells
                 placement_cell_grid = runtime.placement_cell_grid(dwelling_state.active, room_aware=room_aware)
                 if placement_cell_grid is not None:
@@ -102,7 +109,7 @@ def _render(app, screen, clock, fonts, state):
             return
         if placement_mask is not None:
             draw_placement_mask_legend(screen, placement_mask, viewport, fonts.small, pose[2],
-                                       placement_cell_label)
+                                       placement_cell_label, compare_cells=not virtual_placement)
         elif sal_heatmap and app.ap_scores:
             app.ui_facade.draw_colorbar(screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores))
 
@@ -246,8 +253,12 @@ def _render(app, screen, clock, fonts, state):
             ("Body + supply turn [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Placement")
             if active == "cli" else "Not available" if active == "coc" else None
         ),
-        placement_weights_label=("Grille-distance ranking" if active == "cli" else "Not applicable" if active == "coc" else None),
-        placement_rotation_label=("Machine-aligned" if active == "cli" else "Exported geometry" if active == "coc" else None),
+        placement_weights_label=("Shared supply-tree cost" if virtual_placement else
+                                 "Grille-distance ranking" if active == "cli" else
+                                 "Not applicable" if active == "coc" else None),
+        placement_rotation_label=("Current rotation" if virtual_placement else
+                                  "Machine-aligned" if active == "cli" else
+                                  "Exported geometry" if active == "coc" else None),
         placement_shortcuts_label=("[A] Auto | [P] Mode | [V] Placement" if active == "cli" else "Fixed source; no placement controls" if active == "coc" else None),
     ))
     draw_sidebar(

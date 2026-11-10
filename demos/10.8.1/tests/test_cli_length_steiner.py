@@ -7,7 +7,7 @@ import pytest
 
 from mep_routing.installations.cli import directed_wall_graph
 from mep_routing.installations.cli.length_steiner import (
-    LengthSteinerStats, TreeLengthPolicy, segment_geometry,
+    LengthSteinerStats, TreeLengthPolicy, rank_length_steiner_roots, segment_geometry,
     solve_length_steiner, validate_tree_lengths,
 )
 from mep_routing.installations.cli.fittings import FITTING_PERTURBATION_MM, FittingCounts, count_tree_fittings
@@ -25,6 +25,20 @@ def prepared(points, edges, candidates, walls=None, weights=None):
         wall_points=walls or {(name, node): points[node]
                              for name, nodes in candidates.items() for node in nodes},
     )
+
+
+def test_virtual_source_requires_one_outlet_to_reach_the_full_terminal_set():
+    graph = prepared(((300, 0), (0, 300), (0, 0), (0, 0), (0, 0)),
+                     ((2, 0), (3, 1), (4, 0), (4, 1)), {"a": [0], "b": [1]})
+    graph.adjacency[0].clear()
+    graph.adjacency[1].clear()
+    prefix = (((0, -200), (0, 0)),)
+    roots = tuple((node, prefix) for node in (2, 3, 4))
+    policy = TreeLengthPolicy(100, split_at_tees=True)
+    assert rank_length_steiner_roots(graph, roots[:2], ("a", "b"), 4000, policy) == ()
+    ranked = rank_length_steiner_roots(graph, roots, ("a", "b"), 4000, policy)
+    single = solve_length_steiner(graph, 4, ("a", "b"), 4000, policy, root_prefix=prefix)
+    assert ranked == ((4, single[0].score.total),)
 
 
 @pytest.mark.parametrize("tees", (False, True))

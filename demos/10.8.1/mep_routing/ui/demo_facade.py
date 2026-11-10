@@ -147,6 +147,9 @@ class DemoUiFacade:
                 a.installation_ui_session = transition.session
                 dwelling = a.workbench_state.dwelling.active
                 if active == "cli" and transition.changed and dwelling is not None:
+                    if a.workbench_state.cli.auto_placement_mode_idx == a.CLI_INSTALLATION.virtual_placement_mode_index:
+                        a.routing_controller.auto_place()
+                        return True, transition.runtime_invalidation_required
                     placement = a.cli_runtime.place_machine(
                         dwelling.prepared, a.CLI_INSTALLATION.machine_catalog.value(selected),
                         minimum_segment_length_factor=a.workbench_state.cli.minimum_segment_length_factor,
