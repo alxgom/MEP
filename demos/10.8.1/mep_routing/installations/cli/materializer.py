@@ -46,6 +46,7 @@ def materialize_cli_tree(
         segments.append(CliDuctSegment(
             start, end, width, height, "tree", route_name, sizing,
         ))
+    tree_lines = {segment.line for segment in segments}
     pin, access = pins[connector.key], access_spec["access_point"]
     if pin != access:
         distance = math.dist(pin, access)
@@ -75,6 +76,9 @@ def materialize_cli_tree(
             continue
         routing_point = tuple(map(float, connection.routing_point))
         grille_point = tuple(map(float, connection.grille_point))
+        if (routing_point, grille_point) in tree_lines:
+            # The tree already carries the final run to a grille on its trunk.
+            continue
         sizing = grille_sizes.get(connection.route_name)
         distance = math.dist(routing_point, grille_point)
         if sizing is not None and distance > grille_stub_length_mm:

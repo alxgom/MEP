@@ -204,7 +204,8 @@ def test_cli_directed_wall_candidates_choose_one_sized_supply_grille_per_room(ba
     assert result.routes
     assert len(result.grille_plan.supply) == 2
     assert all(item.placement_type == "wall_candidate" for item in result.grille_plan.supply)
-    assert all(item.grille_point == item.routing_point for item in result.grille_plan.supply)
+    assert all(math.dist(item.grille_point, item.routing_point) == pytest.approx(400)
+               for item in result.grille_plan.supply)
     assert {item.width_mm for item in result.grille_plan.supply} == {800}
     assert all(item.sizing.airflow_m3h == 630.0 for item in result.grille_plan.supply)
     if backend_index in (5, 6, 7):
@@ -247,6 +248,10 @@ def test_cli_hard_lengths_keep_return_tree_unconstrained(backend_index):
     assert result.supply_segments and result.return_segments
     assert result.supply_minimum_length_mm == 600
     assert all(segment.sizing is None for segment in result.return_segments)
+    for supply, returned in zip(result.grille_plan.supply, result.grille_plan.returns, strict=True):
+        options = result.grille_plan.pairs_by_supply[supply.route_name]
+        assert any(option.grille_point == supply.grille_point and paired_return == returned
+                   for option, paired_return in options)
 
 
 @pytest.mark.parametrize("backend_index", (5, 6, 7))
@@ -427,9 +432,59 @@ def test_cli_grilles_use_horizontal_return_with_partial_false_ceiling():
     plan = prepare_cli_grilles((room,), room.polygon)
     assert len(plan.connections) == 2
     assert {item.placement_type for item in plan.connections} == {"return_horizontal"}
+    supply = plan.supply[0]
+    assert supply.grille_point == (2000, 1500)
+    assert supply.routing_point == (2400, 1500)
+    assert all(candidate.grille_point[0] == 2000
+               for candidate, _returned in plan.pairs_by_supply[supply.route_name])
     returned = plan.returns[0]
     assert returned.grille_point == returned.routing_point
     assert false_ceiling.covers(Point(returned.grille_point))
+
+
+def test_cli_rejects_cover_edge_without_clearance_behind_the_supply_anchor():
+    room = _room("Living", (0, 0, 4000, 3000))
+    room.space_coverings = [(box(3500, 0, 4000, 3000), False)]
+    plan = prepare_cli_grilles((room,), room.polygon)
+    assert plan.missing_rooms == ("Living",)
+    assert not plan.supply and not plan.returns
+
+
+def test_cli_directed_tree_routes_to_the_inner_cover_edge_and_its_paired_return():
+    prepared = _prepared()
+    cover = box(1500, 200, 2800, 2400)
+    prepared.rooms[0].space_coverings = [(cover, False)]
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    result = runtime.solve(
+        prepared, CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        solver_backend_index=7, start_mode_index=1,
+    )
+    assert len(result.routes) == 2
+    supply = result.grille_plan.supply[0]
+    returned = result.grille_plan.returns[0]
+    assert supply.grille_point == (1500, 1300)
+    assert supply.routing_point == (1900, 1300)
+    assert returned.placement_type == "return_horizontal"
+    assert cover.contains(Point(returned.grille_point))
+
+
+def test_cli_blocks_a_tree_when_a_target_room_has_no_valid_grille_pair():
+    prepared = _prepared()
+    bedroom = prepared.rooms[1]
+    bedroom.space_coverings = [(box(5300, 200, 5800, 2400), False)]
+    runtime = CliInteractiveRuntime(
+        CLI_INSTALLATION, CommonGraphConfig(200, 600, 100, 0, 200),
+        TerminalRuntimeConfig(100, 100, 300),
+    )
+    result = runtime.solve(
+        prepared, CLI_INSTALLATION.default_machine, (3000, 3500), 0,
+        return_enabled=False, solver_backend_index=7, start_mode_index=1,
+    )
+    assert result.status == "Blocked: no valid CLI grille pair for Bedroom"
+    assert not result.routes
 
 
 def test_cli_placement_uses_selected_machine_footprint():

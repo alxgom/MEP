@@ -138,10 +138,15 @@ class CliInteractiveRuntime:
             supply_width_by_room_id=grille_sizes,
         )
         if not return_enabled:
-            grilles = CliGrillePlan(tuple(grilles.supply))
+            grilles = replace(grilles, connections=grilles.supply)
         if GraphMode(graph_mode) in (GraphMode.MEDIAL_AXIS, GraphMode.HANNAN_MEDIAL) and solver_backend_index in CLI_DIRECTED_BACKENDS:
             return self._finish(
                 (), "Unsupported: Voronoi grids support Kou and line-graph metric MST; directed wall solvers remain orthogonal",
+                started, 0, grilles, pins, context_obstacles=context_obstacles,
+            )
+        if grilles.missing_rooms:
+            return self._finish(
+                (), f"Blocked: no valid CLI grille pair for {', '.join(grilles.missing_rooms)}",
                 started, 0, grilles, pins, context_obstacles=context_obstacles,
             )
         if not grilles.supply:
@@ -197,6 +202,17 @@ class CliInteractiveRuntime:
                 ), started, 0, grilles, pins,
                 context_obstacles=context_obstacles,
             )
+        if start_mode_index == 1 and solver_backend_index in CLI_DIRECTED_BACKENDS:
+            selected = {}
+            for supply_grille in supply.connections:
+                returned_grille = next(
+                    returned_grille for option, returned_grille in grilles.pairs_by_supply[supply_grille.route_name]
+                    if option.grille_point == supply_grille.grille_point
+                    and option.routing_point == supply_grille.routing_point
+                )
+                selected[supply_grille.route_name] = supply_grille
+                selected[returned_grille.route_name] = returned_grille
+            grilles = replace(grilles, connections=tuple(selected[item.route_name] for item in grilles.connections))
         returned = None
         if return_enabled:
             returned = self._solve_tree(
@@ -206,11 +222,6 @@ class CliInteractiveRuntime:
                 start_mode_index=0,
                 prior_segments=tuple(segment.line for segment in supply.segments),
             )
-        if supply.connections:
-            selected = {item.route_name: item for item in supply.connections}
-            grilles = CliGrillePlan(tuple(
-                selected.get(item.route_name, item) for item in grilles.connections
-            ))
         routes = (("Supply Air Tree", [segment.line for segment in supply.segments]),)
         status = f"Cli supply solved: {len(grilles.supply)} grilles"
         return_segments = ()
@@ -285,7 +296,15 @@ class CliInteractiveRuntime:
                 self._length_failure = "Blocked: no room for a 90° supply exit"
                 return None
         terminals = {item.route_name: item.routing_point for item in connections}
-        role_prepared = replace(prepared, terminals=terminals, wet_room_names=[])
+        choose_supply = role == "supply" and start_mode_index == 1 and solver_backend_index in CLI_DIRECTED_BACKENDS
+        graph_terminals = dict(terminals)
+        if choose_supply:
+            for name, pairs in grilles.pairs_by_supply.items():
+                graph_terminals.update(
+                    (f"{name} choice {index}", item.routing_point)
+                    for index, (item, _returned) in enumerate(pairs[1:], 2)
+                )
+        role_prepared = replace(prepared, terminals=graph_terminals, wet_room_names=[])
 
         def simple_inputs(**kwargs):
             return build_cli_simple_graph_inputs(
@@ -337,7 +356,7 @@ class CliInteractiveRuntime:
                     weighted_adjacency[neighbor] = [
                         edge for edge in weighted_adjacency[neighbor] if edge[0] != root_node
                     ]
-        graph_nodes, graph_adjacency = runtime.nodes, weighted_adjacency
+        graph_nodes = runtime.nodes
         selected_connections = tuple(connections)
         length_policy, length_stats = None, None
         if role == "supply" and solver_backend_index in CLI_LENGTH_BACKENDS:
@@ -350,11 +369,7 @@ class CliInteractiveRuntime:
             if math.dist(runtime.nodes[root_node, :2], access["access_point"]) > 1e-7:
                 self._length_failure = "Unsupported: graph snaps the machine access; use Hannan or Core Simple"
                 return None
-        if role == "supply" and start_mode_index == 1 and solver_backend_index in CLI_DIRECTED_BACKENDS:
-            targets = [room for room in prepared.rooms if is_cli_supply_room(room)]
-            rooms_by_name = {
-                item.room_name: room for item, room in zip(connections, targets)
-            }
+        if choose_supply:
             directed_solver = (
                 solve_directed_wall_steiner if solver_backend_index != 3
                 else solve_directed_wall_tree
@@ -366,14 +381,14 @@ class CliInteractiveRuntime:
                 fitting_weight=FITTING_PERTURBATION_MM if solver_backend_index == CLI_FITTING_BACKEND else 0.0,
             )
             directed = directed_solver(
-                runtime.nodes, weighted_adjacency, root_node, rooms_by_name,
+                runtime.nodes, weighted_adjacency, root_node, grilles.pairs_by_supply,
                 connections, bend_penalty_mm, **extra,
             )
             if directed is None:
                 if length_stats is not None and length_stats.rejected_physical_tree:
                     self._length_failure = "Blocked: constrained candidate failed physical-tree check"
                 return None
-            tree, graph_nodes, graph_adjacency = directed.tree, directed.nodes, directed.adjacency
+            tree, graph_nodes = directed.tree, directed.nodes
             selected_connections = directed.selected_connections
             terminals = {item.route_name: item.routing_point for item in selected_connections}
         else:

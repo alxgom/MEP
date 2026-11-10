@@ -1,11 +1,12 @@
-"""Cli grille placement ported from the legacy 10.8_cli prototype."""
+"""Plan-view CLI grille supports and paired placement options."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace as dataclass_replace
+from dataclasses import dataclass, field, replace as dataclass_replace
+from functools import lru_cache
 import math
 
-from shapely.geometry import LineString, MultiLineString, Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from mep_routing.domain.machines import local_axis_to_world
@@ -24,6 +25,7 @@ class CliGrillePlacementConfig:
     allowed_region_buffer_mm: int = 300
     minimum_false_ceiling_area_mm2: int = 500_000
     connector_length_mm: int = 400
+    supply_routing_clearance_factor: float = 0.6
 
 
 @dataclass(frozen=True)
@@ -31,7 +33,7 @@ class CliGrilleConnection:
     route_name: str
     room_name: str
     role: str
-    grille_point: tuple[int, int]
+    grille_point: tuple[float, float]
     routing_point: tuple[int, int]
     width_mm: int
     inward_normal: tuple[float, float]
@@ -43,6 +45,10 @@ class CliGrilleConnection:
 @dataclass(frozen=True)
 class CliGrillePlan:
     connections: tuple[CliGrilleConnection, ...]
+    pairs_by_supply: dict[str, tuple[tuple[CliGrilleConnection, CliGrilleConnection], ...]] = field(
+        default_factory=dict,
+    )
+    missing_rooms: tuple[str, ...] = ()
 
     @property
     def supply(self):
@@ -61,7 +67,7 @@ class CliGrillePlan:
 
 @dataclass(frozen=True)
 class _Candidate:
-    point: tuple[int, int]
+    point: tuple[float, float]
     routing_point: tuple[int, int]
     role: str
     inward_normal: tuple[float, float]
@@ -72,48 +78,34 @@ class _Candidate:
     placement_type: str = "wall"
 
 
-def _point_allowed(room, point, routing_region, buffer_mm):
-    candidate = Point(point)
-    if not room.polygon.covers(candidate):
-        return False
-    if routing_region is None:
-        return True
-    return routing_region.buffer(buffer_mm, cap_style=2, join_style=3).covers(candidate)
-
-
 def _routing_allowed(point, routing_region):
     return routing_region is None or routing_region.covers(Point(point))
 
 
-def _unit_and_inward(first, second, room_polygon):
-    dx, dy = second[0] - first[0], second[1] - first[1]
-    length = math.hypot(dx, dy)
-    if length <= 1e-7:
-        return None
-    unit = (dx / length, dy / length)
-    normals = ((-unit[1], unit[0]), (unit[1], -unit[0]))
-    middle = ((first[0] + second[0]) / 2.0, (first[1] + second[1]) / 2.0)
-    inward = next((normal for normal in normals if room_polygon.contains(Point(
-        middle[0] + normal[0] * 80.0, middle[1] + normal[1] * 80.0,
-    ))), normals[0])
-    return unit, inward, length
+@lru_cache(maxsize=32)
+def _supply_routing_region(region, clearance):
+    return None if region is None else region.buffer(-clearance)
 
 
 def _candidate(room, segment, index, distance, width, role, routing_region, config):
-    vector = _unit_and_inward(segment["p0"], segment["p1"], room.polygon)
-    if vector is None:
+    unit, inward, length = segment["geometry"]
+    margin = config.minimum_wall_distance_mm + width / 2
+    if not margin - 1e-7 <= distance <= length - margin + 1e-7:
         return None
-    unit, inward, length = vector
     point = (
-        round(segment["p0"][0] + unit[0] * distance),
-        round(segment["p0"][1] + unit[1] * distance),
+        segment["p0"][0] + unit[0] * distance,
+        segment["p0"][1] + unit[1] * distance,
     )
-    if not _point_allowed(room, point, routing_region, config.allowed_region_buffer_mm):
+    if room.polygon.distance(Point(point)) > 1e-7:
         return None
     routing_point = (
         round(point[0] - inward[0] * config.connector_length_mm),
         round(point[1] - inward[1] * config.connector_length_mm),
     )
+    if role == "supply":
+        routing_region = _supply_routing_region(
+            routing_region, config.connector_length_mm * config.supply_routing_clearance_factor,
+        )
     if not _routing_allowed(routing_point, routing_region):
         return None
     return _Candidate(
@@ -144,35 +136,27 @@ def _simplified_boundary_lines(polygon):
     )
 
 
-def _line_parts(geometry):
-    if geometry is None or geometry.is_empty:
-        return ()
-    if isinstance(geometry, LineString):
-        return (geometry,)
-    if isinstance(geometry, MultiLineString):
-        return tuple(geometry.geoms)
-    if hasattr(geometry, "geoms"):
-        return tuple(line for part in geometry.geoms for line in _line_parts(part))
-    return ()
-
-
-def _eligible_segments(room_polygon, allowed, minimum_length):
+@lru_cache(maxsize=128)
+def _eligible_segments(room_polygon, allowed, minimum_length, reach_limit):
     result = []
+    inward_sign = 1 if room_polygon.exterior.is_ccw else -1
     for line in _simplified_boundary_lines(room_polygon):
         if line.length < minimum_length:
             continue
         distance = float(allowed.distance(line))
-        expansion = 300.0 if math.isclose(distance, 0.0, abs_tol=100.0) else min(distance * 1.2, 300.0)
-        for part in _line_parts(allowed.buffer(expansion, cap_style=2, join_style=3).intersection(line)):
-            if part.length < minimum_length:
-                continue
-            coords = list(part.coords)
-            result.append({
-                "p0": tuple(map(float, coords[0])),
-                "p1": tuple(map(float, coords[-1])),
-                "length": float(part.length),
-            })
-    return result
+        expansion = reach_limit if distance <= 100.0 else min(distance * 1.2, reach_limit)
+        part = allowed.buffer(expansion, cap_style=2, join_style=3).intersection(line)
+        if not isinstance(part, LineString) or part.is_empty or part.length < minimum_length:
+            continue
+        first, last = part.coords[0], part.coords[-1]
+        if line.project(Point(first)) > line.project(Point(last)):
+            first, last = last, first
+        dx, dy = last[0] - first[0], last[1] - first[1]
+        length = math.hypot(dx, dy)
+        unit = (dx / length, dy / length)
+        inward = (-inward_sign * unit[1], inward_sign * unit[0])
+        result.append({"p0": first, "p1": last, "length": length, "geometry": (unit, inward, length)})
+    return tuple(result)
 
 
 def _overlap(left, right):
@@ -213,10 +197,7 @@ def _machine_aligned(room, segment, index, routing_region, config, machine, pins
     hit = LineString((segment["p0"], segment["p1"])).intersection(ray)
     if not isinstance(hit, Point):
         return None
-    vector = _unit_and_inward(segment["p0"], segment["p1"], room.polygon)
-    if vector is None:
-        return None
-    unit, _inward, length = vector
+    unit, _inward, length = segment["geometry"]
     distance = (hit.x - segment["p0"][0]) * unit[0] + (hit.y - segment["p0"][1]) * unit[1]
     margin = config.minimum_wall_distance_mm + config.supply_width_mm / 2
     if distance < margin or distance > length - margin:
@@ -243,7 +224,7 @@ def _cover_region(room, routing_region):
         return unary_union(polygons)
     if routing_region is None or routing_region.is_empty:
         return None
-    return room.polygon.intersection(routing_region)
+    return routing_region
 
 
 def _wall_options(room, segments, routing_region, config, machine, pins, angle):
@@ -281,14 +262,21 @@ def _options(room, routing_region, config, machine, pins, angle):
     allowed = _cover_region(room, routing_region)
     if allowed is None or allowed.is_empty:
         allowed = room.polygon
-    false_ceiling = _largest_polygon(room.polygon.intersection(allowed))
-    if false_ceiling is not None and false_ceiling.area >= config.minimum_false_ceiling_area_mm2:
+    covered = room.polygon.intersection(allowed)
+    if covered.area >= config.minimum_false_ceiling_area_mm2:
         uncovered = _largest_polygon(room.polygon.difference(allowed))
         if uncovered is not None:
             segments = _eligible_segments(
                 uncovered, allowed, config.supply_width_mm + 2 * config.minimum_wall_distance_mm,
+                config.allowed_region_buffer_mm,
             )
-            return_point = false_ceiling.representative_point()
+            false_ceiling = _largest_polygon(covered if routing_region is None else covered.intersection(routing_region))
+            if false_ceiling is None or false_ceiling.area <= config.minimum_false_ceiling_area_mm2:
+                return []
+            return_point = false_ceiling.centroid
+            if not false_ceiling.covers(return_point):
+                return_point = false_ceiling.representative_point()
+            supply_region = allowed if routing_region is None else allowed.intersection(routing_region)
             horizontal_return = _Candidate(
                 (round(return_point.x), round(return_point.y)),
                 (round(return_point.x), round(return_point.y)), "return", (0.0, 0.0),
@@ -297,13 +285,16 @@ def _options(room, routing_region, config, machine, pins, angle):
             horizontal = []
             for index, segment in enumerate(segments):
                 supply = _at_center(
-                    room, segment, index, config.supply_width_mm, "supply", routing_region, config,
+                    room, segment, index, config.supply_width_mm, "supply", supply_region, config,
                 )
                 if _valid_pair(supply, horizontal_return, config):
                     horizontal.append(("return_horizontal", supply, horizontal_return))
-            if horizontal:
-                return horizontal
-    segments = _eligible_segments(room.polygon, allowed, config.minimum_wall_length_mm)
+            return horizontal
+        if getattr(room, "space_coverings", ()):
+            return []
+    segments = _eligible_segments(
+        room.polygon, allowed, config.minimum_wall_length_mm, config.allowed_region_buffer_mm,
+    )
     return _wall_options(room, segments, routing_region, config, machine, pins, angle)
 
 
@@ -311,9 +302,9 @@ def prepare_cli_grilles(
     rooms, routing_region, *, machine=None, machine_pins=None, angle_degrees=0,
     config=CliGrillePlacementConfig(), supply_width_by_room_id=None,
 ):
-    """Select the first valid legacy-compatible supply/return option per Cli room."""
+    """Prepare one fixed pair and the distinct routable supply choices per CLI room."""
     targets = [room for room in rooms if is_cli_supply_room(room)]
-    connections, counts = [], {}
+    connections, counts, pairs_by_supply, missing_rooms = [], {}, {}, []
     for room in targets:
         room_config = config
         supply_sizing = None
@@ -329,14 +320,24 @@ def prepare_cli_grilles(
             room, routing_region, room_config, machine, machine_pins, angle_degrees,
         )
         if not options:
+            missing_rooms.append(room_name)
             continue
-        placement_type, supply, returned = options[0]
-        for candidate in (supply, returned):
-            connections.append(CliGrilleConnection(
-                f"{room_name} {'Supply' if candidate.role == 'supply' else 'Return'}",
-                room_name, candidate.role, candidate.point, candidate.routing_point,
-                candidate.width_mm, candidate.inward_normal, placement_type,
-                float(room.polygon.area) / 1_000_000.0,
-                supply_sizing if candidate.role == "supply" else None,
-            ))
-    return CliGrillePlan(tuple(connections))
+        pairs = {}
+        for placement_type, supply, returned in options:
+            key = (supply.point, supply.routing_point, supply.inward_normal)
+            if key in pairs:
+                continue
+            pairs[key] = tuple(
+                CliGrilleConnection(
+                    f"{room_name} {'Supply' if candidate.role == 'supply' else 'Return'}",
+                    room_name, candidate.role, candidate.point, candidate.routing_point,
+                    candidate.width_mm, candidate.inward_normal, placement_type,
+                    float(room.polygon.area) / 1_000_000.0,
+                    supply_sizing if candidate.role == "supply" else None,
+                )
+                for candidate in (supply, returned)
+            )
+        room_pairs = tuple(pairs.values())
+        connections.extend(room_pairs[0])
+        pairs_by_supply[room_pairs[0][0].route_name] = room_pairs
+    return CliGrillePlan(tuple(connections), pairs_by_supply, tuple(missing_rooms))
