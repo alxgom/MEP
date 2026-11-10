@@ -21,7 +21,7 @@ from .events import (
     move_panel_interaction,
 )
 from .installation_projection import active_capabilities
-from .controls import dwelling_selector_bounds
+from .controls import dwelling_selector_bounds, weight_slider_hit
 from .installation_header import (
     activate_installation, installation_header_hit, reorder_installation_at_x,
     toggle_installation,
@@ -253,7 +253,7 @@ class WorkbenchEventAdapter:
             bend_reset=controls.bend_reset.collidepoint(pos),
             crossing_slider=controls.crossing.collidepoint(pos),
             crossing_reset=controls.crossing_reset.collidepoint(pos),
-            yellow_placement_penalty_slider=controls.yellow_placement_penalty.collidepoint(pos),
+            yellow_placement_penalty_slider=weight_slider_hit(controls.yellow_placement_penalty, pos),
             yellow_placement_penalty_reset=controls.yellow_placement_penalty_reset.collidepoint(pos),
         )
         occupied = any((panel_hit.help_card, panel_hit.min_piece_slider, panel_hit.min_piece_reset, panel_hit.bend_slider,

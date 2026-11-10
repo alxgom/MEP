@@ -1,3 +1,6 @@
+from pygame import Rect
+
+from mep_routing.ui.controls import slider_value_from_x, weight_slider_hit
 from mep_routing.ui.runtime import CanvasViewport
 
 
@@ -39,3 +42,13 @@ def test_layout_has_no_permanent_vertical_colorbar_gutter():
 
     assert viewport.colorbar_width == 0
     assert viewport.canvas_width == viewport.window_width - viewport.canvas_left - viewport.panel_width - 10
+
+
+def test_weight_slider_hit_covers_the_knob_at_both_endpoints():
+    track = Rect(25, 568, 224, 8)
+    assert weight_slider_hit(track, (track.left, track.centery))
+    assert weight_slider_hit(track, (track.right, track.centery))
+    assert weight_slider_hit(track, (track.right, track.centery - 7))
+    assert not weight_slider_hit(track, (track.right + 8, track.centery))
+    assert not weight_slider_hit(Rect(0, 0, 0, 0), (0, 0))
+    assert slider_value_from_x(track.right, track, 0, 1500) == 1500

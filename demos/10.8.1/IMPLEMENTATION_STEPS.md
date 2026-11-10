@@ -1027,6 +1027,8 @@ Before each commit:
 
 - Raised the CLI yellow-placement slider limit to 1500 mm. The placement message reports the winning zone, its applied penalty and the resulting ranking score. At 90° on the first dwelling, the best green score was 4000 mm above the best yellow score. On dwelling `01_01_P04_V06` at 180°, dragging from 0 to 1500 mm and releasing switched the verified placement from yellow to green. All 621 tests passed.
 
+- Fixed the yellow-placement slider hit area to include its knob at both endpoints. On `01_01_P04_V06` at 180°, a headless Pygame test grabbed the knob at 1500 mm, dragged to 0 and back, and verified the machine moved between the green and yellow positions after each release. All 622 tests passed.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

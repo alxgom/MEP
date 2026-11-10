@@ -3,6 +3,9 @@ from __future__ import annotations
 import math
 
 
+_WEIGHT_SLIDER_KNOB_RADIUS = 8
+
+
 def canvas_tool_button_bounds(canvas_left, canvas_top):
     """Return stable bounds for shared canvas toolbar controls."""
     size = 28
@@ -58,6 +61,12 @@ def slider_fraction(value, min_value, max_value):
     return max(0.0, min(1.0, (value - min_value) / span))
 
 
+def weight_slider_hit(track, point):
+    """Include the knob at either end while keeping the track's value scale."""
+    diameter = 2 * _WEIGHT_SLIDER_KNOB_RADIUS
+    return track.width > 0 and track.inflate(diameter, max(0, diameter - track.height)).collidepoint(point)
+
+
 def draw_min_piece_slider(screen, font_small, x, y, width, value, min_value, max_value, text_color, muted_color):
     """Draw the min-piece slider and return its Pygame hit rectangle."""
     import pygame
@@ -93,7 +102,7 @@ def draw_weight_slider(
     integer=False,
     decimals=1,
 ):
-    """Draw a weight slider and its reset button, returning both hit rectangles."""
+    """Draw a weight slider and return its value track and reset rectangle."""
     import pygame
 
     reset_size = 18
@@ -106,8 +115,8 @@ def draw_weight_slider(
     pygame.draw.rect(screen, (22, 22, 30), rect, border_radius=4)
     pygame.draw.rect(screen, muted_color, rect, 1, border_radius=4)
     knob_x = int(rect.x + slider_fraction(value, min_value, max_value) * rect.width)
-    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), 8)
-    pygame.draw.circle(screen, (190, 196, 204), (knob_x, rect.centery), 8, 1)
+    pygame.draw.circle(screen, (255, 255, 255), (knob_x, rect.centery), _WEIGHT_SLIDER_KNOB_RADIUS)
+    pygame.draw.circle(screen, (190, 196, 204), (knob_x, rect.centery), _WEIGHT_SLIDER_KNOB_RADIUS, 1)
     pygame.draw.rect(screen, (32, 34, 38), reset_rect, border_radius=4)
     pygame.draw.rect(screen, (128, 136, 144), reset_rect, 1, border_radius=4)
     cx, cy = reset_rect.center
