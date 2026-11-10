@@ -82,6 +82,7 @@ class CliWorkbenchState:
     duct_geometry_mode_idx: int = 0
     show_placement_mask: bool = False
     show_placement_cells: bool = True
+    room_aware_placement_cells: bool = True
 
 
 @dataclass

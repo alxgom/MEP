@@ -142,6 +142,34 @@ def cached_cell_template(region_wkb, walls_wkb, boundary_resolution_mm, min_cell
                                boundary_resolution_mm=boundary_resolution_mm, min_cell_area_mm2=min_cell_area_mm2)
 
 
+def build_room_cell_template(allowed_region, room_polys, wall_polys=(), *,
+                             boundary_resolution_mm=200, min_cell_area_mm2=40000):
+    """Partition room interiors and the remaining allowed space separately.
+
+    If room polygons overlap, the earlier room owns the overlap. Match portals
+    across zones afterward; room boundaries do not act as routing barriers.
+    """
+    options = dict(boundary_resolution_mm=boundary_resolution_mm, min_cell_area_mm2=min_cell_area_mm2)
+    if allowed_region is None or allowed_region.is_empty:
+        return build_cell_template(allowed_region, wall_polys, **options)
+
+    remaining = allowed_region
+    cells, discarded = [], 0
+    for room in room_polys:
+        zone = remaining.intersection(room)
+        if not zone.area:
+            continue
+        template = build_cell_template(zone, wall_polys, **options)
+        cells.extend(template.cells)
+        discarded += template.discarded_small_cells
+        remaining = remaining.difference(zone)
+    residual = build_cell_template(remaining, wall_polys, **options)
+    cells = tuple(sorted((*cells, *residual.cells)))
+    retained_area = sum((x1 - x0) * (y1 - y0) for x0, y0, x1, y1 in cells)
+    return CellTemplate(cells, _portals(cells), max(0.0, allowed_region.area - retained_area),
+                        discarded + residual.discarded_small_cells)
+
+
 @lru_cache(maxsize=16)
 def cached_machine_cell_template(base, machine_wkb, walls_wkb, boundary_resolution_mm,
                                  min_cell_area_mm2, allowed_area_mm2):

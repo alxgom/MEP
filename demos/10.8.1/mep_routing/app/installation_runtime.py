@@ -84,17 +84,22 @@ class CliInstallationRuntime:
         self.app = app
         self._placement_masks = CliPlacementMasks()
         self._cell_dwelling = None
-        self._placement_cell_grid = None
+        self._placement_cell_grids = {}
 
     def placement_mask(self, dwelling, angle_degrees):
         return self._placement_masks.get(dwelling, self._machine(), angle_degrees)
 
-    def placement_cell_grid(self, dwelling):
-        """Cache the actual Cell Skeleton geometry independently of the pose."""
+    def placement_cell_grid(self, dwelling, *, room_aware):
+        """Cache both placement overlays independently of the machine pose."""
         if dwelling is not self._cell_dwelling:
-            self._placement_cell_grid = dwelling.workspace.lifecycle.build_static_cell_grid()
+            self._placement_cell_grids.clear()
             self._cell_dwelling = dwelling
-        return self._placement_cell_grid
+        if room_aware not in self._placement_cell_grids:
+            rooms = tuple(room.polygon for room in dwelling.prepared.rooms) if room_aware else ()
+            self._placement_cell_grids[room_aware] = dwelling.workspace.lifecycle.build_static_cell_grid(
+                room_polys=rooms,
+            )
+        return self._placement_cell_grids[room_aware]
 
     def placement_outlines(self, pins, angle_degrees):
         body, extension = cli_placement_footprint_parts(self._machine(), pins, angle_degrees)

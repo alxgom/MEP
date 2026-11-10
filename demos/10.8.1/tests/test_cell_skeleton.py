@@ -7,7 +7,9 @@ import pytest
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import unary_union
 
-from mep_routing.graphs.cells import build_cell_template, build_cell_skeleton, cached_cell_template, _portals
+from mep_routing.graphs.cells import (
+    _portals, build_cell_skeleton, build_cell_template, build_room_cell_template, cached_cell_template,
+)
 from mep_routing.graphs.lifecycle import GraphLifecycle, GraphMode
 from mep_routing.graphs.runtime import create_runtime_graph
 from mep_routing.graphs.variants import build_cell_variant
@@ -77,6 +79,31 @@ def test_wall_bands_remain_cell_features_without_becoming_solid_obstacles():
     runtime = create_runtime_graph(nodes, edges)
     left, right = [int(runtime.spatial_index.query(p)[1]) for p in [(500, 1000), (3500, 1000)]]
     assert attached == 2 and right in reachable(runtime.adjacency, left)
+
+
+def test_room_partition_keeps_an_unmodeled_gap_and_connects_both_rooms():
+    region = box(0, 0, 4000, 2000)
+    rooms = (box(0, 0, 1900, 2000), box(2100, 0, 4000, 2000))
+    template = build_room_cell_template(region, rooms)
+    assert len(template.cells) == 3 and len(template.portals) == 2
+    assert not template.excluded_area_mm2
+    assert all(not (box(*cell).intersection(rooms[0]).area and box(*cell).intersection(rooms[1]).area)
+               for cell in template.cells)
+    nodes, edges, _ = build_cell_skeleton(template, (), region)
+    runtime = create_runtime_graph(nodes, edges)
+    assert len(reachable(runtime.adjacency, 0)) == len(nodes)
+
+
+def test_room_partition_respects_sloped_boundaries_and_area_floor():
+    region = box(0, 0, 4000, 3000)
+    room = Polygon([(0, 0), (4000, 0), (0, 3000)])
+    template = build_room_cell_template(region, (room, region.difference(room)))
+    cells = [box(*bounds) for bounds in template.cells]
+    assert len(cells) > 1
+    assert all(cell.area >= 40000 and cell.covered_by(region) for cell in cells)
+    assert all(cell.intersection(room).area == pytest.approx(0) or cell.covered_by(room) for cell in cells)
+    assert sum(cell.area for cell in cells) == pytest.approx(unary_union(cells).area)
+    assert region.area - sum(cell.area for cell in cells) == pytest.approx(template.excluded_area_mm2)
 
 
 def test_required_attachments_are_exact_and_do_not_bridge_disconnected_regions():

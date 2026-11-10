@@ -94,14 +94,15 @@ class GraphLifecycle:
             "max_link_distance_mm": self.scaffold_spacing_mm,
         }
 
-    def build_static_cell_grid(self):
+    def build_static_cell_grid(self, *, room_polys=()):
         """Build the Cell Skeleton without a live machine or endpoint attachments."""
         region = self.node_region()
         if region is None:
             return None
         return build_cell_variant(
             allowed_region=region, wall_polys=self.wall_polygons,
-            wall_thickness_mm=self.wall_thickness_mm, required_points=(), **self._cell_options(),
+            wall_thickness_mm=self.wall_thickness_mm, required_points=(), room_polys=room_polys,
+            **self._cell_options(),
         )
 
     def clear_hannan_templates(self) -> None:

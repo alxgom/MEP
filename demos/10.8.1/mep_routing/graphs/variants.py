@@ -15,7 +15,7 @@ from .epsilon import build_axes as build_epsilon_axes
 from .simple import SimpleGraphInputs, build_simple_grid
 from .medial import cached_medial_template, attach_medial_points
 from .runtime import Edge
-from .cells import cached_cell_template, cached_machine_cell_template, build_cell_skeleton
+from .cells import build_cell_skeleton, build_room_cell_template, cached_cell_template, cached_machine_cell_template
 from .hybrid import join_hanan_voronoi, join_grids_locally, cached_join_grids_locally
 from .hannan import build_wall_shift_axes
 
@@ -37,11 +37,17 @@ class GraphVariantResult:
 
 def build_cell_variant(*, allowed_region, wall_polys, wall_thickness_mm, required_points,
                        boundary_resolution_mm=200, machine_polygon=None, min_cell_area_mm2=40000,
-                       walls=(), wall_offset_mm=100, max_link_distance_mm=600):
+                       walls=(), wall_offset_mm=100, max_link_distance_mm=600, room_polys=()):
     started = perf_counter()
     required_points = list(required_points)
     walls_wkb = tuple(w.wkb for w in wall_polys)
-    base = cached_cell_template(allowed_region.wkb, walls_wkb, boundary_resolution_mm, min_cell_area_mm2)
+    if room_polys:
+        base = build_room_cell_template(
+            allowed_region, room_polys, wall_polys,
+            boundary_resolution_mm=boundary_resolution_mm, min_cell_area_mm2=min_cell_area_mm2,
+        )
+    else:
+        base = cached_cell_template(allowed_region.wkb, walls_wkb, boundary_resolution_mm, min_cell_area_mm2)
     template, rebuilt_cells = base, 0
     if machine_polygon is not None:
         allowed_region = allowed_region.difference(machine_polygon)

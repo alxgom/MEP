@@ -675,9 +675,12 @@ This check uses static plan geometry; return
 extensions, vertical clearance and other installations are outside its scope.
 It does not affect automatic placement or routing.
 
-The heatmap also shows the dwelling's fixed **Cell Skeleton** grid, including
-the center and portal connections and the wall-shifted Hanan edges.
-This preview omits machine and terminal attachments so it stays fixed.
+The heatmap also shows a fixed **Cell Skeleton** preview with center and portal
+connections and wall-shifted Hanan edges. It partitions each room outline within
+the allowed area, then partitions the remaining space separately. Room
+boundaries guide the cells without blocking allowed connections between them.
+Use `[Ctrl+G]` to compare with the original partition. This preview omits machine
+and terminal attachments, and changing it does not change the routing grid.
 A green or yellow ring marks a cell center that passes the placement mask for
 the current rotation; gray dots mark the other centers. Drag the machine so
 its body center sits on a ring to try that position. The cell overlay stays

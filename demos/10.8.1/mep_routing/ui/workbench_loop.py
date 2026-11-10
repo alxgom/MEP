@@ -68,13 +68,17 @@ def _render(app, screen, clock, fonts, state):
     placement_mask = None
     placement_outlines = ()
     placement_cell_grid = None
+    placement_cell_label = None
     if cli_heatmap and active_view.can("machine_selection") and dwelling_state.active is not None:
         runtime = app.routing_controller.installations.get("cli")
         placement_mask = runtime.placement_mask(dwelling_state.active.prepared, pose[2])
         if placement_mask is not None:
             placement_outlines = runtime.placement_outlines(pins, pose[2])
             if workbench.cli.show_placement_cells:
-                placement_cell_grid = runtime.placement_cell_grid(dwelling_state.active)
+                room_aware = workbench.cli.room_aware_placement_cells
+                placement_cell_grid = runtime.placement_cell_grid(dwelling_state.active, room_aware=room_aware)
+                if placement_cell_grid is not None:
+                    placement_cell_label = "Room-aware" if room_aware else "Original cells"
     if sal_heatmap:
         app.routing_controller.ensure_placement_scores()
 
@@ -91,7 +95,7 @@ def _render(app, screen, clock, fonts, state):
             return
         if placement_mask is not None:
             draw_placement_mask_legend(screen, placement_mask, viewport, fonts.small, pose[2],
-                                       placement_cell_grid is not None)
+                                       placement_cell_label)
         elif sal_heatmap and app.ap_scores:
             app.ui_facade.draw_colorbar(screen, app.ui_facade.get_placeable_heatmap_scores(app.ap_scores))
 

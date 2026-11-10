@@ -81,13 +81,13 @@ def draw_placement_cell_grid(screen, grid, mask, viewport):
     screen.set_clip(previous_clip)
 
 
-def draw_placement_mask_legend(screen, mask, viewport, font, angle, cells_visible=False):
+def draw_placement_mask_legend(screen, mask, viewport, font, angle, cell_label=None):
     import pygame
 
     x, y, width, _ = horizontal_colorbar_bounds(viewport.canvas_rect, width=340)
-    if cells_visible:
+    if cell_label:
         y -= 19
-    pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 65 if cells_visible else 46), border_radius=4)
+    pygame.draw.rect(screen, (31, 35, 43), (x, y, width, 65 if cell_label else 46), border_radius=4)
     title = font.render(f"CLI body + supply extension · {angle:g}° · {mask.step_mm} mm raster", True, (240, 240, 240))
     screen.blit(title, (x + 8, y + 4))
     items = ((8, _PLACEMENT_VALID, "Body clear"),
@@ -96,8 +96,8 @@ def draw_placement_mask_legend(screen, mask, viewport, font, angle, cells_visibl
     for offset, color, label in items:
         pygame.draw.rect(screen, color, (x + offset, y + 26, 10, 10))
         screen.blit(font.render(label, True, (240, 240, 240)), (x + offset + 15, y + 22))
-    if cells_visible:
-        label = font.render("Cell Skeleton · ring = candidate center · [Shift+G]", True, (240, 240, 240))
+    if cell_label:
+        label = font.render(f"{cell_label} · rings fit · Ctrl+G compare · Shift+G hide", True, (240, 240, 240))
         screen.blit(label, (x + 8, y + 42))
 
 
