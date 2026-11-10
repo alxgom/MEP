@@ -262,14 +262,19 @@ class DemoRoutingController:
                     bend_penalty_mm=state.bend_penalty_mm,
                     yellow_placement_penalty_mm=state.yellow_placement_penalty_mm,
                 )
-                message = (f"{outcome.status} at {pose.angle_degrees:g}° · {outcome.ranked}/{outcome.feasible} ranked "
-                           f"· {outcome.verified} checked · {outcome.elapsed_ms:.0f} ms")
-                a.observation.set_transient_message(message)
+                status = outcome.status
                 if outcome.placement is not None:
+                    yellow = mask.center_status(outcome.placement.center) == "allowed"
+                    zone = "Yellow" if yellow else "Green"
+                    penalty = state.yellow_placement_penalty_mm if yellow else 0
+                    status = f"{zone} pose (+{penalty} mm) · score {outcome.placement.score:,.0f}"
                     pose.set(outcome.placement.center, outcome.placement.angle_degrees)
                     state.graph_type_idx = a.CLI_INSTALLATION.graph_modes.index(a.cli_runtime.virtual_placement.graph_mode)
                     state.router_backend_idx = a.cli_runtime.virtual_placement.backend_index
                     state.room_start_mode_idx = 1
+                message = (f"{status} at {pose.angle_degrees:g}° · {outcome.ranked}/{outcome.feasible} ranked "
+                           f"· {outcome.verified} checked · {outcome.elapsed_ms:.0f} ms")
+                a.observation.set_transient_message(message)
                 return outcome
             placement = a.cli_runtime.place_machine(
                 dwelling.prepared, machine, minimum_segment_length_factor=state.minimum_segment_length_factor,

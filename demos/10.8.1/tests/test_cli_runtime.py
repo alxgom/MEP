@@ -543,12 +543,13 @@ def test_cli_virtual_placement_charges_yellow_outlets_once():
     )
     args = (prepared, machine, 90, mask, grilles, dimensions, dimensions[1], 4000, ())
     baseline, count = runtime.virtual_placement.rank(*args)
-    penalized, penalized_count = runtime.virtual_placement.rank(*args, yellow_placement_penalty_mm=500)
+    penalty = CLI_INSTALLATION.yellow_placement_penalty_max_mm
+    penalized, penalized_count = runtime.virtual_placement.rank(*args, yellow_placement_penalty_mm=penalty)
     original = dict(baseline)
     assert count == penalized_count
     assert original.keys() == dict(penalized).keys()
     assert {mask.center_status(center) for center in original} == {"clear", "allowed"}
     for center, score in penalized:
-        expected = 500 if mask.center_status(center) == "allowed" else 0
+        expected = penalty if mask.center_status(center) == "allowed" else 0
         assert score == pytest.approx(original[center] + expected)
     assert [score for _, score in penalized] == sorted(score for _, score in penalized)

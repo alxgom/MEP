@@ -58,7 +58,7 @@ class CliInstallationDefinition:
     start_mode_labels: tuple[str, ...] = CLI_START_MODE_LABELS
     auto_placement_labels: tuple[str, ...] = CLI_AUTO_PLACEMENT_LABELS
     virtual_placement_mode_index: int = 2
-    yellow_placement_penalty_max_mm: int = 500
+    yellow_placement_penalty_max_mm: int = 1500
     interactive_runtime_available: bool = True
     directed_backend_indices: tuple[int, ...] = CLI_DIRECTED_BACKENDS
     length_backend_indices: tuple[int, ...] = CLI_LENGTH_BACKENDS
