@@ -260,6 +260,7 @@ class DemoRoutingController:
                     dwelling.prepared, machine, pose.angle_degrees, mask, context_obstacles=context,
                     minimum_segment_length_factor=state.minimum_segment_length_factor,
                     bend_penalty_mm=state.bend_penalty_mm,
+                    crossing_penalty_multiplier=state.crossing_penalty_multiplier,
                     yellow_placement_penalty_mm=state.yellow_placement_penalty_mm,
                 )
                 status = outcome.status

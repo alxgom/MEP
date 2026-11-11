@@ -1033,6 +1033,8 @@ Before each commit:
 
 - Raised the yellow-placement penalty limit to 6000 mm. On `A_A1_P00_V01` at 90°, dragging from 1500 to 6000 mm and releasing moved the machine from the yellow pose at (7737, 4418) mm to the verified green pose at (8400, 4418) mm and routed all three supply grilles. All 622 tests passed.
 
+- CLI Virtual source now uses the shared graph to shortlist placements and compares the first verified supply route in each zone using the Workbench Score. It tries up to five poses per zone and adds the slider value once to the yellow pose. On `A_A1_P00_V01` at 90°, the verified scores were 22,206 for yellow and 22,681 for green. The solver switched at 475 mm, and a Pygame slider test moved the machine at 509 mm. All 622 tests passed.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

@@ -30,6 +30,7 @@ from .grilles import CliGrillePlan, prepare_cli_grilles
 from .materializer import CliDuctSegment, materialize_cli_tree
 from .length_steiner import LengthSteinerStats, TreeLengthPolicy, validate_tree_lengths
 from .placement import CliPlacementResult, CliPlacementRuntime
+from .route_analysis import CliRouteAnalysis
 from .solver_backends import solve_cli_tree
 from .sizing import (
     CliSizingContext, CoreConstantFrictionSizing, CoreSupplyGrilleSizing,
@@ -118,7 +119,8 @@ class CliInteractiveRuntime:
 
     def place_machine_steiner(self, dwelling, machine, angle, mask, *,
                               minimum_segment_length_factor=1.0, bend_penalty_mm=4000.0,
-                              context_obstacles=(), yellow_placement_penalty_mm=0):
+                              crossing_penalty_multiplier=5.0, context_obstacles=(),
+                              yellow_placement_penalty_mm=0):
         started = perf_counter()
         ranked, feasible, verified = (), 0, 0
         if self.last_placement is not None and self.last_placement.green_score_gap_mm is not None:
@@ -144,30 +146,30 @@ class CliInteractiveRuntime:
         ranked, feasible = self.virtual_placement.rank(
             dwelling, machine, angle, mask, grilles, dimensions,
             dimensions[1] * minimum_segment_length_factor, bend_penalty_mm, context_obstacles,
-            yellow_placement_penalty_mm=yellow_placement_penalty_mm,
         )
         if not ranked:
             return outcome("No outlet can serve all supply grilles on the shared graph")
-
-        green_score = next((score for center, score in ranked if mask.center_status(center) == "clear"), None)
-        yellow_score = next((score for center, score in ranked if mask.center_status(center) == "allowed"), None)
-        green_score_gap = None
-        if green_score is not None and yellow_score is not None:
-            green_score_gap = green_score - (yellow_score - yellow_placement_penalty_mm)
 
         verifier = CliInteractiveRuntime(
             self.definition, self.graph_config, self.terminal_config,
             sizing_policy_factory=self.sizing_policy_factory,
             grille_sizing_policy_factory=self.grille_sizing_policy_factory,
         )
-        # Bound the number of pose-specific graph rebuilds per interactive run.
-        for center, score in ranked[:5]:
+        route_analysis = CliRouteAnalysis(bend_penalty_mm, crossing_penalty_multiplier)
+        attempts, verified_poses = {"clear": 0, "allowed": 0}, {}
+        # Verify the first usable pose in each zone, using at most five attempts per zone.
+        for center in ranked:
+            zone = mask.center_status(center)
+            if zone in verified_poses or attempts[zone] >= 5:
+                continue
+            attempts[zone] += 1
             verified += 1
             result = verifier.solve(
                 dwelling, machine, center, angle, context_obstacles=context_obstacles,
                 return_enabled=False, graph_mode=self.virtual_placement.graph_mode,
                 solver_backend_index=self.virtual_placement.backend_index, start_mode_index=1,
                 minimum_segment_length_factor=minimum_segment_length_factor, bend_penalty_mm=bend_penalty_mm,
+                crossing_penalty_multiplier=crossing_penalty_multiplier,
             )
             body = cli_machine_footprint(result.machine_pins)
             obstacles = (body, *dwelling.columns, *dwelling.shafts, *context_obstacles)
@@ -177,9 +179,22 @@ class CliInteractiveRuntime:
                 if segment.kind not in ("machine_stub", "machine_branch")
                 for obstacle in obstacles
             ):
-                self.last_placement = CliPlacementResult(center, angle, score, feasible, green_score_gap)
-                return outcome("Virtual source selected a verified pose", self.last_placement)
-        return outcome(f"No verified pose among the first {verified} ranked outlets")
+                verified_poses[zone] = center, route_analysis.score(result.routes)
+                if len(verified_poses) == 2:
+                    break
+        if not verified_poses:
+            return outcome(f"No verified pose among {verified} ranked outlets checked")
+
+        # The virtual source's yellow connection is charged once on the installed route score.
+        score, _, center = min(
+            (score + (yellow_placement_penalty_mm if zone == "allowed" else 0), zone == "allowed", center)
+            for zone, (center, score) in verified_poses.items()
+        )
+        green_score_gap = None
+        if len(verified_poses) == 2:
+            green_score_gap = verified_poses["clear"][1] - verified_poses["allowed"][1]
+        self.last_placement = CliPlacementResult(center, angle, score, feasible, green_score_gap)
+        return outcome("Virtual source selected a verified pose", self.last_placement)
 
     def solve(
         self, prepared_dwelling, machine, center, angle_degrees=0, *,

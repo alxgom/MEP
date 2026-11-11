@@ -11,6 +11,7 @@ from mep_routing.installations.cli import (
     CLI_INSTALLATION,
     CliInteractiveRuntime,
     CliPlacementRuntime,
+    CliRouteAnalysis,
     cli_machine_pins,
     prepare_cli_grilles,
     prepare_cli_supply_terminals,
@@ -520,7 +521,7 @@ def test_cli_virtual_placement_publishes_a_verified_hybrid_grid_pose():
     assert outcome.placement == runtime.last_placement
     assert outcome.placement is not None and outcome.placement.angle_degrees == 90
     assert outcome.placement.center in dict(runtime.virtual_placement.screened_centers(prepared, mask))
-    assert 1 <= outcome.verified <= 5 and outcome.ranked > 1
+    assert 1 <= outcome.verified <= 10 and outcome.ranked > 1
     routed = runtime.solve(
         prepared, machine, outcome.placement.center, 90, return_enabled=False,
         solver_backend_index=7, start_mode_index=1,
@@ -528,7 +529,7 @@ def test_cli_virtual_placement_publishes_a_verified_hybrid_grid_pose():
     assert routed.routes and len(routed.grille_plan.supply) == 2
 
 
-def test_cli_virtual_placement_charges_yellow_outlets_once():
+def test_cli_virtual_placement_switches_at_the_verified_route_score_gap():
     prepared = _prepared()
     machine = CLI_INSTALLATION.default_machine
     runtime = CliInteractiveRuntime(
@@ -537,19 +538,20 @@ def test_cli_virtual_placement_charges_yellow_outlets_once():
     )
     dimensions = runtime.supply_exit_dimensions(machine, 1)
     mask = CliPlacementMasks().get(prepared, machine, 90, dimensions)
-    grilles = prepare_cli_grilles(
-        prepared.rooms, prepared.routing_region_base,
-        supply_width_by_room_id=runtime._size_supply_grilles(prepared.rooms, machine),
-    )
-    args = (prepared, machine, 90, mask, grilles, dimensions, dimensions[1], 4000, ())
-    baseline, count = runtime.virtual_placement.rank(*args)
-    penalty = CLI_INSTALLATION.yellow_placement_penalty_max_mm
-    penalized, penalized_count = runtime.virtual_placement.rank(*args, yellow_placement_penalty_mm=penalty)
-    original = dict(baseline)
-    assert count == penalized_count
-    assert original.keys() == dict(penalized).keys()
-    assert {mask.center_status(center) for center in original} == {"clear", "allowed"}
-    for center, score in penalized:
-        expected = penalty if mask.center_status(center) == "allowed" else 0
-        assert score == pytest.approx(original[center] + expected)
-    assert [score for _, score in penalized] == sorted(score for _, score in penalized)
+    args = (prepared, machine, 90, mask)
+    baseline = runtime.place_machine_steiner(*args).placement
+    gap = baseline.green_score_gap_mm
+    assert mask.center_status(baseline.center) == "allowed"
+    assert gap > 1
+    yellow = runtime.place_machine_steiner(*args, yellow_placement_penalty_mm=gap - 1).placement
+    green = runtime.place_machine_steiner(*args, yellow_placement_penalty_mm=gap).placement
+    assert yellow.center == baseline.center
+    assert yellow.score == pytest.approx(baseline.score + gap - 1)
+    assert mask.center_status(green.center) == "clear"
+    assert green.score == pytest.approx(baseline.score + gap)
+    for placement, penalty in ((yellow, gap - 1), (green, 0)):
+        result = runtime.solve(
+            prepared, machine, placement.center, 90, return_enabled=False,
+            solver_backend_index=7, start_mode_index=1,
+        )
+        assert placement.score == pytest.approx(CliRouteAnalysis(4000, 5).score(result.routes) + penalty)
