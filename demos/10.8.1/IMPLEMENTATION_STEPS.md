@@ -1031,6 +1031,8 @@ Before each commit:
 
 - The CLI Virtual source sidebar shows the score gap between the top green and yellow candidates at the selected penalty. The gap updates during the drag, and placement reruns on release. On `A_A1_P00_V01` at 90°, the live event test reduced the yellow lead from 5058 mm to 3558 mm and kept the winning pose at (7737, 4418) mm. All 622 tests passed.
 
+- Raised the yellow-placement penalty limit to 6000 mm. On `A_A1_P00_V01` at 90°, dragging from 1500 to 6000 mm and releasing moved the machine from the yellow pose at (7737, 4418) mm to the verified green pose at (8400, 4418) mm and routed all three supply grilles. All 622 tests passed.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.
