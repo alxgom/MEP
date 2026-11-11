@@ -1029,6 +1029,8 @@ Before each commit:
 
 - Fixed the yellow-placement slider hit area to include its knob at both endpoints. On `01_01_P04_V06` at 180°, a headless Pygame test grabbed the knob at 1500 mm, dragged to 0 and back, and verified the machine moved between the green and yellow positions after each release. All 622 tests passed.
 
+- The CLI Virtual source sidebar shows the score gap between the top green and yellow candidates at the selected penalty. The gap updates during the drag, and placement reruns on release. On `A_A1_P00_V01` at 90°, the live event test reduced the yellow lead from 5058 mm to 3558 mm and kept the winning pose at (7737, 4418) mm. All 622 tests passed.
+
 - Decide later whether collision policy remains top-level `COLLISIONS` or moves under a shared domain area.
 - Decide later whether Demo 10.8.1 should move to a standalone folder such as `Documents/interactive-routing-app`.
 - Obtain concrete Cli/Coc/San behavior only when ready to merge those demos.

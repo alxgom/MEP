@@ -121,6 +121,8 @@ class CliInteractiveRuntime:
                               context_obstacles=(), yellow_placement_penalty_mm=0):
         started = perf_counter()
         ranked, feasible, verified = (), 0, 0
+        if self.last_placement is not None and self.last_placement.green_score_gap_mm is not None:
+            self.last_placement = replace(self.last_placement, green_score_gap_mm=None)
 
         def outcome(status, placement=None):
             return CliVirtualPlacementResult(
@@ -147,6 +149,12 @@ class CliInteractiveRuntime:
         if not ranked:
             return outcome("No outlet can serve all supply grilles on the shared graph")
 
+        green_score = next((score for center, score in ranked if mask.center_status(center) == "clear"), None)
+        yellow_score = next((score for center, score in ranked if mask.center_status(center) == "allowed"), None)
+        green_score_gap = None
+        if green_score is not None and yellow_score is not None:
+            green_score_gap = green_score - (yellow_score - yellow_placement_penalty_mm)
+
         verifier = CliInteractiveRuntime(
             self.definition, self.graph_config, self.terminal_config,
             sizing_policy_factory=self.sizing_policy_factory,
@@ -169,7 +177,7 @@ class CliInteractiveRuntime:
                 if segment.kind not in ("machine_stub", "machine_branch")
                 for obstacle in obstacles
             ):
-                self.last_placement = CliPlacementResult(center, angle, score, feasible)
+                self.last_placement = CliPlacementResult(center, angle, score, feasible, green_score_gap)
                 return outcome("Virtual source selected a verified pose", self.last_placement)
         return outcome(f"No verified pose among the first {verified} ranked outlets")
 

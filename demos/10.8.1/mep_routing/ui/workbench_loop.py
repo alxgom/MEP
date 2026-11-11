@@ -201,12 +201,25 @@ def _render(app, screen, clock, fonts, state):
     available = app.installation_ui_session.installations[active].runtime_available
     cli_state = app.workbench_state.cli
     solver_detail = None
+    placement_weights_label = None
     if active == "cli":
         auto_placement_mode = app.CLI_INSTALLATION.auto_placement_labels[
             cli_state.auto_placement_mode_idx
         ]
         bend_value = cli_state.bend_penalty_mm
         crossing_value = cli_state.crossing_penalty_multiplier
+        placement_weights_label = "Grille-distance ranking"
+        if virtual_placement:
+            placement_weights_label = "Shared supply-tree cost"
+            placement = app.cli_runtime.last_result.placement
+            if (placement is not None and (*placement.center, placement.angle_degrees) == pose
+                    and placement.green_score_gap_mm is not None):
+                gap = round(placement.green_score_gap_mm - cli_state.yellow_placement_penalty_mm)
+                if gap == 0:
+                    placement_weights_label = "Green and yellow scores tie"
+                else:
+                    leader = "Yellow" if gap > 0 else "Green"
+                    placement_weights_label = f"{leader} leads by {abs(gap):,} mm"
         if cli_state.router_backend_idx in app.CLI_INSTALLATION.length_backend_indices:
             stats = app.cli_runtime.last_result.supply_length_stats
             if stats is not None and stats.fittings is not None:
@@ -216,6 +229,7 @@ def _render(app, screen, clock, fonts, state):
         auto_placement_mode = "Fixed exported source"
         bend_value = 0.0
         crossing_value = 0.0
+        placement_weights_label = "Not applicable"
     else:
         auto_placement_mode = app.demo_config.auto_placement_modes[app.auto_placement_mode_idx]
         bend_value = app.C_BEND
@@ -253,9 +267,7 @@ def _render(app, screen, clock, fonts, state):
             ("Body + supply turn [V]" if placement_mask is not None else "Unavailable [V]" if cli_heatmap else "Off · [V] Placement")
             if active == "cli" else "Not available" if active == "coc" else None
         ),
-        placement_weights_label=("Shared supply-tree cost" if virtual_placement else
-                                 "Grille-distance ranking" if active == "cli" else
-                                 "Not applicable" if active == "coc" else None),
+        placement_weights_label=placement_weights_label,
         placement_rotation_label=("Current rotation" if virtual_placement else
                                   "Machine-aligned" if active == "cli" else
                                   "Exported geometry" if active == "coc" else None),

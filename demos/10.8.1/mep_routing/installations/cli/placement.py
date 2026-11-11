@@ -17,6 +17,7 @@ class CliPlacementResult:
     angle_degrees: int
     score: float
     feasible_candidates: int
+    green_score_gap_mm: float | None = None  # Green minus yellow before the penalty.
 
 
 class CliPlacementRuntime:
